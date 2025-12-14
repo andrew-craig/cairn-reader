@@ -4,9 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { MainTabParamList } from '../types';
 import {
-  HomeScreen,
-  FavoritesScreen,
-  ArchiveScreen,
+  ExploreScreen,
+  ReadScreen,
   SettingsScreen,
 } from '../screens';
 import { Colors } from '../constants';
@@ -33,32 +32,22 @@ export const TabNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+        name="Explore"
+        component={ExploreScreen}
         options={{
-          title: 'Reading List',
+          title: 'Explore',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="compass-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Read"
+        component={ReadScreen}
+        options={{
+          title: 'Read',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="book-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Favorites"
-        component={FavoritesScreen}
-        options={{
-          title: 'Favorites',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Archive"
-        component={ArchiveScreen}
-        options={{
-          title: 'Archive',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="archive-outline" size={size} color={color} />
           ),
         }}
       />

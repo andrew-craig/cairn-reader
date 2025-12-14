@@ -7,8 +7,7 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Home: undefined;
-  Favorites: undefined;
-  Archive: undefined;
+  Explore: undefined;
+  Read: undefined;
   Settings: undefined;
 };
