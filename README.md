@@ -1,8 +1,15 @@
-# ReadItLater
+# Cairn
 
-A modern read-it-later mobile application built with React Native and Expo, targeting both iOS and Android platforms.
+A modern read-it-later application with a React Native mobile app and Go-based backend services for content discovery, storage, and user management.
 
-## Features
+## Overview
+
+Cairn is a monorepo containing:
+- **Mobile App**: React Native application for iOS and Android
+- **Backend Services**: Go microservices for content management and discovery
+- **Infrastructure**: Docker configuration and deployment scripts
+
+### Mobile App Features
 
 - 📚 Save articles for later reading
 - ⭐ Mark articles as favorites
@@ -13,8 +20,17 @@ A modern read-it-later mobile application built with React Native and Expo, targ
 - 🌓 Dark mode support
 - 💾 Local storage with AsyncStorage
 
+### Backend Features
+
+- RSS feed discovery and automatic content delivery
+- Content recommendation engine
+- User authentication with JWT
+- Article storage with cleaned HTML content
+- Multi-user content deduplication
+
 ## Tech Stack
 
+### Mobile App
 - **Framework**: React Native with Expo
 - **Navigation**: React Navigation (Stack & Bottom Tabs)
 - **Language**: TypeScript
@@ -22,37 +38,54 @@ A modern read-it-later mobile application built with React Native and Expo, targ
 - **UI**: React Native core components
 - **Icons**: Expo Vector Icons (Ionicons)
 
+### Backend Services
+- **Language**: Go 1.23+
+- **Database**: PostgreSQL
+- **Authentication**: JWT with RS256 signing
+- **Secrets Management**: HashiCorp Vault
+- **Deployment**: Docker & Docker Compose
+
 ## Project Structure
 
 ```
 cairn/
-├── src/
-│   ├── components/        # Reusable UI components
-│   │   └── common/        # Common components (ArticleCard, Button, etc.)
-│   ├── screens/           # App screens
-│   │   ├── HomeScreen.tsx
-│   │   ├── AddArticleScreen.tsx
-│   │   ├── ArticleDetailScreen.tsx
-│   │   ├── FavoritesScreen.tsx
-│   │   ├── ArchiveScreen.tsx
-│   │   └── SettingsScreen.tsx
-│   ├── navigation/        # Navigation configuration
-│   │   ├── RootNavigator.tsx
-│   │   └── TabNavigator.tsx
-│   ├── services/          # Services (Storage, API, etc.)
-│   │   └── storage.ts
-│   ├── types/             # TypeScript type definitions
-│   │   ├── article.ts
-│   │   └── navigation.ts
-│   ├── utils/             # Utility functions
-│   │   └── helpers.ts
-│   └── constants/         # App constants (theme, colors, etc.)
-│       └── theme.ts
-├── assets/                # Images, fonts, and other assets
-├── App.tsx                # Entry point
-├── app.json               # Expo configuration
-├── package.json           # Dependencies
-└── tsconfig.json          # TypeScript configuration
+├── apps/
+│   └── mobile/              # React Native mobile app
+│       ├── src/
+│       │   ├── components/  # Reusable UI components
+│       │   ├── screens/     # App screens
+│       │   ├── navigation/  # Navigation configuration
+│       │   ├── services/    # Services (Storage, API, etc.)
+│       │   ├── types/       # TypeScript type definitions
+│       │   ├── utils/       # Utility functions
+│       │   └── constants/   # App constants (theme, colors, etc.)
+│       ├── assets/          # Images, fonts, and other assets
+│       ├── App.tsx          # Entry point
+│       └── package.json
+│
+├── services/
+│   ├── explore/             # RSS Fetcher & Recommendation Engine
+│   │   ├── fetcher/         # RSS feed fetching service
+│   │   ├── recommender/     # Content recommendation service
+│   │   ├── pkg/             # Shared packages
+│   │   └── README.md        # Explore service documentation
+│   │
+│   ├── read/                # Content Storage Service
+│   │   └── requirements.md  # Read service requirements
+│   │
+│   └── users/               # User Management & Authentication
+│       ├── cmd/             # Application entrypoints
+│       ├── internal/        # Private application code
+│       ├── pkg/             # Public shared libraries
+│       ├── migrations/      # Database migrations
+│       └── README.md        # User service documentation
+│
+├── infrastructure/
+│   └── docker/              # Docker configurations
+│
+├── packages/                # Shared packages across services
+│
+└── scripts/                 # Build and deployment scripts
 ```
 
 ## Getting Started
@@ -62,40 +95,43 @@ cairn/
 - Node.js (v16 or later)
 - npm or yarn
 - Expo CLI (optional, but recommended)
+- Go 1.23+ (for backend services)
+- Docker & Docker Compose (for running backend services)
+- PostgreSQL 14+ (if running services locally without Docker)
 
-### Installation
+### Mobile App Development
 
-1. Install dependencies:
+1. Navigate to the mobile app directory:
+
+```bash
+cd apps/mobile
+```
+
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Start the development server:
+3. Start the development server:
 
 ```bash
 npm start
 ```
 
-3. Run on iOS simulator:
+4. Run on iOS simulator:
 
 ```bash
 npm run ios
 ```
 
-4. Run on Android emulator:
+5. Run on Android emulator:
 
 ```bash
 npm run android
 ```
 
-5. Run on web browser:
-
-```bash
-npm run web
-```
-
-### Using Expo Go
+#### Using Expo Go
 
 1. Install Expo Go on your iOS or Android device
 2. Run `npm start` to start the development server
@@ -103,13 +139,76 @@ npm run web
    - iOS: Camera app
    - Android: Expo Go app
 
-## App Screens
+### Backend Services Development
+
+#### Running All Services with Docker
+
+```bash
+# From the root directory
+docker-compose up --build
+```
+
+#### Running Individual Services
+
+See the documentation for each service:
+- [Explore Service](services/explore/README.md) - RSS fetching and recommendations
+- [Read Service](services/read/requirements.md) - Content storage and management
+- [User Service](services/users/README.md) - Authentication and user management
+
+## Services Documentation
+
+### Explore Service
+The Explore service consists of two microservices:
+- **Fetcher**: Discovers and fetches content from RSS feeds
+- **Recommender**: Stores content and implements recommendation algorithms
+
+Features:
+- Automatic RSS feed polling
+- Content deduplication
+- Recommendation engine for suggesting articles
+- PostgreSQL storage
+
+See the [Explore Service README](services/explore/README.md) for detailed documentation.
+
+### Read Service
+The Read service manages article storage and user-specific metadata.
+
+Features:
+- Cleaned HTML content storage using readability parser
+- Multi-user content deduplication
+- User-specific metadata (read status, scroll position, favorites)
+- REST APIs for content retrieval and updates
+
+See the [Read Service Requirements](services/read/requirements.md) for detailed specifications.
+
+### User Service
+The User service handles authentication and account management.
+
+Features:
+- User registration with email/password or mobile device ID
+- Stateless JWT authentication with RS256 signing
+- Refresh token management with automatic rotation
+- Account upgrade from device-only to email/password
+- Secure secrets management with HashiCorp Vault
+
+See the [User Service README](services/users/README.md) for detailed documentation.
+
+## Mobile App Screens
 
 ### Reading List (Home)
 - Displays all unread articles
 - Pull to refresh
 - Tap to view article details
 - Heart icon to toggle favorites
+
+### Explore
+- Discover new content from RSS feeds
+- Browse recommended articles
+- Subscribe to feeds
+
+### Read
+- Access saved articles
+- Track reading progress
 
 ### Favorites
 - Shows all favorited articles
@@ -121,6 +220,7 @@ npm run web
 
 ### Settings
 - App information
+- Account management
 - Clear all articles option
 
 ### Add Article
@@ -163,45 +263,125 @@ interface Article {
 
 The app supports both light and dark modes, automatically following the system preference. Color schemes are defined in `src/constants/theme.ts`.
 
+## Architecture
+
+Cairn follows a microservices architecture:
+
+```
+┌─────────────────┐
+│   Mobile App    │
+│ (React Native)  │
+└────────┬────────┘
+         │
+         │ REST APIs
+         │
+    ┌────┴─────────────────────────────────┐
+    │                                      │
+    │                                      │
+┌───▼────────┐  ┌──────────────┐  ┌───────▼──────┐
+│   User     │  │   Explore    │  │     Read     │
+│  Service   │  │   Service    │  │   Service    │
+│            │  │              │  │              │
+│  - Auth    │  │  - Fetcher   │  │  - Content   │
+│  - JWT     │  │  - Recommender│  │  - Storage   │
+└─────┬──────┘  └──────┬───────┘  └──────┬───────┘
+      │                │                  │
+      │                │                  │
+      └────────────────┼──────────────────┘
+                       │
+                  ┌────▼─────┐
+                  │PostgreSQL│
+                  └──────────┘
+```
+
+### Service Communication
+- All services expose REST APIs
+- Services are independently deployable
+- Shared data models in PostgreSQL
+- JWT-based authentication across services
+
 ## Future Enhancements
 
-- [ ] Article metadata extraction from URLs
-- [ ] Tags and categories
-- [ ] Search functionality
-- [ ] Export/import data
-- [ ] Reading progress tracking
+### Mobile App
 - [ ] Offline reading mode
-- [ ] Cloud sync
-- [ ] Multiple user accounts
-- [ ] RSS feed integration
+- [ ] Reading progress sync
+- [ ] Enhanced article reader with adjustable fonts
+- [ ] Dark mode scheduling
+- [ ] Export/import data
+
+### Backend Services
+- [ ] Full-text search across articles
+- [ ] Article summarization with AI
+- [ ] Email digest notifications
+- [ ] Web scraper for direct URL imports
+- [ ] Image hosting and optimization
+- [ ] Reading analytics and statistics
+- [ ] Social features (sharing, comments)
 
 ## Development
 
-### Type Checking
+### Mobile App Development
+
+#### Type Checking
 
 ```bash
+cd apps/mobile
 npm run type-check
 ```
 
-### Linting
+#### Linting
 
 ```bash
+cd apps/mobile
 npm run lint
 ```
 
-## Building for Production
+#### Building for Production
 
-### iOS
+##### iOS
 
 ```bash
+cd apps/mobile
 expo build:ios
 ```
 
-### Android
+##### Android
 
 ```bash
+cd apps/mobile
 expo build:android
 ```
+
+### Backend Services Development
+
+#### Running Tests
+
+```bash
+# Explore service
+cd services/explore
+go test ./...
+
+# User service
+cd services/users
+go test ./...
+```
+
+#### Running with Live Reload
+
+```bash
+# Install air for live reloading
+go install github.com/cosmtrek/air@latest
+
+# Run with air in each service directory
+cd services/users
+air
+```
+
+#### Database Migrations
+
+See individual service READMEs for migration instructions:
+- [User Service Migrations](services/users/README.md)
+- [Explore Service Setup](services/explore/README.md)
 
 ## License
 
