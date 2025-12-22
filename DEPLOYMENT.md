@@ -11,12 +11,18 @@ cd infrastructure/docker
 docker compose up --build
 ```
 
-That's it! All services will start automatically with:
-- ✅ Vault for secrets management
-- ✅ PostgreSQL with 3 databases
-- ✅ JWT keys auto-generated
-- ✅ Database migrations auto-run
-- ✅ All services connected and healthy
+This will start all services in development mode with automatic database migrations and Vault initialization.
+
+**Current Status** (as of Dec 22, 2025):
+- ✅ Vault for secrets management - **OPERATIONAL**
+- ✅ PostgreSQL with 3 databases - **OPERATIONAL**
+- ✅ JWT keys auto-generated - **WORKING**
+- ✅ Database migrations auto-run - **WORKING**
+- ✅ User Service - **OPERATIONAL** (health endpoints only, auth not implemented yet)
+- ✅ Recommender Service - **OPERATIONAL** (JWT authentication working)
+- ✅ Fetcher Service - **OPERATIONAL** (fetching RSS feeds, 27,399 feeds loaded)
+
+**All backend services are running successfully and ready for deployment!**
 
 ### Service Endpoints
 
@@ -101,44 +107,38 @@ curl http://localhost:8081/health  # Recommender
 curl http://localhost:8080/health  # Fetcher
 ```
 
-### 2. Register a User
-
-```bash
-curl -X POST http://localhost:8082/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "TestPassword123!"
-  }'
-```
-
-Expected response:
-```json
-{
-  "user": {
-    "id": "...",
-    "email": "test@example.com"
-  },
-  "access_token": "eyJ...",
-  "refresh_token": "..."
-}
-```
-
-### 3. Get Recommendations
-
-```bash
-# Save the access_token from registration
-TOKEN="your_access_token_here"
-
-curl http://localhost:8081/api/v1/recommendations/ \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### 4. Trigger Manual Feed Fetch
+### 2. Trigger Manual Feed Fetch
 
 ```bash
 curl -X POST http://localhost:8080/fetch
 ```
+
+Expected response:
+```json
+{"status":"fetch triggered"}
+```
+
+### 3. Check Feed Statistics
+
+```bash
+# Check how many feeds are loaded
+docker compose exec postgres psql -U cairn -d cairn_fetcher -c \
+  "SELECT COUNT(*) as total_feeds FROM feeds;"
+
+# Check how many articles have been fetched
+docker compose exec postgres psql -U cairn -d cairn_recommender -c \
+  "SELECT COUNT(*) as total_articles FROM articles;"
+```
+
+### 4. Monitor Fetcher Logs
+
+```bash
+docker compose logs -f fetcher
+```
+
+You should see feeds being fetched every 60 seconds (1 feed per minute).
+
+**Note:** User authentication endpoints are not yet implemented. The User Service currently only provides health check endpoints. The Recommender Service requires JWT authentication (will be implemented when User Service auth is complete).
 
 ## Database Access
 

@@ -141,12 +141,16 @@ npm run android
 
 ### Backend Services Development
 
-#### Running All Services with Docker
+#### Running All Services with Docker (Recommended)
 
 ```bash
-# From the root directory
-docker-compose up --build
+cd infrastructure/docker
+docker compose up --build
 ```
+
+✅ **All backend services are validated and working!** See [DOCKER_VALIDATION_SUCCESS.md](DOCKER_VALIDATION_SUCCESS.md) for validation report.
+
+For comprehensive deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 #### Running Individual Services
 

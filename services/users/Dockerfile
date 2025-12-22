@@ -3,12 +3,14 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy user service
+COPY users users/
 
-# Copy source code
-COPY . .
+# Set working directory to user service
+WORKDIR /app/users
+
+# Download dependencies
+RUN go mod download
 
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o user-service ./cmd/user-service
@@ -21,10 +23,10 @@ RUN apk --no-cache add ca-certificates wget
 WORKDIR /root/
 
 # Copy the binary from builder
-COPY --from=builder /app/user-service .
+COPY --from=builder /app/users/user-service .
 
 # Copy migrations (needed for runtime migration execution)
-COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/users/migrations ./migrations
 
 EXPOSE 8080
 

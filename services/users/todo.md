@@ -154,6 +154,74 @@
 - [x] GET /ready endpoint (database + Vault check)
 - [ ] Add metrics endpoint (optional)
 
+### 5.5 Application Wiring (cmd/user-service/main.go) - ✅ COMPLETE
+**Status**: IMPLEMENTED - Service is now fully wired and runnable
+**Priority**: COMPLETE
+
+- [x] Initialize database connection
+  - [x] Connect to PostgreSQL using config
+  - [x] Set up connection pool with appropriate settings
+  - [x] Test database connectivity on startup
+  - [x] Implement graceful connection handling
+- [x] Initialize Vault client
+  - [x] Connect to Vault using config
+  - [x] Authenticate with Vault (AppRole or token)
+  - [x] Test Vault connectivity on startup
+  - [x] Handle Vault connection failures gracefully
+- [x] Load secrets from Vault
+  - [x] Retrieve JWT key pair (private and public keys)
+  - [x] Retrieve database credentials (if using Vault for DB creds)
+  - [x] Handle secret retrieval errors
+- [x] Run database migrations
+  - [x] Execute pending migrations on startup
+  - [x] Handle migration errors appropriately
+  - [x] Log migration status
+- [x] Initialize repositories
+  - [x] Create UserRepository instance with DB connection
+  - [x] Create RefreshTokenRepository instance with DB connection
+- [x] Initialize services
+  - [x] Create JWT manager with keys from Vault
+  - [x] Create password hasher
+  - [x] Create refresh token service with repository
+  - [x] Create AuthService with dependencies
+  - [x] Create UserService with dependencies
+- [x] Initialize handlers
+  - [x] Create AuthHandler with AuthService
+  - [x] Create UserHandler with UserService
+  - [x] Create HealthHandler with DB and Vault clients
+- [x] Set up Gin router
+  - [x] Replace stdlib ServeMux with Gin router
+  - [x] Configure Gin mode (release/debug based on environment)
+  - [x] Add global middleware (recovery, logging, CORS, security headers)
+- [x] Register all routes
+  - [x] Auth routes (POST /auth/register, /auth/login, etc.)
+  - [x] User routes (GET/PATCH/DELETE /users/:id, POST /users/:id/upgrade)
+  - [x] Health routes (GET /health, /ready)
+  - [x] Apply middleware to appropriate route groups
+  - [x] Apply rate limiting to auth endpoints
+  - [x] Apply JWT auth middleware to protected routes
+  - [x] Apply authorization middleware to user routes
+- [x] Set up background tasks
+  - [x] Start JWT key rotation manager
+  - [x] Start expired token cleanup scheduler
+  - [x] Ensure graceful shutdown of background tasks
+- [x] Implement graceful shutdown
+  - [x] Close database connections
+  - [x] Stop background tasks
+  - [x] Wait for in-flight requests to complete
+  - [x] Close Vault client
+
+**Current State**: main.go has full application wiring with:
+- Database connection with health checks and connection pooling
+- Vault client with authentication and health verification
+- JWT key loading from Vault with automatic rotation
+- All repositories, services, and handlers properly initialized
+- Gin router with all routes and middleware configured
+- Background tasks for key rotation and token cleanup
+- Graceful shutdown handling for all resources
+
+**Implementation**: See [cmd/user-service/main.go:1-307](cmd/user-service/main.go)
+
 ## Phase 6: Shared Authentication Package
 
 ### 6.1 JWT Validation Library

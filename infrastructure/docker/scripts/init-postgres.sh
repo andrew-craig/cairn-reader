@@ -3,8 +3,8 @@ set -e
 
 echo "Creating databases and users..."
 
-# Create databases
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+# Create databases - connect to postgres database
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-EOSQL
     -- User Service Database
     CREATE DATABASE cairn_users;
 
@@ -19,9 +19,12 @@ echo "Databases created successfully!"
 
 # Run User Service migrations
 echo "Running User Service migrations..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname cairn_users <<-EOSQL
-$(cat /docker-entrypoint-initdb.d/user-migrations/*.sql 2>/dev/null || echo "-- No user migrations found")
-EOSQL
+for f in /docker-entrypoint-initdb.d/user-migrations/*.sql; do
+    if [ -f "$f" ]; then
+        echo "Applying migration: $f"
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname cairn_users -f "$f"
+    fi
+done
 
 # Run Recommender migrations
 echo "Running Recommender Service migrations..."

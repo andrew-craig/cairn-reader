@@ -1,14 +1,17 @@
 # Build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy the entire services directory to handle go.mod replace directives
+COPY users users/
+COPY explore explore/
 
-# Copy source code
-COPY . .
+# Set working directory to explore service
+WORKDIR /app/explore
+
+# Download dependencies
+RUN go mod download
 
 # Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o recommender ./recommender/cmd/recommender
@@ -16,12 +19,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o recommender ./rec
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates wget
 
 WORKDIR /root/
 
 # Copy the binary from builder
-COPY --from=builder /app/recommender .
+COPY --from=builder /app/explore/recommender .
 
 EXPOSE 8081
 
