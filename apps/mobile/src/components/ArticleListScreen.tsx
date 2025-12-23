@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,11 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+
+  // Memoize viewability config to prevent recreating on each render
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 50,
+  });
 
   const renderHeader = () => (
     <View style={[GlobalStyles.header, { backgroundColor: colors.background }]}>
@@ -97,9 +102,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{
-          itemVisiblePercentThreshold: 50,
-        }}
+        viewabilityConfig={viewabilityConfigRef.current}
       />
     </SafeAreaView>
   );

@@ -1,10 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Dimensions } from 'react-native';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { Article } from '../types';
 import { ExploreService } from '../services';
 
 const MIN_LOOKAHEAD_ARTICLES = 5; // Minimum articles to keep ahead of current scroll position
+const ESTIMATED_ARTICLE_HEIGHT = 95; // Estimated height of ArticleRow in pixels
+const BUFFER_MULTIPLIER = 1.5; // Load 1.5x screen height worth of articles
+
+/**
+ * Calculate the minimum number of articles needed to fill the screen
+ * based on device viewport height and estimated article row height.
+ */
+const calculateInitialArticleCount = (): number => {
+  const screenHeight = Dimensions.get('window').height;
+  const articlesPerScreen = Math.ceil(screenHeight / ESTIMATED_ARTICLE_HEIGHT);
+  // Multiply by buffer to ensure we have enough to scroll
+  const bufferedCount = Math.ceil(articlesPerScreen * BUFFER_MULTIPLIER);
+  // Ensure we have at least the minimum lookahead articles
+  return Math.max(bufferedCount, MIN_LOOKAHEAD_ARTICLES + 2);
+};
 
 export const ExploreScreen: React.FC = () => {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -23,9 +39,13 @@ export const ExploreScreen: React.FC = () => {
       const recommendations = await ExploreService.getRecommendations();
       setArticles(recommendations);
 
-      // After initial load, check if we need more articles
-      if (recommendations.length < MIN_LOOKAHEAD_ARTICLES) {
-        await loadMoreUntilBuffer();
+      // After initial load, ensure we have enough articles to fill the screen
+      // Calculate dynamically based on viewport height
+      const minInitialArticles = calculateInitialArticleCount();
+      console.log(`Initial article count needed: ${minInitialArticles} (screen height: ${Dimensions.get('window').height}px)`);
+
+      if (recommendations.length < minInitialArticles) {
+        await loadMoreUntilBuffer(minInitialArticles);
       }
     } catch (error) {
       console.error('Error loading explore articles:', error);
@@ -42,7 +62,7 @@ export const ExploreScreen: React.FC = () => {
     loadExploreArticles();
   };
 
-  const loadMoreUntilBuffer = async () => {
+  const loadMoreUntilBuffer = async (minArticles?: number) => {
     if (isFetchingRef.current) return;
 
     isFetchingRef.current = true;
@@ -52,7 +72,10 @@ export const ExploreScreen: React.FC = () => {
       let shouldContinue = true;
       let previousLength = 0;
 
-      // Keep fetching until we have at least MIN_LOOKAHEAD_ARTICLES beyond the visible position
+      // Use provided minimum or calculate based on scroll position
+      const targetMinimum = minArticles ?? MIN_LOOKAHEAD_ARTICLES;
+
+      // Keep fetching until we have enough articles
       while (shouldContinue) {
         // Get current articles count to check buffer
         const currentArticlesCount = await new Promise<number>((resolve) => {
@@ -62,10 +85,14 @@ export const ExploreScreen: React.FC = () => {
           });
         });
 
-        const remainingArticles = currentArticlesCount - lastVisibleIndex;
+        // For initial load (minArticles provided), check total count
+        // For scroll-based loading, check remaining articles beyond visible position
+        const articlesToCheck = minArticles !== undefined
+          ? currentArticlesCount
+          : currentArticlesCount - lastVisibleIndex;
 
-        // Stop if we have enough articles in the buffer
-        if (remainingArticles >= MIN_LOOKAHEAD_ARTICLES) {
+        // Stop if we have enough articles
+        if (articlesToCheck >= targetMinimum) {
           break;
         }
 
