@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   FlatList,
-  StyleSheet,
   useColorScheme,
   RefreshControl,
 } from 'react-native';
@@ -11,7 +10,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Article, RootStackParamList } from '../types';
 import { ArticleCard, EmptyState } from '../components/common';
 import { StorageService } from '../services';
-import { Colors } from '../constants';
+import { Colors, GlobalStyles } from '../constants';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -60,7 +59,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={articles}
         keyExtractor={item => item.id}
@@ -86,18 +85,9 @@ export const HomeScreen: React.FC = () => {
           />
         }
         contentContainerStyle={
-          articles.length === 0 ? styles.emptyContainer : undefined
+          articles.length === 0 ? GlobalStyles.container : undefined
         }
       />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-  },
-});

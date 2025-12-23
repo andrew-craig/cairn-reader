@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Button } from '../components/common';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { AuthService } from '../services';
 
 interface LoginScreenProps {
@@ -79,26 +79,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.text }]}>Welcome to Cairn</Text>
+          {/* Logo Placeholder */}
+          <View style={[styles.logoPlaceholder, { backgroundColor: colors.border }]} />
+
+          {/* Title */}
+          <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
+
+          {/* Subtitle */}
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Your personal read-it-later service
+            Read and discover{'\n'}what you love
           </Text>
 
           {!showEmailLogin ? (
             <View style={styles.buttonContainer}>
               <Button
-                title="Get Started"
+                title="Explore"
                 onPress={handleGetStarted}
                 loading={isLoading}
                 disabled={isLoading}
               />
-              <View style={styles.divider}>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-                <Text style={[styles.dividerText, { color: colors.textSecondary }]}>or</Text>
-                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              </View>
               <Button
-                title="Login with Email"
+                title="Login"
                 onPress={() => setShowEmailLogin(true)}
                 variant="secondary"
                 disabled={isLoading}
@@ -159,11 +160,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </View>
           )}
 
-          <Text style={[styles.helpText, { color: colors.textSecondary }]}>
-            {showEmailLogin
-              ? 'Enter your email and password to access your account'
-              : 'Get Started uses your device ID to create an account automatically'}
-          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -181,46 +177,47 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.xxl,
   },
+  logoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: BorderRadius.sm,
+    marginBottom: Spacing.xl,
+  },
   title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: 'bold',
+    fontSize: 48,
+    fontFamily: FontFamily.headingBold,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   subtitle: {
-    fontSize: FontSizes.md,
+    fontSize: FontSizes.lg,
+    fontFamily: FontFamily.heading,
     textAlign: 'center',
     marginBottom: Spacing.xxl,
+    lineHeight: 28,
   },
   buttonContainer: {
     gap: Spacing.md,
     marginVertical: Spacing.lg,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-  },
-  dividerText: {
-    marginHorizontal: Spacing.md,
-    fontSize: FontSizes.sm,
+    width: '100%',
+    maxWidth: 400,
   },
   emailForm: {
     gap: Spacing.md,
     marginTop: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
   },
   input: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.md,
     fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
     borderWidth: 1,
     minHeight: 48,
   },

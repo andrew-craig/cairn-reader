@@ -1,29 +1,31 @@
 export const Colors = {
   light: {
-    primary: '#007AFF',
-    background: '#FFFFFF',
-    card: '#F2F2F7',
-    text: '#000000',
-    textSecondary: '#8E8E93',
-    border: '#C6C6C8',
+    primary: '#0F0C0B', // Figma: red/primary
+    background: '#FDFCFC', // Figma: red/background
+    card: '#FBFAF9', // Figma: red/floating
+    text: '#0F0C0B', // Figma: red/primary
+    textSecondary: '#696563', // Figma: red/secondary
+    border: '#F1EFEE', // Figma: red/line
+    hover: '#EDEAE9', // Figma: red/hover
     success: '#34C759',
     error: '#FF3B30',
     warning: '#FF9500',
-    tabIconDefault: '#8E8E93',
-    tabIconSelected: '#007AFF',
+    tabIconDefault: '#696563',
+    tabIconSelected: '#0F0C0B',
   },
   dark: {
-    primary: '#0A84FF',
-    background: '#000000',
+    primary: '#FDFCFC',
+    background: '#0F0C0B',
     card: '#1C1C1E',
-    text: '#FFFFFF',
+    text: '#FDFCFC',
     textSecondary: '#8E8E93',
     border: '#38383A',
+    hover: '#2C2C2E',
     success: '#30D158',
     error: '#FF453A',
     warning: '#FF9F0A',
     tabIconDefault: '#8E8E93',
-    tabIconSelected: '#0A84FF',
+    tabIconSelected: '#FDFCFC',
   },
 };
 
@@ -51,4 +53,15 @@ export const BorderRadius = {
   lg: 12,
   xl: 16,
   full: 9999,
+};
+
+export const FontFamily = {
+  default: 'Inter_400Regular',
+  defaultMedium: 'Inter_500Medium',
+  defaultSemiBold: 'Inter_600SemiBold',
+  defaultBold: 'Inter_700Bold',
+  heading: 'CrimsonPro_400Regular',
+  headingMedium: 'CrimsonPro_500Medium',
+  headingSemiBold: 'CrimsonPro_600SemiBold',
+  headingBold: 'CrimsonPro_700Bold',
 };

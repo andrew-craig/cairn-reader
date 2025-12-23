@@ -51,7 +51,7 @@ services:
       - ../../services/explore/recommender/migrations:/docker-entrypoint-initdb.d/recommender-migrations
       - ../../services/explore/fetcher/migrations:/docker-entrypoint-initdb.d/fetcher-migrations
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cairn"]
+      test: ["CMD-SHELL", "pg_isready -U cairn -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5

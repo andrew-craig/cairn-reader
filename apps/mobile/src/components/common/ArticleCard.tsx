@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Article } from '../../types';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
 import { formatDate, extractDomain } from '../../utils';
 
 interface ArticleCardProps {
@@ -94,11 +94,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSizes.lg,
-    fontWeight: '600',
+    fontFamily: FontFamily.defaultSemiBold,
     marginBottom: Spacing.xs,
   },
   description: {
     fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
     marginBottom: Spacing.sm,
     lineHeight: 20,
   },
@@ -109,10 +110,12 @@ const styles = StyleSheet.create({
   },
   domain: {
     fontSize: FontSizes.xs,
+    fontFamily: FontFamily.default,
     flex: 1,
   },
   date: {
     fontSize: FontSizes.xs,
+    fontFamily: FontFamily.default,
   },
   favoriteButton: {
     position: 'absolute',

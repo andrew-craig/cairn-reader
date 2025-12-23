@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   useColorScheme,
 } from 'react-native';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
 
 interface ButtonProps {
   title: string;
@@ -72,6 +72,6 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontFamily: FontFamily.defaultSemiBold,
   },
 });

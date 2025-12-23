@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Application from 'expo-application';
+import { Platform } from 'react-native';
 import {
   LoginResponse,
   LoginRequest,
@@ -22,7 +23,14 @@ export class AuthService {
   }
 
   static async getDeviceId(): Promise<string> {
-    const deviceId = await Application.getInstallationIdAsync();
+    let deviceId: string | null = null;
+
+    if (Platform.OS === 'ios') {
+      deviceId = await Application.getIosIdForVendorAsync();
+    } else if (Platform.OS === 'android') {
+      deviceId = Application.getAndroidId();
+    }
+
     if (!deviceId) {
       throw new Error('Failed to get device ID');
     }
@@ -37,7 +45,7 @@ export class AuthService {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ deviceId } as MobileAuthRequest),
+      body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
     if (!response.ok) {
@@ -46,7 +54,10 @@ export class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    await this.saveTokens(data.tokens);
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
     return data;
   }
 
@@ -58,7 +69,7 @@ export class AuthService {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ deviceId } as MobileAuthRequest),
+      body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
     if (!response.ok) {
@@ -67,7 +78,10 @@ export class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    await this.saveTokens(data.tokens);
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
     return data;
   }
 
@@ -86,7 +100,10 @@ export class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    await this.saveTokens(data.tokens);
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
     return data;
   }
 
@@ -105,7 +122,10 @@ export class AuthService {
     }
 
     const data: LoginResponse = await response.json();
-    await this.saveTokens(data.tokens);
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
     return data;
   }
 
@@ -118,7 +138,7 @@ export class AuthService {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.accessToken}`,
           },
-          body: JSON.stringify({ refreshToken: this.refreshToken }),
+          body: JSON.stringify({ refresh_token: this.refreshToken }),
         });
       } catch (error) {
         console.error('Error during logout:', error);
@@ -170,7 +190,7 @@ export class AuthService {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ refreshToken: this.refreshToken }),
+      body: JSON.stringify({ refresh_token: this.refreshToken }),
     });
 
     if (!response.ok) {
@@ -178,7 +198,10 @@ export class AuthService {
       throw new Error('Failed to refresh token');
     }
 
-    const data = await response.json();
-    await this.saveTokens(data.tokens);
+    const data: LoginResponse = await response.json();
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
   }
 }

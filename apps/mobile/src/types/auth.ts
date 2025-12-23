@@ -14,7 +14,9 @@ export interface AuthTokens {
 
 export interface LoginResponse {
   user: User;
-  tokens: AuthTokens;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
 }
 
 export interface RegisterRequest {
@@ -28,5 +30,5 @@ export interface LoginRequest {
 }
 
 export interface MobileAuthRequest {
-  deviceId: string;
+  expo_device_id: string;
 }

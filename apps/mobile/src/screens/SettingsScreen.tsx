@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StorageService } from '../services';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, GlobalStyles, FontFamily } from '../constants';
 
 export const SettingsScreen: React.FC = () => {
   const colorScheme = useColorScheme();
@@ -41,14 +41,14 @@ export const SettingsScreen: React.FC = () => {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[GlobalStyles.container, { backgroundColor: colors.background }]}
     >
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+      <View style={GlobalStyles.section}>
+        <Text style={[GlobalStyles.sectionTitle, { color: colors.text }]}>
           About
         </Text>
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <View style={styles.row}>
+        <View style={[GlobalStyles.card, { backgroundColor: colors.card }]}>
+          <View style={GlobalStyles.row}>
             <Text style={[styles.label, { color: colors.text }]}>Version</Text>
             <Text style={[styles.value, { color: colors.textSecondary }]}>
               1.0.0
@@ -57,16 +57,16 @@ export const SettingsScreen: React.FC = () => {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
+      <View style={GlobalStyles.section}>
+        <Text style={[GlobalStyles.sectionTitle, { color: colors.text }]}>
           Data
         </Text>
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={[GlobalStyles.card, { backgroundColor: colors.card }]}>
           <TouchableOpacity
-            style={styles.row}
+            style={GlobalStyles.row}
             onPress={handleClearAllData}
           >
-            <View style={styles.rowLeft}>
+            <View style={GlobalStyles.rowLeft}>
               <Ionicons name="trash-outline" size={24} color={colors.error} />
               <Text style={[styles.label, styles.dangerText, { color: colors.error }]}>
                 Clear All Articles
@@ -81,11 +81,11 @@ export const SettingsScreen: React.FC = () => {
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+      <View style={GlobalStyles.footer}>
+        <Text style={[GlobalStyles.footerText, { color: colors.textSecondary }]}>
           ReadItLater
         </Text>
-        <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+        <Text style={[GlobalStyles.footerText, { color: colors.textSecondary }]}>
           Save articles for later reading
         </Text>
       </View>
@@ -94,51 +94,15 @@ export const SettingsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  section: {
-    marginTop: Spacing.lg,
-    marginHorizontal: Spacing.md,
-  },
-  sectionTitle: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
-    marginLeft: Spacing.sm,
-  },
-  card: {
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
   label: {
     fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
   },
   value: {
     fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
   },
   dangerText: {
     marginLeft: Spacing.sm,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: Spacing.xxl,
-    marginBottom: Spacing.xl,
-  },
-  footerText: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.xs,
   },
 });

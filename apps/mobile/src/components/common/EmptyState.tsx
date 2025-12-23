@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, FontSizes } from '../../constants';
+import { Colors, Spacing, FontSizes, FontFamily } from '../../constants';
 
 interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -37,13 +37,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FontSizes.xl,
-    fontWeight: '600',
+    fontFamily: FontFamily.defaultSemiBold,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   message: {
     fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
     textAlign: 'center',
     lineHeight: 22,
   },
