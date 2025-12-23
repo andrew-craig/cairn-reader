@@ -265,11 +265,15 @@ POST /fetch               → Manually trigger feed fetch
 
 ### Explore Service - Recommender (port 8081)
 ```
-GET  /health                           → Health check
-POST /api/v1/articles                  → Submit articles (from fetcher)
-GET  /api/v1/recommendations/{userID}  → Get 5 recommendations
-POST /api/v1/articles/read             → Mark article as read
-     Body: {"user_id": "...", "article_id": "..."}
+GET  /health                               → Health check
+POST /explore/articles                     → Submit articles (from fetcher)
+GET  /explore/recommendations/{userID}     → Get 5 recommendations (requires auth)
+POST /explore/articles/read                → Mark article as read (requires auth)
+     Body: {"article_id": "..."} (user_id from JWT)
+POST /explore/articles/{articleID}/vote    → Vote on article (requires auth)
+     Body: {"vote_type": "upvote|downvote"} (user_id from JWT)
+DELETE /explore/articles/{articleID}/vote  → Remove vote (requires auth)
+GET  /explore/articles/{articleID}/votes   → Get vote counts (requires auth)
 ```
 
 ### User Service (port 8080)
@@ -308,9 +312,10 @@ GET /ready                             → Readiness check (DB + Vault connectiv
 1. Start services: `cd services/explore && docker-compose up --build`
 2. View logs: `docker-compose logs -f`
 3. Trigger fetch: `curl -X POST http://localhost:8080/fetch`
-4. Check recommendations: `curl http://localhost:8081/api/v1/recommendations/user123`
-5. Mark as read: `curl -X POST http://localhost:8081/api/v1/articles/read -d '{"user_id":"user123","article_id":"..."}'`
-6. Run tests: `make test` or `go test ./...`
+4. Check recommendations: `curl -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/recommendations/user123`
+5. Mark as read: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/read -d '{"article_id":"..."}'`
+6. Vote on article: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/{id}/vote -d '{"vote_type":"upvote"}'`
+7. Run tests: `make test` or `go test ./...`
 
 ### Database Migrations
 Migrations are automatically run when PostgreSQL containers are first created. To reset databases:

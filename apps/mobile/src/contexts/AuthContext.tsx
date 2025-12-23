@@ -26,9 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const authenticated = await AuthService.isAuthenticated();
 
       if (authenticated) {
-        // TODO: Fetch user profile from /users/{id} endpoint
-        // For now, we'll set a placeholder
-        setUser({ id: 'current-user' } as User);
+        const user = await AuthService.getUser();
+        setUser(user);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);

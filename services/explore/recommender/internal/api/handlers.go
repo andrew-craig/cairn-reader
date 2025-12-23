@@ -128,7 +128,7 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleVote handles upvoting or downvoting an article
-// POST /api/v1/articles/:id/vote
+// POST /explore/articles/:id/vote
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -139,8 +139,8 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /api/v1/articles/{articleID}/vote
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/articles/")
+	// Extract article ID from path: /explore/articles/{articleID}/vote
+	path := strings.TrimPrefix(r.URL.Path, "/explore/articles/")
 	path = strings.TrimSuffix(path, "/vote")
 	articleID := strings.TrimSpace(path)
 
@@ -178,7 +178,7 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRemoveVote removes a user's vote from an article
-// DELETE /api/v1/articles/:id/vote
+// DELETE /explore/articles/:id/vote
 func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -189,8 +189,8 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /api/v1/articles/{articleID}/vote
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/articles/")
+	// Extract article ID from path: /explore/articles/{articleID}/vote
+	path := strings.TrimPrefix(r.URL.Path, "/explore/articles/")
 	path = strings.TrimSuffix(path, "/vote")
 	articleID := strings.TrimSpace(path)
 
@@ -214,15 +214,15 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetVotes returns vote counts for an article
-// GET /api/v1/articles/:id/votes
+// GET /explore/articles/:id/votes
 func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract article ID from path: /api/v1/articles/{articleID}/votes
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/articles/")
+	// Extract article ID from path: /explore/articles/{articleID}/votes
+	path := strings.TrimPrefix(r.URL.Path, "/explore/articles/")
 	path = strings.TrimSuffix(path, "/votes")
 	articleID := strings.TrimSpace(path)
 

@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, GlobalStyles } from '../constants';
 import { ArticleRow } from './common/ArticleRow';
 import { Article } from '../types';
@@ -19,6 +20,9 @@ interface ArticleListScreenProps {
   onRefresh?: () => void;
   refreshing?: boolean;
   emptyMessage?: string;
+  onEndReached?: () => void;
+  onViewableItemsChanged?: (info: any) => void;
+  loadingMore?: boolean;
 }
 
 export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
@@ -30,6 +34,9 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   onRefresh,
   refreshing = false,
   emptyMessage = 'No articles found',
+  onEndReached,
+  onViewableItemsChanged,
+  loadingMore = false,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -57,26 +64,43 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     </View>
   );
 
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+
+    return (
+      <View style={{ padding: 20, alignItems: 'center' }}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
+    );
+  };
+
   if (loading) {
     return (
-      <View style={[GlobalStyles.container, GlobalStyles.centerContent, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[GlobalStyles.container, GlobalStyles.centerContent, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={articles}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
+        ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}
         onRefresh={onRefresh}
         refreshing={refreshing}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.5}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={{
+          itemVisiblePercentThreshold: 50,
+        }}
       />
-    </View>
+    </SafeAreaView>
   );
 };

@@ -25,17 +25,13 @@ export const TabNavigator: React.FC = () => {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
         },
-        headerStyle: {
-          backgroundColor: colors.card,
-        },
-        headerTintColor: colors.text,
+        headerShown: false,
       }}
     >
       <Tab.Screen
         name="Explore"
         component={ExploreScreen}
         options={{
-          title: 'Explore',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="compass-outline" size={size} color={color} />
           ),
@@ -45,7 +41,6 @@ export const TabNavigator: React.FC = () => {
         name="Read"
         component={ReadScreen}
         options={{
-          title: 'Read',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="book-outline" size={size} color={color} />
           ),
@@ -55,7 +50,6 @@ export const TabNavigator: React.FC = () => {
         name="Settings"
         component={SettingsScreen}
         options={{
-          title: 'Settings',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />
           ),

@@ -45,7 +45,7 @@ func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []model
 		return fmt.Errorf("failed to marshal articles: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v1/articles", c.baseURL)
+	url := fmt.Sprintf("%s/explore/articles", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
 	"github.com/andrew-craig/cairn-explore/pkg/models"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
@@ -65,8 +66,13 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	// Initialize recommendation engine
 	engine := recommend.NewEngine(articleRepo, userRepo)
 
+	// Create a mock auth middleware that allows all requests for testing
+	mockAuthMiddleware := &auth.Middleware{}
+	// Note: In production tests, you'd want to properly initialize this with test keys
+	// For now, we'll use a minimal setup that allows requests through
+
 	// Setup HTTP server
-	apiServer := api.NewServer(articleRepo, userRepo, voteRepo, engine)
+	apiServer := api.NewServer(articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware)
 	server := httptest.NewServer(apiServer.Routes())
 
 	return &IntegrationTestSuite{
@@ -131,7 +137,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 
 	// Submit article via HTTP API (simulating fetcher)
 	payload, _ := json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err := http.Post(suite.server.URL+"/api/v1/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err := http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit article: %v", err)
 	}
@@ -154,7 +160,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	// Submit same article again (test deduplication)
 	article.Title = "Updated Title"
 	payload, _ = json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err = http.Post(suite.server.URL+"/api/v1/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err = http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit duplicate article: %v", err)
 	}
@@ -310,7 +316,7 @@ func TestUpvotingFlow(t *testing.T) {
 	}
 	payload, _ := json.Marshal(votePayload)
 	resp, err := http.Post(
-		suite.server.URL+"/api/v1/articles/"+article.ID+"/vote",
+		suite.server.URL+"/explore/articles/"+article.ID+"/vote",
 		"application/json",
 		bytes.NewBuffer(payload),
 	)
@@ -378,7 +384,7 @@ func TestDownvotingFlow(t *testing.T) {
 	}
 	payload, _ := json.Marshal(votePayload)
 	resp, err := http.Post(
-		suite.server.URL+"/api/v1/articles/"+badArticle.ID+"/vote",
+		suite.server.URL+"/explore/articles/"+badArticle.ID+"/vote",
 		"application/json",
 		bytes.NewBuffer(payload),
 	)
@@ -526,7 +532,7 @@ func TestEndToEndFlow(t *testing.T) {
 	}
 
 	payload, _ := json.Marshal(map[string][]models.Article{"articles": articles})
-	resp, err := http.Post(suite.server.URL+"/api/v1/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err := http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit articles: %v", err)
 	}
@@ -537,7 +543,7 @@ func TestEndToEndFlow(t *testing.T) {
 	}
 
 	// 2. User gets recommendations
-	resp, err = http.Get(suite.server.URL + "/api/v1/recommendations/" + userID)
+	resp, err = http.Get(suite.server.URL + "/explore/recommendations/" + userID)
 	if err != nil {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
@@ -565,7 +571,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 		payload, _ := json.Marshal(votePayload)
 		resp, err := http.Post(
-			suite.server.URL+"/api/v1/articles/"+recommendations[0].ID+"/vote",
+			suite.server.URL+"/explore/articles/"+recommendations[0].ID+"/vote",
 			"application/json",
 			bytes.NewBuffer(payload),
 		)

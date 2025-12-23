@@ -7,19 +7,25 @@ import {
   RegisterRequest,
   MobileAuthRequest,
   AuthTokens,
+  User,
 } from '../types';
+import { API_CONFIG } from '../config/api';
 
-const API_BASE_URL = 'https://cairn.seatrain.net';
+const API_BASE_URL = API_CONFIG.USER_SERVICE_URL;
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
+const USER_KEY = '@cairn:user';
 
 export class AuthService {
   private static accessToken: string | null = null;
   private static refreshToken: string | null = null;
+  private static user: User | null = null;
 
   static async initialize(): Promise<void> {
     this.accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
     this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+    const userJson = await AsyncStorage.getItem(USER_KEY);
+    this.user = userJson ? JSON.parse(userJson) : null;
   }
 
   static async getDeviceId(): Promise<string> {
@@ -58,6 +64,7 @@ export class AuthService {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
     });
+    await this.saveUser(data.user);
     return data;
   }
 
@@ -82,6 +89,7 @@ export class AuthService {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
     });
+    await this.saveUser(data.user);
     return data;
   }
 
@@ -104,6 +112,7 @@ export class AuthService {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
     });
+    await this.saveUser(data.user);
     return data;
   }
 
@@ -126,6 +135,7 @@ export class AuthService {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
     });
+    await this.saveUser(data.user);
     return data;
   }
 
@@ -159,9 +169,11 @@ export class AuthService {
   static async clearTokens(): Promise<void> {
     this.accessToken = null;
     this.refreshToken = null;
+    this.user = null;
 
     await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
     await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
+    await AsyncStorage.removeItem(USER_KEY);
   }
 
   static async getAccessToken(): Promise<string | null> {
@@ -203,5 +215,23 @@ export class AuthService {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
     });
+  }
+
+  static async saveUser(user: User): Promise<void> {
+    this.user = user;
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+
+  static async getUser(): Promise<User | null> {
+    if (!this.user) {
+      const userJson = await AsyncStorage.getItem(USER_KEY);
+      this.user = userJson ? JSON.parse(userJson) : null;
+    }
+    return this.user;
+  }
+
+  static async getUserId(): Promise<string | null> {
+    const user = await this.getUser();
+    return user?.id || null;
   }
 }

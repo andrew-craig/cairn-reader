@@ -74,7 +74,7 @@ go test -v ./...
 Fetcher DB (PostgreSQL) <--SQL-- Fetcher (8080) --HTTP POST--> Recommender (8081) --SQL--> Recommender DB (PostgreSQL)
 ```
 
-The fetcher manages its own feed sources in its own database, fetches RSS content, and sends successfully fetched articles to the recommender via `POST /api/v1/articles`. The recommender handles article deduplication, user engagement tracking, and serves recommendations from its own database.
+The fetcher manages its own feed sources in its own database, fetches RSS content, and sends successfully fetched articles to the recommender via `POST /explore/articles`. The recommender handles article deduplication, user engagement tracking, and serves recommendations from its own database.
 
 ### Directory Organization
 
@@ -222,7 +222,7 @@ ALTER TABLE articles ADD COLUMN deleted BOOLEAN DEFAULT false;
   - Serve 4 high-quality + 1 low-exposure article
   - Track recommendation counts
 - ❌ **Voting system** (Requirement 4)
-  - POST /api/v1/articles/:id/vote endpoint
+  - POST /explore/articles/:id/vote endpoint
   - Track votes per user (prevent double-voting)
   - Update upvotes/downvotes counters
 
@@ -243,26 +243,26 @@ POST /fetch         → Manually trigger fetch
 ### Recommender Service (port 8081)
 **Current:**
 ```
-GET  /health                           → Health check
-POST /api/v1/articles                  → Submit articles (from fetcher)
-GET  /api/v1/recommendations/{userID}  → Get 5 recommendations
-POST /api/v1/articles/read             → Mark article as read
-     Body: {"user_id": "...", "article_id": "..."}
+GET  /health                               → Health check
+POST /explore/articles                     → Submit articles (from fetcher)
+GET  /explore/recommendations/{userID}     → Get 5 recommendations
+POST /explore/articles/read                → Mark article as read
+     Body: {"article_id": "..."} (user_id from JWT)
+
+# Voting System
+POST   /explore/articles/:id/vote          → Upvote/downvote article (requires auth)
+       Body: {"vote_type": "upvote|downvote"} (user_id from JWT)
+DELETE /explore/articles/:id/vote          → Remove vote (requires auth)
+GET    /explore/articles/:id/votes         → Get vote counts (requires auth)
 ```
 
 **Planned (per implementation plans):**
 ```
 # Feed Management (for fetcher)
-GET  /api/v1/feeds/next               → Get next feed to fetch (prioritized)
-POST /api/v1/feeds/fetch-result       → Report fetch success/failure
-POST /api/v1/feeds/import             → Import/update feeds from Kagi list
-GET  /api/v1/feeds                    → List all feeds (admin)
-
-# Voting System
-POST   /api/v1/articles/:id/vote      → Upvote/downvote article
-       Body: {"user_id": "...", "vote_type": "upvote|downvote"}
-DELETE /api/v1/articles/:id/vote/:userID → Remove vote
-GET    /api/v1/articles/:id/votes     → Get vote counts
+GET  /explore/feeds/next               → Get next feed to fetch (prioritized)
+POST /explore/feeds/fetch-result       → Report fetch success/failure
+POST /explore/feeds/import             → Import/update feeds from Kagi list
+GET  /explore/feeds                    → List all feeds (admin)
 
 # Admin & Monitoring
 GET  /admin/stats                     → System statistics
@@ -358,17 +358,17 @@ Key third-party packages:
 **Current Functionality:**
 1. Start services: `docker-compose up --build`
 2. Trigger fetch: `curl -X POST http://localhost:8080/fetch`
-3. Check recommendations: `curl http://localhost:8081/api/v1/recommendations/user123`
-4. Mark as read: `curl -X POST http://localhost:8081/api/v1/articles/read -d '{"user_id":"user123","article_id":"abc..."}'`
+3. Check recommendations: `curl -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/recommendations/user123`
+4. Mark as read: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/read -d '{"article_id":"abc..."}'`
 5. View logs: `docker-compose logs -f`
 
-**Planned Functionality (after implementation):**
+**Voting (requires authentication):**
 ```bash
-# Voting
-curl -X POST http://localhost:8081/api/v1/articles/abc123/vote \
-  -d '{"user_id": "user123", "vote_type": "upvote"}'
-curl -X DELETE http://localhost:8081/api/v1/articles/abc123/vote/user123
-curl http://localhost:8081/api/v1/articles/abc123/votes
+# Upvote/downvote
+curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/abc123/vote \
+  -d '{"vote_type": "upvote"}'
+curl -X DELETE -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/abc123/vote
+curl -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/abc123/votes
 
 # Admin
 curl http://localhost:8081/admin/stats

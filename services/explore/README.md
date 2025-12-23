@@ -81,8 +81,12 @@ go run cmd/recommender/main.go
 
 ### Recommender Service
 - `GET /health` - Health check
-- `POST /api/v1/articles` - Submit new articles (called by fetcher)
-- `GET /api/v1/recommendations/:userID` - Get 5 recommended articles for a user
+- `POST /explore/articles` - Submit new articles (called by fetcher)
+- `GET /explore/recommendations/:userID` - Get 5 recommended articles for a user
+- `POST /explore/articles/read` - Mark an article as read (requires authentication)
+- `POST /explore/articles/:articleID/vote` - Vote on an article (requires authentication)
+- `DELETE /explore/articles/:articleID/vote` - Remove vote from an article (requires authentication)
+- `GET /explore/articles/:articleID/votes` - Get vote counts for an article (requires authentication)
 
 ## Future Improvements
 

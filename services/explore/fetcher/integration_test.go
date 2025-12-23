@@ -78,7 +78,7 @@ https://example.com/feed3.xml`))
 	// Step 3: Create mock recommender server
 	articleCount := 0
 	recommenderServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/articles" && r.Method == http.MethodPost {
+		if r.URL.Path == "/explore/articles" && r.Method == http.MethodPost {
 			articleCount++
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte(`{"status":"success"}`))
