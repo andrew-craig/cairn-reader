@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/andrew-craig/cairn-explore/pkg/models"
 	"github.com/lib/pq"
@@ -246,13 +247,21 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 		LIMIT $2
 	`
 
+	log.Printf("[DB] GetForRecommendation: userID=%s (internal=%d), limit=%d", externalUserID, internalUserID, limit)
+
 	rows, err := r.db.QueryContext(ctx, query, internalUserID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get articles for recommendation: %w", err)
 	}
 	defer rows.Close()
 
-	return r.scanArticles(rows)
+	articles, err := r.scanArticles(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[DB] GetForRecommendation: Returning %d articles (after filtering out already-recommended)", len(articles))
+	return articles, nil
 }
 
 // GetLowExposureArticles retrieves articles with the lowest recommend counts
@@ -315,6 +324,7 @@ func (r *ArticleRepository) IncrementRecommendCount(ctx context.Context, article
 }
 
 // RecordRecommendation tracks that an article was recommended to a user
+// Uses ON CONFLICT DO NOTHING to handle duplicate recommendations gracefully
 func (r *ArticleRepository) RecordRecommendation(ctx context.Context, externalUserID string, articleID string) error {
 	// Convert external user ID to internal user ID
 	var internalUserID int
@@ -329,6 +339,7 @@ func (r *ArticleRepository) RecordRecommendation(ctx context.Context, externalUs
 	query := `
 		INSERT INTO recommendations (user_id, article_id, recommended_at)
 		VALUES ($1, $2, NOW())
+		ON CONFLICT (user_id, article_id) DO NOTHING
 	`
 
 	_, err := r.db.ExecContext(ctx, query, internalUserID, articleID)

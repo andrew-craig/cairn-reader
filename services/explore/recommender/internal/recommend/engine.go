@@ -26,10 +26,13 @@ func NewEngine(articleRepo *db.ArticleRepository, userRepo *db.UserRepository) *
 
 // GetRecommendations returns 5 recommended articles for a user
 // Algorithm: 4 high-quality articles (based on quality score) + 1 low-exposure article
-// Quality score formula: (upvotes + (downvotes * 3)) / recommends
+// Quality score formula: (upvotes - (downvotes * 3)) / recommends
 func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]models.Article, error) {
+	log.Printf("[Recommendations] Starting recommendation generation for user: %s", userID)
+
 	// Ensure user exists
 	if _, err := e.userRepo.CreateOrGetUser(ctx, userID); err != nil {
+		log.Printf("[Recommendations] ERROR: Failed to create/get user %s: %v", userID, err)
 		return nil, err
 	}
 
@@ -37,8 +40,11 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	// Request more than needed to allow for quality filtering
 	articles, err := e.articleRepo.GetForRecommendation(ctx, userID, 100)
 	if err != nil {
+		log.Printf("[Recommendations] ERROR: Failed to get eligible articles for user %s: %v", userID, err)
 		return nil, err
 	}
+
+	log.Printf("[Recommendations] Found %d eligible articles for user: %s", len(articles), userID)
 
 	// If we have 5 or fewer articles, return what we have
 	if len(articles) <= 5 {
@@ -90,14 +96,24 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	}
 
 	// Track recommendations and increment counters
+	successCount := 0
 	for _, article := range recommended {
 		if err := e.trackRecommendation(ctx, userID, article.ID); err != nil {
-			log.Printf("Warning: failed to track recommendation for article %s: %v", article.ID, err)
+			log.Printf("[Recommendations] WARNING: Failed to track recommendation for article %s (user: %s): %v", article.ID, userID, err)
+		} else {
+			successCount++
 		}
 	}
 
-	log.Printf("Recommended %d articles to user %s (%d high-quality, %d exploration)",
-		len(recommended), userID, len(highQuality), len(recommended)-len(highQuality))
+	log.Printf("[Recommendations] Successfully recommended %d articles to user %s (%d high-quality, %d exploration, %d/%d tracked)",
+		len(recommended), userID, len(highQuality), len(recommended)-len(highQuality), successCount, len(recommended))
+
+	// Log article IDs for debugging
+	articleIDs := make([]string, len(recommended))
+	for i, article := range recommended {
+		articleIDs[i] = article.ID
+	}
+	log.Printf("[Recommendations] Article IDs: %v", articleIDs)
 
 	return recommended, nil
 }
@@ -135,7 +151,7 @@ func (e *Engine) selectHighQualityArticles(articles []models.Article, count int)
 }
 
 // calculateQualityScore computes the quality score for an article
-// Formula: (upvotes + (downvotes * 3)) / recommends
+// Formula: (upvotes - (downvotes * 3)) / recommends
 // Articles with 0 recommends are treated as having infinite/very high score
 func (e *Engine) calculateQualityScore(article models.Article) float64 {
 	// Handle division by zero: articles with 0 recommends get very high score
@@ -150,10 +166,10 @@ func (e *Engine) calculateQualityScore(article models.Article) float64 {
 		return 1000.0
 	}
 
-	// Calculate quality score: (upvotes + (downvotes * 3)) / recommends
-	// Note: Higher downvotes DECREASE the score (they're in the numerator with positive sign)
-	// This is intentional per the requirements - downvotes heavily penalize quality
-	numerator := float64(article.Upvotes + (article.Downvotes * 3))
+	// Calculate quality score: (upvotes - (downvotes * 3)) / recommends
+	// Downvotes heavily penalize quality (3x multiplier)
+	// Higher downvotes result in a lower (or negative) score
+	numerator := float64(article.Upvotes - (article.Downvotes * 3))
 	score := numerator / float64(article.Recommends)
 
 	return score
@@ -171,5 +187,6 @@ func (e *Engine) trackRecommendation(ctx context.Context, userID string, article
 		return fmt.Errorf("failed to record recommendation: %w", err)
 	}
 
+	log.Printf("[Recommendations] Successfully tracked recommendation: article=%s, user=%s", articleID, userID)
 	return nil
 }
