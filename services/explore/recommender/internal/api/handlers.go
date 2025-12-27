@@ -87,11 +87,13 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"user_id":         userID,
 		"recommendations": recommendations,
 		"count":           len(recommendations),
-	})
+	}); err != nil {
+		log.Printf("error encoding recommendations response: %v", err)
+	}
 }
 
 // handleMarkAsRead marks an article as read for a user
@@ -127,10 +129,12 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Article marked as read",
-	})
+	}); err != nil {
+		log.Printf("error encoding mark-as-read response: %v", err)
+	}
 }
 
 // handleVote handles upvoting or downvoting an article
@@ -177,10 +181,12 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Vote recorded successfully",
-	})
+	}); err != nil {
+		log.Printf("error encoding vote response: %v", err)
+	}
 }
 
 // handleRemoveVote removes a user's vote from an article
@@ -213,14 +219,20 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Vote removed successfully",
-	})
+	}); err != nil {
+		log.Printf("error encoding remove-vote response: %v", err)
+	}
 }
 
 // handleGetVotes returns vote counts for an article
 // GET /explore/articles/:id/votes
+//
+// NOTE: This endpoint is protected by auth middleware. The user_id query parameter
+// allows fetching the authenticated user's vote status. Consider using the JWT user ID
+// directly instead of the query parameter for better security.
 func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -244,9 +256,11 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Optionally get user's vote if user_id is provided as query parameter
+	// Get the authenticated user's vote using the JWT context
+	// TODO: Consider removing the query parameter option and always using JWT user ID
 	userVote := ""
-	userID := r.URL.Query().Get("user_id")
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+	userID := authenticatedUserID.String()
 	if userID != "" {
 		userVote, err = s.voteRepo.GetUserVote(r.Context(), userID, articleID)
 		if err != nil {
@@ -267,5 +281,7 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("error encoding votes response: %v", err)
+	}
 }

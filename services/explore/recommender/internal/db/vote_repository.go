@@ -1,9 +1,12 @@
+// Package db provides database access for the recommender service.
+// It implements the repository pattern for articles, users, and votes.
 package db
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 )
 
 // VoteRepository handles vote database operations
@@ -42,7 +45,7 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			fmt.Printf("error rolling back transaction: %v\n", err)
+			log.Printf("error rolling back transaction: %v", err)
 		}
 	}()
 
@@ -148,7 +151,7 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, externalUserID string, 
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			fmt.Printf("error rolling back transaction: %v\n", err)
+			log.Printf("error rolling back transaction: %v", err)
 		}
 	}()
 
