@@ -339,26 +339,33 @@ func TestIsAuthenticated(t *testing.T) {
 }
 
 func TestChain(t *testing.T) {
+	// Define custom context key types to avoid collisions
+	type testContextKey string
+	const (
+		testKey1 testContextKey = "key1"
+		testKey2 testContextKey = "key2"
+	)
+
 	// Create middleware that adds values to context
 	middleware1 := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "key1", "value1")
+			ctx := context.WithValue(r.Context(), testKey1, "value1")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 
 	middleware2 := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "key2", "value2")
+			ctx := context.WithValue(r.Context(), testKey2, "value2")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Context().Value("key1") != "value1" {
+		if r.Context().Value(testKey1) != "value1" {
 			t.Error("Expected key1 to be in context")
 		}
-		if r.Context().Value("key2") != "value2" {
+		if r.Context().Value(testKey2) != "value2" {
 			t.Error("Expected key2 to be in context")
 		}
 		w.WriteHeader(http.StatusOK)

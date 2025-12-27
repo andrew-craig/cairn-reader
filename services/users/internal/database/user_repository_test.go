@@ -52,22 +52,6 @@ func cleanupTestUser(t *testing.T, db *DB, userID uuid.UUID) {
 	}
 }
 
-// cleanupTestUserByEmail removes a test user by email
-func cleanupTestUserByEmail(t *testing.T, db *DB, email string) {
-	_, err := db.Pool.Exec(context.Background(), "DELETE FROM users WHERE email = $1", email)
-	if err != nil {
-		t.Logf("Warning: failed to cleanup test user by email: %v", err)
-	}
-}
-
-// cleanupTestUserByDeviceID removes a test user by device ID
-func cleanupTestUserByDeviceID(t *testing.T, db *DB, deviceID string) {
-	_, err := db.Pool.Exec(context.Background(), "DELETE FROM users WHERE expo_device_id = $1", deviceID)
-	if err != nil {
-		t.Logf("Warning: failed to cleanup test user by device ID: %v", err)
-	}
-}
-
 func TestNewUserRepository(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()

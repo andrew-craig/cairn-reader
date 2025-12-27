@@ -5,6 +5,7 @@ import {
   useColorScheme,
   FlatList,
   ActivityIndicator,
+  ViewToken,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, GlobalStyles } from '../constants';
@@ -21,7 +22,10 @@ interface ArticleListScreenProps {
   refreshing?: boolean;
   emptyMessage?: string;
   onEndReached?: () => void;
-  onViewableItemsChanged?: (info: any) => void;
+  onViewableItemsChanged?: (info: {
+    viewableItems: ViewToken[];
+    changed: ViewToken[];
+  }) => void;
   loadingMore?: boolean;
 }
 

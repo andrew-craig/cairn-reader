@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Dimensions, ViewToken } from 'react-native';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { Article } from '../types';
@@ -30,53 +30,20 @@ export const ExploreScreen: React.FC = () => {
   const [lastVisibleIndex, setLastVisibleIndex] = useState(0);
   const isFetchingRef = useRef(false);
 
-  useEffect(() => {
-    loadExploreArticles();
-  }, []);
-
-  const loadExploreArticles = async () => {
-    try {
-      const recommendations = await ExploreService.getRecommendations();
-      setArticles(recommendations);
-
-      // After initial load, ensure we have enough articles to fill the screen
-      // Calculate dynamically based on viewport height
-      const minInitialArticles = calculateInitialArticleCount();
-      console.log(`Initial article count needed: ${minInitialArticles} (screen height: ${Dimensions.get('window').height}px)`);
-
-      if (recommendations.length < minInitialArticles) {
-        await loadMoreUntilBuffer(minInitialArticles);
-      }
-    } catch (error) {
-      console.error('Error loading explore articles:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setArticles([]);
-    setLastVisibleIndex(0);
-    loadExploreArticles();
-  };
-
-  const loadMoreUntilBuffer = async (minArticles?: number) => {
+  const loadMoreUntilBuffer = useCallback(async (minArticles?: number) => {
     if (isFetchingRef.current) return;
 
     isFetchingRef.current = true;
     setLoadingMore(true);
 
     try {
-      let shouldContinue = true;
       let previousLength = 0;
 
       // Use provided minimum or calculate based on scroll position
       const targetMinimum = minArticles ?? MIN_LOOKAHEAD_ARTICLES;
 
       // Keep fetching until we have enough articles
-      while (shouldContinue) {
+      while (true) {
         // Get current articles count to check buffer
         const currentArticlesCount = await new Promise<number>((resolve) => {
           setArticles(prev => {
@@ -129,6 +96,38 @@ export const ExploreScreen: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
+  }, [lastVisibleIndex]);
+
+  const loadExploreArticles = useCallback(async () => {
+    try {
+      const recommendations = await ExploreService.getRecommendations();
+      setArticles(recommendations);
+
+      // After initial load, ensure we have enough articles to fill the screen
+      // Calculate dynamically based on viewport height
+      const minInitialArticles = calculateInitialArticleCount();
+      console.log(`Initial article count needed: ${minInitialArticles} (screen height: ${Dimensions.get('window').height}px)`);
+
+      if (recommendations.length < minInitialArticles) {
+        await loadMoreUntilBuffer(minInitialArticles);
+      }
+    } catch (error) {
+      console.error('Error loading explore articles:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [loadMoreUntilBuffer]);
+
+  useEffect(() => {
+    loadExploreArticles();
+  }, [loadExploreArticles]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setArticles([]);
+    setLastVisibleIndex(0);
+    loadExploreArticles();
   };
 
   const handleEndReached = () => {
@@ -136,9 +135,12 @@ export const ExploreScreen: React.FC = () => {
     loadMoreUntilBuffer();
   };
 
-  const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      const lastVisible = viewableItems[viewableItems.length - 1];
+  const handleViewableItemsChanged = useRef((info: {
+    viewableItems: ViewToken[];
+    changed: ViewToken[];
+  }) => {
+    if (info.viewableItems.length > 0) {
+      const lastVisible = info.viewableItems[info.viewableItems.length - 1];
       const index = articles.findIndex(a => a.id === lastVisible.item.id);
       if (index !== -1) {
         setLastVisibleIndex(index);

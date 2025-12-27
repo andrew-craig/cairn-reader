@@ -482,7 +482,7 @@ func TestFetchSingleFeed_OnlyNewArticles(t *testing.T) {
 		t.Errorf("Expected consecutive_failures=0, got %d", failures)
 	}
 	if lastFetchedAfter == nil {
-		t.Error("Expected last_fetched_at to be updated")
+		t.Fatal("Expected last_fetched_at to be updated")
 	}
 	if !lastFetchedAfter.After(lastFetch) {
 		t.Error("Expected last_fetched_at to be updated to a more recent time")

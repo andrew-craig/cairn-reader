@@ -174,10 +174,7 @@ func (c *Fetcher) convertToArticle(item *gofeed.Item, feed *gofeed.Feed, feedURL
 		content = item.Description
 	}
 
-	categories := make([]string, 0, len(item.Categories))
-	for _, cat := range item.Categories {
-		categories = append(categories, cat)
-	}
+	categories := append([]string(nil), item.Categories...)
 
 	return models.Article{
 		ID:          id,
