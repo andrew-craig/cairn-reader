@@ -1,3 +1,7 @@
+// Package sync provides functionality for synchronizing feed sources
+// from external sources like the Kagi Small Web collection.
+// It runs daily to ensure the feed database stays up-to-date with
+// new feed sources.
 package sync
 
 import (
@@ -12,7 +16,9 @@ import (
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/db"
 )
 
-// FeedSyncer fetches and updates the Kagi feed list daily
+// FeedSyncer fetches and updates the Kagi feed list daily.
+// The Kagi Small Web collection is a curated list of high-quality,
+// independent web feeds that forms the basis of content discovery.
 type FeedSyncer struct {
 	repo       *db.FeedRepository
 	kagiURL    string
@@ -30,12 +36,15 @@ func NewFeedSyncer(repo *db.FeedRepository, kagiURL string) *FeedSyncer {
 	}
 }
 
-// Run starts the daily sync process
+// Run starts the daily sync process that keeps the feed database updated.
+// Syncs immediately on startup to ensure feeds are available right away,
+// then runs every 24 hours to pick up new feeds from the Kagi collection.
+// Non-fatal errors are logged but don't stop the sync loop.
 func (s *FeedSyncer) Run(ctx context.Context) error {
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 
-	// Fetch immediately on startup, then once per day
+	// Sync immediately on startup to ensure feeds are available
 	if err := s.syncFeeds(ctx); err != nil {
 		log.Printf("Initial feed sync failed: %v", err)
 		// Continue despite error - will retry in 24 hours
@@ -53,15 +62,22 @@ func (s *FeedSyncer) Run(ctx context.Context) error {
 	}
 }
 
-// SyncOnce runs a single sync operation (useful for testing)
+// SyncOnce runs a single sync operation.
+// Exposed for manual triggering via the /feeds/sync HTTP endpoint
+// and for use in tests.
 func (s *FeedSyncer) SyncOnce(ctx context.Context) error {
 	return s.syncFeeds(ctx)
 }
 
+// syncFeeds performs the actual synchronization:
+// 1. Fetches the feed list from the Kagi Small Web URL
+// 2. Parses the list to extract feed URLs
+// 3. Imports new feeds to the database (existing feeds are unchanged)
+// 4. Logs statistics about the feed database state
 func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 	log.Printf("Starting feed sync from %s", s.kagiURL)
 
-	// Fetch from Kagi Small Web feed list
+	// Fetch the feed list from Kagi Small Web repository
 	req, err := http.NewRequestWithContext(ctx, "GET", s.kagiURL, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -86,18 +102,18 @@ func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 		return fmt.Errorf("read response body: %w", err)
 	}
 
-	// Parse feed URLs (one per line)
+	// Parse the feed list (one URL per line, # for comments)
 	feedURLs := s.parseFeedList(string(body))
 	if len(feedURLs) == 0 {
 		return fmt.Errorf("no feed URLs found in response")
 	}
 
-	// Import feeds to database
+	// Import feeds to database (uses ON CONFLICT DO NOTHING to avoid duplicates)
 	if err := s.repo.ImportFeeds(ctx, feedURLs); err != nil {
 		return fmt.Errorf("import feeds: %w", err)
 	}
 
-	// Log statistics
+	// Log feed database statistics for monitoring
 	total, enabled, disabled, neverFetched, err := s.repo.GetFeedStats(ctx)
 	if err != nil {
 		log.Printf("Failed to get feed stats: %v", err)
@@ -109,18 +125,23 @@ func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 	return nil
 }
 
-// parseFeedList parses the Kagi feed list format (one URL per line, # for comments)
+// parseFeedList parses the Kagi feed list format.
+// Format:
+//   - One URL per line
+//   - Lines starting with # are comments
+//   - Empty lines are ignored
+//   - Only http:// and https:// URLs are accepted
 func (s *FeedSyncer) parseFeedList(content string) []string {
 	lines := strings.Split(content, "\n")
 	var feedURLs []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		// Skip empty lines and comments
+		// Skip empty lines and comment lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Basic validation: must start with http:// or https://
+		// Only accept valid HTTP(S) URLs for security
 		if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
 			feedURLs = append(feedURLs, line)
 		}

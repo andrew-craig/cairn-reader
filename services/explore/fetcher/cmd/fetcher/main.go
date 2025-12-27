@@ -1,3 +1,9 @@
+// Package main is the entry point for the fetcher service.
+// The fetcher service is responsible for:
+// - Syncing feed sources from the Kagi Small Web collection (daily)
+// - Fetching RSS feeds on a scheduled basis (1 feed per minute)
+// - Submitting fetched articles to the recommender service via HTTP
+// - Providing HTTP endpoints for health checks and manual triggers
 package main
 
 import (
@@ -17,8 +23,11 @@ import (
 )
 
 func main() {
+	// Load configuration from environment variables with sensible defaults
 	port := getEnv("PORT", "8080")
 	recommenderURL := getEnv("RECOMMENDER_URL", "http://localhost:8081")
+	// NOTE: fetchInterval is currently unused - the fetcher uses a hardcoded 60-second interval
+	// TODO: Pass this value to the Fetcher to make the interval configurable
 	fetchInterval := getEnvDuration("FETCH_INTERVAL", 5*time.Minute)
 	kagiFeedURL := getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt")
 
@@ -61,6 +70,11 @@ func main() {
 	}()
 
 	// Setup HTTP server for health checks and manual triggers
+	// Routes:
+	//   GET  /health      - Returns service health status
+	//   POST /fetch       - Triggers a single feed fetch (async)
+	//   GET  /feeds/stats - Returns feed statistics (total, enabled, disabled, never_fetched)
+	//   POST /feeds/sync  - Triggers feed list sync from Kagi (async)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/fetch", func(w http.ResponseWriter, r *http.Request) {
@@ -131,11 +145,13 @@ func main() {
 	}
 }
 
+// healthHandler returns a simple health check response for load balancers and monitoring
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"healthy","service":"fetcher"}`))
 }
 
+// getEnv retrieves an environment variable or returns a default value if not set
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -143,6 +159,9 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+// getEnvDuration parses an environment variable as seconds and returns it as a Duration.
+// If the variable is not set or cannot be parsed, returns the default value.
+// NOTE: The value is expected to be in seconds (e.g., "60" for 60 seconds)
 func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if duration, err := time.ParseDuration(value + "s"); err == nil {
