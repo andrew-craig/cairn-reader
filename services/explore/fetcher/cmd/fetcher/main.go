@@ -26,9 +26,7 @@ func main() {
 	// Load configuration from environment variables with sensible defaults
 	port := getEnv("PORT", "8080")
 	recommenderURL := getEnv("RECOMMENDER_URL", "http://localhost:8081")
-	// NOTE: fetchInterval is currently unused - the fetcher uses a hardcoded 60-second interval
-	// TODO: Pass this value to the Fetcher to make the interval configurable
-	fetchInterval := getEnvDuration("FETCH_INTERVAL", 5*time.Minute)
+	fetchInterval := getEnvDuration("FETCH_INTERVAL", 60) // Default: 60 seconds (1 feed per minute)
 	kagiFeedURL := getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt")
 
 	// Initialize database connection
@@ -59,8 +57,8 @@ func main() {
 	// Initialize HTTP client for communicating with recommender service
 	recommenderClient := client.NewRecommenderClient(recommenderURL)
 
-	// Initialize fetcher with feedRepo (Phase 3: one-feed-per-minute)
-	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient)
+	// Initialize fetcher with configurable interval
+	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient, fetchInterval)
 
 	// Start background fetcher (fetches 1 feed per minute)
 	go func() {

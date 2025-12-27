@@ -24,26 +24,30 @@ type Fetcher struct {
 	feedRepo          *db.FeedRepository
 	recommenderClient client.RecommenderClientInterface
 	parser            *gofeed.Parser
+	fetchInterval     time.Duration
 }
 
-// NewFetcher creates a new fetcher instance
-func NewFetcher(feedRepo *db.FeedRepository, recommenderClient client.RecommenderClientInterface) *Fetcher {
+// NewFetcher creates a new fetcher instance with the specified fetch interval.
+// The interval determines how frequently feeds are fetched (e.g., 60s means 1 feed per minute).
+func NewFetcher(feedRepo *db.FeedRepository, recommenderClient client.RecommenderClientInterface, fetchInterval time.Duration) *Fetcher {
 	return &Fetcher{
 		feedRepo:          feedRepo,
 		recommenderClient: recommenderClient,
 		parser:            gofeed.NewParser(),
+		fetchInterval:     fetchInterval,
 	}
 }
 
-// Run starts the fetch loop that fetches one feed every 60 seconds.
+// Run starts the fetch loop that fetches one feed at the configured interval.
 // It performs an initial fetch immediately on startup, then continues
 // fetching at the configured interval until the context is cancelled.
 // The loop is designed to be gentle on feed sources while ensuring
 // all feeds are fetched regularly.
-// TODO: Make the interval configurable via constructor parameter
 func (f *Fetcher) Run(ctx context.Context) error {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(f.fetchInterval)
 	defer ticker.Stop()
+
+	log.Printf("Starting fetcher with interval: %v", f.fetchInterval)
 
 	// Fetch immediately on startup to begin processing feeds right away
 	if err := f.FetchSingleFeed(ctx); err != nil {
