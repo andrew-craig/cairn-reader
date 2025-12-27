@@ -3,6 +3,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -18,16 +19,18 @@ type Server struct {
 	voteRepo       *db.VoteRepository
 	engine         *recommend.Engine
 	authMiddleware *auth.Middleware
+	logger         *slog.Logger
 }
 
 // NewServer creates a new API server
-func NewServer(articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware) *Server {
+func NewServer(articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
 	return &Server{
 		articleRepo:    articleRepo,
 		userRepo:       userRepo,
 		voteRepo:       voteRepo,
 		engine:         engine,
 		authMiddleware: authMiddleware,
+		logger:         logger,
 	}
 }
 

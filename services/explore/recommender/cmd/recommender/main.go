@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
+	"github.com/andrew-craig/cairn-explore/pkg/logging"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/cleanup"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
@@ -21,7 +22,19 @@ import (
 )
 
 func main() {
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       getEnv("LOG_LEVEL", "info"),
+		Format:      getEnv("LOG_FORMAT", "text"),
+		ServiceName: "recommender",
+	})
+	logging.SetDefault(logger)
+
 	port := getEnv("PORT", "8081")
+
+	slog.Info("starting service",
+		slog.String("port", port),
+	)
 
 	// Database configuration
 	dbConfig := db.Config{
@@ -33,9 +46,13 @@ func main() {
 	}
 
 	// Connect to database
+	slog.Info("connecting to database",
+		slog.String("host", dbConfig.Host),
+	)
 	database, err := connectDB(dbConfig)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer database.Close()
 
@@ -44,26 +61,32 @@ func main() {
 	vaultToken := getEnv("VAULT_TOKEN", "")
 	publicKeyPath := getEnv("JWT_PUBLIC_KEY_PATH", "secret/jwt/public-key")
 
-	log.Printf("Connecting to Vault at %s", vaultAddr)
+	slog.Info("connecting to vault",
+		slog.String("address", vaultAddr),
+	)
 	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
 		Address: vaultAddr,
 		Token:   vaultToken,
 	})
 	if err != nil {
-		log.Fatalf("Failed to create Vault client: %v", err)
+		slog.Error("failed to create vault client", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Fetch JWT public key from Vault
-	log.Printf("Fetching JWT public key from Vault path: %s", publicKeyPath)
+	slog.Info("fetching JWT public key from vault",
+		slog.String("path", publicKeyPath),
+	)
 	publicKey, err := vaultClient.GetPublicKey(publicKeyPath)
 	if err != nil {
-		log.Fatalf("Failed to get JWT public key from Vault: %v", err)
+		slog.Error("failed to get JWT public key from vault", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Create JWT validator and auth middleware
 	validator := auth.NewValidator(publicKey)
 	authMiddleware := auth.NewMiddleware(validator)
-	log.Println("JWT authentication middleware initialized")
+	slog.Info("JWT authentication middleware initialized")
 
 	// Initialize repositories
 	articleRepo := db.NewArticleRepository(database)
@@ -79,10 +102,13 @@ func main() {
 	cleanupInterval := 24 * time.Hour // Run cleanup once per day
 	cleanupJob := cleanup.NewArticleCleanup(articleRepo, retentionDays, cleanupInterval)
 	cleanupJob.Start()
-	log.Printf("Article cleanup job started (retention: %d days, interval: %s)", retentionDays, cleanupInterval)
+	slog.Info("article cleanup job started",
+		slog.Int("retention_days", retentionDays),
+		slog.Duration("interval", cleanupInterval),
+	)
 
 	// Initialize API server with auth middleware
-	server := api.NewServer(articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware)
+	server := api.NewServer(articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, logger)
 	httpServer := &http.Server{
 		Addr:         ":" + port,
 		Handler:      server.Routes(),
@@ -97,7 +123,7 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		log.Println("Shutting down recommender service...")
+		slog.Info("shutting down service")
 
 		// Stop cleanup job
 		cleanupJob.Stop()
@@ -106,13 +132,16 @@ func main() {
 		defer cancel()
 
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Error during shutdown: %v", err)
+			slog.Error("error during shutdown", slog.Any("error", err))
 		}
 	}()
 
-	log.Printf("Recommender service starting on port %s", port)
+	slog.Info("service ready to accept requests",
+		slog.String("port", port),
+	)
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 
@@ -133,10 +162,13 @@ func connectDB(config db.Config) (*sql.DB, error) {
 	// Wait for database to be ready
 	for i := 0; i < 30; i++ {
 		if err := database.Ping(); err == nil {
-			log.Println("Successfully connected to database")
+			slog.Info("component initialized", slog.String("component", "database"))
 			return database, nil
 		}
-		log.Printf("Waiting for database to be ready... (%d/30)", i+1)
+		slog.Debug("waiting for database",
+			slog.Int("attempt", i+1),
+			slog.Int("max_attempts", 30),
+		)
 		time.Sleep(time.Second)
 	}
 
@@ -157,7 +189,11 @@ func getEnvAsInt(key string, defaultValue int) int {
 	}
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		log.Printf("Invalid value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		slog.Warn("invalid environment variable value",
+			slog.String("key", key),
+			slog.String("value", valueStr),
+			slog.Int("default", defaultValue),
+		)
 		return defaultValue
 	}
 	return value

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -16,12 +16,23 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(wrapped, r)
 
-		log.Printf(
-			"%s %s %d %s",
-			r.Method,
-			r.URL.Path,
-			wrapped.statusCode,
-			time.Since(start),
+		duration := time.Since(start)
+		status := wrapped.statusCode
+
+		// Choose log level based on status code
+		logFn := s.logger.Info
+		if status >= 500 {
+			logFn = s.logger.Error
+		} else if status >= 400 {
+			logFn = s.logger.Warn
+		}
+
+		logFn("http request completed",
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.Int("status", status),
+			slog.Duration("duration", duration),
+			slog.String("client_ip", r.RemoteAddr),
 		)
 	})
 }

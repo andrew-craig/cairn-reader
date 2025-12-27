@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,61 +16,79 @@ import (
 	"github.com/andrew-craig/cairn-core/user-service/internal/database"
 	"github.com/andrew-craig/cairn-core/user-service/internal/handlers"
 	"github.com/andrew-craig/cairn-core/user-service/internal/services"
+	"github.com/andrew-craig/cairn-core/user-service/pkg/logging"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Load .env file in development
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
-	}
+	// Load .env file in development (before logger initialization)
+	_ = godotenv.Load() // Ignore error as .env file is optional
 
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		slog.Error("failed to load configuration", slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	log.Printf("Starting Cairn User Service in %s mode on port %s", cfg.Server.Environment, cfg.Server.Port)
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       cfg.Logging.Level,
+		Format:      cfg.Logging.Format,
+		ServiceName: "user-service",
+	})
+	logging.SetDefault(logger)
+
+	slog.Info("starting service",
+		slog.String("environment", cfg.Server.Environment),
+		slog.String("port", cfg.Server.Port),
+	)
 
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Initialize Vault client
-	log.Println("Connecting to Vault...")
+	slog.Info("component initializing", slog.String("component", "vault"))
 	vaultClient, err := initializeVault(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize Vault: %v", err)
+		slog.Error("failed to initialize vault", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Println("✓ Vault connection established")
+	slog.Info("component initialized", slog.String("component", "vault"))
 
 	// Load JWT keys from Vault
-	log.Println("Loading JWT keys from Vault...")
+	slog.Info("loading JWT keys from vault")
 	privateKey, publicKey, err := vaultClient.GetJWTKeys(
 		cfg.JWT.PrivateKeyPath,
 		cfg.JWT.PublicKeyPath,
 	)
 	if err != nil {
-		log.Fatalf("Failed to load JWT keys from Vault: %v", err)
+		slog.Error("failed to load JWT keys", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Println("✓ JWT keys loaded")
+	slog.Info("JWT keys loaded")
 
 	// Initialize database connection
-	log.Println("Connecting to database...")
+	slog.Info("component initializing",
+		slog.String("component", "database"),
+		slog.String("host", cfg.Database.Host),
+	)
 	db, err := initializeDatabase(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		slog.Error("failed to initialize database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer db.Close()
-	log.Println("✓ Database connection established")
+	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Run database migrations
-	log.Println("Running database migrations...")
+	slog.Info("running database migrations")
 	migrationsPath, err := filepath.Abs("migrations")
 	if err != nil {
-		log.Fatalf("Failed to get migrations path: %v", err)
+		slog.Error("failed to get migrations path", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	dbConfig := &database.Config{
@@ -86,18 +104,19 @@ func main() {
 	}
 
 	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		slog.Error("failed to run migrations", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Println("✓ Database migrations completed")
+	slog.Info("database migrations completed")
 
 	// Initialize repositories
-	log.Println("Initializing repositories...")
+	slog.Info("initializing repositories")
 	userRepo := database.NewUserRepository(db)
 	refreshTokenRepo := database.NewRefreshTokenRepository(db)
-	log.Println("✓ Repositories initialized")
+	slog.Info("repositories initialized")
 
 	// Initialize auth components
-	log.Println("Initializing authentication components...")
+	slog.Info("initializing authentication components")
 	passwordHasher := auth.NewPasswordHasher(cfg.Security.BcryptCost)
 
 	jwtManager := auth.NewJWTManagerWithConfig(auth.JWTManagerConfig{
@@ -112,10 +131,10 @@ func main() {
 		refreshTokenRepo,
 		cfg.JWT.RefreshTokenExpiry,
 	)
-	log.Println("✓ Authentication components initialized")
+	slog.Info("authentication components initialized")
 
 	// Initialize services
-	log.Println("Initializing services...")
+	slog.Info("initializing services")
 	authService := services.NewAuthService(services.AuthServiceConfig{
 		UserRepo:            userRepo,
 		RefreshTokenService: refreshTokenService,
@@ -132,10 +151,10 @@ func main() {
 		PasswordMinLength: cfg.Security.MinPasswordLength,
 		RequireComplexity: cfg.Security.RequirePasswordComplexity,
 	})
-	log.Println("✓ Services initialized")
+	slog.Info("services initialized")
 
 	// Set up key rotation manager
-	log.Println("Setting up key rotation manager...")
+	slog.Info("setting up key rotation manager")
 	keyRotationManager, err := auth.NewKeyRotationManager(vaultClient, auth.KeyRotationConfig{
 		PrivateKeyPath:       cfg.JWT.PrivateKeyPath,
 		PublicKeyPath:        cfg.JWT.PublicKeyPath,
@@ -144,22 +163,23 @@ func main() {
 		OnRotation: func(keyPair *auth.JWTKeyPair) error {
 			// Update JWT manager with new keys
 			jwtManager.UpdateKeys(keyPair.PrivateKey, keyPair.PublicKey)
-			log.Println("✓ JWT keys rotated successfully")
+			slog.Info("JWT keys rotated successfully")
 			return nil
 		},
 	})
 	if err != nil {
-		log.Fatalf("Failed to create key rotation manager: %v", err)
+		slog.Error("failed to create key rotation manager", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Start key rotation in background
 	keyRotationManager.Start(ctx)
-	log.Println("✓ Key rotation manager started")
+	slog.Info("key rotation manager started")
 
 	// Start expired token cleanup scheduler
-	log.Println("Starting token cleanup scheduler...")
+	slog.Info("starting token cleanup scheduler")
 	go tokenCleanupScheduler(ctx, refreshTokenService)
-	log.Println("✓ Token cleanup scheduler started")
+	slog.Info("token cleanup scheduler started")
 
 	// Set Gin mode based on environment
 	if cfg.Server.Environment == "production" {
@@ -167,7 +187,7 @@ func main() {
 	}
 
 	// Set up HTTP router
-	log.Println("Setting up HTTP router...")
+	slog.Info("setting up HTTP router")
 	router := handlers.Router(handlers.RouterConfig{
 		DB:                  db,
 		VaultClient:         vaultClient,
@@ -176,8 +196,9 @@ func main() {
 		JWTManager:          jwtManager,
 		AuthRateLimit:       cfg.Security.RateLimitRequests,
 		AuthRateLimitWindow: cfg.Security.RateLimitWindow,
+		Logger:              logger,
 	})
-	log.Println("✓ HTTP router configured")
+	slog.Info("HTTP router configured")
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -187,10 +208,13 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("✓ Server listening on port %s", cfg.Server.Port)
-		log.Println("Cairn User Service is ready to accept requests")
+		slog.Info("server listening",
+			slog.String("port", cfg.Server.Port),
+		)
+		slog.Info("service ready to accept requests")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
+			slog.Error("server failed to start", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 
@@ -199,24 +223,25 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	slog.Info("shutting down server")
 
 	// Cancel context to stop background tasks
 	cancel()
 
 	// Stop key rotation manager
 	keyRotationManager.Stop()
-	log.Println("✓ Background tasks stopped")
+	slog.Info("background tasks stopped")
 
 	// Graceful shutdown with timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		slog.Error("server forced to shutdown", slog.Any("error", err))
+		os.Exit(1)
 	}
 
-	log.Println("✓ Server exited gracefully")
+	slog.Info("server exited gracefully")
 }
 
 // initializeVault creates and configures the Vault client
@@ -286,7 +311,7 @@ func tokenCleanupScheduler(ctx context.Context, refreshTokenService *auth.Refres
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Token cleanup scheduler stopped")
+			slog.Info("token cleanup scheduler stopped")
 			return
 		case <-ticker.C:
 			runTokenCleanup(ctx, refreshTokenService)
@@ -298,11 +323,13 @@ func tokenCleanupScheduler(ctx context.Context, refreshTokenService *auth.Refres
 func runTokenCleanup(ctx context.Context, refreshTokenService *auth.RefreshTokenService) {
 	count, err := refreshTokenService.CleanupExpiredTokens(ctx)
 	if err != nil {
-		log.Printf("Token cleanup failed: %v", err)
+		slog.Warn("token cleanup failed", slog.Any("error", err))
 		return
 	}
 
 	if count > 0 {
-		log.Printf("Cleaned up %d expired refresh tokens", count)
+		slog.Info("cleaned up expired tokens",
+			slog.Int64("count", count),
+		)
 	}
 }

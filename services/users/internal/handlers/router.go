@@ -3,12 +3,14 @@
 package handlers
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn-core/user-service/internal/auth"
 	"github.com/andrew-craig/cairn-core/user-service/internal/database"
 	"github.com/andrew-craig/cairn-core/user-service/internal/middleware"
 	"github.com/andrew-craig/cairn-core/user-service/internal/services"
+	"github.com/andrew-craig/cairn-core/user-service/pkg/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,21 +24,22 @@ type RouterConfig struct {
 	JWTManager          *auth.JWTManager      // JWT manager for token validation middleware
 	AuthRateLimit       int                   // Requests per window for auth endpoints (default: 10)
 	AuthRateLimitWindow time.Duration         // Time window for auth rate limiting (default: 1 minute)
+	Logger              *slog.Logger          // Structured logger for request logging
 }
 
 // Router sets up the HTTP routes and returns a configured gin.Engine.
 // It applies the following middleware chain to all routes:
 //   - Recovery: Recovers from panics and returns 500 errors
-//   - RequestLogger: Logs incoming requests
+//   - RequestLogger: Structured logging with slog for all requests
 //   - CORS: Handles Cross-Origin Resource Sharing
 //   - RequireHTTPS: Enforces HTTPS in production
 //   - SecureHeadersRelaxed: Adds security headers (CSP, X-Frame-Options, etc.)
 func Router(config RouterConfig) *gin.Engine {
-	router := gin.Default()
+	router := gin.New() // Use gin.New() instead of gin.Default() to avoid default logger
 
 	// Apply global middleware stack for security and observability
 	router.Use(middleware.Recovery())
-	router.Use(middleware.RequestLogger())
+	router.Use(logging.RequestLogger(config.Logger)) // Use structured logging middleware
 	router.Use(middleware.CORS())
 	router.Use(middleware.RequireHTTPS())
 	router.Use(middleware.SecureHeadersRelaxed())

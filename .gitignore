@@ -61,3 +61,19 @@ web-build/
 .env
 .env.local
 .env.*.local
+
+# Go
+#
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+services/*/bin/
+services/*/*-service
+services/*/user-service
+services/*/fetcher-service
+services/*/recommender-service
