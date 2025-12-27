@@ -54,7 +54,7 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		}
 
 		// Store user ID in context
-		ctx := context.WithValue(r.Context(), UserIDContextKey, claims.UserID)
+		ctx := SetUserIDInContext(r.Context(), claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -81,7 +81,7 @@ func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 		}
 
 		// Store user ID in context
-		ctx := context.WithValue(r.Context(), UserIDContextKey, claims.UserID)
+		ctx := SetUserIDInContext(r.Context(), claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -94,6 +94,12 @@ func (m *Middleware) sendError(w http.ResponseWriter, statusCode int, error stri
 		Error:   error,
 		Message: message,
 	})
+}
+
+// SetUserIDInContext adds the user ID to the request context
+// Returns a new context with the user ID value
+func SetUserIDInContext(ctx context.Context, userID uuid.UUID) context.Context {
+	return context.WithValue(ctx, UserIDContextKey, userID)
 }
 
 // GetUserIDFromContext retrieves the user ID from the request context

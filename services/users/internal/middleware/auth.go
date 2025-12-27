@@ -3,7 +3,6 @@ package middleware
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/andrew-craig/cairn-core/user-service/internal/auth"
 	"github.com/gin-gonic/gin"
@@ -154,21 +153,4 @@ func MustGetUserID(c *gin.Context) uuid.UUID {
 		panic("user ID not found in context - ensure JWTAuth middleware is applied")
 	}
 	return userID
-}
-
-// extractTokenFromHeader is a helper that tries multiple common token formats
-// This can handle: "Bearer <token>", "bearer <token>", "<token>"
-func extractTokenFromHeader(authHeader string) string {
-	if authHeader == "" {
-		return ""
-	}
-
-	// Try Bearer format first
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-		return parts[1]
-	}
-
-	// If no Bearer prefix, return the header as-is (might be just the token)
-	return authHeader
 }

@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
 )
@@ -85,9 +84,6 @@ func (s *RecommendationService) Routes() http.Handler {
 func (s *RecommendationService) handleGetRecommendations(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
 	userID := auth.MustGetUserID(r.Context())
-
-	// Parse user ID from path if needed (for validation)
-	pathUserID := strings.TrimPrefix(r.URL.Path, "/api/v1/recommendations/")
 
 	// Optionally validate that path user ID matches authenticated user
 	// (implement authorization logic here)

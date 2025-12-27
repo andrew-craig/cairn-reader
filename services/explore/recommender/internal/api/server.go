@@ -53,11 +53,12 @@ func (s *Server) Routes() http.Handler {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Route voting endpoints based on path patterns and HTTP method
 			if strings.HasSuffix(r.URL.Path, "/vote") {
-				if r.Method == http.MethodPost {
+				switch r.Method {
+				case http.MethodPost:
 					s.handleVote(w, r)
-				} else if r.Method == http.MethodDelete {
+				case http.MethodDelete:
 					s.handleRemoveVote(w, r)
-				} else {
+				default:
 					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				}
 			} else if strings.HasSuffix(r.URL.Path, "/votes") {

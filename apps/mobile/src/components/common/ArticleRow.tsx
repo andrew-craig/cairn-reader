@@ -8,7 +8,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Article } from '../../types';
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
+import { Colors, FontFamily } from '../../constants';
 
 interface ArticleRowProps {
   article: Article;
