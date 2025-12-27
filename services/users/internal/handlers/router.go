@@ -1,3 +1,5 @@
+// Package handlers provides HTTP request handlers for the user service API.
+// It sets up routes, middleware, and connects handlers to their respective services.
 package handlers
 
 import (
@@ -10,22 +12,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RouterConfig holds dependencies needed to set up routes
+// RouterConfig holds all dependencies needed to set up the HTTP router.
+// These dependencies are injected from the main application during startup.
 type RouterConfig struct {
-	DB                  *database.DB
-	VaultClient         *auth.VaultClient
-	AuthService         services.AuthService
-	UserService         services.UserService
-	JWTManager          *auth.JWTManager
-	AuthRateLimit       int           // Requests per window for auth endpoints
-	AuthRateLimitWindow time.Duration // Time window for auth rate limiting
+	DB                  *database.DB          // Database connection for health checks
+	VaultClient         *auth.VaultClient     // Vault client for health checks
+	AuthService         services.AuthService  // Service handling authentication operations
+	UserService         services.UserService  // Service handling user management operations
+	JWTManager          *auth.JWTManager      // JWT manager for token validation middleware
+	AuthRateLimit       int                   // Requests per window for auth endpoints (default: 10)
+	AuthRateLimitWindow time.Duration         // Time window for auth rate limiting (default: 1 minute)
 }
 
-// Router sets up the HTTP routes
+// Router sets up the HTTP routes and returns a configured gin.Engine.
+// It applies the following middleware chain to all routes:
+//   - Recovery: Recovers from panics and returns 500 errors
+//   - RequestLogger: Logs incoming requests
+//   - CORS: Handles Cross-Origin Resource Sharing
+//   - RequireHTTPS: Enforces HTTPS in production
+//   - SecureHeadersRelaxed: Adds security headers (CSP, X-Frame-Options, etc.)
 func Router(config RouterConfig) *gin.Engine {
 	router := gin.Default()
 
-	// Apply global middleware
+	// Apply global middleware stack for security and observability
 	router.Use(middleware.Recovery())
 	router.Use(middleware.RequestLogger())
 	router.Use(middleware.CORS())
@@ -51,28 +60,30 @@ func Router(config RouterConfig) *gin.Engine {
 		authRateLimitWindow = 1 * time.Minute // Default: 1 minute window
 	}
 
-	// Authentication endpoints with rate limiting
+	// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
+	// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
 	auth := router.Group("/auth")
 	auth.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
 	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/register/mobile", authHandler.RegisterMobile)
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/login/mobile", authHandler.LoginMobile)
-		auth.POST("/refresh", authHandler.Refresh)
-		auth.POST("/logout", authHandler.Logout)
-		// logout-all requires authentication
+		auth.POST("/register", authHandler.Register)           // Create account with email/password
+		auth.POST("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
+		auth.POST("/login", authHandler.Login)                 // Authenticate with email/password
+		auth.POST("/login/mobile", authHandler.LoginMobile)    // Authenticate with device ID
+		auth.POST("/refresh", authHandler.Refresh)             // Exchange refresh token for new access token
+		auth.POST("/logout", authHandler.Logout)               // Revoke a specific refresh token
+		// logout-all requires authentication since it needs to know which user's tokens to revoke
 		auth.POST("/logout-all", middleware.JWTAuth(config.JWTManager), authHandler.LogoutAll)
 	}
 
-	// User management endpoints
+	// User management endpoints - all routes require JWT authentication
+	// Authorization (ensuring users can only access their own data) is handled in the service layer
 	users := router.Group("/users")
-	users.Use(middleware.JWTAuth(config.JWTManager)) // All user endpoints require authentication
+	users.Use(middleware.JWTAuth(config.JWTManager))
 	{
-		users.GET("/:id", userHandler.GetUser)
-		users.PATCH("/:id", userHandler.UpdateUser)
-		users.POST("/:id/upgrade", userHandler.UpgradeAccount)
-		users.DELETE("/:id", userHandler.DeleteUser)
+		users.GET("/:id", userHandler.GetUser)           // Get user profile
+		users.PATCH("/:id", userHandler.UpdateUser)      // Update user email
+		users.POST("/:id/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
+		users.DELETE("/:id", userHandler.DeleteUser)     // Delete user account and all associated data
 	}
 
 	return router

@@ -1,6 +1,11 @@
+// Package middleware provides HTTP middleware components for the user service.
+// This file implements a token bucket rate limiter that supports per-IP,
+// per-user, and custom key-based rate limiting with automatic cleanup
+// of stale entries to prevent memory leaks.
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -108,7 +113,8 @@ func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 		key := c.ClientIP()
 
 		if !limiter.allow(key) {
-			c.Header("X-RateLimit-Limit", string(rune(limit)))
+			// Set rate limit headers to inform the client of the limits
+			c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
 			c.Header("X-RateLimit-Window", window.String())
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate limit exceeded",
@@ -122,8 +128,9 @@ func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
 	}
 }
 
-// RateLimitByUser creates a middleware that limits requests per authenticated user
-// This should be used after the JWTAuth middleware
+// RateLimitByUser creates a middleware that limits requests per authenticated user.
+// This should be used after the JWTAuth middleware. If the user is not authenticated,
+// it falls back to IP-based rate limiting.
 func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
 	limiter := NewRateLimiter(limit, window)
 
@@ -134,7 +141,7 @@ func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
 			// If user is not authenticated, fall back to IP-based rate limiting
 			key := c.ClientIP()
 			if !limiter.allow(key) {
-				c.Header("X-RateLimit-Limit", string(rune(limit)))
+				c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
 				c.Header("X-RateLimit-Window", window.String())
 				c.JSON(http.StatusTooManyRequests, gin.H{
 					"error":       "rate limit exceeded",
@@ -144,10 +151,10 @@ func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
 				return
 			}
 		} else {
-			// Use user ID as the key
+			// Use user ID as the key for authenticated users
 			key := userID.String()
 			if !limiter.allow(key) {
-				c.Header("X-RateLimit-Limit", string(rune(limit)))
+				c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
 				c.Header("X-RateLimit-Window", window.String())
 				c.JSON(http.StatusTooManyRequests, gin.H{
 					"error":       "rate limit exceeded",
@@ -162,7 +169,8 @@ func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
 	}
 }
 
-// RateLimitWithKey creates a middleware that limits requests using a custom key function
+// RateLimitWithKey creates a middleware that limits requests using a custom key function.
+// This allows for flexible rate limiting strategies based on any request attribute.
 type KeyFunc func(*gin.Context) string
 
 func RateLimitWithKey(limit int, window time.Duration, keyFunc KeyFunc) gin.HandlerFunc {
@@ -172,7 +180,7 @@ func RateLimitWithKey(limit int, window time.Duration, keyFunc KeyFunc) gin.Hand
 		key := keyFunc(c)
 
 		if !limiter.allow(key) {
-			c.Header("X-RateLimit-Limit", string(rune(limit)))
+			c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
 			c.Header("X-RateLimit-Window", window.String())
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate limit exceeded",

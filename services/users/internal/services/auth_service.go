@@ -1,3 +1,7 @@
+// Package services provides the business logic layer for the user service.
+// It contains the AuthService for authentication operations (registration, login, token management)
+// and the UserService for user profile management (get, update, upgrade, delete).
+// Services orchestrate between handlers (HTTP layer) and repositories (database layer).
 package services
 
 import (
