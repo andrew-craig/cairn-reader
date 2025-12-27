@@ -34,7 +34,7 @@ func TestFilterNewArticles_FirstFetch(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	// Create test items with different publish times
 	now := time.Now()
@@ -71,7 +71,7 @@ func TestFilterNewArticles_OnlyNew(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	// Last fetch was 2 hours ago
 	lastFetch := time.Now().Add(-2 * time.Hour)
@@ -115,7 +115,7 @@ func TestFilterNewArticles_UseUpdatedDate(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	lastFetch := time.Now().Add(-2 * time.Hour)
 	now := time.Now()
@@ -148,7 +148,7 @@ func TestFilterNewArticles_EmptyItems(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	lastFetch := time.Now().Add(-2 * time.Hour)
 	items := []*gofeed.Item{}
@@ -171,7 +171,7 @@ func TestConvertToArticle_Complete(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	publishedTime := time.Now()
 	item := &gofeed.Item{
@@ -230,7 +230,7 @@ func TestConvertToArticle_Minimal(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 
 	// Minimal item with only required fields
 	item := &gofeed.Item{
@@ -303,7 +303,7 @@ func TestFetchSingleFeed_Success(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	// Create fetcher and fetch
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
 	err := fetcher.FetchSingleFeed(ctx)
@@ -350,7 +350,7 @@ func TestFetchSingleFeed_HTTPError(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	// Create fetcher and fetch
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
 	err := fetcher.FetchSingleFeed(ctx)
@@ -396,7 +396,7 @@ func TestFetchSingleFeed_RecommenderError(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	// Create fetcher and fetch
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
 	err := fetcher.FetchSingleFeed(ctx)
@@ -423,7 +423,7 @@ func TestFetchSingleFeed_NoEnabledFeeds(t *testing.T) {
 	testutil.CreateTestFeed(t, database, testutil.TestFeedURL1, false, nil, 10)
 
 	// Create fetcher and fetch
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
 	err := fetcher.FetchSingleFeed(ctx)
@@ -458,7 +458,7 @@ func TestFetchSingleFeed_OnlyNewArticles(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, &lastFetch, 0)
 
 	// Create fetcher and fetch
-	fetcher := NewFetcher(repo, mockClient)
+	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
 	err := fetcher.FetchSingleFeed(ctx)

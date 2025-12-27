@@ -91,7 +91,7 @@ https://example.com/feed3.xml`))
 	recommenderClient := client.NewRecommenderClient(recommenderServer.URL)
 
 	// Step 4: Fetch feeds one by one
-	f := fetcher.NewFetcher(repo, recommenderClient)
+	f := fetcher.NewFetcher(repo, recommenderClient, 60*time.Second)
 
 	// Fetch first feed (should be feed 1 since none have been fetched)
 	err = f.FetchSingleFeed(ctx)
@@ -184,7 +184,7 @@ func TestFeedHealthTracking(t *testing.T) {
 	recommenderClient := client.NewRecommenderClient(recommenderServer.URL)
 
 	// Create fetcher
-	f := fetcher.NewFetcher(repo, recommenderClient)
+	f := fetcher.NewFetcher(repo, recommenderClient, 60*time.Second)
 
 	// Fetch 10 times (should fail each time and disable feed)
 	for i := 1; i <= 10; i++ {
