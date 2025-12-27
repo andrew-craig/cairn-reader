@@ -44,7 +44,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Printf("error closing database: %v", err)
+		}
+	}()
 
 	// Initialize article repository
 	articleRepo := db.NewArticleRepository(database)

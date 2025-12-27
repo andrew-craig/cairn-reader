@@ -24,7 +24,9 @@ func setupTestDB(t *testing.T) *sql.DB {
 	}
 
 	if err := db.Ping(); err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			t.Logf("error closing database: %v", closeErr)
+		}
 		t.Skipf("Skipping test: could not ping test database: %v", err)
 	}
 
@@ -55,7 +57,9 @@ func cleanupTestDB(t *testing.T, db *sql.DB) {
 func teardownTestDB(t *testing.T, db *sql.DB) {
 	t.Helper()
 	cleanupTestDB(t, db)
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Logf("error closing database: %v", err)
+	}
 }
 
 // createTestArticle creates a test article with default values

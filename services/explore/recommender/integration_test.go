@@ -88,7 +88,9 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 func (suite *IntegrationTestSuite) teardown() {
 	cleanupTestData(nil, suite.database)
 	suite.server.Close()
-	suite.database.Close()
+	if err := suite.database.Close(); err != nil {
+		fmt.Printf("error closing database: %v\n", err)
+	}
 }
 
 func cleanupTestData(t *testing.T, db *sql.DB) {
@@ -141,7 +143,11 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to submit article: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Errorf("Expected status 201, got %d", resp.StatusCode)

@@ -40,7 +40,11 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			fmt.Printf("error rolling back transaction: %v\n", err)
+		}
+	}()
 
 	// Check if user has already voted on this article
 	var existingVoteType sql.NullString
@@ -142,7 +146,11 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, externalUserID string, 
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			fmt.Printf("error rolling back transaction: %v\n", err)
+		}
+	}()
 
 	// Get the existing vote type
 	var voteType string

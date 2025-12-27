@@ -13,7 +13,11 @@ import (
 
 func TestSyncFeeds_Success(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -21,7 +25,9 @@ func TestSyncFeeds_Success(t *testing.T) {
 	// Create a test HTTP server that returns sample Kagi list
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(testutil.SampleKagiList()))
+		if _, err := w.Write([]byte(testutil.SampleKagiList())); err != nil {
+			t.Logf("error writing response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -56,7 +62,11 @@ func TestSyncFeeds_Success(t *testing.T) {
 
 func TestSyncFeeds_SkipsComments(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -64,12 +74,14 @@ func TestSyncFeeds_SkipsComments(t *testing.T) {
 	// Create a test HTTP server with comments and blank lines
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`# Comment line
+		if _, err := w.Write([]byte(`# Comment line
 https://example.com/feed1.xml
 
 # Another comment
 https://example.com/feed2.xml
-`))
+`)); err != nil {
+			t.Logf("error writing response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -92,7 +104,11 @@ https://example.com/feed2.xml
 
 func TestSyncFeeds_PreservesExistingMetadata(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -105,8 +121,10 @@ func TestSyncFeeds_PreservesExistingMetadata(t *testing.T) {
 	// Create a test HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`https://example.com/feed1.xml
-https://example.com/feed2.xml`))
+		if _, err := w.Write([]byte(`https://example.com/feed1.xml
+https://example.com/feed2.xml`)); err != nil {
+			t.Logf("error writing response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -140,7 +158,11 @@ https://example.com/feed2.xml`))
 
 func TestSyncFeeds_HTTPError(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -170,7 +192,11 @@ func TestSyncFeeds_HTTPError(t *testing.T) {
 
 func TestSyncFeeds_EmptyResponse(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -178,7 +204,9 @@ func TestSyncFeeds_EmptyResponse(t *testing.T) {
 	// Create a test HTTP server that returns empty content
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(""))
+		if _, err := w.Write([]byte("")); err != nil {
+			t.Logf("error writing response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -201,7 +229,11 @@ func TestSyncFeeds_EmptyResponse(t *testing.T) {
 
 func TestSyncFeeds_DuplicatesInList(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -209,11 +241,13 @@ func TestSyncFeeds_DuplicatesInList(t *testing.T) {
 	// Create a test HTTP server with duplicate URLs
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`https://example.com/feed1.xml
+		if _, err := w.Write([]byte(`https://example.com/feed1.xml
 https://example.com/feed2.xml
 https://example.com/feed1.xml
 https://example.com/feed3.xml
-https://example.com/feed2.xml`))
+https://example.com/feed2.xml`)); err != nil {
+			t.Logf("error writing response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -236,7 +270,11 @@ https://example.com/feed2.xml`))
 
 func TestNewFeedSyncer(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 
 	repo := db.NewFeedRepository(database)
 	url := "https://example.com/feeds.txt"

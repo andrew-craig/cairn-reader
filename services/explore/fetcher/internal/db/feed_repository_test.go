@@ -11,7 +11,11 @@ import (
 
 func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -47,7 +51,11 @@ func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {
 
 func TestGetNextFeed_PrioritizesOldestFetch(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -79,7 +87,11 @@ func TestGetNextFeed_PrioritizesOldestFetch(t *testing.T) {
 
 func TestGetNextFeed_SkipsDisabledFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -107,7 +119,11 @@ func TestGetNextFeed_SkipsDisabledFeeds(t *testing.T) {
 
 func TestGetNextFeed_NoEnabledFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -130,7 +146,11 @@ func TestGetNextFeed_NoEnabledFeeds(t *testing.T) {
 
 func TestUpdateFetchResult_Success(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -161,7 +181,11 @@ func TestUpdateFetchResult_Success(t *testing.T) {
 
 func TestUpdateFetchResult_Failure(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -190,7 +214,11 @@ func TestUpdateFetchResult_Failure(t *testing.T) {
 
 func TestUpdateFetchResult_DisablesAfter10Failures(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -219,7 +247,11 @@ func TestUpdateFetchResult_DisablesAfter10Failures(t *testing.T) {
 
 func TestImportFeeds_NewFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -246,7 +278,11 @@ func TestImportFeeds_NewFeeds(t *testing.T) {
 
 func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -289,7 +325,11 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 
 func TestRecordFetchHistory_Success(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -340,7 +380,11 @@ func TestRecordFetchHistory_Success(t *testing.T) {
 
 func TestRecordFetchHistory_Failure(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -384,7 +428,11 @@ func TestRecordFetchHistory_Failure(t *testing.T) {
 
 func TestListFeeds_All(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -408,7 +456,11 @@ func TestListFeeds_All(t *testing.T) {
 
 func TestListFeeds_EnabledOnly(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Logf("error closing database: %v", err)
+		}
+	}()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
