@@ -79,7 +79,11 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Printf("error rolling back transaction: %v", err)
+		}
+	}()
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO articles (
@@ -99,7 +103,11 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			log.Printf("error closing statement: %v", err)
+		}
+	}()
 
 	for _, article := range articles {
 		_, err := stmt.ExecContext(ctx,
@@ -185,7 +193,11 @@ func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent articles: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("error closing rows: %v", err)
+		}
+	}()
 
 	return r.scanArticles(rows)
 }
@@ -217,7 +229,11 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, externalUserID
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unread articles: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("error closing rows: %v", err)
+		}
+	}()
 
 	return r.scanArticles(rows)
 }
@@ -253,7 +269,11 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 	if err != nil {
 		return nil, fmt.Errorf("failed to get articles for recommendation: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("error closing rows: %v", err)
+		}
+	}()
 
 	articles, err := r.scanArticles(rows)
 	if err != nil {
@@ -293,7 +313,11 @@ func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, external
 	if err != nil {
 		return nil, fmt.Errorf("failed to get low exposure articles: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("error closing rows: %v", err)
+		}
+	}()
 
 	return r.scanArticles(rows)
 }

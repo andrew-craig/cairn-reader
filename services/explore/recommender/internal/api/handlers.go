@@ -14,10 +14,12 @@ import (
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "healthy",
 		"service": "recommender",
-	})
+	}); err != nil {
+		log.Printf("error encoding response: %v", err)
+	}
 }
 
 // handleArticles receives articles from the fetcher
@@ -38,7 +40,9 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 
 	if len(payload.Articles) == 0 {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "no articles to process"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "no articles to process"}); err != nil {
+			log.Printf("error encoding response: %v", err)
+		}
 		return
 	}
 
@@ -53,11 +57,13 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "success",
 		"count":   len(payload.Articles),
 		"message": "Articles stored successfully",
-	})
+	}); err != nil {
+		log.Printf("error encoding response: %v", err)
+	}
 }
 
 // handleRecommendations returns recommended articles for a user

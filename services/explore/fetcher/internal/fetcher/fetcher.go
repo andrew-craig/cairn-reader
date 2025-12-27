@@ -68,8 +68,12 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 	// 2. Fetch RSS content
 	feedData, err := f.fetchRSS(ctx, feed.URL)
 	if err != nil {
-		f.feedRepo.UpdateFetchResult(ctx, feed.ID, false)
-		f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, 0, 0, err.Error())
+		if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); updateErr != nil {
+			log.Printf("error updating fetch result for feed %d: %v", feed.ID, updateErr)
+		}
+		if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, 0, 0, err.Error()); histErr != nil {
+			log.Printf("error recording fetch history for feed %d: %v", feed.ID, histErr)
+		}
 		return fmt.Errorf("fetch RSS: %w", err)
 	}
 
@@ -85,8 +89,12 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 	if len(newArticles) > 0 {
 		if err := f.recommenderClient.SubmitArticles(ctx, newArticles); err != nil {
 			log.Printf("Failed to submit articles: %v", err)
-			f.feedRepo.UpdateFetchResult(ctx, feed.ID, false)
-			f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, len(feedData.Items), 0, err.Error())
+			if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); updateErr != nil {
+				log.Printf("error updating fetch result for feed %d: %v", feed.ID, updateErr)
+			}
+			if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, len(feedData.Items), 0, err.Error()); histErr != nil {
+				log.Printf("error recording fetch history for feed %d: %v", feed.ID, histErr)
+			}
 			return fmt.Errorf("submit articles: %w", err)
 		}
 		articlesSent = len(newArticles)
@@ -95,8 +103,12 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 
 	// 5. Update fetch status
 	success := true // Success if we completed the fetch, even if no new articles
-	f.feedRepo.UpdateFetchResult(ctx, feed.ID, success)
-	f.feedRepo.RecordFetchHistory(ctx, feed.ID, success, len(feedData.Items), articlesSent, "")
+	if err := f.feedRepo.UpdateFetchResult(ctx, feed.ID, success); err != nil {
+		log.Printf("error updating fetch result for feed %d: %v", feed.ID, err)
+	}
+	if err := f.feedRepo.RecordFetchHistory(ctx, feed.ID, success, len(feedData.Items), articlesSent, ""); err != nil {
+		log.Printf("error recording fetch history for feed %d: %v", feed.ID, err)
+	}
 
 	return nil
 }

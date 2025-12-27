@@ -68,7 +68,11 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		go feedFetcher.FetchSingleFeed(ctx)
+		go func() {
+			if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
+				log.Printf("error in fetch goroutine: %v", err)
+			}
+		}()
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"fetch triggered"}`))
 	})
@@ -87,7 +91,11 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		go feedSyncer.SyncOnce(ctx)
+		go func() {
+			if err := feedSyncer.SyncOnce(ctx); err != nil {
+				log.Printf("error in sync goroutine: %v", err)
+			}
+		}()
 		w.WriteHeader(http.StatusAccepted)
 		w.Write([]byte(`{"status":"sync triggered"}`))
 	})

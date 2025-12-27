@@ -130,7 +130,11 @@ func (r *FeedRepository) ImportFeeds(ctx context.Context, feedURLs []string) err
 	if err != nil {
 		return fmt.Errorf("prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			log.Printf("error closing statement: %v", err)
+		}
+	}()
 
 	newCount := 0
 	for _, url := range feedURLs {

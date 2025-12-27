@@ -71,7 +71,11 @@ func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("fetch kagi feed list: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
