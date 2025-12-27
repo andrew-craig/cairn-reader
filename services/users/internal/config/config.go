@@ -14,6 +14,13 @@ type Config struct {
 	Vault    VaultConfig
 	JWT      JWTConfig
 	Security SecurityConfig
+	Logging  LoggingConfig
+}
+
+// LoggingConfig contains logging configuration
+type LoggingConfig struct {
+	Level  string // debug, info, warn, error
+	Format string // json, text
 }
 
 // ServerConfig contains HTTP server configuration
@@ -108,6 +115,10 @@ func Load() (*Config, error) {
 			RequirePasswordComplexity: getBoolEnv("REQUIRE_PASSWORD_COMPLEXITY", true),
 			RateLimitRequests:       getIntEnv("RATE_LIMIT_REQUESTS", 100),
 			RateLimitWindow:         getDurationEnv("RATE_LIMIT_WINDOW", 1*time.Minute),
+		},
+		Logging: LoggingConfig{
+			Level:  getEnv("LOG_LEVEL", "info"),
+			Format: getEnv("LOG_FORMAT", "text"),
 		},
 	}
 

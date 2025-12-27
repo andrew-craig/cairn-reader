@@ -9,7 +9,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,22 +20,39 @@ import (
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/db"
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/fetcher"
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/sync"
+	"github.com/andrew-craig/cairn-explore/pkg/logging"
 )
 
 func main() {
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       getEnv("LOG_LEVEL", "info"),
+		Format:      getEnv("LOG_FORMAT", "text"),
+		ServiceName: "fetcher",
+	})
+	logging.SetDefault(logger)
+
 	// Load configuration from environment variables with sensible defaults
 	port := getEnv("PORT", "8080")
 	recommenderURL := getEnv("RECOMMENDER_URL", "http://localhost:8081")
 	fetchInterval := getEnvDuration("FETCH_INTERVAL", 60) // Default: 60 seconds (1 feed per minute)
 	kagiFeedURL := getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt")
 
+	slog.Info("starting service",
+		slog.String("port", port),
+		slog.Duration("fetch_interval", fetchInterval),
+	)
+
 	// Initialize database connection
+	slog.Info("connecting to database")
 	dbConfig := db.NewConfigFromEnv()
 	database, err := dbConfig.Connect()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer database.Close()
+	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Initialize repositories
 	feedRepo := db.NewFeedRepository(database)
@@ -48,9 +65,10 @@ func main() {
 	defer cancel()
 
 	// Start feed sync in background (runs once immediately, then every 24 hours)
+	slog.Info("starting feed sync background task")
 	go func() {
 		if err := feedSyncer.Run(ctx); err != nil {
-			log.Printf("Feed syncer stopped: %v", err)
+			slog.Info("feed syncer stopped", slog.Any("error", err))
 		}
 	}()
 
@@ -61,9 +79,10 @@ func main() {
 	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient, fetchInterval)
 
 	// Start background fetcher (fetches 1 feed per minute)
+	slog.Info("starting feed fetcher background task")
 	go func() {
 		if err := feedFetcher.Run(ctx); err != nil {
-			log.Printf("Fetcher stopped: %v", err)
+			slog.Info("fetcher stopped", slog.Any("error", err))
 		}
 	}()
 
@@ -82,7 +101,7 @@ func main() {
 		}
 		go func() {
 			if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
-				log.Printf("error in fetch goroutine: %v", err)
+				slog.Error("error in fetch goroutine", slog.Any("error", err))
 			}
 		}()
 		w.WriteHeader(http.StatusAccepted)
@@ -105,7 +124,7 @@ func main() {
 		}
 		go func() {
 			if err := feedSyncer.SyncOnce(ctx); err != nil {
-				log.Printf("error in sync goroutine: %v", err)
+				slog.Error("error in sync goroutine", slog.Any("error", err))
 			}
 		}()
 		w.WriteHeader(http.StatusAccepted)
@@ -125,21 +144,23 @@ func main() {
 		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 		<-sigChan
 
-		log.Println("Shutting down fetcher service...")
+		slog.Info("shutting down service")
 		cancel()
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
-			log.Printf("Error during shutdown: %v", err)
+			slog.Error("error during shutdown", slog.Any("error", err))
 		}
 	}()
 
-	log.Printf("Fetcher service starting on port %s", port)
-	log.Printf("Fetch interval: %v", fetchInterval)
+	slog.Info("service ready to accept requests",
+		slog.String("port", port),
+	)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("server error", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 

@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"time"
@@ -28,14 +28,13 @@ func Recovery() gin.HandlerFunc {
 				}
 
 				// Log the panic with stack trace
-				log.Printf(
-					"PANIC RECOVERED: [%s] error=%v user=%s path=%s method=%s stack=%s",
-					requestID,
-					err,
-					userID,
-					c.Request.URL.Path,
-					c.Request.Method,
-					debug.Stack(),
+				slog.Error("panic recovered",
+					slog.String("request_id", requestID),
+					slog.Any("error", err),
+					slog.String("user_id", userID),
+					slog.String("path", c.Request.URL.Path),
+					slog.String("method", c.Request.Method),
+					slog.String("stack", string(debug.Stack())),
 				)
 
 				// Return 500 error
@@ -74,14 +73,13 @@ func RecoveryWithDetails() gin.HandlerFunc {
 				stack := string(debug.Stack())
 
 				// Log the panic with stack trace
-				log.Printf(
-					"PANIC RECOVERED: [%s] error=%v user=%s path=%s method=%s\nstack:\n%s",
-					requestID,
-					err,
-					userID,
-					c.Request.URL.Path,
-					c.Request.Method,
-					stack,
+				slog.Error("panic recovered",
+					slog.String("request_id", requestID),
+					slog.Any("error", err),
+					slog.String("user_id", userID),
+					slog.String("path", c.Request.URL.Path),
+					slog.String("method", c.Request.Method),
+					slog.String("stack", stack),
 				)
 
 				// Return 500 error with details (development only!)
@@ -137,16 +135,15 @@ func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
 	}
 
 	// Log the panic
-	log.Printf(
-		"PANIC RECOVERED: [%s] error=%v user=%s path=%s method=%s ip=%s timestamp=%s\nstack:\n%s",
-		requestID,
-		err,
-		userID,
-		c.Request.URL.Path,
-		c.Request.Method,
-		c.ClientIP(),
-		time.Now().Format(time.RFC3339),
-		stack,
+	slog.Error("panic recovered",
+		slog.String("request_id", requestID),
+		slog.Any("error", err),
+		slog.String("user_id", userID),
+		slog.String("path", c.Request.URL.Path),
+		slog.String("method", c.Request.Method),
+		slog.String("client_ip", c.ClientIP()),
+		slog.Time("timestamp", time.Now()),
+		slog.String("stack", string(stack)),
 	)
 
 	// Return error response
@@ -197,19 +194,21 @@ func SafeRecovery() gin.HandlerFunc {
 				}
 
 				// Log detailed panic information
-				log.Printf(
-					"PANIC: [%s] error=%v user=%s ip=%s path=%s method=%s timestamp=%s",
-					requestID,
-					err,
-					userID,
-					c.ClientIP(),
-					c.Request.URL.Path,
-					c.Request.Method,
-					time.Now().Format(time.RFC3339),
+				slog.Error("panic",
+					slog.String("request_id", requestID),
+					slog.Any("error", err),
+					slog.String("user_id", userID),
+					slog.String("client_ip", c.ClientIP()),
+					slog.String("path", c.Request.URL.Path),
+					slog.String("method", c.Request.Method),
+					slog.Time("timestamp", time.Now()),
 				)
 
 				// Log stack trace separately (for analysis, not sent to client)
-				log.Printf("Stack trace for request [%s]:\n%s", requestID, debug.Stack())
+				slog.Error("stack trace",
+					slog.String("request_id", requestID),
+					slog.String("stack", string(debug.Stack())),
+				)
 
 				// Return generic error (don't expose internal details)
 				c.JSON(http.StatusInternalServerError, gin.H{
