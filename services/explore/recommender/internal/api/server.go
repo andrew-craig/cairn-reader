@@ -1,3 +1,5 @@
+// Package api provides the HTTP API layer for the recommender service.
+// It handles routing, request/response handling, and authentication middleware.
 package api
 
 import (

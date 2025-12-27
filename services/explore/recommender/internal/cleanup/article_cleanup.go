@@ -1,3 +1,6 @@
+// Package cleanup provides background jobs for article retention management.
+// It handles soft-deletion (marking articles as deleted) and hard-deletion
+// (permanent removal) of old articles based on configurable retention periods.
 package cleanup
 
 import (

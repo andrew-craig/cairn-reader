@@ -1,3 +1,5 @@
+// Package db provides database access for the recommender service.
+// It implements the repository pattern for articles, users, and votes.
 package db
 
 import (

@@ -1,3 +1,5 @@
+// Package recommend implements the article recommendation algorithm.
+// It selects articles for users based on quality scores and exposure metrics.
 package recommend
 
 import (
@@ -118,7 +120,8 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	return recommended, nil
 }
 
-// selectHighQualityArticles selects the top N articles based on quality score
+// selectHighQualityArticles selects the top N articles based on quality score.
+// It calculates quality scores for all articles and returns the top N by score.
 func (e *Engine) selectHighQualityArticles(articles []models.Article, count int) []models.Article {
 	type scoredArticle struct {
 		article models.Article
@@ -133,6 +136,8 @@ func (e *Engine) selectHighQualityArticles(articles []models.Article, count int)
 	}
 
 	// Sort by score (descending)
+	// NOTE: This uses a simple O(n²) sort. For larger datasets (100+ articles),
+	// consider using sort.Slice for O(n log n) performance.
 	for i := 0; i < len(scored); i++ {
 		for j := i + 1; j < len(scored); j++ {
 			if scored[j].score > scored[i].score {
