@@ -1,3 +1,6 @@
+// Package database provides PostgreSQL database connectivity and repository
+// implementations for the user service. It uses pgx for high-performance
+// PostgreSQL operations with connection pooling.
 package database
 
 import (
@@ -8,22 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DB wraps the database connection pool
+// DB wraps the pgx connection pool and provides health checking capabilities.
+// It should be created via New() and closed via Close() when the application shuts down.
 type DB struct {
 	Pool *pgxpool.Pool
 }
 
-// Config holds database configuration
+// Config holds PostgreSQL database connection configuration.
+// All fields except SSLMode are required for a successful connection.
 type Config struct {
-	Host            string
-	Port            string
-	User            string
-	Password        string
-	Database        string
-	SSLMode         string
-	MaxOpenConns    int32
-	MaxIdleConns    int32
-	ConnMaxLifetime time.Duration
+	Host            string        // Database server hostname or IP address
+	Port            string        // Database server port (typically "5432")
+	User            string        // Database username
+	Password        string        // Database password
+	Database        string        // Database name to connect to
+	SSLMode         string        // SSL mode: "disable", "require", "verify-ca", "verify-full"
+	MaxOpenConns    int32         // Maximum number of open connections in the pool
+	MaxIdleConns    int32         // Minimum number of idle connections maintained in the pool
+	ConnMaxLifetime time.Duration // Maximum lifetime of a connection before it's closed and replaced
 }
 
 // New creates a new database connection
