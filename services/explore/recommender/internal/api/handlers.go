@@ -17,7 +17,8 @@ const (
 	maxSimpleRequestSize = 1 << 10  // 1KB for simple JSON requests
 )
 
-// handleHealth returns the health status
+// handleHealth returns the health status (liveness probe)
+// This endpoint indicates if the process is running
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -26,6 +27,32 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"service": "recommender",
 	}); err != nil {
 		slog.Error("failed to encode health response", slog.Any("error", err))
+	}
+}
+
+// handleReady returns the readiness status (readiness probe)
+// This endpoint checks if dependencies (database) are available
+func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
+	// Check database connectivity
+	if err := s.db.PingContext(r.Context()); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		if err := json.NewEncoder(w).Encode(map[string]string{
+			"status": "not ready",
+			"error":  "database unavailable",
+		}); err != nil {
+			slog.Error("failed to encode readiness response", slog.Any("error", err))
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ready",
+		"service": "recommender",
+	}); err != nil {
+		slog.Error("failed to encode readiness response", slog.Any("error", err))
 	}
 }
 
