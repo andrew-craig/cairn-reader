@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/andrew-craig/cairn-explore/pkg/models"
 	"github.com/lib/pq"
@@ -83,7 +83,7 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Printf("error rolling back transaction: %v", err)
+			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
 
@@ -107,7 +107,7 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 	}
 	defer func() {
 		if err := stmt.Close(); err != nil {
-			log.Printf("error closing statement: %v", err)
+			slog.Error("failed to close statement", slog.Any("error", err))
 		}
 	}()
 
@@ -197,7 +197,7 @@ func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("error closing rows: %v", err)
+			slog.Error("failed to close rows", slog.Any("error", err))
 		}
 	}()
 
@@ -233,7 +233,7 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, externalUserID
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("error closing rows: %v", err)
+			slog.Error("failed to close rows", slog.Any("error", err))
 		}
 	}()
 
@@ -265,7 +265,10 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 		LIMIT $2
 	`
 
-	log.Printf("[DB] GetForRecommendation: userID=%s (internal=%d), limit=%d", externalUserID, internalUserID, limit)
+	slog.Info("getting articles for recommendation",
+		slog.String("user_id", externalUserID),
+		slog.Int("internal_user_id", internalUserID),
+		slog.Int("limit", limit))
 
 	rows, err := r.db.QueryContext(ctx, query, internalUserID, limit)
 	if err != nil {
@@ -273,7 +276,7 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("error closing rows: %v", err)
+			slog.Error("failed to close rows", slog.Any("error", err))
 		}
 	}()
 
@@ -282,7 +285,9 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 		return nil, err
 	}
 
-	log.Printf("[DB] GetForRecommendation: Returning %d articles (after filtering out already-recommended)", len(articles))
+	slog.Info("returning articles for recommendation",
+		slog.Int("count", len(articles)),
+		slog.String("user_id", externalUserID))
 	return articles, nil
 }
 
@@ -317,7 +322,7 @@ func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, external
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("error closing rows: %v", err)
+			slog.Error("failed to close rows", slog.Any("error", err))
 		}
 	}()
 
