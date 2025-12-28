@@ -34,8 +34,8 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	slog.Info("starting recommendation generation", slog.String("user_id", userID))
 
 	// Ensure user exists
-	if _, err := e.userRepo.CreateOrGetUser(ctx, userID); err != nil {
-		slog.Error("failed to create/get user", slog.String("user_id", userID), slog.Any("error", err))
+	if err := e.userRepo.EnsureUserExists(ctx, userID); err != nil {
+		slog.Error("failed to ensure user exists", slog.String("user_id", userID), slog.Any("error", err))
 		return nil, err
 	}
 

@@ -19,36 +19,33 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// CreateOrGetUser creates a user if not exists, or returns the existing user's internal ID
+// EnsureUserExists creates a user if they don't already exist
 // This implements the auto-create user behavior required by Phase 3
-func (r *UserRepository) CreateOrGetUser(ctx context.Context, externalUserID string) (int, error) {
+func (r *UserRepository) EnsureUserExists(ctx context.Context, userID string) error {
 	// Validate UUID format
-	if _, err := uuid.Parse(externalUserID); err != nil {
-		return 0, fmt.Errorf("invalid user ID format (must be UUID): %w", err)
+	if _, err := uuid.Parse(userID); err != nil {
+		return fmt.Errorf("invalid user ID format (must be UUID): %w", err)
 	}
 
 	query := `
-		INSERT INTO users (user_id, created_at)
+		INSERT INTO users (id, created_at)
 		VALUES ($1, NOW())
-		ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
-		RETURNING id
+		ON CONFLICT (id) DO NOTHING
 	`
 
-	var id int
-	err := r.db.QueryRowContext(ctx, query, externalUserID).Scan(&id)
+	_, err := r.db.ExecContext(ctx, query, userID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create or get user: %w", err)
+		return fmt.Errorf("failed to ensure user exists: %w", err)
 	}
 
-	return id, nil
+	return nil
 }
 
 // MarkArticleAsRead marks an article as read for a user
-func (r *UserRepository) MarkArticleAsRead(ctx context.Context, externalUserID, articleID string) error {
-	// First, get or create the user to get their internal ID
-	userID, err := r.CreateOrGetUser(ctx, externalUserID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+func (r *UserRepository) MarkArticleAsRead(ctx context.Context, userID, articleID string) error {
+	// Ensure user exists first
+	if err := r.EnsureUserExists(ctx, userID); err != nil {
+		return fmt.Errorf("failed to ensure user exists: %w", err)
 	}
 
 	query := `
@@ -59,7 +56,7 @@ func (r *UserRepository) MarkArticleAsRead(ctx context.Context, externalUserID, 
 			read_at = $3
 	`
 
-	_, err = r.db.ExecContext(ctx, query, userID, articleID, time.Now())
+	_, err := r.db.ExecContext(ctx, query, userID, articleID, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to mark article as read: %w", err)
 	}
@@ -68,13 +65,7 @@ func (r *UserRepository) MarkArticleAsRead(ctx context.Context, externalUserID, 
 }
 
 // GetReadArticleIDs returns the IDs of articles a user has read
-func (r *UserRepository) GetReadArticleIDs(ctx context.Context, externalUserID string) ([]string, error) {
-	// First, get the user's internal ID
-	userID, err := r.CreateOrGetUser(ctx, externalUserID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
+func (r *UserRepository) GetReadArticleIDs(ctx context.Context, userID string) ([]string, error) {
 	query := `
 		SELECT article_id
 		FROM user_articles
