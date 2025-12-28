@@ -76,7 +76,7 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	testLogger := slog.Default()
 
 	// Setup HTTP server
-	apiServer := api.NewServer(articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware, testLogger)
+	apiServer := api.NewServer(database, articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware, testLogger)
 	server := httptest.NewServer(apiServer.Routes())
 
 	return &IntegrationTestSuite{

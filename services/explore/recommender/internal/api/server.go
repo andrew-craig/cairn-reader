@@ -3,6 +3,7 @@
 package api
 
 import (
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 // Server holds the API server dependencies
 type Server struct {
+	db             *sql.DB
 	articleRepo    *db.ArticleRepository
 	userRepo       *db.UserRepository
 	voteRepo       *db.VoteRepository
@@ -23,8 +25,9 @@ type Server struct {
 }
 
 // NewServer creates a new API server
-func NewServer(articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
+func NewServer(database *sql.DB, articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
 	return &Server{
+		db:             database,
 		articleRepo:    articleRepo,
 		userRepo:       userRepo,
 		voteRepo:       voteRepo,
@@ -38,8 +41,9 @@ func NewServer(articleRepo *db.ArticleRepository, userRepo *db.UserRepository, v
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check - public endpoint
+	// Health check endpoints - public
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/ready", s.handleReady)
 
 	// Public API routes - no authentication required
 	mux.HandleFunc("/explore/articles", s.handleArticles)

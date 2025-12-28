@@ -66,18 +66,21 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 
 		// Different vote type: decrement old, increment new
 		var updateQuery string
+		var oldVoteType string
 		if existingVoteType.String == "upvote" && voteType == "downvote" {
 			updateQuery = `
 				UPDATE articles
 				SET upvotes = upvotes - 1, downvotes = downvotes + 1, updated_at = NOW()
 				WHERE id = $1 AND upvotes > 0
 			`
+			oldVoteType = "upvote"
 		} else { // existing is downvote, new is upvote
 			updateQuery = `
 				UPDATE articles
 				SET upvotes = upvotes + 1, downvotes = downvotes - 1, updated_at = NOW()
 				WHERE id = $1 AND downvotes > 0
 			`
+			oldVoteType = "downvote"
 		}
 
 		result, err := tx.ExecContext(ctx, updateQuery, articleID)
@@ -86,6 +89,11 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 		}
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected == 0 {
+			slog.Warn("vote counter update had no effect (possibly already at 0)",
+				slog.String("article_id", articleID),
+				slog.String("old_vote_type", oldVoteType),
+				slog.String("new_vote_type", voteType),
+			)
 			return fmt.Errorf("article not found: %s", articleID)
 		}
 
@@ -185,9 +193,16 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 		`
 	}
 
-	_, err = tx.ExecContext(ctx, updateQuery, articleID)
+	result, err := tx.ExecContext(ctx, updateQuery, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to update article vote counts: %w", err)
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		slog.Warn("vote counter update had no effect (possibly already at 0)",
+			slog.String("article_id", articleID),
+			slog.String("vote_type", voteType),
+		)
 	}
 
 	// Delete the vote record
