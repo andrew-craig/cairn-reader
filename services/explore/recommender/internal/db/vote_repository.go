@@ -81,9 +81,13 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 			`
 		}
 
-		_, err = tx.ExecContext(ctx, updateQuery, articleID)
+		result, err := tx.ExecContext(ctx, updateQuery, articleID)
 		if err != nil {
 			return fmt.Errorf("failed to update article vote counts: %w", err)
+		}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			return fmt.Errorf("article not found: %s", articleID)
 		}
 
 		// Update the vote record
@@ -113,9 +117,13 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 			`
 		}
 
-		_, err = tx.ExecContext(ctx, updateQuery, articleID)
+		result, err := tx.ExecContext(ctx, updateQuery, articleID)
 		if err != nil {
 			return fmt.Errorf("failed to update article vote counts: %w", err)
+		}
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected == 0 {
+			return fmt.Errorf("article not found: %s", articleID)
 		}
 
 		// Insert the vote record

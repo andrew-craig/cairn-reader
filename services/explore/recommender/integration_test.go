@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,8 +72,11 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	// Note: In production tests, you'd want to properly initialize this with test keys
 	// For now, we'll use a minimal setup that allows requests through
 
+	// Create a test logger
+	testLogger := slog.Default()
+
 	// Setup HTTP server
-	apiServer := api.NewServer(articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware)
+	apiServer := api.NewServer(articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware, testLogger)
 	server := httptest.NewServer(apiServer.Routes())
 
 	return &IntegrationTestSuite{
