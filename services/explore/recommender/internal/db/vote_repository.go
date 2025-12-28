@@ -26,16 +26,15 @@ func NewVoteRepository(db *sql.DB, userRepo *UserRepository) *VoteRepository {
 // RecordVote inserts or updates a vote (upsert)
 // Updates articles.upvotes and articles.downvotes counts atomically
 // Implements Phase 3 voting logic with user auto-creation
-func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, articleID string, voteType string) error {
+func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleID string, voteType string) error {
 	// Validate vote type
 	if voteType != "upvote" && voteType != "downvote" {
 		return fmt.Errorf("invalid vote type: %s (must be 'upvote' or 'downvote')", voteType)
 	}
 
-	// Get or create user to get internal ID
-	userID, err := r.userRepository.CreateOrGetUser(ctx, externalUserID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+	// Ensure user exists
+	if err := r.userRepository.EnsureUserExists(ctx, userID); err != nil {
+		return fmt.Errorf("failed to ensure user exists: %w", err)
 	}
 
 	// Start a transaction to ensure atomicity
@@ -145,12 +144,7 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 }
 
 // RemoveVote deletes a vote and updates article counts
-func (r *VoteRepository) RemoveVote(ctx context.Context, externalUserID string, articleID string) error {
-	// Get user's internal ID
-	userID, err := r.userRepository.CreateOrGetUser(ctx, externalUserID)
-	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
-	}
+func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleID string) error {
 
 	// Start a transaction to ensure atomicity
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -227,13 +221,7 @@ func (r *VoteRepository) GetVoteCounts(ctx context.Context, articleID string) (u
 
 // GetUserVote returns the user's vote for an article (if any)
 // Returns empty string if user hasn't voted
-func (r *VoteRepository) GetUserVote(ctx context.Context, externalUserID string, articleID string) (voteType string, err error) {
-	// Get user's internal ID
-	userID, err := r.userRepository.CreateOrGetUser(ctx, externalUserID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get user: %w", err)
-	}
-
+func (r *VoteRepository) GetUserVote(ctx context.Context, userID string, articleID string) (voteType string, err error) {
 	query := `SELECT vote_type FROM votes WHERE user_id = $1 AND article_id = $2`
 
 	err = r.db.QueryRowContext(ctx, query, userID, articleID).Scan(&voteType)

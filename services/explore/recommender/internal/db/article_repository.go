@@ -205,17 +205,7 @@ func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 }
 
 // GetUnreadForUser retrieves unread articles for a user
-func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, externalUserID string, limit int) ([]models.Article, error) {
-	// Convert external user ID to internal user ID
-	var internalUserID int
-	if r.userRepository != nil {
-		var err error
-		internalUserID, err = r.userRepository.CreateOrGetUser(ctx, externalUserID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user: %w", err)
-		}
-	}
-
+func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -227,7 +217,7 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, externalUserID
 		LIMIT $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, internalUserID, limit)
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unread articles: %w", err)
 	}
@@ -242,17 +232,7 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, externalUserID
 
 // GetForRecommendation retrieves articles suitable for recommendation
 // Excludes deleted articles and articles already recommended to the user
-func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUserID string, limit int) ([]models.Article, error) {
-	// Convert external user ID to internal user ID
-	var internalUserID int
-	if r.userRepository != nil {
-		var err error
-		internalUserID, err = r.userRepository.CreateOrGetUser(ctx, externalUserID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user: %w", err)
-		}
-	}
-
+func (r *ArticleRepository) GetForRecommendation(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -266,11 +246,10 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 	`
 
 	slog.Info("getting articles for recommendation",
-		slog.String("user_id", externalUserID),
-		slog.Int("internal_user_id", internalUserID),
+		slog.String("user_id", userID),
 		slog.Int("limit", limit))
 
-	rows, err := r.db.QueryContext(ctx, query, internalUserID, limit)
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get articles for recommendation: %w", err)
 	}
@@ -287,23 +266,13 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, externalUs
 
 	slog.Info("returning articles for recommendation",
 		slog.Int("count", len(articles)),
-		slog.String("user_id", externalUserID))
+		slog.String("user_id", userID))
 	return articles, nil
 }
 
 // GetLowExposureArticles retrieves articles with the lowest recommend counts
 // Used for exploration/discovery in recommendation algorithm
-func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, externalUserID string, limit int) ([]models.Article, error) {
-	// Convert external user ID to internal user ID
-	var internalUserID int
-	if r.userRepository != nil {
-		var err error
-		internalUserID, err = r.userRepository.CreateOrGetUser(ctx, externalUserID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user: %w", err)
-		}
-	}
-
+func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -316,7 +285,7 @@ func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, external
 		LIMIT $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, internalUserID, limit)
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get low exposure articles: %w", err)
 	}
@@ -356,24 +325,14 @@ func (r *ArticleRepository) IncrementRecommendCount(ctx context.Context, article
 
 // RecordRecommendation tracks that an article was recommended to a user
 // Uses ON CONFLICT DO NOTHING to handle duplicate recommendations gracefully
-func (r *ArticleRepository) RecordRecommendation(ctx context.Context, externalUserID string, articleID string) error {
-	// Convert external user ID to internal user ID
-	var internalUserID int
-	if r.userRepository != nil {
-		var err error
-		internalUserID, err = r.userRepository.CreateOrGetUser(ctx, externalUserID)
-		if err != nil {
-			return fmt.Errorf("failed to get user: %w", err)
-		}
-	}
-
+func (r *ArticleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) error {
 	query := `
 		INSERT INTO recommendations (user_id, article_id, recommended_at)
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (user_id, article_id) DO NOTHING
 	`
 
-	_, err := r.db.ExecContext(ctx, query, internalUserID, articleID)
+	_, err := r.db.ExecContext(ctx, query, userID, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to record recommendation: %w", err)
 	}
