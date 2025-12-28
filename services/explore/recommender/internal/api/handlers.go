@@ -2,12 +2,19 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
 
 	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
 	"github.com/andrew-craig/cairn-explore/pkg/models"
+)
+
+const (
+	// Request body size limits
+	maxArticlesBatchSize = 10 << 20 // 10MB for batch article submission
+	maxSimpleRequestSize = 1 << 10  // 1KB for simple JSON requests
 )
 
 // handleHealth returns the health status
@@ -29,11 +36,20 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent DoS attacks
+	r.Body = http.MaxBytesReader(w, r.Body, maxArticlesBatchSize)
+
 	var payload struct {
 		Articles []models.Article `json:"articles"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			log.Printf("Request body too large: limit=%d", maxBytesErr.Limit)
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -107,11 +123,20 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
+	// Limit request body size to prevent DoS attacks
+	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+
 	var payload struct {
 		ArticleID string `json:"article_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			log.Printf("Request body too large: limit=%d", maxBytesErr.Limit)
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -159,11 +184,20 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent DoS attacks
+	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+
 	var payload struct {
 		VoteType string `json:"vote_type"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			log.Printf("Request body too large: limit=%d", maxBytesErr.Limit)
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
