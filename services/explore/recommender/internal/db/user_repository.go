@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // UserRepository handles user database operations
@@ -20,6 +22,11 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 // CreateOrGetUser creates a user if not exists, or returns the existing user's internal ID
 // This implements the auto-create user behavior required by Phase 3
 func (r *UserRepository) CreateOrGetUser(ctx context.Context, externalUserID string) (int, error) {
+	// Validate UUID format
+	if _, err := uuid.Parse(externalUserID); err != nil {
+		return 0, fmt.Errorf("invalid user ID format (must be UUID): %w", err)
+	}
+
 	query := `
 		INSERT INTO users (user_id, created_at)
 		VALUES ($1, NOW())

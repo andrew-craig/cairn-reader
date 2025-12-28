@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -31,9 +32,10 @@ func NewConfigFromEnv() *Config {
 
 // Connect establishes a database connection
 func (c *Config) Connect() (*sql.DB, error) {
+	sslMode := getEnv("DB_SSLMODE", "require")
 	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		c.Host, c.Port, c.User, c.Password, c.DBName,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.Host, c.Port, c.User, c.Password, c.DBName, sslMode,
 	)
 
 	db, err := sql.Open("postgres", connStr)
@@ -44,6 +46,11 @@ func (c *Config) Connect() (*sql.DB, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
+
+	// Configure connection pool
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	log.Printf("Connected to fetcher database at %s:%s", c.Host, c.Port)
 	return db, nil

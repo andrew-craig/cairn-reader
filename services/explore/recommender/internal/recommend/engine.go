@@ -5,8 +5,9 @@ package recommend
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
+	"sort"
 
 	"github.com/andrew-craig/cairn-explore/pkg/models"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
@@ -30,11 +31,11 @@ func NewEngine(articleRepo *db.ArticleRepository, userRepo *db.UserRepository) *
 // Algorithm: 4 high-quality articles (based on quality score) + 1 low-exposure article
 // Quality score formula: (upvotes - (downvotes * 3)) / recommends
 func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]models.Article, error) {
-	log.Printf("[Recommendations] Starting recommendation generation for user: %s", userID)
+	slog.Info("starting recommendation generation", slog.String("user_id", userID))
 
 	// Ensure user exists
 	if _, err := e.userRepo.CreateOrGetUser(ctx, userID); err != nil {
-		log.Printf("[Recommendations] ERROR: Failed to create/get user %s: %v", userID, err)
+		slog.Error("failed to create/get user", slog.String("user_id", userID), slog.Any("error", err))
 		return nil, err
 	}
 
@@ -42,18 +43,18 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	// Request more than needed to allow for quality filtering
 	articles, err := e.articleRepo.GetForRecommendation(ctx, userID, 100)
 	if err != nil {
-		log.Printf("[Recommendations] ERROR: Failed to get eligible articles for user %s: %v", userID, err)
+		slog.Error("failed to get eligible articles", slog.String("user_id", userID), slog.Any("error", err))
 		return nil, err
 	}
 
-	log.Printf("[Recommendations] Found %d eligible articles for user: %s", len(articles), userID)
+	slog.Info("found eligible articles", slog.Int("count", len(articles)), slog.String("user_id", userID))
 
 	// If we have 5 or fewer articles, return what we have
 	if len(articles) <= 5 {
 		// Still need to track recommendations and increment counters
 		for _, article := range articles {
 			if err := e.trackRecommendation(ctx, userID, article.ID); err != nil {
-				log.Printf("Warning: failed to track recommendation for article %s: %v", article.ID, err)
+				slog.Warn("failed to track recommendation", slog.String("article_id", article.ID), slog.Any("error", err))
 			}
 		}
 		return articles, nil
@@ -101,21 +102,28 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 	successCount := 0
 	for _, article := range recommended {
 		if err := e.trackRecommendation(ctx, userID, article.ID); err != nil {
-			log.Printf("[Recommendations] WARNING: Failed to track recommendation for article %s (user: %s): %v", article.ID, userID, err)
+			slog.Warn("failed to track recommendation",
+				slog.String("article_id", article.ID),
+				slog.String("user_id", userID),
+				slog.Any("error", err))
 		} else {
 			successCount++
 		}
 	}
 
-	log.Printf("[Recommendations] Successfully recommended %d articles to user %s (%d high-quality, %d exploration, %d/%d tracked)",
-		len(recommended), userID, len(highQuality), len(recommended)-len(highQuality), successCount, len(recommended))
+	slog.Info("successfully recommended articles",
+		slog.Int("total", len(recommended)),
+		slog.String("user_id", userID),
+		slog.Int("high_quality", len(highQuality)),
+		slog.Int("exploration", len(recommended)-len(highQuality)),
+		slog.Int("tracked", successCount))
 
 	// Log article IDs for debugging
 	articleIDs := make([]string, len(recommended))
 	for i, article := range recommended {
 		articleIDs[i] = article.ID
 	}
-	log.Printf("[Recommendations] Article IDs: %v", articleIDs)
+	slog.Debug("recommended article IDs", slog.Any("article_ids", articleIDs))
 
 	return recommended, nil
 }
@@ -135,16 +143,10 @@ func (e *Engine) selectHighQualityArticles(articles []models.Article, count int)
 		scored[i] = scoredArticle{article: article, score: score}
 	}
 
-	// Sort by score (descending)
-	// NOTE: This uses a simple O(n²) sort. For larger datasets (100+ articles),
-	// consider using sort.Slice for O(n log n) performance.
-	for i := 0; i < len(scored); i++ {
-		for j := i + 1; j < len(scored); j++ {
-			if scored[j].score > scored[i].score {
-				scored[i], scored[j] = scored[j], scored[i]
-			}
-		}
-	}
+	// Sort by score (descending) using sort.Slice (O(n log n))
+	sort.Slice(scored, func(i, j int) bool {
+		return scored[i].score > scored[j].score
+	})
 
 	// Extract top N articles
 	result := make([]models.Article, 0, count)
@@ -192,6 +194,6 @@ func (e *Engine) trackRecommendation(ctx context.Context, userID string, article
 		return fmt.Errorf("failed to record recommendation: %w", err)
 	}
 
-	log.Printf("[Recommendations] Successfully tracked recommendation: article=%s, user=%s", articleID, userID)
+	slog.Debug("successfully tracked recommendation", slog.String("article_id", articleID), slog.String("user_id", userID))
 	return nil
 }

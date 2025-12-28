@@ -50,6 +50,7 @@ services:
       - DB_USER=cairn
       - DB_PASSWORD=cairn_password
       - DB_NAME=cairn_db
+      - DB_SSLMODE=disable  # Disable SSL for local development
       - ARTICLE_RETENTION_DAYS=90  # Delete articles after 90 days
     depends_on:
       postgres:
@@ -78,6 +79,7 @@ services:
       - DB_USER=fetcher
       - DB_PASSWORD=fetcher_password
       - DB_NAME=fetcher_db
+      - DB_SSLMODE=disable  # Disable SSL for local development
       - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
     depends_on:
       fetcher_db:

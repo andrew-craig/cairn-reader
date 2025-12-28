@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -46,7 +46,7 @@ func (s *FeedSyncer) Run(ctx context.Context) error {
 
 	// Sync immediately on startup to ensure feeds are available
 	if err := s.syncFeeds(ctx); err != nil {
-		log.Printf("Initial feed sync failed: %v", err)
+		slog.Error("initial feed sync failed", slog.Any("error", err))
 		// Continue despite error - will retry in 24 hours
 	}
 
@@ -54,7 +54,7 @@ func (s *FeedSyncer) Run(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			if err := s.syncFeeds(ctx); err != nil {
-				log.Printf("Feed sync failed: %v", err)
+				slog.Error("feed sync failed", slog.Any("error", err))
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -75,7 +75,7 @@ func (s *FeedSyncer) SyncOnce(ctx context.Context) error {
 // 3. Imports new feeds to the database (existing feeds are unchanged)
 // 4. Logs statistics about the feed database state
 func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
-	log.Printf("Starting feed sync from %s", s.kagiURL)
+	slog.Info("starting feed sync", slog.String("source_url", s.kagiURL))
 
 	// Fetch the feed list from Kagi Small Web repository
 	req, err := http.NewRequestWithContext(ctx, "GET", s.kagiURL, nil)
@@ -89,7 +89,7 @@ func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Printf("error closing response body: %v", err)
+			slog.Error("failed to close response body", slog.Any("error", err))
 		}
 	}()
 
@@ -116,10 +116,13 @@ func (s *FeedSyncer) syncFeeds(ctx context.Context) error {
 	// Log feed database statistics for monitoring
 	total, enabled, disabled, neverFetched, err := s.repo.GetFeedStats(ctx)
 	if err != nil {
-		log.Printf("Failed to get feed stats: %v", err)
+		slog.Error("failed to get feed stats", slog.Any("error", err))
 	} else {
-		log.Printf("Feed sync complete - Total: %d, Enabled: %d, Disabled: %d, Never fetched: %d",
-			total, enabled, disabled, neverFetched)
+		slog.Info("feed sync complete",
+			slog.Int("total", total),
+			slog.Int("enabled", enabled),
+			slog.Int("disabled", disabled),
+			slog.Int("never_fetched", neverFetched))
 	}
 
 	return nil

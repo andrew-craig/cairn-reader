@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 // VoteRepository handles vote database operations
@@ -45,7 +45,7 @@ func (r *VoteRepository) RecordVote(ctx context.Context, externalUserID string, 
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Printf("error rolling back transaction: %v", err)
+			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
 
@@ -159,7 +159,7 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, externalUserID string, 
 	}
 	defer func() {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Printf("error rolling back transaction: %v", err)
+			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
 

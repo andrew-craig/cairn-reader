@@ -7,7 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/client"
@@ -47,21 +47,21 @@ func (f *Fetcher) Run(ctx context.Context) error {
 	ticker := time.NewTicker(f.fetchInterval)
 	defer ticker.Stop()
 
-	log.Printf("Starting fetcher with interval: %v", f.fetchInterval)
+	slog.Info("starting fetcher", slog.Duration("interval", f.fetchInterval))
 
 	// Fetch immediately on startup to begin processing feeds right away
 	if err := f.FetchSingleFeed(ctx); err != nil {
-		log.Printf("Initial fetch failed: %v", err)
+		slog.Error("initial fetch failed", slog.Any("error", err))
 	}
 
 	for {
 		select {
 		case <-ticker.C:
 			if err := f.FetchSingleFeed(ctx); err != nil {
-				log.Printf("Fetch failed: %v", err)
+				slog.Error("fetch failed", slog.Any("error", err))
 			}
 		case <-ctx.Done():
-			log.Println("Stopping fetcher")
+			slog.Info("stopping fetcher")
 			return ctx.Err()
 		}
 	}
@@ -84,51 +84,51 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 		return fmt.Errorf("no enabled feeds available")
 	}
 
-	log.Printf("Fetching feed %d: %s", feed.ID, feed.URL)
+	slog.Info("fetching feed", slog.Int("feed_id", feed.ID), slog.String("url", feed.URL))
 
 	// Step 2: Fetch and parse RSS/Atom content from the feed URL
 	feedData, err := f.fetchRSS(ctx, feed.URL)
 	if err != nil {
 		if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); updateErr != nil {
-			log.Printf("error updating fetch result for feed %d: %v", feed.ID, updateErr)
+			slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
 		}
 		if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, 0, 0, err.Error()); histErr != nil {
-			log.Printf("error recording fetch history for feed %d: %v", feed.ID, histErr)
+			slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
 		}
 		return fmt.Errorf("fetch RSS: %w", err)
 	}
 
-	log.Printf("Fetched feed: %s (%d items)", feedData.Title, len(feedData.Items))
+	slog.Info("fetched feed", slog.String("title", feedData.Title), slog.Int("items", len(feedData.Items)))
 
 	// Step 3: Filter to only include articles published after last successful fetch
 	newArticles := f.filterNewArticles(feedData.Items, feed.LastFetchedAt, feedData, feed.URL)
 
-	log.Printf("Found %d new articles (total items: %d)", len(newArticles), len(feedData.Items))
+	slog.Info("found new articles", slog.Int("new_count", len(newArticles)), slog.Int("total_items", len(feedData.Items)))
 
 	// Step 4: Submit new articles to the recommender service via HTTP POST
 	articlesSent := 0
 	if len(newArticles) > 0 {
 		if err := f.recommenderClient.SubmitArticles(ctx, newArticles); err != nil {
-			log.Printf("Failed to submit articles: %v", err)
+			slog.Error("failed to submit articles", slog.Any("error", err))
 			if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); updateErr != nil {
-				log.Printf("error updating fetch result for feed %d: %v", feed.ID, updateErr)
+				slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
 			}
 			if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, len(feedData.Items), 0, err.Error()); histErr != nil {
-				log.Printf("error recording fetch history for feed %d: %v", feed.ID, histErr)
+				slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
 			}
 			return fmt.Errorf("submit articles: %w", err)
 		}
 		articlesSent = len(newArticles)
-		log.Printf("Successfully submitted %d articles", articlesSent)
+		slog.Info("successfully submitted articles", slog.Int("count", articlesSent))
 	}
 
 	// Step 5: Record successful fetch - resets consecutive failure count
 	success := true // Success if we completed the fetch, even if no new articles
 	if err := f.feedRepo.UpdateFetchResult(ctx, feed.ID, success); err != nil {
-		log.Printf("error updating fetch result for feed %d: %v", feed.ID, err)
+		slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", err))
 	}
 	if err := f.feedRepo.RecordFetchHistory(ctx, feed.ID, success, len(feedData.Items), articlesSent, ""); err != nil {
-		log.Printf("error recording fetch history for feed %d: %v", feed.ID, err)
+		slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", err))
 	}
 
 	return nil
