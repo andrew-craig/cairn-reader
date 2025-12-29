@@ -548,8 +548,8 @@ curl http://localhost:8081/health/ready
 
 ## Additional Resources
 
-- [Deployment Guide](READ_SERVICE_DEPLOYMENT.md)
-- [Troubleshooting Guide](READ_SERVICE_TROUBLESHOOTING.md)
-- [Architecture Documentation](READ_SERVICE_ARCHITECTURE.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [Troubleshooting Guide](TROUBLESHOOTING.md)
+- [Architecture Documentation](ARCHITECTURE.md)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
