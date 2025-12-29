@@ -397,6 +397,93 @@ go test ./internal/recommend/... -v -short  # Skip integration tests
 
 ## High Priority
 
+### 5. Standardize Logging Library to log/slog in Read Service
+**Files:**
+- `services/read/content/cmd/content/main.go:22`
+- `services/read/fetcher/cmd/fetcher/main.go:22`
+- `services/read/content/internal/api/middleware/logging.go:47`
+- `services/read/fetcher/internal/api/middleware/logging.go`
+- `services/read/go.mod:18`
+
+**Issue:** Read Service uses `go.uber.org/zap` while Engineering Principles document `log/slog` (stdlib). Additionally, middleware uses unstructured `log.Printf` creating inconsistent logging format.
+
+**Current State:**
+```go
+// Main services
+import "go.uber.org/zap"
+logger, err := zap.NewProduction()
+
+// Middleware
+log.Printf("[%s] %s %s - Status: %d - Duration: %v", r.Method, r.URL.Path, ...)
+```
+
+**Implementation:**
+
+1. Update main.go files to use slog:
+```go
+import "log/slog"
+
+func main() {
+    // Initialize structured logger
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    slog.SetDefault(logger)
+
+    logger.Info("Starting content service",
+        slog.String("port", cfg.Port),
+    )
+
+    // ... rest of main
+}
+```
+
+2. Update middleware to use structured logging:
+```go
+// services/read/content/internal/api/middleware/logging.go
+package middleware
+
+import (
+    "log/slog"
+    "net/http"
+    "time"
+)
+
+func Logging(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+
+        wrapped := &responseWriter{
+            ResponseWriter: w,
+            statusCode:     http.StatusOK,
+        }
+
+        next.ServeHTTP(wrapped, r)
+
+        duration := time.Since(start)
+        slog.Info("request completed",
+            slog.String("method", r.Method),
+            slog.String("path", r.URL.Path),
+            slog.String("remote_addr", r.RemoteAddr),
+            slog.Int("status", wrapped.statusCode),
+            slog.Duration("duration", duration),
+        )
+    })
+}
+```
+
+3. Remove zap dependency:
+```bash
+cd services/read
+# Remove from go.mod
+go mod edit -dropreplace go.uber.org/zap
+go mod tidy
+```
+
+**Benefits:**
+- Consistent with documented standards (stdlib preference)
+- Structured logging across all middleware
+- Zero configuration, no external dependencies
+- Matches User Service and Explore Service patterns
+
 ---
 
 ### 4. Move Shared Models to Root Package
@@ -543,6 +630,103 @@ cp .env.example .env
 ---
 
 ## Medium Priority
+
+### 7. Document Read Service Technology Stack in Engineering Principles
+**File:** `docs/ENGINEERING_PRINCIPLES.md`
+
+**Issue:** Read Service uses several libraries not documented in the Engineering Principles Technology Stack section. This makes it unclear what libraries are approved and creates knowledge gaps for new developers.
+
+**Libraries Missing Documentation:**
+- `github.com/go-chi/chi/v5 v5.2.3` - HTTP router (core framework choice)
+- `github.com/sony/gobreaker v0.5.0` - Circuit breaker pattern
+- `github.com/robfig/cron/v3 v3.0.1` - Job scheduling
+- `github.com/microcosm-cc/bluemonday v1.0.27` - HTML sanitization
+- `github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0` - Content extraction
+
+**Implementation:**
+
+Add to `docs/ENGINEERING_PRINCIPLES.md` Technology Stack section (after line 440):
+
+```markdown
+### Read Service Specific Libraries
+
+| Library | Version | Purpose | Rationale |
+|---------|---------|---------|-----------|
+| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router | Lightweight, idiomatic Go, excellent middleware support, stdlib-compatible |
+| `github.com/go-shiori/go-readability` | latest | Content extraction | Extract readable content from HTML articles |
+| `github.com/microcosm-cc/bluemonday` | v1.0.27 | HTML sanitization | Security - XSS prevention, industry standard |
+| `github.com/sony/gobreaker` | v0.5.0 | Circuit breaker | Resilience for external API calls, prevents cascade failures |
+| `github.com/robfig/cron/v3` | v3.0.1 | Job scheduling | Background jobs (cleanup, polling), cron-compatible syntax |
+
+**Why chi/v5?**
+- Minimal overhead compared to full frameworks (Gin)
+- 100% compatible with stdlib http.Handler
+- Composable middleware chain
+- Path parameter extraction without string manipulation
+- Suitable for services with moderate routing needs (Read Service has ~10 endpoints)
+```
+
+Update the HTTP Framework section:
+```markdown
+| `net/http` | stdlib | HTTP (Explore Service) | Simple services don't need framework overhead |
+| `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
+| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (Read Service) | Lightweight, idiomatic, stdlib-compatible |
+```
+
+---
+
+### 8. Rename testhelpers to testutil for Consistency
+**Files:**
+- `services/read/content/internal/testhelpers/database.go`
+- `services/read/fetcher/internal/testhelpers/database.go`
+- All test files importing testhelpers
+
+**Issue:** Read Service uses `internal/testhelpers/` while Engineering Principles document `internal/testutil/`. This creates inconsistency with other services and makes test utilities harder to find.
+
+**Current State:**
+```go
+// Read Service pattern (inconsistent)
+import "github.com/andrew-craig/cairn-read/content/internal/testhelpers"
+
+// Documented pattern (User Service, Explore Service)
+import "github.com/andrew-craig/cairn/users/internal/testutil"
+```
+
+**Implementation:**
+
+1. Rename directories:
+```bash
+cd services/read/content
+mv internal/testhelpers internal/testutil
+
+cd ../fetcher
+mv internal/testhelpers internal/testutil
+```
+
+2. Update all import statements:
+```bash
+# Find and replace in all test files
+find services/read -name "*_test.go" -exec sed -i 's/testhelpers/testutil/g' {} \;
+
+# Or use your IDE's refactor/rename feature
+```
+
+3. Verify tests still pass:
+```bash
+cd services/read/content
+go test ./...
+
+cd ../fetcher
+go test ./...
+```
+
+**Benefits:**
+- Consistency with documented standards
+- Matches User Service and Explore Service patterns
+- Easier for developers to locate test utilities
+- Follows Go community conventions
+
+---
 
 ### 4. Standardize Database Architecture Pattern
 **Files:**
@@ -1028,6 +1212,158 @@ go test ./... -v -short       # Skip integration tests
 ---
 
 ## Low Priority
+
+### 25. Centralize Configuration Management in Read Service
+**Files:**
+- `services/read/content/cmd/content/main.go:89-126`
+- `services/read/fetcher/cmd/fetcher/main.go:89-126`
+
+**Issue:** Read Service implements configuration directly in main.go without centralized config package or validation. Engineering Principles recommend grouped config in `internal/config/config.go` following User Service pattern.
+
+**Current State:**
+```go
+// services/read/content/cmd/content/main.go
+type Config struct {
+    Port string
+    DB   database.Config
+}
+
+func loadConfig() Config {
+    return Config{
+        Port: getEnv("PORT", "8080"),
+        DB: database.Config{
+            Host:     getEnv("DB_HOST", "localhost"),
+            // ...
+        },
+    }
+}
+
+func getEnv(key, defaultValue string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return defaultValue
+}
+```
+
+**Implementation:**
+
+Create `services/read/content/internal/config/config.go`:
+```go
+package config
+
+import (
+    "fmt"
+    "os"
+    "strconv"
+
+    "github.com/andrew-craig/cairn-read/content/internal/database"
+)
+
+type Config struct {
+    Server   ServerConfig
+    Database database.Config
+}
+
+type ServerConfig struct {
+    Port string
+}
+
+func Load() (*Config, error) {
+    cfg := &Config{
+        Server: ServerConfig{
+            Port: getEnv("PORT", "8080"),
+        },
+        Database: database.Config{
+            Host:     getEnv("DB_HOST", "localhost"),
+            Port:     getEnvInt("DB_PORT", 5432),
+            User:     getEnv("DB_USER", "cairn_content"),
+            Password: getEnv("DB_PASSWORD", "cairn_content_pass"),
+            DBName:   getEnv("DB_NAME", "cairn_content"),
+            SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+        },
+    }
+
+    if err := cfg.Validate(); err != nil {
+        return nil, fmt.Errorf("invalid configuration: %w", err)
+    }
+
+    return cfg, nil
+}
+
+func (c *Config) Validate() error {
+    if c.Server.Port == "" {
+        return fmt.Errorf("PORT is required")
+    }
+    if c.Database.Host == "" {
+        return fmt.Errorf("DB_HOST is required")
+    }
+    if c.Database.DBName == "" {
+        return fmt.Errorf("DB_NAME is required")
+    }
+    return nil
+}
+
+func getEnv(key, defaultValue string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+    if value := os.Getenv(key); value != "" {
+        if intVal, err := strconv.Atoi(value); err == nil {
+            return intVal
+        }
+    }
+    return defaultValue
+}
+```
+
+Update main.go:
+```go
+package main
+
+import (
+    "github.com/andrew-craig/cairn-read/content/internal/config"
+    "github.com/andrew-craig/cairn-read/content/internal/database"
+)
+
+func main() {
+    // Load and validate configuration
+    cfg, err := config.Load()
+    if err != nil {
+        log.Fatalf("Failed to load configuration: %v", err)
+    }
+
+    // Initialize database with validated config
+    db, err := database.NewConnection(cfg.Database)
+    if err != nil {
+        log.Fatalf("Failed to connect to database: %v", err)
+    }
+    defer db.Close()
+
+    // Use cfg.Server.Port instead of cfg.Port
+    server := &http.Server{
+        Addr: ":" + cfg.Server.Port,
+        // ...
+    }
+}
+```
+
+Repeat for fetcher service.
+
+**Benefits:**
+- Centralized configuration management
+- Validation at startup prevents runtime errors
+- Consistent with User Service pattern
+- Easier to test configuration logic
+- Better organization
+
+**Note:** This is a low-priority improvement since the current approach is functional. Implement when refactoring or adding new configuration options.
+
+---
 
 ### 12. Define Sentinel Errors for Common Cases
 **File:** `recommender/internal/db/article_repository.go`
@@ -1546,12 +1882,14 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 
 ## Summary
 
-**Total Issues:** 41 (4 Critical, 6 High, 17 Medium, 14 Low)
+**Total Issues:** 45 (4 Critical, 7 High, 19 Medium, 15 Low)
 
 **Quick Wins (Can be done in <1 hour each):**
 - Critical #1: Consolidate logging package
 - High #4: Move shared models
+- High #5: Standardize Read Service logging to slog
 - High #6: Remove hardcoded secrets
+- Medium #8: Rename testhelpers to testutil
 - Low #20: Consolidate getEnv helpers
 - Low #21: Add package documentation
 
@@ -1559,6 +1897,8 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 - Critical #2: Standardize on pgx/v5 driver
 - Critical #3: Add OpenAPI specs
 - Critical #4: Add recommendation engine tests
+- High #5: Standardize Read Service logging (consistency across all services)
+- Medium #7: Document Read Service tech stack (knowledge sharing)
 - Medium #15: Add API versioning
 - Medium #16: Add input validation
 
