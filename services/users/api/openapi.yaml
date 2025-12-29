@@ -1,0 +1,823 @@
+openapi: 3.0.3
+info:
+  title: Cairn User Service API
+  version: 1.0.0
+  description: |
+    User authentication and account management service for Cairn.
+
+    ## Features
+    - Email/password authentication
+    - Mobile device authentication (Expo device ID)
+    - JWT-based stateless authentication with RS256 signing
+    - Refresh token management with automatic rotation
+    - Account upgrade from mobile-only to hybrid (email + device)
+    - User profile management
+
+    ## Account Types
+    - **Mobile-only**: Created with Expo device ID, can only authenticate with device
+    - **Email-only**: Created with email/password, can only authenticate with credentials
+    - **Hybrid**: Upgraded from mobile-only, can authenticate with email/password (device login disabled)
+
+    ## Authentication Flow
+    1. Register or login to receive access_token and refresh_token
+    2. Include access_token in Authorization header: `Bearer <access_token>`
+    3. When access_token expires, use refresh_token to get a new one
+    4. Refresh tokens are automatically rotated on each use
+
+    ## Security
+    - Passwords hashed with bcrypt (cost factor 12+)
+    - JWT tokens signed with RS256 (2048-bit RSA keys)
+    - Rate limiting on authentication endpoints (10 requests/minute per IP)
+    - Authorization checks ensure users can only access their own data
+  contact:
+    name: Cairn API Support
+    url: https://github.com/andrew-craig/cairn
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: User service (local development)
+  - url: https://api.cairn.example.com
+    description: Production server (HTTPS required)
+
+tags:
+  - name: Health
+    description: Health check and readiness endpoints
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: User Management
+    description: User profile and account operations (requires authentication)
+
+paths:
+  # Health Endpoints
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Basic health check endpoint (liveness probe)
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check
+      description: |
+        Checks if the service is ready to accept requests (readiness probe).
+        Verifies database and Vault connectivity.
+      operationId: readyCheck
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  database:
+                    type: string
+                    example: connected
+                  vault:
+                    type: string
+                    example: connected
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Authentication Endpoints
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register with email/password
+      description: |
+        Creates a new email-only account.
+        Password must be at least 8 characters.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: User's password (min 8 characters)
+                  example: SecurePass123!
+              required:
+                - email
+                - password
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input or weak password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Account with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/register/mobile:
+    post:
+      tags:
+        - Authentication
+      summary: Register with mobile device ID
+      description: |
+        Creates a new mobile-only account using Expo device ID.
+        Device info and IP address are extracted from request headers.
+      operationId: registerMobile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expo_device_id:
+                  type: string
+                  description: Expo Application Installation ID
+                  example: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+              required:
+                - expo_device_id
+      responses:
+        '201':
+          description: Mobile user registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Account with this device ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email/password
+      description: |
+        Authenticates a user with email and password.
+        Returns access token and refresh token.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login/mobile:
+    post:
+      tags:
+        - Authentication
+      summary: Login with mobile device ID
+      description: |
+        Authenticates a mobile-only user with Expo device ID.
+        Note: Hybrid accounts cannot use device login.
+      operationId: loginMobile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expo_device_id:
+                  type: string
+                  description: Expo Application Installation ID
+                  example: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+              required:
+                - expo_device_id
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid device ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Device login not allowed for hybrid accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Exchange a refresh token for a new access token.
+        The refresh token is automatically rotated (a new one is issued).
+
+        **Token Reuse Detection**: If a refresh token is reused after rotation,
+        all tokens for that user are revoked as a security measure.
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: The refresh token to exchange
+                  example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid, expired, or reused refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                expired:
+                  value:
+                    error: "refresh token has expired"
+                reuse:
+                  value:
+                    error: "token reuse detected - all tokens have been revoked"
+                invalid:
+                  value:
+                    error: "invalid or expired refresh token"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout (revoke refresh token)
+      description: Revokes a specific refresh token, logging out from one device
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: The refresh token to revoke
+                  example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: successfully logged out
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout-all:
+    post:
+      tags:
+        - Authentication
+      summary: Logout from all devices
+      description: |
+        Revokes all refresh tokens for the authenticated user.
+        Requires JWT authentication.
+      operationId: logoutAll
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out from all devices
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: successfully logged out from all devices
+        '401':
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # User Management Endpoints
+  /users/{id}:
+    get:
+      tags:
+        - User Management
+      summary: Get user profile
+      description: |
+        Retrieves user profile information.
+        Users can only access their own profile.
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - can only access own profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      tags:
+        - User Management
+      summary: Update user profile
+      description: |
+        Updates user profile information (currently only email).
+        Users can only update their own profile.
+      operationId: updateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: New email address
+                  example: newemail@example.com
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input or no fields to update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - can only update own profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags:
+        - User Management
+      summary: Delete user account
+      description: |
+        Deletes the user account and all associated data.
+        Users can only delete their own account.
+        This action is irreversible.
+      operationId: deleteUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: user account successfully deleted
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - can only delete own account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{id}/upgrade:
+    post:
+      tags:
+        - User Management
+      summary: Upgrade mobile-only account
+      description: |
+        Upgrades a mobile-only account to a hybrid account by adding email/password.
+        After upgrade, the account can authenticate with email/password.
+        Device login is disabled for hybrid accounts.
+      operationId: upgradeAccount
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User ID (must match authenticated user)
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Email address to add
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: Password (min 8 characters)
+                  example: SecurePass123!
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Account upgraded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input, weak password, or not a mobile-only account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - can only upgrade own account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from authentication endpoints.
+        Include in Authorization header: `Bearer <access_token>`
+
+        The JWT contains:
+        - user_id: UUID of the authenticated user
+        - exp: Expiration timestamp
+
+        Default access token lifetime: 15 minutes
+
+  schemas:
+    User:
+      type: object
+      description: User account information
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: 123e4567-e89b-12d3-a456-426614174000
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: User email (null for mobile-only accounts)
+          example: user@example.com
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2025-12-29T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2025-12-29T10:00:00Z"
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last login timestamp
+          example: "2025-12-29T12:30:00Z"
+      required:
+        - id
+        - created_at
+        - updated_at
+
+    AuthResponse:
+      type: object
+      description: Authentication response with tokens
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        access_token:
+          type: string
+          description: JWT access token (expires in 15 minutes by default)
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          description: Refresh token (expires in 7 days by default)
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        expires_in:
+          type: integer
+          format: int64
+          description: Access token expiration time in seconds
+          example: 900
+      required:
+        - user
+        - access_token
+        - refresh_token
+        - expires_in
+
+    Error:
+      type: object
+      description: Standard error response
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Invalid request
+      required:
+        - error
