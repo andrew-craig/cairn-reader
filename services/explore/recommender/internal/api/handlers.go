@@ -34,7 +34,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // This endpoint checks if dependencies (database) are available
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	// Check database connectivity
-	if err := s.db.PingContext(r.Context()); err != nil {
+	if err := s.db.Ping(r.Context()); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		if err := json.NewEncoder(w).Encode(map[string]string{

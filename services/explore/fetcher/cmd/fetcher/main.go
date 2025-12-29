@@ -44,9 +44,10 @@ func main() {
 	)
 
 	// Initialize database connection
+	ctx := context.Background()
 	slog.Info("connecting to database")
 	dbConfig := db.NewConfigFromEnv()
-	database, err := dbConfig.Connect()
+	database, err := dbConfig.Connect(ctx)
 	if err != nil {
 		slog.Error("failed to connect to database", slog.Any("error", err))
 		os.Exit(1)
@@ -61,13 +62,13 @@ func main() {
 	feedSyncer := sync.NewFeedSyncer(feedRepo, kagiFeedURL)
 
 	// Start background processes
-	ctx, cancel := context.WithCancel(context.Background())
+	bgCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start feed sync in background (runs once immediately, then every 24 hours)
 	slog.Info("starting feed sync background task")
 	go func() {
-		if err := feedSyncer.Run(ctx); err != nil {
+		if err := feedSyncer.Run(bgCtx); err != nil {
 			slog.Info("feed syncer stopped", slog.Any("error", err))
 		}
 	}()
@@ -81,7 +82,7 @@ func main() {
 	// Start background fetcher (fetches 1 feed per minute)
 	slog.Info("starting feed fetcher background task")
 	go func() {
-		if err := feedFetcher.Run(ctx); err != nil {
+		if err := feedFetcher.Run(bgCtx); err != nil {
 			slog.Info("fetcher stopped", slog.Any("error", err))
 		}
 	}()
@@ -100,7 +101,7 @@ func main() {
 			return
 		}
 		go func() {
-			if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
+			if err := feedFetcher.FetchSingleFeed(bgCtx); err != nil {
 				slog.Error("error in fetch goroutine", slog.Any("error", err))
 			}
 		}()
@@ -108,7 +109,7 @@ func main() {
 		w.Write([]byte(`{"status":"fetch triggered"}`))
 	})
 	mux.HandleFunc("/feeds/stats", func(w http.ResponseWriter, r *http.Request) {
-		total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(ctx)
+		total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -123,7 +124,7 @@ func main() {
 			return
 		}
 		go func() {
-			if err := feedSyncer.SyncOnce(ctx); err != nil {
+			if err := feedSyncer.SyncOnce(bgCtx); err != nil {
 				slog.Error("error in sync goroutine", slog.Any("error", err))
 			}
 		}()

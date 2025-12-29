@@ -4,22 +4,22 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 
 	"github.com/andrew-craig/cairn/services/explore/pkg/models"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ArticleRepository handles article database operations
 type ArticleRepository struct {
-	db             *sql.DB
+	db             *pgxpool.Pool
 	userRepository *UserRepository
 }
 
 // NewArticleRepository creates a new article repository
-func NewArticleRepository(db *sql.DB) *ArticleRepository {
+func NewArticleRepository(db *pgxpool.Pool) *ArticleRepository {
 	return &ArticleRepository{db: db}
 }
 
@@ -48,7 +48,7 @@ func (r *ArticleRepository) Create(ctx context.Context, article models.Article) 
 		WHERE articles.deleted = false
 	`
 
-	_, err := r.db.ExecContext(ctx, query,
+	_, err := r.db.Exec(ctx, query,
 		article.ID,
 		article.Title,
 		article.Link,
@@ -58,7 +58,7 @@ func (r *ArticleRepository) Create(ctx context.Context, article models.Article) 
 		article.Published,
 		article.FeedURL,
 		article.FeedTitle,
-		pq.Array(article.Categories),
+		article.Categories,
 		article.FeedID,
 	)
 
@@ -77,17 +77,17 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 		return nil
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
 			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
 
-	stmt, err := tx.PrepareContext(ctx, `
+	query := `
 		INSERT INTO articles (
 			id, title, link, description, content, author, published,
 			feed_url, feed_title, categories, feed_id, created_at, updated_at
@@ -101,18 +101,10 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 			published = EXCLUDED.published,
 			updated_at = NOW()
 		WHERE articles.deleted = false
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer func() {
-		if err := stmt.Close(); err != nil {
-			slog.Error("failed to close statement", slog.Any("error", err))
-		}
-	}()
+	`
 
 	for _, article := range articles {
-		_, err := stmt.ExecContext(ctx,
+		_, err := tx.Exec(ctx, query,
 			article.ID,
 			article.Title,
 			article.Link,
@@ -122,7 +114,7 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 			article.Published,
 			article.FeedURL,
 			article.FeedTitle,
-			pq.Array(article.Categories),
+			article.Categories,
 			article.FeedID,
 		)
 		if err != nil {
@@ -130,7 +122,7 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -147,9 +139,8 @@ func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Art
 	`
 
 	var article models.Article
-	var categories pq.StringArray
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err := r.db.QueryRow(ctx, query, id).Scan(
 		&article.ID,
 		&article.Title,
 		&article.Link,
@@ -159,7 +150,7 @@ func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Art
 		&article.Published,
 		&article.FeedURL,
 		&article.FeedTitle,
-		&categories,
+		&article.Categories,
 		&article.FeedID,
 		&article.Upvotes,
 		&article.Downvotes,
@@ -169,14 +160,12 @@ func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Art
 		&article.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		return nil, fmt.Errorf("article not found")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get article: %w", err)
 	}
-
-	article.Categories = categories
 
 	return &article, nil
 }
@@ -191,15 +180,11 @@ func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 		LIMIT $1
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, limit)
+	rows, err := r.db.Query(ctx, query, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get recent articles: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			slog.Error("failed to close rows", slog.Any("error", err))
-		}
-	}()
+	defer rows.Close()
 
 	return r.scanArticles(rows)
 }
@@ -217,15 +202,11 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, userID string,
 		LIMIT $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	rows, err := r.db.Query(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get unread articles: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			slog.Error("failed to close rows", slog.Any("error", err))
-		}
-	}()
+	defer rows.Close()
 
 	return r.scanArticles(rows)
 }
@@ -249,15 +230,11 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, userID str
 		slog.String("user_id", userID),
 		slog.Int("limit", limit))
 
-	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	rows, err := r.db.Query(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get articles for recommendation: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			slog.Error("failed to close rows", slog.Any("error", err))
-		}
-	}()
+	defer rows.Close()
 
 	articles, err := r.scanArticles(rows)
 	if err != nil {
@@ -285,15 +262,11 @@ func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, userID s
 		LIMIT $2
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	rows, err := r.db.Query(ctx, query, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get low exposure articles: %w", err)
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			slog.Error("failed to close rows", slog.Any("error", err))
-		}
-	}()
+	defer rows.Close()
 
 	return r.scanArticles(rows)
 }
@@ -306,17 +279,12 @@ func (r *ArticleRepository) IncrementRecommendCount(ctx context.Context, article
 		WHERE id = $1
 	`
 
-	result, err := r.db.ExecContext(ctx, query, articleID)
+	result, err := r.db.Exec(ctx, query, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to increment recommend count: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected() == 0 {
 		return fmt.Errorf("article not found")
 	}
 
@@ -332,7 +300,7 @@ func (r *ArticleRepository) RecordRecommendation(ctx context.Context, userID str
 		ON CONFLICT (user_id, article_id) DO NOTHING
 	`
 
-	_, err := r.db.ExecContext(ctx, query, userID, articleID)
+	_, err := r.db.Exec(ctx, query, userID, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to record recommendation: %w", err)
 	}
@@ -350,17 +318,12 @@ func (r *ArticleRepository) MarkOldArticlesAsDeleted(ctx context.Context, days i
 		  AND deleted = false
 	`
 
-	result, err := r.db.ExecContext(ctx, query, days)
+	result, err := r.db.Exec(ctx, query, days)
 	if err != nil {
 		return 0, fmt.Errorf("failed to mark old articles as deleted: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	return int(rowsAffected), nil
+	return int(result.RowsAffected()), nil
 }
 
 // HardDeleteOldArticles permanently removes articles older than N days
@@ -373,26 +336,20 @@ func (r *ArticleRepository) HardDeleteOldArticles(ctx context.Context, days int)
 		  AND deleted = true
 	`
 
-	result, err := r.db.ExecContext(ctx, query, days)
+	result, err := r.db.Exec(ctx, query, days)
 	if err != nil {
 		return 0, fmt.Errorf("failed to hard delete old articles: %w", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	return int(rowsAffected), nil
+	return int(result.RowsAffected()), nil
 }
 
 // scanArticles is a helper to scan multiple article rows
-func (r *ArticleRepository) scanArticles(rows *sql.Rows) ([]models.Article, error) {
+func (r *ArticleRepository) scanArticles(rows pgx.Rows) ([]models.Article, error) {
 	articles := make([]models.Article, 0)
 
 	for rows.Next() {
 		var article models.Article
-		var categories pq.StringArray
 
 		err := rows.Scan(
 			&article.ID,
@@ -404,7 +361,7 @@ func (r *ArticleRepository) scanArticles(rows *sql.Rows) ([]models.Article, erro
 			&article.Published,
 			&article.FeedURL,
 			&article.FeedTitle,
-			&categories,
+			&article.Categories,
 			&article.FeedID,
 			&article.Upvotes,
 			&article.Downvotes,
@@ -417,7 +374,6 @@ func (r *ArticleRepository) scanArticles(rows *sql.Rows) ([]models.Article, erro
 			return nil, fmt.Errorf("failed to scan article: %w", err)
 		}
 
-		article.Categories = categories
 		articles = append(articles, article)
 	}
 

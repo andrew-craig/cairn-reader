@@ -3,9 +3,10 @@ module github.com/andrew-craig/cairn/services/explore
 go 1.24.7
 
 require (
-	github.com/andrew-craig/cairn v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/services/users v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/lib/pq v1.10.9
 	github.com/mmcdole/gofeed v1.3.0
 )
@@ -20,6 +21,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.11.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
@@ -37,6 +39,9 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
 	github.com/hashicorp/vault/api v1.22.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
@@ -70,3 +75,6 @@ replace github.com/andrew-craig/cairn/services/users => ../users
 
 // Use local version of shared cairn packages
 replace github.com/andrew-craig/cairn => ../..
+
+// Use local version of pkg/logging
+replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
