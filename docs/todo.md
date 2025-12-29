@@ -497,7 +497,7 @@ go mod tidy
 **Current State:**
 ```go
 // In services/users/go.mod
-replace github.com/andrew-craig/cairn-core/user-service => ../users
+replace github.com/andrew-craig/cairn/services/users => ../users
 
 // This forces user service to import from explore
 import "github.com/andrew-craig/cairn/explore/pkg/models"
@@ -534,7 +534,7 @@ import "github.com/andrew-craig/cairn/pkg/models"
 **Current State:**
 ```go
 // services/explore/go.mod
-replace github.com/andrew-craig/cairn-core/user-service => ../users
+replace github.com/andrew-craig/cairn/services/users => ../users
 ```
 
 This forces the Dockerfile to copy both directories:
@@ -686,7 +686,7 @@ Update the HTTP Framework section:
 **Current State:**
 ```go
 // Read Service pattern (inconsistent)
-import "github.com/andrew-craig/cairn-read/content/internal/testhelpers"
+import "github.com/andrew-craig/cairn/services/read/content/internal/testhelpers"
 
 // Documented pattern (User Service, Explore Service)
 import "github.com/andrew-craig/cairn/users/internal/testutil"
@@ -1257,7 +1257,7 @@ import (
     "os"
     "strconv"
 
-    "github.com/andrew-craig/cairn-read/content/internal/database"
+    "github.com/andrew-craig/cairn/services/read/content/internal/database"
 )
 
 type Config struct {
@@ -1326,8 +1326,8 @@ Update main.go:
 package main
 
 import (
-    "github.com/andrew-craig/cairn-read/content/internal/config"
-    "github.com/andrew-craig/cairn-read/content/internal/database"
+    "github.com/andrew-craig/cairn/services/read/content/internal/config"
+    "github.com/andrew-craig/cairn/services/read/content/internal/database"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andrew-craig/cairn-read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
 )
 
 // ValidateJSON validates that the request body contains valid JSON

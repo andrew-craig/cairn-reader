@@ -389,7 +389,7 @@ PASS: TestDownvotingFlow
 PASS: TestDeletedArticlesExcluded
 PASS: TestEndToEndFlow
 
-ok  	github.com/andrew-craig/cairn-explore/recommender	0.561s
+ok  	github.com/andrew-craig/cairn/services/explore/recommender	0.561s
 ```
 
 **Note**: Feed management testing (sync, prioritization, auto-disable) is handled in the Fetcher service test suite (39 tests, fully implemented).

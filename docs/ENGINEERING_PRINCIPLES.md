@@ -568,8 +568,8 @@ import (
     "github.com/gin-gonic/gin"
 
     // 3. Internal packages
-    "github.com/andrew-craig/cairn-core/user-service/internal/database"
-    "github.com/andrew-craig/cairn-core/user-service/internal/services"
+    "github.com/andrew-craig/cairn/services/users/internal/database"
+    "github.com/andrew-craig/cairn/services/users/internal/services"
 )
 ```
 

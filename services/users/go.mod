@@ -1,4 +1,4 @@
-module github.com/andrew-craig/cairn-core/user-service
+module github.com/andrew-craig/cairn/services/users
 
 go 1.24.7
 

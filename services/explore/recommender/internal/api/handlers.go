@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
-	"github.com/andrew-craig/cairn-explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/users/pkg/auth"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
 )
 
 const (

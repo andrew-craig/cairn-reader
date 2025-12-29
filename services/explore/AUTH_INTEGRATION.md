@@ -4,7 +4,7 @@ This document describes how JWT authentication from the Cairn User Service has b
 
 ## Overview
 
-The Explore service now uses the shared authentication package (`github.com/andrew-craig/cairn-core/user-service/pkg/auth`) to validate JWT tokens issued by the User Service. This enables secure, stateless authentication across all protected endpoints.
+The Explore service now uses the shared authentication package (`github.com/andrew-craig/cairn/services/users/pkg/auth`) to validate JWT tokens issued by the User Service. This enables secure, stateless authentication across all protected endpoints.
 
 ## Architecture
 

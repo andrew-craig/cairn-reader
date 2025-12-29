@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/fetcher/internal/api/handlers"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/api/middleware"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/database"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/repository"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/service"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/handlers"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/middleware"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )

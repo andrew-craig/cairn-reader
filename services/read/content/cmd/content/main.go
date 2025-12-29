@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/content/internal/api"
-	"github.com/andrew-craig/cairn-read/content/internal/database"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api"
+	"github.com/andrew-craig/cairn/services/read/content/internal/database"
 	"go.uber.org/zap"
 )
 

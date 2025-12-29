@@ -3,11 +3,11 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/andrew-craig/cairn-read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn-read/content/internal/api/middleware"
-	"github.com/andrew-craig/cairn-read/content/internal/models"
-	"github.com/andrew-craig/cairn-read/content/internal/repository"
-	"github.com/andrew-craig/cairn-read/content/internal/service"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/content/internal/service"
 	"github.com/google/uuid"
 )
 

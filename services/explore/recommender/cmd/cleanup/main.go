@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	_ "github.com/lib/pq"
 )
 

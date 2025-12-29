@@ -1,4 +1,4 @@
-module github.com/andrew-craig/cairn-read
+module github.com/andrew-craig/cairn/services/read
 
 go 1.24.0
 

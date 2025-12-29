@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
 )
 
 // FeedItemsCleanupJobConfig holds configuration for the feed items cleanup job

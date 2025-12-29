@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/andrew-craig/cairn-core/user-service/internal/database"
-	"github.com/andrew-craig/cairn-core/user-service/internal/middleware"
-	"github.com/andrew-craig/cairn-core/user-service/internal/services"
+	"github.com/andrew-craig/cairn/services/users/internal/database"
+	"github.com/andrew-craig/cairn/services/users/internal/middleware"
+	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

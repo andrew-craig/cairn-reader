@@ -154,7 +154,7 @@ All 6 integration tests passing:
 --- PASS: TestEndToEndFlow (0.02s)
 
 PASS
-ok  	github.com/andrew-craig/cairn-explore/recommender	0.561s
+ok  	github.com/andrew-craig/cairn/services/explore/recommender	0.561s
 ```
 
 ## Test Coverage
