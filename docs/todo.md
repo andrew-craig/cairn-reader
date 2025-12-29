@@ -6,143 +6,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Add OpenAPI/Swagger Specifications
-**Files to Create:**
-- `services/explore/api/openapi.yaml`
-- `services/users/api/openapi.yaml`
-
-**Issue:** No formal API documentation exists. APIs are documented only in CLAUDE.md and code comments, making client integration difficult.
-
-**Implementation:**
-
-1. Create directory structure:
-```bash
-mkdir -p services/explore/api
-mkdir -p services/users/api
-```
-
-2. Add OpenAPI 3.0 spec for Explore service (`services/explore/api/openapi.yaml`):
-```yaml
-openapi: 3.0.3
-info:
-  title: Cairn Explore Service API
-  version: 1.0.0
-  description: RSS feed fetching and article recommendation service
-
-servers:
-  - url: http://localhost:8080
-    description: Fetcher service
-  - url: http://localhost:8081
-    description: Recommender service
-
-paths:
-  /health:
-    get:
-      summary: Health check
-      responses:
-        '200':
-          description: Service is healthy
-
-  /explore/recommendations/{userID}:
-    get:
-      summary: Get personalized article recommendations
-      parameters:
-        - name: userID
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of recommended articles
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Article'
-
-  /explore/articles/{articleID}/vote:
-    post:
-      summary: Vote on an article
-      parameters:
-        - name: articleID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                vote_type:
-                  type: string
-                  enum: [upvote, downvote]
-              required:
-                - vote_type
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Vote recorded
-        '400':
-          description: Invalid vote type
-        '401':
-          description: Unauthorized
-
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  schemas:
-    Article:
-      type: object
-      properties:
-        id:
-          type: string
-        title:
-          type: string
-        link:
-          type: string
-          format: uri
-        description:
-          type: string
-        published_at:
-          type: string
-          format: date-time
-        author:
-          type: string
-        categories:
-          type: array
-          items:
-            type: string
-```
-
-3. Add similar spec for User service with auth endpoints
-4. Install swagger-ui for local viewing:
-```bash
-docker run -p 8082:8080 -e SWAGGER_JSON=/api/openapi.yaml \
-  -v $(pwd)/services/explore/api:/api swaggerapi/swagger-ui
-```
-
-5. Add to CI/CD pipeline for validation:
-```bash
-npm install -g @apidevtools/swagger-cli
-swagger-cli validate services/explore/api/openapi.yaml
-```
-
----
-
-### 3. Add Tests for Recommendation Engine
+### 1. Add Tests for Recommendation Engine
 **File:** `services/explore/recommender/internal/recommend/engine.go`
 
 **Issue:** The recommendation engine contains core business logic but has no test coverage. This is critical as it implements the quality scoring algorithm.
@@ -1799,6 +1663,9 @@ The following items have been successfully implemented and verified:
 
 ### Performance & Modernization
 - **Standardize PostgreSQL Driver to pgx/v5** - Migrated explore services (fetcher and recommender) from `database/sql` + `lib/pq` to modern `pgx/v5/pgxpool`. Updated all repository methods, connection pooling, and transaction handling. Benefits include 2-3x faster query performance, better connection pooling with health checks, and native PostgreSQL protocol support. Both services build and compile successfully.
+
+### Documentation & API
+- **Add OpenAPI/Swagger Specifications** - Created comprehensive OpenAPI 3.0 specifications for both Explore and User services (`services/explore/api/openapi.yaml` and `services/users/api/openapi.yaml`). Documented all endpoints with request/response schemas, authentication requirements, and examples. Added documentation section to CLAUDE.md with instructions for viewing specs with Swagger UI and validation commands. Both specs validated successfully with @apidevtools/swagger-cli.
 
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
