@@ -54,35 +54,639 @@ Cairn is a microservices-based read-it-later application backend designed for sc
 
 ## User Service
 
-> **TODO**: Document User Service architecture
->
-> Topics to cover:
-> - Service purpose and responsibilities
-> - JWT authentication flow
-> - Token management (access + refresh tokens)
-> - Vault integration for key management
-> - User registration and login endpoints
-> - Database schema (users, refresh_tokens)
-> - Security considerations
+The User Service is responsible for managing user access to the Cairn platform, including user registration, authentication, and account management. It provides stateless JWT-based authentication with secure key management through HashiCorp Vault.
 
-**Status**: Partially implemented. See [services/users/README.md](../services/users/README.md) for current implementation details.
+### Service Purpose and Responsibilities
+
+**Core Responsibilities**:
+- User account creation and management (email/password or mobile device ID)
+- Stateless JWT authentication with RS256 signing
+- Refresh token management with automatic rotation
+- Mobile device authentication via Expo device ID
+- Account upgrade from device-only to email/password
+- Authorization middleware ensuring users can only access their own data
+- Secure secrets management with HashiCorp Vault
+
+**Technology Stack**:
+- Go 1.21+
+- Gin HTTP framework
+- PostgreSQL for user data and refresh tokens
+- HashiCorp Vault for key management
+- JWT with RS256 (2048-bit RSA keys)
+- Bcrypt for password hashing (cost factor 12+)
+
+### Authentication Flow
+
+#### Registration and Login Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              Email/Password Registration                 │
+└─────────────────────────────────────────────────────────┘
+
+Client                    User Service              Database
+  │                            │                        │
+  ├──POST /auth/register──────>│                        │
+  │  {email, password}         │                        │
+  │                            ├──Hash password─────────>│
+  │                            ├──Create user record────>│
+  │                            ├──Generate JWT tokens───>│
+  │<───{access_token,──────────┤                        │
+  │     refresh_token}         │                        │
+
+
+┌─────────────────────────────────────────────────────────┐
+│              Mobile Device Registration                  │
+└─────────────────────────────────────────────────────────┘
+
+Client                    User Service              Database
+  │                            │                        │
+  ├──POST /auth/register/mobile>│                       │
+  │  {expo_device_id}          │                        │
+  │                            ├──Create user record────>│
+  │                            ├──Generate JWT tokens───>│
+  │<───{access_token,──────────┤                        │
+  │     refresh_token}         │                        │
+```
+
+#### Token Refresh Flow
+
+```
+Client                    User Service              Database
+  │                            │                        │
+  ├──POST /auth/refresh───────>│                        │
+  │  {refresh_token}           │                        │
+  │                            ├──Hash & lookup token──>│
+  │                            ├──Validate expiry───────>│
+  │                            ├──Rotate refresh token─>│
+  │                            ├──Generate new access───>│
+  │<───{access_token,──────────┤                        │
+  │     refresh_token}         │                        │
+```
+
+### JWT Token Management
+
+**Access Tokens**:
+- Short-lived tokens (default: 15 minutes)
+- Signed with RS256 (2048-bit RSA private key)
+- Contains user_id claim for authorization
+- Stateless validation using public key
+- Standard claims: issuer, audience, subject, expiry
+
+**Refresh Tokens**:
+- Long-lived tokens (default: 7 days)
+- Stored as SHA-256 hash in database
+- Supports automatic rotation on refresh
+- Tracks device info and IP address for security
+- Token family tracking for reuse detection
+- Cascade deletion when user is deleted
+
+**Token Claims Structure**:
+```json
+{
+  "user_id": "uuid-v4",
+  "iss": "cairn-user-service",
+  "aud": ["cairn-api"],
+  "sub": "uuid-v4",
+  "iat": 1234567890,
+  "exp": 1234567890,
+  "nbf": 1234567890
+}
+```
+
+### HashiCorp Vault Integration
+
+**Purpose**: Secure storage and management of cryptographic keys and secrets
+
+**Vault Storage**:
+- RSA private key (2048-bit) for JWT signing
+- RSA public key for JWT validation
+- Database credentials (optional, for production)
+- Support for key rotation
+
+**Vault Authentication**:
+- Token authentication for development
+- AppRole authentication for production
+- Automatic token renewal
+- Health checks for Vault connectivity
+
+**Key Rotation Support**:
+- Background key rotation manager
+- Configurable rotation interval
+- Atomic key updates with rollback on failure
+- Callback support for notifying dependent services
+
+### API Endpoints
+
+**Authentication Endpoints** (Rate Limited):
+```
+POST /auth/register           # Create account with email/password
+POST /auth/register/mobile    # Create mobile-only account (Expo device ID)
+POST /auth/login              # Login with email/password
+POST /auth/login/mobile       # Login with Expo device ID
+POST /auth/refresh            # Exchange refresh token for new access token
+POST /auth/logout             # Revoke specific refresh token
+POST /auth/logout-all         # Revoke all refresh tokens for user (requires auth)
+```
+
+**User Management Endpoints** (All require JWT authentication):
+```
+GET    /users/:id             # Get user profile
+PATCH  /users/:id             # Update user profile
+POST   /users/:id/upgrade     # Add email/password to mobile-only account
+DELETE /users/:id             # Delete account and all data
+```
+
+**Health Endpoints**:
+```
+GET /health                   # Liveness check (is process running?)
+GET /ready                    # Readiness check (DB + Vault connectivity)
+```
+
+### Database Schema
+
+#### Users Table
+
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE,                    -- NULL for mobile-only
+    password_hash VARCHAR(255),                    -- NULL for mobile-only
+    expo_device_id VARCHAR(255) UNIQUE,            -- NULL for email-only
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_login_at TIMESTAMP WITH TIME ZONE,
+
+    -- Account type constraints
+    CONSTRAINT check_account_type CHECK (
+        (email IS NOT NULL AND password_hash IS NOT NULL) OR
+        (expo_device_id IS NOT NULL)
+    ),
+    CONSTRAINT check_email_with_password CHECK (
+        (email IS NULL AND password_hash IS NULL) OR
+        (email IS NOT NULL AND password_hash IS NOT NULL)
+    )
+);
+
+CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_users_expo_device_id ON users(expo_device_id) WHERE expo_device_id IS NOT NULL;
+```
+
+**Key Fields**:
+- `id`: Primary UUID identifier
+- `email`: Email address (NULL for mobile-only accounts)
+- `password_hash`: Bcrypt hash (NULL for mobile-only accounts)
+- `expo_device_id`: Expo Application Installation ID (NULL for email-only accounts)
+- `last_login_at`: Timestamp of last successful login
+
+#### Refresh Tokens Table
+
+```sql
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,       -- SHA-256 hash
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    device_info TEXT,                               -- User agent or device info
+    ip_address VARCHAR(45),                         -- IPv4 or IPv6
+    token_family UUID                               -- For rotation tracking
+);
+
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
+```
+
+**Key Fields**:
+- `token_hash`: SHA-256 hash of the refresh token (not stored in plaintext)
+- `token_family`: UUID to track token rotation chains for reuse detection
+- `device_info`: User agent or device information for security tracking
+- `ip_address`: IP address from which token was created
+
+### Security Considerations
+
+**Password Security**:
+- Bcrypt hashing with cost factor 12+ (configurable)
+- Automatic cost increase as hardware improves
+- Passwords never stored in plaintext or logged
+
+**Token Security**:
+- RS256 asymmetric signing (more secure than HS256)
+- 2048-bit RSA keys stored in Vault
+- Refresh tokens hashed before database storage (SHA-256)
+- Token rotation on refresh to limit exposure
+- Token family tracking to detect reuse attacks
+
+**API Security**:
+- Rate limiting on authentication endpoints (10 requests/minute per IP)
+- HTTPS required in production
+- CORS middleware with configurable origins
+- Security headers (CSP, X-Frame-Options, X-Content-Type-Options)
+- Recovery middleware to prevent panic crashes
+
+**Authorization**:
+- JWT middleware validates all protected endpoints
+- Authorization checks in service layer ensure users can only access their own data
+- User ID extracted from validated JWT claims (not request parameters)
+
+**Audit Trail**:
+- Refresh tokens track device info and IP address
+- `last_login_at` timestamp for login monitoring
+- `last_used_at` timestamp for refresh token usage
+
+**Status**: Fully implemented. See [services/users/README.md](../services/users/README.md) for deployment details.
 
 ---
 
 ## Explore Service
 
-> **TODO**: Document Explore Service architecture
->
-> Topics to cover:
-> - Service purpose and responsibilities
-> - Fetcher service (RSS feed polling)
-> - Recommender service (recommendation algorithm)
-> - Article voting system
-> - Feed management and tiering
-> - Database schema (feeds, articles, votes, recommendations)
-> - Communication between Fetcher and Recommender
+The Explore Service is a dual-microservice system for discovering and recommending RSS content to users. It consists of two independent services (Fetcher and Recommender) with separate databases that communicate exclusively via REST APIs.
 
-**Status**: Operational. See [services/explore/README.md](../services/explore/README.md) for current implementation details.
+### Service Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Explore Service                           │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌────────────────────┐              ┌───────────────────┐  │
+│  │  Fetcher Service   │   HTTP POST  │ Recommender Svc   │  │
+│  │     :8080          │──────────────>│     :8081         │  │
+│  │                    │   Articles    │                   │  │
+│  │  - Feed Mgmt       │              │  - Article Store  │  │
+│  │  - RSS Polling     │              │  - Voting         │  │
+│  │  - Feed Sync       │              │  - Recommendations│  │
+│  └─────────┬──────────┘              └─────────┬─────────┘  │
+│            │                                   │             │
+│     ┌──────▼────────┐                  ┌──────▼──────────┐  │
+│     │ Fetcher DB    │                  │ Recommender DB  │  │
+│     │  (feeds,      │                  │  (articles,     │  │
+│     │   history)    │                  │   votes, users) │  │
+│     └───────────────┘                  └─────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Key Architectural Principle**: Each service owns its own database. Services communicate only via HTTP APIs, never direct database access.
+
+### Fetcher Service
+
+**Purpose**: Manage RSS feed sources and fetch content for users
+
+**Core Responsibilities**:
+- Maintain feed sources in dedicated PostgreSQL database
+- Fetch RSS/Atom feeds at controlled rate (1 feed per minute)
+- Parse feed items and extract metadata
+- Filter new articles since last successful fetch
+- Submit new articles to Recommender via HTTP POST
+- Auto-disable feeds after 10 consecutive failures
+- Daily sync from Kagi Small Web collection
+- Track fetch history for monitoring
+
+**Technology Stack**:
+- Go 1.23+
+- PostgreSQL (fetcher_db)
+- gofeed for RSS/Atom parsing
+- 30-second HTTP timeout for fetches
+- 10-second timeout for API calls
+
+**Feed Management**:
+- Daily sync from [Kagi Small Web Text collection](https://github.com/kagisearch/smallweb/blob/main/smallweb.txt)
+- Prioritizes never-fetched feeds, then oldest
+- Fetches 1 feed every 60 seconds (configurable)
+- Auto-disables feeds after 10 consecutive failures
+- Only successfully fetched articles sent to recommender
+
+**Endpoints**:
+```
+GET  /health              # Health check (liveness)
+POST /fetch               # Manually trigger feed fetch
+```
+
+### Recommender Service
+
+**Purpose**: Store articles and provide personalized recommendations
+
+**Core Responsibilities**:
+- Receive articles from Fetcher via HTTP POST
+- Store articles with SHA256 hash IDs (deduplication)
+- Manage user engagement (upvotes/downvotes)
+- Serve personalized recommendations (5 articles per request)
+- Track articles read per user
+- Track recommendation history to avoid repeats
+- Auto-create users on first interaction
+
+**Technology Stack**:
+- Go 1.23+
+- PostgreSQL (cairn_db)
+- JWT authentication (validates tokens from User Service)
+- Quality-based recommendation algorithm
+
+**Endpoints**:
+```
+GET  /health                               # Health check
+POST /explore/articles                     # Submit articles (from fetcher)
+GET  /explore/recommendations/{userID}     # Get 5 recommendations (requires auth)
+POST /explore/articles/read                # Mark article as read (requires auth)
+POST /explore/articles/{articleID}/vote    # Vote on article (requires auth)
+DELETE /explore/articles/{articleID}/vote  # Remove vote (requires auth)
+GET  /explore/articles/{articleID}/votes   # Get vote counts (requires auth)
+```
+
+### Recommendation Algorithm
+
+**Algorithm**: 4 high-quality articles + 1 low-exposure article (exploration)
+
+**Quality Score Formula**:
+```
+quality_score = (upvotes - (downvotes × 3)) / recommends
+
+Where:
+- upvotes: Number of positive votes
+- downvotes: Number of negative votes (weighted 3x)
+- recommends: Number of times recommended to any user
+```
+
+**Selection Process**:
+1. Get articles eligible for recommendation (not deleted, not already recommended to user)
+2. Calculate quality score for each article
+3. Select 4 articles with highest quality scores
+4. Select 1 article with lowest recommends count (exploration)
+5. Track recommendations to avoid repeats
+6. Increment recommends counter for each returned article
+
+**Special Cases**:
+- Articles with 0 recommends get very high default score (1000.0)
+- Articles with 0 recommends and upvotes get infinite score (prioritized)
+- If < 5 eligible articles, return what's available
+
+**Benefits**:
+- Balances quality (user votes) with freshness (low exposure)
+- Downvotes heavily penalize quality (3x multiplier)
+- New articles get surfaced quickly
+- Prevents recommendation repetition per user
+
+### Database Schema
+
+#### Fetcher Database (fetcher_db)
+
+**Feeds Table**:
+```sql
+CREATE TABLE feeds (
+    id SERIAL PRIMARY KEY,
+    url TEXT UNIQUE NOT NULL,
+    title TEXT,
+    description TEXT,
+    last_fetched_at TIMESTAMP,
+    consecutive_failures INT DEFAULT 0,
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_feeds_last_fetched ON feeds(last_fetched_at NULLS FIRST) WHERE enabled = true;
+CREATE INDEX idx_feeds_enabled ON feeds(enabled);
+```
+
+**Fetch History Table**:
+```sql
+CREATE TABLE fetch_history (
+    id SERIAL PRIMARY KEY,
+    feed_id INT REFERENCES feeds(id) ON DELETE CASCADE,
+    fetch_started_at TIMESTAMP NOT NULL,
+    fetch_completed_at TIMESTAMP,
+    success BOOLEAN,
+    articles_found INT DEFAULT 0,
+    articles_sent INT DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_fetch_history_feed_id ON fetch_history(feed_id);
+CREATE INDEX idx_fetch_history_created_at ON fetch_history(created_at DESC);
+```
+
+#### Recommender Database (cairn_db)
+
+**Users Table**:
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT UNIQUE NOT NULL,  -- External user ID from User Service
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Articles Table**:
+```sql
+CREATE TABLE articles (
+    id VARCHAR(255) PRIMARY KEY,      -- SHA256 hash of article link
+    title TEXT NOT NULL,
+    link TEXT NOT NULL,
+    description TEXT,
+    content TEXT,
+    author VARCHAR(255),
+    published TIMESTAMP NOT NULL,
+    feed_url TEXT NOT NULL,
+    feed_title VARCHAR(255),
+    categories TEXT[],                -- Array of category tags
+    upvotes INT DEFAULT 0,
+    downvotes INT DEFAULT 0,
+    recommends INT DEFAULT 0,         -- Counter for recommendation tracking
+    deleted BOOLEAN DEFAULT FALSE,
+    feed_id INT,                      -- Reference to fetcher DB (no FK constraint)
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP
+);
+
+CREATE INDEX idx_articles_published ON articles(published DESC);
+CREATE INDEX idx_articles_feed_url ON articles(feed_url);
+CREATE INDEX idx_articles_categories ON articles USING GIN(categories);
+CREATE INDEX idx_articles_recommends ON articles(recommends);
+CREATE INDEX idx_articles_quality_score ON articles(upvotes, downvotes, recommends) WHERE deleted = false;
+```
+
+**User Articles Table** (tracks read status):
+```sql
+CREATE TABLE user_articles (
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    article_id VARCHAR(255) REFERENCES articles(id) ON DELETE CASCADE,
+    read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, article_id)
+);
+
+CREATE INDEX idx_user_articles_user_id ON user_articles(user_id);
+CREATE INDEX idx_user_articles_read ON user_articles(read);
+```
+
+**Votes Table**:
+```sql
+CREATE TABLE votes (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    article_id VARCHAR(255) REFERENCES articles(id) ON DELETE CASCADE,
+    vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, article_id)
+);
+
+CREATE INDEX idx_votes_article ON votes(article_id);
+CREATE INDEX idx_votes_user ON votes(user_id);
+CREATE INDEX idx_votes_vote_type ON votes(vote_type);
+```
+
+**Recommendations Table** (tracks recommendation history):
+```sql
+CREATE TABLE recommendations (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    article_id VARCHAR(255) REFERENCES articles(id) ON DELETE CASCADE,
+    recommended_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_recommendations_user_article ON recommendations(user_id, article_id);
+CREATE INDEX idx_recommendations_article ON recommendations(article_id);
+```
+
+### Communication Patterns
+
+#### Fetcher → Recommender Communication
+
+**Pattern**: HTTP POST with JSON payload
+
+**Flow**:
+```
+Fetcher Service                 Recommender Service
+      │                                │
+      ├──1. Fetch RSS feed─────────────┤
+      ├──2. Parse feed items───────────┤
+      ├──3. Filter new articles────────┤
+      │                                │
+      ├──POST /explore/articles────────>│
+      │  {articles: [...]}             │
+      │                                ├──4. Store articles in DB
+      │                                ├──5. Deduplicate by hash
+      │<───{status: "success"}─────────┤
+      │                                │
+      ├──6. Record fetch history───────┤
+      └──7. Update last_fetched_at─────┘
+```
+
+**Request Format**:
+```json
+{
+  "articles": [
+    {
+      "id": "sha256-hash",
+      "title": "Article Title",
+      "link": "https://example.com/article",
+      "description": "Article description",
+      "content": "Full article content",
+      "author": "Author Name",
+      "published": "2024-01-01T00:00:00Z",
+      "feed_url": "https://example.com/feed.xml",
+      "feed_title": "Feed Title",
+      "categories": ["tech", "programming"]
+    }
+  ]
+}
+```
+
+**Error Handling**:
+- 30-second timeout for HTTP requests
+- 10-second timeout for API calls
+- Failed submissions marked in fetch history
+- Consecutive failures tracked per feed
+- Auto-disable after 10 consecutive failures
+
+### Article ID Generation
+
+**Method**: SHA256 hash of article link
+
+**Benefits**:
+- Ensures uniqueness across all feeds
+- Enables automatic deduplication
+- Deterministic ID generation
+- No need for centralized ID allocation
+
+**Implementation**:
+```go
+hash := sha256.Sum256([]byte(articleLink))
+articleID := hex.EncodeToString(hash[:])
+```
+
+### Feed Polling Strategy
+
+**Objective**: Gentle polling to avoid overwhelming feed sources
+
+**Strategy**:
+- Fetch 1 feed every 60 seconds (configurable via `FETCH_INTERVAL`)
+- Prioritize never-fetched feeds first
+- Then fetch oldest by `last_fetched_at`
+- Only fetch from enabled feeds
+- Filter articles: only send items published after `last_fetched_at`
+- First fetch of a feed sends all available articles
+
+**Failure Handling**:
+- Track consecutive failures per feed
+- Auto-disable after 10 consecutive failures (configurable via `MAX_FETCH_ERRORS`)
+- Failed feeds can be manually re-enabled
+- Each successful fetch resets consecutive failure counter
+
+**Feed Sources**:
+- Daily sync from Kagi Small Web collection
+- URL: `https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt`
+- Runs on startup and every 24 hours
+- New feeds automatically added (existing feeds unchanged)
+
+### Voting System
+
+**Supported Actions**:
+- `upvote`: Positive vote (increases quality score)
+- `downvote`: Negative vote (decreases quality score 3x)
+- Remove vote: Delete existing vote
+
+**Vote Mechanics**:
+- One vote per user per article (enforced by unique constraint)
+- Changing vote type replaces previous vote
+- Vote counts materialized in articles table for performance
+- Votes tracked in separate votes table for audit trail
+
+**Vote Impact on Recommendations**:
+- Upvotes increase article quality score
+- Downvotes heavily penalize quality (3x multiplier)
+- Quality score influences selection of 4 high-quality articles
+- Low-exposure article (exploration) not affected by votes
+
+### Security Considerations
+
+**Authentication**:
+- All user-facing endpoints require JWT authentication
+- JWT tokens validated using User Service public key
+- User ID extracted from validated JWT claims
+- No query parameter authentication (prevents tampering)
+
+**Input Validation**:
+- Article batch size limited to 10MB
+- Simple request size limited to 1KB
+- Vote type must be 'upvote' or 'downvote'
+- Article IDs validated before database operations
+
+**Database Security**:
+- No raw SQL queries (parameterized queries only)
+- Prepared statements prevent SQL injection
+- Foreign key constraints enforce referential integrity
+- Check constraints enforce valid enum values
+
+**Rate Limiting**:
+- Fetcher: 1 feed per minute (protects feed sources)
+- Recommender: No rate limiting (relies on User Service auth)
+
+**Status**: Fully operational. See [services/explore/README.md](../services/explore/README.md) for deployment details.
 
 ---
 
