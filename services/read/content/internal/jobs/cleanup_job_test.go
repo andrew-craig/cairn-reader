@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
@@ -11,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/zap"
 )
 
 // MockContentRepository is a mock implementation of repository.ContentRepository
@@ -83,7 +84,7 @@ func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan ti
 
 func TestCleanupJob_Run_Success(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// Expect deletion of content older than 90 days
@@ -99,7 +100,7 @@ func TestCleanupJob_Run_Success(t *testing.T) {
 
 func TestCleanupJob_Run_NoContentToDelete(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// Expect deletion but return 0 rows deleted
@@ -115,7 +116,7 @@ func TestCleanupJob_Run_NoContentToDelete(t *testing.T) {
 
 func TestCleanupJob_Run_Error(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// Mock repository to return an error
@@ -131,7 +132,7 @@ func TestCleanupJob_Run_Error(t *testing.T) {
 
 func TestCleanupJob_RunWithBatching_Success(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// Mock multiple batch deletions
@@ -154,7 +155,7 @@ func TestCleanupJob_RunWithBatching_Success(t *testing.T) {
 
 func TestCleanupJob_RunWithBatching_ErrorInMiddle(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// First batch succeeds, second batch fails
@@ -172,7 +173,7 @@ func TestCleanupJob_RunWithBatching_ErrorInMiddle(t *testing.T) {
 
 func TestCleanupJob_RunWithBatching_NoContentToDelete(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	job := NewCleanupJob(mockRepo, logger)
 
 	// First call returns 0 rows deleted
@@ -189,7 +190,7 @@ func TestCleanupJob_RunWithBatching_NoContentToDelete(t *testing.T) {
 
 func TestCleanupJob_NewCleanupJob(t *testing.T) {
 	mockRepo := new(MockContentRepository)
-	logger, _ := zap.NewDevelopment()
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	job := NewCleanupJob(mockRepo, logger)
 
