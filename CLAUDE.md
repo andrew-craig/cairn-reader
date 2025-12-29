@@ -306,6 +306,7 @@ Formal API specifications are available in OpenAPI 3.0 format:
 
 - **Explore Service**: `services/explore/api/openapi.yaml`
 - **User Service**: `services/users/api/openapi.yaml`
+- **Read Service**: `services/read/api/openapi.yaml`
 
 **Viewing the API Documentation:**
 
@@ -318,11 +319,16 @@ docker run -p 8082:8080 -e SWAGGER_JSON=/api/openapi.yaml \
 # User Service API
 docker run -p 8083:8080 -e SWAGGER_JSON=/api/openapi.yaml \
   -v $(pwd)/services/users/api:/api swaggerapi/swagger-ui
+
+# Read Service API
+docker run -p 8084:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/services/read/api:/api swaggerapi/swagger-ui
 ```
 
 Then visit:
 - Explore Service: http://localhost:8082
 - User Service: http://localhost:8083
+- Read Service: http://localhost:8084
 
 **Validating OpenAPI Specs:**
 ```bash
@@ -331,6 +337,9 @@ npx @apidevtools/swagger-cli validate services/explore/api/openapi.yaml
 
 # Validate User Service spec
 npx @apidevtools/swagger-cli validate services/users/api/openapi.yaml
+
+# Validate Read Service spec
+npx @apidevtools/swagger-cli validate services/read/api/openapi.yaml
 ```
 
 ## Testing and Development Workflow
