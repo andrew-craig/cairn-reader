@@ -990,9 +990,9 @@ If you're still experiencing issues:
 1. **Check existing issues**: [GitHub Issues](https://github.com/andrew-craig/cairn-read/issues)
 2. **Review documentation**:
    - [README.md](../README.md)
-   - [ARCHITECTURE.md](ARCHITECTURE.md)
-   - [DEPLOYMENT.md](DEPLOYMENT.md)
-   - [CONFIGURATION.md](CONFIGURATION.md)
+   - [READ_SERVICE_ARCHITECTURE.md](READ_SERVICE_ARCHITECTURE.md)
+   - [READ_SERVICE_DEPLOYMENT.md](READ_SERVICE_DEPLOYMENT.md)
+   - [READ_SERVICE_CONFIGURATION.md](READ_SERVICE_CONFIGURATION.md)
 3. **File a new issue** with:
    - Exact error message
    - Relevant logs

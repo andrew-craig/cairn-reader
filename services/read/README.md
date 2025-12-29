@@ -257,7 +257,7 @@ make migrate-status
 
 Services are configured via environment variables. See:
 
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) - Complete configuration reference
+- [../../docs/READ_SERVICE_CONFIGURATION.md](../../docs/READ_SERVICE_CONFIGURATION.md) - Complete configuration reference
 - [.env.example](services/content-service/.env.example) - Example environment files
 
 Key environment variables:
@@ -277,7 +277,7 @@ LOG_LEVEL=info
 
 ## Deployment
 
-For detailed deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+For detailed deployment instructions, see [../../docs/READ_SERVICE_DEPLOYMENT.md](../../docs/READ_SERVICE_DEPLOYMENT.md).
 
 ### Docker Compose (Recommended for Single-Server)
 
@@ -393,7 +393,7 @@ docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service
 
 ## Troubleshooting
 
-For common issues and solutions, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+For common issues and solutions, see [../../docs/READ_SERVICE_TROUBLESHOOTING.md](../../docs/READ_SERVICE_TROUBLESHOOTING.md).
 
 ## Contributing
 
@@ -468,7 +468,7 @@ For issues, questions, or contributions:
 
 - **Issues**: [GitHub Issues](https://github.com/andrew-craig/cairn-read/issues)
 - **Documentation**: See `/docs` directory
-- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Architecture**: [../../docs/READ_SERVICE_ARCHITECTURE.md](../../docs/READ_SERVICE_ARCHITECTURE.md)
 
 ## Acknowledgments
 
