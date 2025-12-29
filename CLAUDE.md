@@ -300,6 +300,39 @@ GET /health                            → Basic health check
 GET /ready                             → Readiness check (DB + Vault connectivity)
 ```
 
+### OpenAPI/Swagger Documentation
+
+Formal API specifications are available in OpenAPI 3.0 format:
+
+- **Explore Service**: `services/explore/api/openapi.yaml`
+- **User Service**: `services/users/api/openapi.yaml`
+
+**Viewing the API Documentation:**
+
+Using Swagger UI (requires Docker):
+```bash
+# Explore Service API
+docker run -p 8082:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/services/explore/api:/api swaggerapi/swagger-ui
+
+# User Service API
+docker run -p 8083:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/services/users/api:/api swaggerapi/swagger-ui
+```
+
+Then visit:
+- Explore Service: http://localhost:8082
+- User Service: http://localhost:8083
+
+**Validating OpenAPI Specs:**
+```bash
+# Validate Explore Service spec
+npx @apidevtools/swagger-cli validate services/explore/api/openapi.yaml
+
+# Validate User Service spec
+npx @apidevtools/swagger-cli validate services/users/api/openapi.yaml
+```
+
 ## Testing and Development Workflow
 
 > 📖 **For comprehensive testing standards and patterns, see [Engineering Principles - Testing Philosophy](/docs/ENGINEERING_PRINCIPLES.md#testing-philosophy)**

@@ -1,0 +1,558 @@
+openapi: 3.0.3
+info:
+  title: Cairn Explore Service API
+  version: 1.0.0
+  description: |
+    RSS feed fetching and article recommendation service for Cairn.
+
+    The Explore service consists of two microservices:
+    - **Fetcher Service** (port 8080): Manages RSS feed sources and fetches content
+    - **Recommender Service** (port 8081): Stores articles and provides personalized recommendations
+
+    ## Architecture
+    Each service has its own PostgreSQL database and communicates via HTTP APIs.
+    The fetcher fetches RSS feeds and sends successfully fetched articles to the recommender.
+
+    ## Authentication
+    Most recommender endpoints require JWT authentication with Bearer tokens.
+    The JWT must contain a valid `user_id` claim.
+  contact:
+    name: Cairn API Support
+    url: https://github.com/andrew-craig/cairn
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Fetcher service (local development)
+  - url: http://localhost:8081
+    description: Recommender service (local development)
+
+tags:
+  - name: Health
+    description: Health check and readiness endpoints
+  - name: Fetcher
+    description: RSS feed fetching operations
+  - name: Recommendations
+    description: Article recommendation endpoints (requires authentication)
+  - name: Articles
+    description: Article management and interaction endpoints (requires authentication)
+  - name: Votes
+    description: Article voting operations (requires authentication)
+
+paths:
+  # Fetcher Service Endpoints (Port 8080)
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check (Fetcher)
+      description: Returns the health status of the fetcher service (liveness probe)
+      operationId: fetcherHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: fetcher
+
+  /fetch:
+    post:
+      tags:
+        - Fetcher
+      summary: Trigger manual feed fetch
+      description: Triggers a single feed fetch asynchronously
+      operationId: triggerFetch
+      responses:
+        '202':
+          description: Fetch triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: fetch triggered
+        '405':
+          description: Method not allowed
+
+  /feeds/stats:
+    get:
+      tags:
+        - Fetcher
+      summary: Get feed statistics
+      description: Returns statistics about feeds (total, enabled, disabled, never fetched)
+      operationId: getFeedStats
+      responses:
+        '200':
+          description: Feed statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    description: Total number of feeds
+                    example: 150
+                  enabled:
+                    type: integer
+                    description: Number of enabled feeds
+                    example: 140
+                  disabled:
+                    type: integer
+                    description: Number of disabled feeds
+                    example: 10
+                  never_fetched:
+                    type: integer
+                    description: Number of feeds never fetched
+                    example: 5
+        '500':
+          description: Internal server error
+
+  /feeds/sync:
+    post:
+      tags:
+        - Fetcher
+      summary: Trigger feed sync
+      description: Triggers feed list synchronization from Kagi Small Web collection (async)
+      operationId: triggerFeedSync
+      responses:
+        '202':
+          description: Sync triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: sync triggered
+        '405':
+          description: Method not allowed
+
+  # Recommender Service Endpoints (Port 8081)
+  /ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check (Recommender)
+      description: Checks if the recommender service is ready (readiness probe). Verifies database connectivity.
+      operationId: recommenderReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  service:
+                    type: string
+                    example: recommender
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not ready
+                  error:
+                    type: string
+                    example: database unavailable
+
+  /explore/articles:
+    post:
+      tags:
+        - Articles
+      summary: Submit articles (internal)
+      description: |
+        Internal endpoint for the fetcher to submit articles to the recommender.
+        Not intended for external use.
+      operationId: submitArticles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                articles:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Article'
+              required:
+                - articles
+      responses:
+        '201':
+          description: Articles stored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  count:
+                    type: integer
+                    example: 15
+                  message:
+                    type: string
+                    example: Articles stored successfully
+        '400':
+          description: Invalid request body
+        '413':
+          description: Request body too large (max 10MB)
+        '500':
+          description: Failed to store articles
+
+  /explore/recommendations/{userID}:
+    get:
+      tags:
+        - Recommendations
+      summary: Get personalized recommendations
+      description: |
+        Returns 5 personalized article recommendations for the authenticated user.
+        The algorithm returns 4 high-quality articles plus 1 new article with low recommend count.
+      operationId: getRecommendations
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          description: User ID (extracted from JWT token)
+          schema:
+            type: string
+            format: uuid
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                    format: uuid
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Article'
+                  count:
+                    type: integer
+                    example: 5
+        '401':
+          description: Unauthorized - missing or invalid JWT token
+        '405':
+          description: Method not allowed
+        '500':
+          description: Failed to get recommendations
+
+  /explore/articles/read:
+    post:
+      tags:
+        - Articles
+      summary: Mark article as read
+      description: Marks an article as read for the authenticated user
+      operationId: markArticleAsRead
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                article_id:
+                  type: string
+                  description: ID of the article to mark as read
+              required:
+                - article_id
+      responses:
+        '200':
+          description: Article marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Article marked as read
+        '400':
+          description: Invalid request body or missing article_id
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '413':
+          description: Request body too large
+        '500':
+          description: Failed to mark article as read
+
+  /explore/articles/{articleID}/vote:
+    post:
+      tags:
+        - Votes
+      summary: Vote on an article
+      description: |
+        Submit an upvote or downvote for an article.
+        If the user has already voted, the vote is updated.
+      operationId: voteOnArticle
+      parameters:
+        - name: articleID
+          in: path
+          required: true
+          description: ID of the article to vote on
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vote_type:
+                  type: string
+                  enum: [upvote, downvote]
+                  description: Type of vote
+              required:
+                - vote_type
+      responses:
+        '200':
+          description: Vote recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Vote recorded successfully
+        '400':
+          description: Invalid vote type or missing article_id
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '413':
+          description: Request body too large
+        '500':
+          description: Failed to record vote
+
+    delete:
+      tags:
+        - Votes
+      summary: Remove vote from article
+      description: Removes the authenticated user's vote from an article
+      operationId: removeVote
+      parameters:
+        - name: articleID
+          in: path
+          required: true
+          description: ID of the article to remove vote from
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vote removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  message:
+                    type: string
+                    example: Vote removed successfully
+        '400':
+          description: Missing article_id
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '500':
+          description: Failed to remove vote
+
+  /explore/articles/{articleID}/votes:
+    get:
+      tags:
+        - Votes
+      summary: Get vote counts for article
+      description: |
+        Returns upvote and downvote counts for an article.
+        If authenticated, also returns the user's current vote.
+      operationId: getVoteCounts
+      parameters:
+        - name: articleID
+          in: path
+          required: true
+          description: ID of the article
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vote counts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  article_id:
+                    type: string
+                  upvotes:
+                    type: integer
+                    example: 42
+                  downvotes:
+                    type: integer
+                    example: 5
+                  user_vote:
+                    type: string
+                    enum: [upvote, downvote]
+                    description: The authenticated user's vote (if any)
+        '400':
+          description: Missing article_id
+        '401':
+          description: Unauthorized
+        '405':
+          description: Method not allowed
+        '500':
+          description: Failed to get vote counts
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from the User Service.
+        The token must contain a valid `user_id` claim.
+
+  schemas:
+    Article:
+      type: object
+      description: An article from an RSS feed
+      properties:
+        id:
+          type: string
+          description: SHA256 hash of the article link (ensures uniqueness)
+          example: "a1b2c3d4e5f6..."
+        title:
+          type: string
+          description: Article title
+          example: "Understanding Microservices Architecture"
+        link:
+          type: string
+          format: uri
+          description: Original article URL
+          example: "https://example.com/article"
+        description:
+          type: string
+          description: Article description or summary
+          example: "A comprehensive guide to microservices..."
+        content:
+          type: string
+          description: Full article content (if available)
+        author:
+          type: string
+          description: Article author
+          example: "John Doe"
+        published:
+          type: string
+          format: date-time
+          description: Publication date
+          example: "2025-12-29T10:00:00Z"
+        feed_url:
+          type: string
+          format: uri
+          description: URL of the RSS feed
+          example: "https://example.com/feed.xml"
+        feed_title:
+          type: string
+          description: Title of the RSS feed
+          example: "Example Blog"
+        categories:
+          type: array
+          items:
+            type: string
+          description: Article categories/tags
+          example: ["technology", "programming"]
+        feed_id:
+          type: integer
+          nullable: true
+          description: Optional reference to the feed in fetcher database
+          example: 123
+        upvotes:
+          type: integer
+          description: Number of upvotes
+          example: 42
+        downvotes:
+          type: integer
+          description: Number of downvotes
+          example: 5
+        recommends:
+          type: integer
+          description: Number of times this article has been recommended
+          example: 150
+        deleted:
+          type: boolean
+          description: Whether the article has been soft-deleted
+          example: false
+        created_at:
+          type: string
+          format: date-time
+          description: When the article was added to the database
+        updated_at:
+          type: string
+          format: date-time
+          description: When the article was last updated
+      required:
+        - id
+        - title
+        - link
+        - published
+        - feed_url
+
+    Error:
+      type: object
+      description: Standard error response
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request body"
