@@ -5,9 +5,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: cairn
-      POSTGRES_PASSWORD: cairn_password
-      POSTGRES_DB: cairn_db
+      POSTGRES_USER: ${POSTGRES_USER_RECOMMENDER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RECOMMENDER}
+      POSTGRES_DB: ${POSTGRES_DB_RECOMMENDER}
     ports:
       - "5432:5432"
     volumes:
@@ -23,9 +23,9 @@ services:
   fetcher_db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: fetcher
-      POSTGRES_PASSWORD: fetcher_password
-      POSTGRES_DB: fetcher_db
+      POSTGRES_USER: ${POSTGRES_USER_FETCHER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_FETCHER}
+      POSTGRES_DB: ${POSTGRES_DB_FETCHER}
     ports:
       - "5433:5432"  # Different port to avoid conflict with recommender DB
     volumes:
@@ -47,9 +47,9 @@ services:
       - PORT=8081
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USER=cairn
-      - DB_PASSWORD=cairn_password
-      - DB_NAME=cairn_db
+      - DB_USER=${POSTGRES_USER_RECOMMENDER}
+      - DB_PASSWORD=${DB_PASSWORD_RECOMMENDER}
+      - DB_NAME=${POSTGRES_DB_RECOMMENDER}
       - DB_SSLMODE=disable  # Disable SSL for local development
       - ARTICLE_RETENTION_DAYS=90  # Delete articles after 90 days
     depends_on:
@@ -76,9 +76,9 @@ services:
       - MAX_FETCH_ERRORS=10  # Disable feed after 10 consecutive failures
       - DB_HOST=fetcher_db
       - DB_PORT=5432
-      - DB_USER=fetcher
-      - DB_PASSWORD=fetcher_password
-      - DB_NAME=fetcher_db
+      - DB_USER=${POSTGRES_USER_FETCHER}
+      - DB_PASSWORD=${DB_PASSWORD_FETCHER}
+      - DB_NAME=${POSTGRES_DB_FETCHER}
       - DB_SSLMODE=disable  # Disable SSL for local development
       - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
     depends_on:

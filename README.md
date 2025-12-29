@@ -102,6 +102,53 @@ cairn/
 - Docker & Docker Compose (for running backend services)
 - PostgreSQL 14+ (if running services locally without Docker)
 
+### Environment Configuration
+
+Before running backend services with Docker, you need to configure environment variables for sensitive data like database passwords and API tokens.
+
+#### Setting Up Environment Files
+
+1. **Infrastructure Services** (User, Explore Fetcher, Explore Recommender):
+   ```bash
+   cd infrastructure/docker
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+2. **Explore Service** (when running standalone):
+   ```bash
+   cd services/explore
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+3. **Read Service** (when running standalone):
+   ```bash
+   cd services/read
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+#### Environment File Structure
+
+Each `.env.example` file contains template values. Copy it to `.env` and update with your actual values:
+
+- **NEVER commit `.env` files** to version control (already in `.gitignore`)
+- Use strong, unique passwords for production
+- Keep development passwords simple for local testing
+- Update tokens and secrets for each environment
+
+Example `.env` file structure:
+```bash
+# PostgreSQL Configuration
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_secure_password_here
+POSTGRES_DB=database_name
+
+# Vault Configuration (infrastructure only)
+VAULT_DEV_ROOT_TOKEN_ID=your_vault_token_here
+```
+
 ### Mobile App Development
 
 1. Navigate to the mobile app directory:

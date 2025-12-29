@@ -1369,6 +1369,7 @@ The following items have been successfully implemented and verified:
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
 - **Validate Article Exists Before Recording Vote** - Added rowsAffected check and error handling
 - **Make SSL Mode Configurable (Default: Require)** - DB_SSLMODE environment variable with "require" default
+- **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables. Created `.env.example` files in three locations: `infrastructure/docker/.env.example`, `services/explore/.env.example`, and `services/read/.env.example`. Updated all docker-compose.yml files (`infrastructure/docker/docker-compose.yml`, `services/explore/docker-compose.yml`, `services/read/docker-compose.yml`) to use environment variable substitution for sensitive values (PostgreSQL passwords, Vault tokens, database credentials). Added comprehensive documentation in README.md with setup instructions and security best practices. All `.env` files are already in `.gitignore` to prevent accidental commits.
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
