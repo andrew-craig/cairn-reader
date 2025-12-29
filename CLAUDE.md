@@ -103,6 +103,8 @@ make docker-run              # Run in Docker container
 
 ## Architecture
 
+> 📖 **For detailed architectural principles and rationale, see [Engineering Principles - Core Architectural Principles](/docs/ENGINEERING_PRINCIPLES.md#core-architectural-principles)**
+
 ### System Architecture
 Cairn follows a microservices architecture where services communicate via REST APIs:
 
@@ -300,6 +302,8 @@ GET /ready                             → Readiness check (DB + Vault connectiv
 
 ## Testing and Development Workflow
 
+> 📖 **For comprehensive testing standards and patterns, see [Engineering Principles - Testing Philosophy](/docs/ENGINEERING_PRINCIPLES.md#testing-philosophy)**
+
 ### Testing Mobile App Changes
 1. Start Expo dev server: `cd apps/mobile && npm start`
 2. Open in iOS simulator: Press `i` in terminal or `npm run ios`
@@ -337,6 +341,8 @@ make migrate-version         # Check current version
 
 ### Adding New Features
 
+> 📖 **For detailed implementation patterns, see [Engineering Principles - Common Patterns](/docs/ENGINEERING_PRINCIPLES.md#common-patterns)**
+
 **Adding a new mobile screen**:
 1. Create screen component in `apps/mobile/src/screens/`
 2. Add screen to navigation in `src/navigation/RootNavigator.tsx` or `TabNavigator.tsx`
@@ -355,6 +361,8 @@ make migrate-version         # Check current version
 3. Reset database to test migration (see above)
 
 ## Code Conventions
+
+> 📖 **For comprehensive coding standards and style guides, see [Engineering Principles - Development Standards](/docs/ENGINEERING_PRINCIPLES.md#development-standards)**
 
 ### Go Code Style
 - Use `fmt.Errorf("context: %w", err)` for error wrapping
@@ -442,6 +450,7 @@ The Explore service uses **two separate PostgreSQL databases**:
 
 ## Documentation References
 
+- **Engineering Principles**: `/docs/ENGINEERING_PRINCIPLES.md` - Architectural principles, coding standards, testing philosophy, and code review guidelines
 - **Main README**: `/README.md` - Project overview and getting started
 - **Explore Service**: `/services/explore/README.md` - RSS fetcher and recommender
 - **Explore Service Plan**: `/services/explore/RECOMMENDER_PLAN.md` - Implementation roadmap
