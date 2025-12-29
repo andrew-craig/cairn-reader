@@ -6,53 +6,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Consolidate Duplicate Logging Package
-**Files:**
-- `services/explore/pkg/logging/logger.go` (53 lines)
-- `services/users/pkg/logging/logger.go` (53 lines)
-
-**Issue:** Identical logging code duplicated across services. This creates maintenance burden and potential drift.
-
-**Current State:**
-```go
-// IDENTICAL CODE IN BOTH LOCATIONS:
-package logging
-
-import "log/slog"
-
-type Config struct {
-    Level  string
-    Format string
-}
-
-func NewLogger(cfg Config) *slog.Logger {
-    // ... identical implementation
-}
-```
-
-**Implementation:**
-1. Create shared package at repository root:
-```bash
-mkdir -p pkg/logging
-mv services/explore/pkg/logging/* pkg/logging/
-```
-
-2. Update imports in both services:
-```go
-// Before
-import "github.com/andrew-craig/cairn/explore/pkg/logging"
-
-// After
-import "github.com/andrew-craig/cairn/pkg/logging"
-```
-
-3. Update `go.mod` files to reference shared package
-4. Delete duplicate from `services/users/pkg/logging/`
-5. Run `go mod tidy` in all services
-
----
-
-### 2. Standardize PostgreSQL Driver to pgx/v5
+### 1. Standardize PostgreSQL Driver to pgx/v5
 **Files:**
 - `services/explore/fetcher/internal/db/config.go`
 - `services/explore/recommender/cmd/recommender/main.go`
@@ -122,7 +76,7 @@ func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 
 ---
 
-### 3. Add OpenAPI/Swagger Specifications
+### 2. Add OpenAPI/Swagger Specifications
 **Files to Create:**
 - `services/explore/api/openapi.yaml`
 - `services/users/api/openapi.yaml`
@@ -258,7 +212,7 @@ swagger-cli validate services/explore/api/openapi.yaml
 
 ---
 
-### 4. Add Tests for Recommendation Engine
+### 3. Add Tests for Recommendation Engine
 **File:** `services/explore/recommender/internal/recommend/engine.go`
 
 **Issue:** The recommendation engine contains core business logic but has no test coverage. This is critical as it implements the quality scoring algorithm.
@@ -397,7 +351,7 @@ go test ./internal/recommend/... -v -short  # Skip integration tests
 
 ## High Priority
 
-### 5. Standardize Logging Library to log/slog in Read Service
+### 4. Standardize Logging Library to log/slog in Read Service
 **Files:**
 - `services/read/content/cmd/content/main.go:22`
 - `services/read/fetcher/cmd/fetcher/main.go:22`
@@ -486,7 +440,7 @@ go mod tidy
 
 ---
 
-### 4. Move Shared Models to Root Package
+### 5. Move Shared Models to Root Package
 **Files:**
 - `services/explore/pkg/models/article.go`
 - `services/explore/pkg/models/user.go`
@@ -524,7 +478,7 @@ import "github.com/andrew-craig/cairn/pkg/models"
 
 ---
 
-### 5. Fix Module Dependency Architecture
+### 6. Fix Module Dependency Architecture
 **Files:**
 - `services/explore/go.mod` (line 6)
 - `services/explore/recommender/Dockerfile`
@@ -570,7 +524,7 @@ go work use services/explore services/users
 
 ---
 
-### 6. Remove Hardcoded Secrets from Docker Compose
+### 7. Remove Hardcoded Secrets from Docker Compose
 **File:** `infrastructure/docker/docker-compose.yml`
 
 **Issue:** Secrets are hardcoded in version-controlled docker-compose file. This is a security risk if the repository becomes public or is compromised.
@@ -631,7 +585,7 @@ cp .env.example .env
 
 ## Medium Priority
 
-### 7. Document Read Service Technology Stack in Engineering Principles
+### 8. Document Read Service Technology Stack in Engineering Principles
 **File:** `docs/ENGINEERING_PRINCIPLES.md`
 
 **Issue:** Read Service uses several libraries not documented in the Engineering Principles Technology Stack section. This makes it unclear what libraries are approved and creates knowledge gaps for new developers.
@@ -675,7 +629,7 @@ Update the HTTP Framework section:
 
 ---
 
-### 8. Rename testhelpers to testutil for Consistency
+### 9. Rename testhelpers to testutil for Consistency
 **Files:**
 - `services/read/content/internal/testhelpers/database.go`
 - `services/read/fetcher/internal/testhelpers/database.go`
@@ -728,7 +682,7 @@ go test ./...
 
 ---
 
-### 4. Standardize Database Architecture Pattern
+### 10. Standardize Database Architecture Pattern
 **Files:**
 - `infrastructure/docker/docker-compose.yml`
 - `services/explore/docker-compose.yml`
@@ -1912,6 +1866,9 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 ## Completed
 
 The following items have been successfully implemented and verified:
+
+### Code Organization & Maintainability
+- **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
