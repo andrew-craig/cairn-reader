@@ -145,95 +145,6 @@ go test ./internal/recommend/... -v -short  # Skip integration tests
 
 ## High Priority
 
-### 4. Standardize Logging Library to log/slog in Read Service
-**Files:**
-- `services/read/content/cmd/content/main.go:22`
-- `services/read/fetcher/cmd/fetcher/main.go:22`
-- `services/read/content/internal/api/middleware/logging.go:47`
-- `services/read/fetcher/internal/api/middleware/logging.go`
-- `services/read/go.mod:18`
-
-**Issue:** Read Service uses `go.uber.org/zap` while Engineering Principles document `log/slog` (stdlib). Additionally, middleware uses unstructured `log.Printf` creating inconsistent logging format.
-
-**Current State:**
-```go
-// Main services
-import "go.uber.org/zap"
-logger, err := zap.NewProduction()
-
-// Middleware
-log.Printf("[%s] %s %s - Status: %d - Duration: %v", r.Method, r.URL.Path, ...)
-```
-
-**Implementation:**
-
-1. Update main.go files to use slog:
-```go
-import "log/slog"
-
-func main() {
-    // Initialize structured logger
-    logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-    slog.SetDefault(logger)
-
-    logger.Info("Starting content service",
-        slog.String("port", cfg.Port),
-    )
-
-    // ... rest of main
-}
-```
-
-2. Update middleware to use structured logging:
-```go
-// services/read/content/internal/api/middleware/logging.go
-package middleware
-
-import (
-    "log/slog"
-    "net/http"
-    "time"
-)
-
-func Logging(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        start := time.Now()
-
-        wrapped := &responseWriter{
-            ResponseWriter: w,
-            statusCode:     http.StatusOK,
-        }
-
-        next.ServeHTTP(wrapped, r)
-
-        duration := time.Since(start)
-        slog.Info("request completed",
-            slog.String("method", r.Method),
-            slog.String("path", r.URL.Path),
-            slog.String("remote_addr", r.RemoteAddr),
-            slog.Int("status", wrapped.statusCode),
-            slog.Duration("duration", duration),
-        )
-    })
-}
-```
-
-3. Remove zap dependency:
-```bash
-cd services/read
-# Remove from go.mod
-go mod edit -dropreplace go.uber.org/zap
-go mod tidy
-```
-
-**Benefits:**
-- Consistent with documented standards (stdlib preference)
-- Structured logging across all middleware
-- Zero configuration, no external dependencies
-- Matches User Service and Explore Service patterns
-
----
-
 ### 5. Move Shared Models to Root Package
 **Files:**
 - `services/explore/pkg/models/article.go`
@@ -1669,6 +1580,7 @@ The following items have been successfully implemented and verified:
 
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
+- **Standardize Logging Library to log/slog in Read Service** - Migrated Read service from `go.uber.org/zap` to stdlib `log/slog`. Updated test file `cleanup_job_test.go` to use slog instead of zap for logger instantiation. Removed zap dependency from go.mod using `go mod edit -dropreplace` and `go mod tidy`. All tests pass and both services (content and fetcher) build successfully. Aligns with Engineering Principles preference for stdlib over external dependencies.
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
