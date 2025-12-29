@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/pkg/auth"
-	"github.com/andrew-craig/cairn/services/explore/pkg/models"
+	"github.com/andrew-craig/cairn/pkg/auth"
+	"github.com/andrew-craig/cairn/pkg/models"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/pkg/auth"
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/cleanup"
