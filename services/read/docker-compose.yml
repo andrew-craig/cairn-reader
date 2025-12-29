@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # Content Service Database
+  content-db:
+    image: postgres:15-alpine
+    container_name: cairn-content-db
+    environment:
+      POSTGRES_DB: cairn_content
+      POSTGRES_USER: cairn_content
+      POSTGRES_PASSWORD: cairn_content_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - content-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cairn_content"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # RSS Fetcher Service Database
+  rss-db:
+    image: postgres:15-alpine
+    container_name: cairn-rss-db
+    environment:
+      POSTGRES_DB: cairn_rss
+      POSTGRES_USER: cairn_rss
+      POSTGRES_PASSWORD: cairn_rss_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - rss-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cairn_rss"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # Content Service
+  content-service:
+    build:
+      context: ./services/content-service
+      dockerfile: Dockerfile
+    container_name: cairn-content-service
+    environment:
+      PORT: 8080
+      DB_HOST: content-db
+      DB_PORT: 5432
+      DB_USER: cairn_content
+      DB_PASSWORD: cairn_content_pass
+      DB_NAME: cairn_content
+      DB_SSL_MODE: disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      content-db:
+        condition: service_healthy
+    networks:
+      - cairn-network
+    restart: unless-stopped
+
+  # Content Service Worker (Background Jobs)
+  content-worker:
+    build:
+      context: ./services/content-service
+      dockerfile: Dockerfile.worker
+    container_name: cairn-content-worker
+    environment:
+      DB_HOST: content-db
+      DB_PORT: 5432
+      DB_USER: cairn_content
+      DB_PASSWORD: cairn_content_pass
+      DB_NAME: cairn_content
+      DB_SSL_MODE: disable
+      CLEANUP_CRON: "0 2 * * *"  # Run daily at 2 AM
+      HEALTH_PORT: 8082
+    ports:
+      - "8082:8082"  # Health check endpoint
+    depends_on:
+      content-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - cairn-network
+    restart: unless-stopped
+
+  # RSS Fetcher Service
+  rss-fetcher-service:
+    build:
+      context: ./services/rss-fetcher-service
+      dockerfile: Dockerfile
+    container_name: cairn-rss-fetcher-service
+    environment:
+      PORT: 8081
+      DB_HOST: rss-db
+      DB_PORT: 5432
+      DB_USER: cairn_rss
+      DB_PASSWORD: cairn_rss_pass
+      DB_NAME: cairn_rss
+      DB_SSL_MODE: disable
+    ports:
+      - "8081:8081"
+    depends_on:
+      rss-db:
+        condition: service_healthy
+    networks:
+      - cairn-network
+    restart: unless-stopped
+
+  # RSS Fetcher Service Worker (Background Jobs)
+  rss-fetcher-worker:
+    build:
+      context: ./services/rss-fetcher-service
+      dockerfile: Dockerfile.worker
+    container_name: cairn-rss-fetcher-worker
+    environment:
+      DB_HOST: rss-db
+      DB_PORT: 5432
+      DB_USER: cairn_rss
+      DB_PASSWORD: cairn_rss_pass
+      DB_NAME: cairn_rss
+      DB_SSL_MODE: disable
+      CONTENT_SERVICE_URL: http://content-service:8080
+      HEALTH_PORT: 8083
+      OUTBOX_CLEANUP_CRON: "0 3 * * *"  # Run daily at 3 AM
+      FEED_ITEMS_CLEANUP_CRON: "0 4 * * *"  # Run daily at 4 AM
+    ports:
+      - "8083:8083"  # Health check endpoint
+    depends_on:
+      rss-db:
+        condition: service_healthy
+      content-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - cairn-network
+    restart: unless-stopped
+
+volumes:
+  content-db-data:
+    driver: local
+  rss-db-data:
+    driver: local
+
+networks:
+  cairn-network:
+    driver: bridge
