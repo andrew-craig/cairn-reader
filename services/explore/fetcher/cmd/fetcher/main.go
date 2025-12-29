@@ -20,7 +20,7 @@ import (
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/db"
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/fetcher"
 	"github.com/andrew-craig/cairn-explore/fetcher/internal/sync"
-	"github.com/andrew-craig/cairn-explore/pkg/logging"
+	"github.com/andrew-craig/cairn/pkg/logging"
 )
 
 func main() {

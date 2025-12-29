@@ -16,7 +16,7 @@ import (
 	"github.com/andrew-craig/cairn-core/user-service/internal/database"
 	"github.com/andrew-craig/cairn-core/user-service/internal/handlers"
 	"github.com/andrew-craig/cairn-core/user-service/internal/services"
-	"github.com/andrew-craig/cairn-core/user-service/pkg/logging"
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
