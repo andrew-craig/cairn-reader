@@ -1,14 +1,14 @@
-# Configuration Reference
+# Cairn Configuration Reference
 
-This document provides a complete reference for all configuration options in Cairn Backend services.
+This document provides a complete reference for all configuration options across all Cairn backend services.
 
 ## Table of Contents
 
 - [Configuration Methods](#configuration-methods)
-- [Content Service Configuration](#content-service-configuration)
-- [RSS Fetcher Service Configuration](#rss-fetcher-service-configuration)
+- [User Service Configuration](#user-service-configuration)
+- [Explore Service Configuration](#explore-service-configuration)
+- [Read Service Configuration](#read-service-configuration)
 - [Database Configuration](#database-configuration)
-- [Worker Configuration](#worker-configuration)
 - [Environment-Specific Configs](#environment-specific-configs)
 - [Security Configuration](#security-configuration)
 
@@ -27,16 +27,54 @@ Configuration values are read in this order (highest to lowest priority):
 2. `.env` file
 3. Default values (hardcoded)
 
-## Content Service Configuration
+---
 
-### Required Configuration
+## User Service Configuration
+
+> **TODO**: Document User Service configuration
+>
+> Topics to cover:
+> - Required environment variables (DATABASE_URL, VAULT_ADDR, etc.)
+> - Optional configuration (JWT lifetimes, port, log level)
+> - Vault integration settings
+> - JWT configuration
+> - Database connection pool settings
+> - Example .env file
+
+**Status**: Service is operational. See [services/users/README.md](../services/users/README.md) for current configuration details.
+
+---
+
+## Explore Service Configuration
+
+> **TODO**: Document Explore Service configuration
+>
+> Topics to cover:
+> - Fetcher service configuration (fetch interval, timeouts)
+> - Recommender service configuration
+> - Database settings for both services
+> - Kagi feed URL configuration
+> - Article retention settings
+> - Example .env file
+
+**Status**: Service is operational. See [services/explore/README.md](../services/explore/README.md) for current configuration details.
+
+---
+
+## Read Service Configuration
+
+The Read Service consists of two microservices (Content Service and RSS Fetcher Service), each with their own configuration.
+
+### Content Service Configuration
+
+#### Required Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `DATABASE_URL` | string | Yes | - | PostgreSQL connection string |
 | `SERVER_PORT` | int | No | `8080` | HTTP server port |
 
-### Optional Configuration
+#### Optional Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -50,7 +88,7 @@ Configuration values are read in this order (highest to lowest priority):
 | `HTTP_WRITE_TIMEOUT_SECONDS` | int | No | `30` | HTTP write timeout |
 | `SHUTDOWN_TIMEOUT_SECONDS` | int | No | `30` | Graceful shutdown timeout |
 
-### Content Processing Configuration
+#### Content Processing Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -59,21 +97,21 @@ Configuration values are read in this order (highest to lowest priority):
 | `ENABLE_SANITIZATION` | bool | No | `true` | Enable HTML sanitization |
 | `MAX_CONTENT_SIZE_BYTES` | int | No | `5242880` | Max content size (5MB default) |
 
-### Pagination Configuration
+#### Pagination Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `DEFAULT_PAGE_SIZE` | int | No | `20` | Default pagination page size |
 | `MAX_PAGE_SIZE` | int | No | `100` | Maximum pagination page size |
 
-### Search Configuration
+#### Search Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `SEARCH_MAX_RESULTS` | int | No | `100` | Maximum search results to return |
 | `SEARCH_LANGUAGE` | string | No | `english` | PostgreSQL text search language |
 
-### Cleanup Job Configuration
+#### Cleanup Job Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -81,7 +119,7 @@ Configuration values are read in this order (highest to lowest priority):
 | `CLEANUP_BATCH_SIZE` | int | No | `100` | Batch size for cleanup operations |
 | `CLEANUP_SCHEDULE` | string | No | `0 2 * * *` | Cron schedule for cleanup (2 AM daily) |
 
-### Example `.env` File
+#### Example `.env` File
 
 ```bash
 # Content Service Configuration
@@ -110,9 +148,9 @@ CLEANUP_BATCH_SIZE=100
 CLEANUP_SCHEDULE="0 2 * * *"
 ```
 
-## RSS Fetcher Service Configuration
+### RSS Fetcher Service Configuration
 
-### Required Configuration
+#### Required Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -120,7 +158,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `SERVER_PORT` | int | No | `8081` | HTTP server port |
 | `CONTENT_SERVICE_URL` | string | Yes | - | Content Service base URL |
 
-### Optional Configuration
+#### Optional Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -133,7 +171,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `HTTP_WRITE_TIMEOUT_SECONDS` | int | No | `30` | HTTP write timeout |
 | `SHUTDOWN_TIMEOUT_SECONDS` | int | No | `30` | Graceful shutdown timeout |
 
-### Feed Polling Configuration
+#### Feed Polling Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -143,7 +181,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `FEED_BATCH_SIZE` | int | No | `10` | Number of feeds to poll per batch |
 | `FEED_POLL_INTERVAL_SECONDS` | int | No | `10` | Sleep between polling batches |
 
-### Polling Tier Configuration
+#### Polling Tier Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -154,20 +192,20 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `TIER_MODERATE_THRESHOLD_DAYS` | int | No | `30` | Days for moderate tier threshold |
 | `TIER_UPDATE_SCHEDULE` | string | No | `0 1 * * *` | Cron schedule for tier updates (1 AM daily) |
 
-### Feed Error Handling
+#### Feed Error Handling
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `MAX_CONSECUTIVE_ERROR_DAYS` | int | No | `7` | Days of errors before auto-disable |
 | `ENABLE_FEED_AUTO_DISABLE` | bool | No | `true` | Auto-disable feeds after consecutive errors |
 
-### Feed Subscription Limits
+#### Feed Subscription Limits
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `MAX_FEEDS_PER_USER` | int | No | `100` | Maximum feeds per user |
 
-### Worker Configuration
+#### Worker Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -177,7 +215,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `ARTICLE_FETCH_TIMEOUT_SECONDS` | int | No | `30` | Timeout for fetching article content |
 | `MAX_EXTRACTION_RETRIES` | int | No | `3` | Max retries for failed extractions |
 
-### Outbox Configuration
+#### Outbox Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -186,7 +224,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `OUTBOX_MAX_RETRIES` | int | No | `6` | Maximum delivery retry attempts |
 | `OUTBOX_RETENTION_DAYS` | int | No | `7` | Days to keep delivered outbox entries |
 
-### Retry Configuration
+#### Retry Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -194,7 +232,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `RETRY_MAX_DELAY_SECONDS` | int | No | `43200` | Maximum retry delay (12 hours) |
 | `RETRY_MULTIPLIER` | float | No | `2.0` | Exponential backoff multiplier |
 
-### Circuit Breaker Configuration
+#### Circuit Breaker Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -203,7 +241,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `CIRCUIT_BREAKER_TIMEOUT_SECONDS` | int | No | `30` | Timeout before half-open state |
 | `ENABLE_CIRCUIT_BREAKER` | bool | No | `true` | Enable circuit breaker |
 
-### Cleanup Job Configuration
+#### Cleanup Job Configuration
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -213,7 +251,7 @@ CLEANUP_SCHEDULE="0 2 * * *"
 | `FEED_ITEMS_FAILED_RETENTION_DAYS` | int | No | `30` | Days to keep failed feed items |
 | `CLEANUP_BATCH_SIZE` | int | No | `100` | Batch size for cleanup operations |
 
-### Example `.env` File
+#### Example `.env` File
 
 ```bash
 # RSS Fetcher Service Configuration
@@ -274,6 +312,8 @@ FEED_ITEMS_FAILED_RETENTION_DAYS=30
 CLEANUP_BATCH_SIZE=100
 ```
 
+---
+
 ## Database Configuration
 
 ### PostgreSQL Connection String Format
@@ -329,9 +369,9 @@ DATABASE_URL=postgres://cairn:password@localhost:5432/content_service?sslmode=di
 MAX_OPEN_CONNS = (Available CPU Cores * 2) + disk_spindles
 ```
 
-## Worker Configuration
+### Worker Configuration (Read Service)
 
-### Feed Polling Worker
+#### Feed Polling Worker
 
 **Key Settings**:
 - `WORKER_CONCURRENCY`: Number of feeds processed concurrently
@@ -343,7 +383,7 @@ MAX_OPEN_CONNS = (Available CPU Cores * 2) + disk_spindles
 - **Medium traffic**: Concurrency=5, Batch=10, Interval=10s
 - **High traffic**: Concurrency=10, Batch=20, Interval=5s
 
-### Content Extraction Worker
+#### Content Extraction Worker
 
 **Key Settings**:
 - `WORKER_CONCURRENCY`: Concurrent article extractions
@@ -355,7 +395,7 @@ MAX_OPEN_CONNS = (Available CPU Cores * 2) + disk_spindles
 - Increase if you have many pending feed items
 - Monitor memory usage (article content can be large)
 
-### Outbox Delivery Worker
+#### Outbox Delivery Worker
 
 **Key Settings**:
 - `WORKER_CONCURRENCY`: Concurrent Content Service API calls
@@ -365,6 +405,8 @@ MAX_OPEN_CONNS = (Available CPU Cores * 2) + disk_spindles
 **Recommendations**:
 - Keep concurrency moderate (5-10) to avoid overwhelming Content Service
 - Circuit breaker will open if Content Service is down
+
+---
 
 ## Environment-Specific Configs
 
@@ -402,6 +444,8 @@ FEED_BATCH_SIZE=20
 CIRCUIT_BREAKER_TIMEOUT_SECONDS=60
 ```
 
+---
+
 ## Security Configuration
 
 ### Database Security
@@ -433,7 +477,7 @@ HTTP_WRITE_TIMEOUT_SECONDS=30
 SHUTDOWN_TIMEOUT_SECONDS=30
 ```
 
-### Content Security
+### Content Security (Read Service)
 
 **Size limits**:
 ```bash
@@ -445,6 +489,8 @@ MAX_CONTENT_SIZE_BYTES=5242880
 ```bash
 ENABLE_SANITIZATION=true  # Always enabled in production
 ```
+
+---
 
 ## Docker Compose Configuration
 
@@ -498,6 +544,8 @@ WORKER_CONCURRENCY=5
 FEED_BATCH_SIZE=10
 ```
 
+---
+
 ## Validation & Testing
 
 ### Validate Configuration
@@ -533,6 +581,8 @@ curl http://localhost:8081/health/ready
 - Reduce `DB_MAX_OPEN_CONNS`
 - Check for memory leaks in logs
 
+---
+
 ## Configuration Best Practices
 
 1. **Never commit secrets** to version control
@@ -546,10 +596,12 @@ curl http://localhost:8081/health/ready
 9. **Back up `.env` files** securely (encrypted)
 10. **Rotate credentials** regularly
 
+---
+
 ## Additional Resources
 
-- [Deployment Guide](READ_SERVICE_DEPLOYMENT.md)
-- [Troubleshooting Guide](READ_SERVICE_TROUBLESHOOTING.md)
-- [Architecture Documentation](READ_SERVICE_ARCHITECTURE.md)
+- [Deployment Guide](DEPLOYMENT.md)
+- [Troubleshooting Guide](TROUBLESHOOTING.md)
+- [Architecture Documentation](ARCHITECTURE.md)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
