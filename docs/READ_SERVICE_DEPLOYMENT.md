@@ -580,7 +580,7 @@ VACUUM ANALYZE;
 
 ## Environment Configuration
 
-See [docs/CONFIGURATION.md](CONFIGURATION.md) for complete configuration reference.
+See [READ_SERVICE_CONFIGURATION.md](READ_SERVICE_CONFIGURATION.md) for complete configuration reference.
 
 ### Essential Environment Variables
 
@@ -819,7 +819,7 @@ services:
 
 ## Troubleshooting
 
-See [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed troubleshooting guide.
+See [READ_SERVICE_TROUBLESHOOTING.md](READ_SERVICE_TROUBLESHOOTING.md) for detailed troubleshooting guide.
 
 ### Quick Checks
 
@@ -893,6 +893,6 @@ docker-compose logs -f
 For issues or questions:
 - GitHub Issues: https://github.com/andrew-craig/cairn-read/issues
 - Documentation: `/docs` directory
-- Architecture: [docs/ARCHITECTURE.md](ARCHITECTURE.md)
-- Configuration: [docs/CONFIGURATION.md](CONFIGURATION.md)
-- Troubleshooting: [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- Architecture: [READ_SERVICE_ARCHITECTURE.md](READ_SERVICE_ARCHITECTURE.md)
+- Configuration: [READ_SERVICE_CONFIGURATION.md](READ_SERVICE_CONFIGURATION.md)
+- Troubleshooting: [READ_SERVICE_TROUBLESHOOTING.md](READ_SERVICE_TROUBLESHOOTING.md)
