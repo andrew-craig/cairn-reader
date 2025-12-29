@@ -10,90 +10,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## High Priority
 
-### 5. Move Shared Models to Root Package
-**Files:**
-- `services/explore/pkg/models/article.go`
-- `services/explore/pkg/models/user.go`
-- `services/explore/pkg/models/vote.go`
-
-**Issue:** Shared domain models are located in the explore service package, but are imported by user service. This creates coupling where user service depends on explore service code.
-
-**Current State:**
-```go
-// In services/users/go.mod
-replace github.com/andrew-craig/cairn/services/users => ../users
-
-// This forces user service to import from explore
-import "github.com/andrew-craig/cairn/explore/pkg/models"
-```
-
-**Implementation:**
-1. Create shared models package:
-```bash
-mkdir -p pkg/models
-mv services/explore/pkg/models/* pkg/models/
-```
-
-2. Update imports across both services:
-```go
-// Before
-import "github.com/andrew-craig/cairn/explore/pkg/models"
-
-// After
-import "github.com/andrew-craig/cairn/pkg/models"
-```
-
-3. Remove replace directive from go.mod files
-4. Run `go mod tidy` in all services
-
----
-
-### 6. Fix Module Dependency Architecture
-**Files:**
-- `services/explore/go.mod` (line 6)
-- `services/explore/recommender/Dockerfile`
-
-**Issue:** The explore service uses a replace directive pointing to local filesystem, creating tight coupling and special Dockerfile handling.
-
-**Current State:**
-```go
-// services/explore/go.mod
-replace github.com/andrew-craig/cairn/services/users => ../users
-```
-
-This forces the Dockerfile to copy both directories:
-```dockerfile
-# services/explore/recommender/Dockerfile
-COPY users users/          # Must copy users dir for auth import
-COPY explore explore/
-WORKDIR /app/explore
-```
-
-**Implementation:**
-
-**Option 1: Extract to Shared Package (Recommended)**
-1. Move auth middleware to root:
-```bash
-mkdir -p pkg/auth
-mv services/users/pkg/auth/* pkg/auth/
-```
-
-2. Update imports in all services
-3. Remove replace directive
-4. Simplify Dockerfile to only copy explore directory
-
-**Option 2: Use Go Workspace**
-1. Create `go.work` at repository root:
-```bash
-go work init
-go work use services/explore services/users
-```
-
-2. This enables local development without replace directives
-3. For production builds, use proper module versioning
-
----
-
 ### 7. Remove Hardcoded Secrets from Docker Compose
 **File:** `infrastructure/docker/docker-compose.yml`
 
@@ -1446,6 +1362,8 @@ The following items have been successfully implemented and verified:
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
 - **Standardize Logging Library to log/slog in Read Service** - Migrated Read service from `go.uber.org/zap` to stdlib `log/slog`. Updated test file `cleanup_job_test.go` to use slog instead of zap for logger instantiation. Removed zap dependency from go.mod using `go mod edit -dropreplace` and `go mod tidy`. All tests pass and both services (content and fetcher) build successfully. Aligns with Engineering Principles preference for stdlib over external dependencies.
+- **Move Shared Models to Root Package** - Created `pkg/models/` at repository root and migrated all domain models (Article, User, Vote, Feed, RecommendationEvent) from `services/explore/pkg/models/`. Updated imports across explore service. Created go.mod for the new shared package. All services (explore, users, read) build successfully.
+- **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. This eliminates the coupling where explore service depended on users service code. Removed the `replace github.com/andrew-craig/cairn/services/users => ../users` directive from explore/go.mod. Updated imports in explore service (recommender) to use `pkg/auth` instead of `services/users/pkg/auth`. Added proper replace directives for pkg/auth, pkg/models, and pkg/logging in all service go.mod files. All services build successfully, eliminating the need for complex Dockerfile workarounds.
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andrew-craig/cairn/services/users/pkg/auth"
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
 	"github.com/jackc/pgx/v5/pgxpool"

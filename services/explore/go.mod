@@ -3,8 +3,9 @@ module github.com/andrew-craig/cairn/services/explore
 go 1.24.7
 
 require (
+	github.com/andrew-craig/cairn/pkg/auth v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/services/users v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn/pkg/models v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/lib/pq v1.10.9
@@ -70,11 +71,12 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 )
 
-// Use local version of user service for auth package
-replace github.com/andrew-craig/cairn/services/users => ../users
-
 // Use local version of shared cairn packages
 replace github.com/andrew-craig/cairn => ../..
 
-// Use local version of pkg/logging
+// Use local versions of pkg packages
+replace github.com/andrew-craig/cairn/pkg/auth => ../../pkg/auth
+
 replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
+
+replace github.com/andrew-craig/cairn/pkg/models => ../../pkg/models

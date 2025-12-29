@@ -9,7 +9,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/andrew-craig/cairn/services/explore/pkg/models"
+	"github.com/andrew-craig/cairn/pkg/models"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 )
 
