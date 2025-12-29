@@ -9,7 +9,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,34 +17,37 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
-	"go.uber.org/zap"
 )
 
 func main() {
-	// Initialize logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	defer logger.Sync()
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       getEnv("LOG_LEVEL", "info"),
+		Format:      getEnv("LOG_FORMAT", "text"),
+		ServiceName: "rss-fetcher-service",
+	})
+	logging.SetDefault(logger)
 
 	// Load configuration from environment variables
 	cfg := loadConfig()
 
-	logger.Info("Starting RSS fetcher service",
-		zap.String("port", cfg.Port),
+	slog.Info("starting service",
+		slog.String("port", cfg.Port),
 	)
 
 	// Initialize database connection
+	slog.Info("component initializing", slog.String("component", "database"))
 	db, err := database.NewConnection(&cfg.DB)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer db.Close()
 
-	logger.Info("Database connection established successfully")
+	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Create router
 	router := api.NewRouter(db)
@@ -60,11 +63,13 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("Server started",
-			zap.String("addr", server.Addr),
+		slog.Info("server listening",
+			slog.String("addr", server.Addr),
 		)
+		slog.Info("service ready to accept requests")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed to start", zap.Error(err))
+			slog.Error("server failed to start", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}()
 
@@ -73,17 +78,17 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down server...")
+	slog.Info("shutting down server")
 
 	// Give outstanding requests 30 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		slog.Error("server forced to shutdown", slog.Any("error", err))
 	}
 
-	logger.Info("Server exited")
+	slog.Info("server exited gracefully")
 }
 
 // Config holds the application configuration

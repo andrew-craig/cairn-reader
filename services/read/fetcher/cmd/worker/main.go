@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/client"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/jobs"
@@ -20,28 +22,30 @@ import (
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/scheduler"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/worker"
 	"github.com/robfig/cron/v3"
-	"go.uber.org/zap"
 )
 
 func main() {
-	// Initialize logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	defer logger.Sync()
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       getEnv("LOG_LEVEL", "info"),
+		Format:      getEnv("LOG_FORMAT", "text"),
+		ServiceName: "rss-fetcher-service-worker",
+	})
+	logging.SetDefault(logger)
 
 	// Load configuration from environment variables
 	cfg := loadConfig()
 
 	// Initialize database connection
+	slog.Info("component initializing", slog.String("component", "database"))
 	db, err := database.NewConnection(&cfg.DB)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer db.Close()
 
-	logger.Info("Database connection established successfully")
+	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Initialize repositories
 	feedRepo := repository.NewFeedRepository(db.DB)
@@ -86,14 +90,16 @@ func main() {
 	outboxCleanupCron := getEnv("OUTBOX_CLEANUP_CRON", "0 3 * * *")
 	_, err = cronScheduler.AddFunc(outboxCleanupCron, outboxCleanupJob.Run)
 	if err != nil {
-		logger.Fatal("Failed to schedule outbox cleanup job", zap.Error(err))
+		slog.Error("failed to schedule outbox cleanup job", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Schedule feed items cleanup job to run daily at 4 AM
 	feedItemsCleanupCron := getEnv("FEED_ITEMS_CLEANUP_CRON", "0 4 * * *")
 	_, err = cronScheduler.AddFunc(feedItemsCleanupCron, feedItemsCleanupJob.Run)
 	if err != nil {
-		logger.Fatal("Failed to schedule feed items cleanup job", zap.Error(err))
+		slog.Error("failed to schedule feed items cleanup job", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Start all background workers
@@ -104,17 +110,17 @@ func main() {
 	outboxWorker.Start()
 	cronScheduler.Start()
 
-	logger.Info("Worker started successfully")
-	logger.Info("Background jobs:")
-	logger.Info("- Feed polling scheduler (tiered polling strategy)")
-	logger.Info("- Tier manager (daily tier updates)")
-	logger.Info("- Content extraction job (processes pending feed items)")
-	logger.Info("- Outbox delivery worker (delivers content to Content Service)")
-	logger.Info("- Outbox cleanup job",
-		zap.String("schedule", outboxCleanupCron),
+	slog.Info("worker started successfully")
+	slog.Info("background jobs")
+	slog.Info("- feed polling scheduler (tiered polling strategy)")
+	slog.Info("- tier manager (daily tier updates)")
+	slog.Info("- content extraction job (processes pending feed items)")
+	slog.Info("- outbox delivery worker (delivers content to Content Service)")
+	slog.Info("- outbox cleanup job",
+		slog.String("schedule", outboxCleanupCron),
 	)
-	logger.Info("- Feed items cleanup job",
-		zap.String("schedule", feedItemsCleanupCron),
+	slog.Info("- feed items cleanup job",
+		slog.String("schedule", feedItemsCleanupCron),
 	)
 
 	// Start health check HTTP server
@@ -122,9 +128,9 @@ func main() {
 	healthServer := setupHealthCheckServer(healthPort, db.DB, logger)
 
 	go func() {
-		logger.Info("Health check server starting", zap.String("port", healthPort))
+		slog.Info("health check server starting", slog.String("port", healthPort))
 		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Health check server failed", zap.Error(err))
+			slog.Error("health check server failed", slog.Any("error", err))
 		}
 	}()
 
@@ -133,7 +139,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down worker...")
+	slog.Info("shutting down worker")
 
 	// Stop all background workers in reverse order
 	ctx := cronScheduler.Stop()
@@ -148,10 +154,10 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := healthServer.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Health check server shutdown failed", zap.Error(err))
+		slog.Error("health check server shutdown failed", slog.Any("error", err))
 	}
 
-	logger.Info("Worker exited")
+	slog.Info("worker exited gracefully")
 }
 
 // Config holds application configuration
@@ -284,7 +290,7 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 }
 
 // setupHealthCheckServer creates an HTTP server for health checks
-func setupHealthCheckServer(port string, db *sql.DB, logger *zap.Logger) *http.Server {
+func setupHealthCheckServer(port string, db *sql.DB, logger *slog.Logger) *http.Server {
 	mux := http.NewServeMux()
 
 	// Liveness probe - always returns 200 if the process is running
@@ -306,7 +312,7 @@ func setupHealthCheckServer(port string, db *sql.DB, logger *zap.Logger) *http.S
 		defer cancel()
 
 		if err := db.PingContext(ctx); err != nil {
-			logger.Error("Health check failed: database ping error", zap.Error(err))
+			logger.Error("health check failed: database ping error", slog.Any("error", err))
 			w.WriteHeader(http.StatusServiceUnavailable)
 			json.NewEncoder(w).Encode(map[string]string{
 				"status": "unavailable",

@@ -2,8 +2,10 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/handlers"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/content/internal/database"
@@ -18,7 +20,7 @@ func NewRouter(db *database.DB) http.Handler {
 
 	// Apply global middleware
 	r.Use(middleware.Recovery)
-	r.Use(middleware.Logging)
+	r.Use(logging.ChiRequestLogger(slog.Default()))
 	r.Use(middleware.ValidateJSON)
 
 	// Initialize repositories
