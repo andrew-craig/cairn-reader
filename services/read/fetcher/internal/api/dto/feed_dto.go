@@ -3,8 +3,8 @@ package dto
 import (
 	"time"
 
-	"github.com/andrew-craig/cairn-read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/service"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
 	"github.com/google/uuid"
 )
 

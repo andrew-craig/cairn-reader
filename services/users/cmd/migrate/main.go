@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/andrew-craig/cairn-core/user-service/internal/config"
-	"github.com/andrew-craig/cairn-core/user-service/internal/database"
+	"github.com/andrew-craig/cairn/services/users/internal/config"
+	"github.com/andrew-craig/cairn/services/users/internal/database"
 	"github.com/joho/godotenv"
 )
 

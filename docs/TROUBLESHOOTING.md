@@ -987,7 +987,7 @@ docker-compose top content-service
 
 If you're still experiencing issues:
 
-1. **Check existing issues**: [GitHub Issues](https://github.com/andrew-craig/cairn-read/issues)
+1. **Check existing issues**: [GitHub Issues](https://github.com/andrew-craig/cairn/services/read/issues)
 2. **Review documentation**:
    - [README.md](../README.md)
    - [ARCHITECTURE.md](ARCHITECTURE.md)

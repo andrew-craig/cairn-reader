@@ -88,7 +88,7 @@ $ go test -v -tags=integration ./recommender/internal/db -run TestIntegration
 === RUN   TestIntegration_CreateBatch_WithDuplicates
 --- PASS: TestIntegration_CreateBatch_WithDuplicates (0.02s)
 PASS
-ok      github.com/andrew-craig/cairn-explore/recommender/internal/db   0.769s
+ok      github.com/andrew-craig/cairn/services/explore/recommender/internal/db   0.769s
 ```
 
 ### Test Coverage

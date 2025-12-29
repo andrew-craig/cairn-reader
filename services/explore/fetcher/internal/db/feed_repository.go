@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/andrew-craig/cairn-explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
 )
 
 // FeedRepository handles database operations for feeds

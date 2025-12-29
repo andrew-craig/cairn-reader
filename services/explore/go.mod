@@ -1,10 +1,10 @@
-module github.com/andrew-craig/cairn-explore
+module github.com/andrew-craig/cairn/services/explore
 
 go 1.24.7
 
 require (
 	github.com/andrew-craig/cairn v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn-core/user-service v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn/services/users v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/mmcdole/gofeed v1.3.0
@@ -40,7 +40,7 @@ require (
 )
 
 // Use local version of user service for auth package
-replace github.com/andrew-craig/cairn-core/user-service => ../users
+replace github.com/andrew-craig/cairn/services/users => ../users
 
 // Use local version of shared cairn packages
 replace github.com/andrew-craig/cairn => ../..

@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/fetcher/internal/client"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/fetcher"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn-read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/client"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
 	"github.com/go-shiori/go-readability"
 	"github.com/microcosm-cc/bluemonday"
 )

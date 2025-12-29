@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/andrew-craig/cairn-explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
 	"github.com/lib/pq"
 )
 

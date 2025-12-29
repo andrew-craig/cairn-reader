@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn-explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
 	_ "github.com/lib/pq"
 )
 

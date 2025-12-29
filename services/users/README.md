@@ -15,7 +15,7 @@ The Cairn User Service is responsible for managing user access to the Cairn read
 ## Project Structure
 
 ```
-cairn-core/
+cairn/services/users/
 ├── cmd/
 │   └── user-service/        # Application entrypoint
 │       └── main.go
@@ -45,8 +45,8 @@ cairn-core/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/andrew-craig/cairn-core.git
-cd cairn-core
+git clone https://github.com/andrew-craig/cairn.git
+cd cairn/services/users
 ```
 
 ### 2. Install dependencies

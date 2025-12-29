@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andrew-craig/cairn-core/user-service/internal/middleware"
-	"github.com/andrew-craig/cairn-core/user-service/internal/services"
+	"github.com/andrew-craig/cairn/services/users/internal/middleware"
+	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 )
 

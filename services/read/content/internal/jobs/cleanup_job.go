@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/content/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
 	"go.uber.org/zap"
 )
 

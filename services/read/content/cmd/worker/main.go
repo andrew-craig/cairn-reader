@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/content/internal/database"
-	"github.com/andrew-craig/cairn-read/content/internal/jobs"
-	"github.com/andrew-craig/cairn-read/content/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/content/internal/database"
+	"github.com/andrew-craig/cairn/services/read/content/internal/jobs"
+	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )

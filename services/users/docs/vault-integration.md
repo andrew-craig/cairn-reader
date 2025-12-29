@@ -112,7 +112,7 @@ vault kv put secret/database/credentials \
 ### Basic Vault Client
 
 ```go
-import "github.com/andrew-craig/cairn-core/user-service/internal/auth"
+import "github.com/andrew-craig/cairn/services/users/internal/auth"
 
 // Create Vault client
 vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
@@ -175,7 +175,7 @@ The `KeyRotationManager` handles automatic key rotation and token renewal:
 import (
     "context"
     "time"
-    "github.com/andrew-craig/cairn-core/user-service/internal/auth"
+    "github.com/andrew-craig/cairn/services/users/internal/auth"
 )
 
 // Create rotation manager

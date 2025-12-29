@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/andrew-craig/cairn-read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn-read/content/internal/api/middleware"
-	"github.com/andrew-craig/cairn-read/content/internal/models"
-	"github.com/andrew-craig/cairn-read/content/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

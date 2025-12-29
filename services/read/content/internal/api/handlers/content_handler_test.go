@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/content/internal/models"
-	"github.com/andrew-craig/cairn-read/content/internal/service"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

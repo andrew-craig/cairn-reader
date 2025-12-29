@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/andrew-craig/cairn-read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
 )
 
 // ConditionalFetchResult represents the result of a conditional fetch

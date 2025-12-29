@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/andrew-craig/cairn-core/user-service/internal/auth"
+	"github.com/andrew-craig/cairn/services/users/internal/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

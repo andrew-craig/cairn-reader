@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/andrew-craig/cairn-read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"

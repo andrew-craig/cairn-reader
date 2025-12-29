@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn-explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/testutil"
 )
 
 func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {

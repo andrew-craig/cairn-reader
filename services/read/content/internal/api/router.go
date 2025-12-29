@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/andrew-craig/cairn-read/content/internal/api/handlers"
-	"github.com/andrew-craig/cairn-read/content/internal/api/middleware"
-	"github.com/andrew-craig/cairn-read/content/internal/database"
-	"github.com/andrew-craig/cairn-read/content/internal/repository"
-	"github.com/andrew-craig/cairn-read/content/internal/service"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/handlers"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn/services/read/content/internal/database"
+	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

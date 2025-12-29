@@ -12,12 +12,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
+	"github.com/andrew-craig/cairn/services/users/pkg/auth"
 	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn-explore/recommender/internal/api"
-	"github.com/andrew-craig/cairn-explore/recommender/internal/cleanup"
-	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
-	"github.com/andrew-craig/cairn-explore/recommender/internal/recommend"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/cleanup"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
 	_ "github.com/lib/pq"
 )
 

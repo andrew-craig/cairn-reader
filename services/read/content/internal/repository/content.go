@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrew-craig/cairn-read/content/internal/models"
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
 	"github.com/google/uuid"
 )
 

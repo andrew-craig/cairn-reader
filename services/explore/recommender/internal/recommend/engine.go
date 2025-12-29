@@ -9,8 +9,8 @@ import (
 	"math"
 	"sort"
 
-	"github.com/andrew-craig/cairn-explore/pkg/models"
-	"github.com/andrew-craig/cairn-explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 )
 
 // Engine handles recommendation logic

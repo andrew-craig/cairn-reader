@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn-explore/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/pkg/models"
 )
 
 // RecommenderClientInterface defines the interface for submitting articles.

@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andrew-craig/cairn-read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/stretchr/testify/assert"
 )
 
