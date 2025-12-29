@@ -1,8 +1,9 @@
 module github.com/andrew-craig/cairn-core/user-service
 
-go 1.24.0
+go 1.24.7
 
 require (
+	github.com/andrew-craig/cairn v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -72,3 +73,6 @@ require (
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Use local version of shared cairn packages
+replace github.com/andrew-craig/cairn => ../..

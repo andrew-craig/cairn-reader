@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/andrew-craig/cairn-core/user-service/pkg/auth"
-	"github.com/andrew-craig/cairn-explore/pkg/logging"
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/cleanup"
 	"github.com/andrew-craig/cairn-explore/recommender/internal/db"

@@ -10,7 +10,7 @@ import (
 type Config struct {
 	Level       string // debug, info, warn, error
 	Format      string // json, text
-	ServiceName string // e.g., "fetcher", "recommender"
+	ServiceName string // e.g., "fetcher", "recommender", "user-service"
 }
 
 // NewLogger creates a configured slog.Logger
