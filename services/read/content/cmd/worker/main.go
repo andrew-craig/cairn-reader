@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,32 +13,35 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/read/content/internal/database"
 	"github.com/andrew-craig/cairn/services/read/content/internal/jobs"
 	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
 	"github.com/robfig/cron/v3"
-	"go.uber.org/zap"
 )
 
 func main() {
-	// Initialize logger
-	logger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	defer logger.Sync()
+	// Initialize structured logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       getEnv("LOG_LEVEL", "info"),
+		Format:      getEnv("LOG_FORMAT", "text"),
+		ServiceName: "content-service-worker",
+	})
+	logging.SetDefault(logger)
 
 	// Load configuration from environment variables
 	cfg := loadConfig()
 
 	// Initialize database connection
+	slog.Info("component initializing", slog.String("component", "database"))
 	db, err := database.NewConnection(cfg.DB)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer db.Close()
 
-	logger.Info("Database connection established successfully")
+	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Initialize repositories
 	contentRepo := repository.NewContentRepository(db.DB)
@@ -52,25 +56,26 @@ func main() {
 	cleanupCron := getEnv("CLEANUP_CRON", "0 2 * * *")
 	_, err = scheduler.AddFunc(cleanupCron, cleanupJob.Run)
 	if err != nil {
-		logger.Fatal("Failed to schedule cleanup job", zap.Error(err))
+		slog.Error("failed to schedule cleanup job", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Start the scheduler
 	scheduler.Start()
-	logger.Info("Worker started successfully",
-		zap.String("cleanup_schedule", cleanupCron),
+	slog.Info("worker started successfully",
+		slog.String("cleanup_schedule", cleanupCron),
 	)
-	logger.Info("Background jobs:")
-	logger.Info("- Orphaned content cleanup (runs daily at 2 AM)")
+	slog.Info("background jobs")
+	slog.Info("- orphaned content cleanup (runs daily at 2 AM)")
 
 	// Start health check HTTP server
 	healthPort := getEnv("HEALTH_PORT", "8082")
 	healthServer := setupHealthCheckServer(healthPort, db.DB, logger)
 
 	go func() {
-		logger.Info("Health check server starting", zap.String("port", healthPort))
+		slog.Info("health check server starting", slog.String("port", healthPort))
 		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Health check server failed", zap.Error(err))
+			slog.Error("health check server failed", slog.Any("error", err))
 		}
 	}()
 
@@ -79,7 +84,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down worker...")
+	slog.Info("shutting down worker")
 
 	// Stop the scheduler gracefully
 	ctx := scheduler.Stop()
@@ -89,10 +94,10 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := healthServer.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Health check server shutdown failed", zap.Error(err))
+		slog.Error("health check server shutdown failed", slog.Any("error", err))
 	}
 
-	logger.Info("Worker exited")
+	slog.Info("worker exited gracefully")
 }
 
 // Config holds application configuration
@@ -169,7 +174,7 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 }
 
 // setupHealthCheckServer creates an HTTP server for health checks
-func setupHealthCheckServer(port string, db *sql.DB, logger *zap.Logger) *http.Server {
+func setupHealthCheckServer(port string, db *sql.DB, logger *slog.Logger) *http.Server {
 	mux := http.NewServeMux()
 
 	// Liveness probe - always returns 200 if the process is running
@@ -191,7 +196,7 @@ func setupHealthCheckServer(port string, db *sql.DB, logger *zap.Logger) *http.S
 		defer cancel()
 
 		if err := db.PingContext(ctx); err != nil {
-			logger.Error("Health check failed: database ping error", zap.Error(err))
+			logger.Error("health check failed: database ping error", slog.Any("error", err))
 			w.WriteHeader(http.StatusServiceUnavailable)
 			json.NewEncoder(w).Encode(map[string]string{
 				"status": "unavailable",

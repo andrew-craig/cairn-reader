@@ -2,9 +2,11 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/handlers"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
@@ -20,9 +22,7 @@ func NewRouter(db *database.DB) http.Handler {
 
 	// Apply global middleware
 	r.Use(middleware.Recovery)
-	r.Use(middleware.Logger)
-	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
+	r.Use(logging.ChiRequestLogger(slog.Default()))
 	r.Use(chimiddleware.Timeout(60 * time.Second))
 
 	// Initialize repositories
