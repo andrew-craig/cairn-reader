@@ -1,24 +1,96 @@
 # Cairn Backend Architecture
 
-This document provides a detailed overview of Cairn's architecture, design decisions, data flows, and technical implementation.
+This document provides a detailed overview of Cairn's architecture, design decisions, data flows, and technical implementation across all backend services.
 
 ## Table of Contents
 
 - [System Overview](#system-overview)
-- [Service Architecture](#service-architecture)
-- [Data Models](#data-models)
-- [Communication Patterns](#communication-patterns)
-- [Content Processing Pipeline](#content-processing-pipeline)
-- [Feed Polling Strategy](#feed-polling-strategy)
-- [Reliability Patterns](#reliability-patterns)
-- [Database Design](#database-design)
+- [User Service](#user-service)
+- [Explore Service](#explore-service)
+- [Read Service](#read-service)
 - [Security Considerations](#security-considerations)
+- [Performance Considerations](#performance-considerations)
+- [Monitoring & Observability](#monitoring--observability)
 
 ## System Overview
 
-Cairn is a microservices-based read-it-later backend system designed for scalability, reliability, and maintainability. The system consists of two primary services that communicate exclusively via REST APIs.
+Cairn is a microservices-based read-it-later application backend designed for scalability, reliability, and maintainability. The system consists of multiple independent services that communicate via REST APIs.
 
 ### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         Client Layer                         │
+│                    (Mobile App / Web App)                    │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+            ┌────────────────┼────────────────┐
+            │                │                │
+    ┌───────▼──────┐  ┌──────▼──────┐  ┌─────▼────────┐
+    │ User Service │  │   Explore   │  │     Read     │
+    │    :8082     │  │   Service   │  │   Service    │
+    │              │  │  :8080/:8081│  │  :8083/:8084 │
+    │  - Auth      │  │              │  │              │
+    │  - Users     │  │  - RSS Feeds │  │  - Content   │
+    │  - JWT       │  │  - Recommend │  │  - Articles  │
+    └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+           │                 │                 │
+    ┌──────▼────┐     ┌──────▼──────┐   ┌─────▼──────┐
+    │PostgreSQL │     │ PostgreSQL  │   │ PostgreSQL │
+    │  (users)  │     │ (explore)   │   │   (read)   │
+    └───────────┘     └─────────────┘   └────────────┘
+```
+
+### Design Principles
+
+1. **Service Isolation**: Each service owns its data; no direct database access across services
+2. **REST-Only Communication**: Services communicate exclusively via HTTP REST APIs
+3. **Eventual Consistency**: Acceptable for content delivery; outbox pattern ensures reliability
+4. **Idempotency**: Operations designed to be safely retried
+5. **Fail-Safe Defaults**: Graceful degradation when dependencies are unavailable
+6. **Single Responsibility**: Each service has a clear, focused purpose
+
+---
+
+## User Service
+
+> **TODO**: Document User Service architecture
+>
+> Topics to cover:
+> - Service purpose and responsibilities
+> - JWT authentication flow
+> - Token management (access + refresh tokens)
+> - Vault integration for key management
+> - User registration and login endpoints
+> - Database schema (users, refresh_tokens)
+> - Security considerations
+
+**Status**: Partially implemented. See [services/users/README.md](../services/users/README.md) for current implementation details.
+
+---
+
+## Explore Service
+
+> **TODO**: Document Explore Service architecture
+>
+> Topics to cover:
+> - Service purpose and responsibilities
+> - Fetcher service (RSS feed polling)
+> - Recommender service (recommendation algorithm)
+> - Article voting system
+> - Feed management and tiering
+> - Database schema (feeds, articles, votes, recommendations)
+> - Communication between Fetcher and Recommender
+
+**Status**: Operational. See [services/explore/README.md](../services/explore/README.md) for current implementation details.
+
+---
+
+## Read Service
+
+The Read Service is a microservices-based read-it-later backend system designed for scalability, reliability, and maintainability. It consists of two primary services that communicate exclusively via REST APIs.
+
+### Read Service Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -49,17 +121,6 @@ Cairn is a microservices-based read-it-later backend system designed for scalabi
                                  │  - content_outbox       │
                                  └─────────────────────────┘
 ```
-
-### Design Principles
-
-1. **Service Isolation**: Each service owns its data; no direct database access across services
-2. **REST-Only Communication**: Services communicate exclusively via HTTP REST APIs
-3. **Eventual Consistency**: Acceptable for content delivery; outbox pattern ensures reliability
-4. **Idempotency**: Operations designed to be safely retried
-5. **Fail-Safe Defaults**: Graceful degradation when dependencies are unavailable
-6. **Single Responsibility**: Each service has a clear, focused purpose
-
-## Service Architecture
 
 ### Content Service
 
@@ -130,9 +191,7 @@ PATCH  /api/v1/feeds/:feed_id/enable            # Re-enable disabled feed
 4. **Tier Management Job**: Daily job to adjust feed tiers
 5. **Cleanup Jobs**: Remove old outbox entries and feed items
 
-## Data Models
-
-### Content Service Data Models
+### Read Service Data Models
 
 #### Contents Table
 
@@ -187,8 +246,6 @@ CREATE INDEX idx_user_contents_added_at ON user_contents(user_id, added_at DESC)
 **Triggers**:
 - **After INSERT**: Clear `orphaned_at` on contents when user adds it
 - **After DELETE**: Set `orphaned_at` on contents when last user removes it
-
-### RSS Fetcher Service Data Models
 
 #### Feeds Table
 
@@ -283,9 +340,9 @@ CREATE TABLE content_outbox (
 CREATE INDEX idx_content_outbox_delivery_status ON content_outbox(delivery_status, next_retry_at) WHERE delivery_status IN ('pending', 'failed');
 ```
 
-## Communication Patterns
+### Communication Patterns
 
-### 1. RSS Fetcher → Content Service
+#### RSS Fetcher → Content Service
 
 **Pattern**: REST API calls with outbox pattern for reliability
 
@@ -314,7 +371,7 @@ Retry 6: 12 hours
 After 6 retries: Mark as failed
 ```
 
-### 2. Circuit Breaker Pattern
+#### Circuit Breaker Pattern
 
 **Purpose**: Prevent overwhelming a failing Content Service
 
@@ -330,9 +387,7 @@ After 6 retries: Mark as failed
 - Allows failing service to recover
 - Provides fast-fail behavior
 
-## Content Processing Pipeline
-
-### Content Creation Flow
+### Content Processing Pipeline
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -373,40 +428,7 @@ After 6 retries: Mark as failed
    └─ Return content ID
 ```
 
-### Content Update Detection
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   Update Detection Flow                      │
-└─────────────────────────────────────────────────────────────┘
-
-1. Feed item already exists in feed_items table
-   │
-2. Make conditional HTTP request
-   │ ├─ Include "If-Modified-Since: {http_last_modified}"
-   │ └─ Include "If-None-Match: {http_etag}"
-   │
-3. Check HTTP response
-   │
-   ├─ 304 Not Modified
-   │  └─ Update last_checked_at, skip reprocessing
-   │
-   └─ 200 OK (content changed)
-      │
-      ├─ Re-fetch and re-process content
-      ├─ Generate new content_hash
-      ├─ Compare with stored hash
-      │
-      └─ If hash changed
-         │
-         ├─ Call Content Service PUT /api/v1/contents/:id
-         ├─ Update cleaned_html, metadata, content_hash
-         └─ Content Service preserves all user-content relationships
-```
-
-## Feed Polling Strategy
-
-### Tiered Polling
+### Feed Polling Strategy
 
 **Objective**: Reduce load on inactive feeds while keeping active feeds fresh
 
@@ -427,86 +449,9 @@ ELSE
 - Updates `next_poll_at` based on new tier
 - New content promotes feed to 'active' tier immediately
 
-### Polling Worker Flow
+### Reliability Patterns
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Feed Polling Worker                       │
-└─────────────────────────────────────────────────────────────┘
-
-LOOP (continuous):
-    1. Query feeds WHERE next_poll_at <= NOW() AND status = 'active'
-       ORDER BY next_poll_at ASC
-       LIMIT 10
-
-    2. FOR EACH feed (concurrent, max 5 workers):
-       │
-       ├─ Fetch RSS/Atom XML (30s timeout)
-       │
-       ├─ Parse feed metadata and items
-       │
-       ├─ FOR EACH item:
-       │  │
-       │  ├─ Check if exists (feed_id + item_guid)
-       │  │
-       │  ├─ If new:
-       │  │  └─ Insert into feed_items with status='pending'
-       │  │
-       │  └─ If exists:
-       │     └─ Check for updates (see Update Detection)
-       │
-       ├─ Update feed metadata:
-       │  ├─ last_fetched_at = NOW()
-       │  ├─ last_published_at = MAX(item.published_at)
-       │  ├─ consecutive_error_days = 0
-       │  └─ next_poll_at = NOW() + tier_interval
-       │
-       └─ IF error:
-          ├─ Increment consecutive_error_days
-          ├─ Store last_error_at, last_error_message
-          └─ IF consecutive_error_days >= 7:
-             └─ Set status = 'disabled'
-
-    3. Sleep 10 seconds
-```
-
-### Content Extraction Worker Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Content Extraction Worker                    │
-└─────────────────────────────────────────────────────────────┘
-
-LOOP (continuous):
-    1. Query feed_items WHERE processing_status = 'pending'
-       LIMIT 20
-
-    2. FOR EACH feed_item (concurrent, max 5 workers):
-       │
-       ├─ Update status = 'processing'
-       │
-       ├─ Fetch full article HTML (30s timeout)
-       │  └─ On timeout/error: Fallback to RSS description
-       │
-       ├─ Apply readability + sanitization
-       │
-       ├─ Generate content_hash
-       │
-       ├─ Get all subscribed users for this feed
-       │
-       ├─ Write to content_outbox:
-       │  ├─ content_payload = {full content JSON}
-       │  ├─ user_ids = [array of subscribed user IDs]
-       │  └─ delivery_status = 'pending'
-       │
-       └─ Update feed_item status = 'completed'
-
-    3. Sleep 10 seconds
-```
-
-## Reliability Patterns
-
-### 1. Outbox Pattern
+#### 1. Outbox Pattern
 
 **Purpose**: Ensure content delivery even if Content Service is temporarily unavailable
 
@@ -521,7 +466,7 @@ LOOP (continuous):
 - No content loss during Content Service downtime
 - Audit trail of all deliveries
 
-### 2. Circuit Breaker
+#### 2. Circuit Breaker
 
 **Purpose**: Prevent overwhelming a failing Content Service
 
@@ -537,7 +482,7 @@ LOOP (continuous):
 - Prevents resource exhaustion
 - Automatic recovery detection
 
-### 3. Idempotency
+#### 3. Idempotency
 
 **Content Service**:
 - Duplicate check on `content_hash + source_feed_id`
@@ -548,77 +493,18 @@ LOOP (continuous):
 - Feed items deduplicated by `feed_id + item_guid`
 - Outbox entries retried safely
 
-### 4. Graceful Degradation
+#### 4. Graceful Degradation
 
 **Strategies**:
 - Fetch timeout → Use RSS description instead of full article
 - Content Service unavailable → Queue in outbox for later delivery
 - Feed fetch failure → Increment error counter, retry next poll
 
-## Database Design
-
-### Indexes
-
-**Content Service**:
-```sql
--- Fast lookups by hash and feed for deduplication
-CREATE UNIQUE INDEX idx_contents_hash_feed ON contents(content_hash, source_feed_id);
-
--- Fast orphaned content cleanup queries
-CREATE INDEX idx_contents_orphaned_at ON contents(orphaned_at) WHERE orphaned_at IS NOT NULL;
-
--- Fast user content list queries
-CREATE INDEX idx_user_contents_added_at ON user_contents(user_id, added_at DESC);
-
--- Fast filtering by status and favorites
-CREATE INDEX idx_user_contents_user_status ON user_contents(user_id, status);
-CREATE INDEX idx_user_contents_user_favorite ON user_contents(user_id, is_favorite) WHERE is_favorite = TRUE;
-
--- Full-text search
-CREATE INDEX idx_contents_search ON contents USING GIN (to_tsvector('english', title || ' ' || COALESCE(author, '')));
-```
-
-**RSS Fetcher Service**:
-```sql
--- Fast feed polling queries
-CREATE INDEX idx_feeds_next_poll ON feeds(next_poll_at) WHERE status = 'active';
-
--- Fast pending feed items queries
-CREATE INDEX idx_feed_items_processing_status ON feed_items(processing_status) WHERE processing_status = 'pending';
-
--- Fast outbox delivery queries
-CREATE INDEX idx_content_outbox_delivery_status ON content_outbox(delivery_status, next_retry_at) WHERE delivery_status IN ('pending', 'failed');
-```
-
-### Triggers
-
-**Content Service**:
-```sql
--- Clear orphaned_at when user adds content
-CREATE TRIGGER clear_orphaned_at
-    AFTER INSERT ON user_contents
-    FOR EACH ROW
-    EXECUTE FUNCTION clear_content_orphaned_at();
-
--- Set orphaned_at when last user removes content
-CREATE TRIGGER mark_orphaned_content
-    AFTER DELETE ON user_contents
-    FOR EACH ROW
-    EXECUTE FUNCTION mark_content_as_orphaned();
-```
-
-**RSS Fetcher Service**:
-```sql
--- Enforce 100 feed limit per user
-CREATE TRIGGER enforce_feed_limit
-    BEFORE INSERT ON feed_subscriptions
-    FOR EACH ROW
-    EXECUTE FUNCTION check_user_feed_limit();
-```
+---
 
 ## Security Considerations
 
-### HTML Sanitization
+### HTML Sanitization (Read Service)
 
 **Library**: bluemonday (industry-standard Go HTML sanitizer)
 
@@ -659,11 +545,15 @@ CREATE TRIGGER enforce_feed_limit
 - Foreign key constraints enforce referential integrity
 - Check constraints enforce valid enum values
 
+> **TODO**: Add security documentation for User Service and Explore Service
+
+---
+
 ## Performance Considerations
 
 ### Connection Pooling
 
-Both services use connection pooling:
+All services use connection pooling:
 ```go
 db.SetMaxOpenConns(25)
 db.SetMaxIdleConns(5)
@@ -688,11 +578,13 @@ Future enhancement:
 - Batch feed polling (10 feeds at a time)
 - Batch outbox delivery (concurrent workers)
 
+---
+
 ## Monitoring & Observability
 
 ### Health Checks
 
-Both services expose:
+All services expose:
 - `GET /health/live` - Liveness check (is process running?)
 - `GET /health/ready` - Readiness check (can handle traffic? DB connected?)
 
@@ -705,6 +597,8 @@ Structured logging includes:
 - User ID (when available)
 - Error stack traces
 
+See [LOGGING_STRATEGY.md](LOGGING_STRATEGY.md) for detailed logging standards.
+
 ### Metrics (Future)
 
 Planned Prometheus metrics:
@@ -715,18 +609,20 @@ Planned Prometheus metrics:
 - Outbox queue depth
 - Circuit breaker state changes
 
+---
+
 ## Scalability Considerations
 
 ### Horizontal Scaling
 
-**Content Service**:
-- Stateless HTTP server → scale by adding instances
-- Database connection pooling limits concurrent connections
-- Load balancer distributes requests
+**Services that can be scaled horizontally**:
+- User Service API (stateless)
+- Explore Service APIs (stateless)
+- Read Service - Content Service API (stateless)
+- Read Service - RSS Fetcher Service API (stateless)
 
-**RSS Fetcher Service**:
-- API server: Stateless → scale by adding instances
-- Workers: Use distributed locks for job coordination (future)
+**Services that need coordination**:
+- RSS Fetcher Worker (use distributed locks)
 
 ### Database Scaling
 
@@ -746,13 +642,15 @@ Planned Prometheus metrics:
 - Distributed job scheduling
 - Worker-specific scaling based on queue depth
 
+---
+
 ## Future Enhancements
 
 ### Authentication & Authorization
 
-- JWT-based authentication
-- User service for user management
+- JWT-based authentication (User Service - implemented)
 - API key authentication for service-to-service
+- Fine-grained authorization policies
 
 ### Caching Layer
 
@@ -778,14 +676,3 @@ Planned Prometheus metrics:
 - PDF support
 - Video/podcast content
 - Multi-language support with language detection
-
-## Conclusion
-
-Cairn's architecture prioritizes:
-- **Reliability**: Outbox pattern, circuit breaker, retry logic
-- **Scalability**: Stateless services, connection pooling, batch processing
-- **Maintainability**: Clean separation of concerns, comprehensive testing
-- **Performance**: Indexes, pagination, caching strategy
-- **Security**: HTML sanitization, input validation, parameterized queries
-
-The microservices architecture allows independent scaling and deployment of Content Service and RSS Fetcher Service while maintaining loose coupling through REST APIs.
