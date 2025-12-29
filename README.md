@@ -70,8 +70,11 @@ cairn/
 │   │   ├── pkg/             # Shared packages
 │   │   └── README.md        # Explore service documentation
 │   │
-│   ├── read/                # Content Storage Service
-│   │   └── requirements.md  # Read service requirements
+│   ├── read/                # Content Storage & RSS Feed Management
+│   │   ├── content/         # Content Service (storage, search, user metadata)
+│   │   ├── fetcher/         # RSS Fetcher Service (feed subscriptions, polling)
+│   │   ├── api/             # OpenAPI specifications
+│   │   └── README.md        # Read service documentation
 │   │
 │   └── users/               # User Management & Authentication
 │       ├── cmd/             # Application entrypoints
@@ -156,7 +159,7 @@ For comprehensive deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 See the documentation for each service:
 - [Explore Service](services/explore/README.md) - RSS fetching and recommendations
-- [Read Service](services/read/requirements.md) - Content storage and management
+- [Read Service](services/read/README.md) - Content storage and RSS feed management
 - [User Service](services/users/README.md) - Authentication and user management
 
 ## Services Documentation
@@ -175,15 +178,27 @@ Features:
 See the [Explore Service README](services/explore/README.md) for detailed documentation.
 
 ### Read Service
-The Read service manages article storage and user-specific metadata.
+The Read service is a comprehensive article storage and RSS feed management system consisting of two microservices:
 
-Features:
-- Cleaned HTML content storage using readability parser
-- Multi-user content deduplication
-- User-specific metadata (read status, scroll position, favorites)
-- REST APIs for content retrieval and updates
+**Content Service** (port 8080):
+- Cleaned HTML content extraction using go-readability
+- HTML sanitization with bluemonday
+- Content deduplication by hash and feed ID
+- User-specific metadata (read status, scroll position, favorites, notes)
+- Full-text search with PostgreSQL GIN index
+- Cursor-based pagination
+- Orphaned content cleanup (90-day retention)
 
-See the [Read Service Requirements](services/read/requirements.md) for detailed specifications.
+**RSS Fetcher Service** (port 8081):
+- User feed subscriptions (100 feed limit per user)
+- Tiered polling strategy (hourly/6-hourly/daily)
+- Content extraction and processing
+- Outbox pattern for reliable content delivery
+- Circuit breaker for fault tolerance
+- Auto-disable feeds after 7 consecutive error days
+- Update detection via ETag/Last-Modified headers
+
+See the [Read Service README](services/read/README.md) for detailed documentation.
 
 ### User Service
 The User service handles authentication and account management.
@@ -314,13 +329,16 @@ Cairn follows a microservices architecture:
 - [ ] Export/import data
 
 ### Backend Services
-- [ ] Full-text search across articles
+- [x] Full-text search across articles (implemented in Read Service)
+- [x] RSS feed management and polling (implemented in Read Service)
 - [ ] Article summarization with AI
 - [ ] Email digest notifications
-- [ ] Web scraper for direct URL imports
 - [ ] Image hosting and optimization
 - [ ] Reading analytics and statistics
 - [ ] Social features (sharing, comments)
+- [ ] Recommendation engine (Read Service)
+- [ ] Import/export functionality (Read Service)
+- [ ] GraphQL API option (Read Service)
 
 ## Development
 
@@ -368,6 +386,12 @@ go test ./...
 # User service
 cd services/users
 go test ./...
+
+# Read service
+cd services/read
+make test                    # Run all tests
+make test-coverage           # Generate coverage report
+make test-integration        # Run integration tests
 ```
 
 #### Running with Live Reload
@@ -386,6 +410,7 @@ air
 See individual service READMEs for migration instructions:
 - [User Service Migrations](services/users/README.md)
 - [Explore Service Setup](services/explore/README.md)
+- [Read Service Migrations](services/read/README.md)
 
 ## License
 

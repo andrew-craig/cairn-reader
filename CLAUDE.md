@@ -8,7 +8,7 @@ Cairn is a read-it-later application consisting of:
 - **Mobile App** (React Native/Expo): iOS and Android app for reading saved articles
 - **Backend Services** (Go): Microservices for content discovery, storage, and user management
   - **Explore Service**: RSS feed fetching and content recommendation
-  - **Read Service**: Article storage and user-specific metadata (planned)
+  - **Read Service**: Article storage and user-specific metadata
   - **User Service**: Authentication and account management
 
 ## Common Commands
@@ -99,6 +99,36 @@ make deps                    # Download and tidy dependencies
 # Docker
 make docker-build            # Build Docker image
 make docker-run              # Run in Docker container
+```
+
+### Read Service (services/read)
+```bash
+cd services/read
+
+# Development (requires Docker)
+docker-compose up --build    # Start all services (Content + RSS Fetcher)
+docker-compose up -d         # Start in detached mode
+docker-compose logs -f       # Follow logs
+docker-compose down          # Stop all services
+
+# Build
+make build                   # Build both services
+
+# Testing
+make test                    # Run all tests
+make test-coverage           # Generate coverage report
+make test-integration        # Run integration tests (requires PostgreSQL)
+
+# Database migrations
+make migrate-up              # Apply pending migrations
+make migrate-down            # Rollback last migration
+make migrate-status          # Check migration status
+make migrate-create name=... # Create new migration
+
+# Code quality
+make fmt                     # Format code
+make vet                     # Run go vet
+make lint                    # Run linter
 ```
 
 ## Architecture
@@ -219,6 +249,19 @@ interface Article {
 - `users`: User accounts with email/password or device ID authentication
 - `refresh_tokens`: JWT refresh token management
 
+**Read Service - Content Database** (`content_service`):
+- `contents`: Cleaned article content with readability extraction and HTML sanitization
+- `user_contents`: User-specific metadata (status, favorites, scroll position, notes)
+- Supports content deduplication by hash and feed ID
+- Full-text search with PostgreSQL GIN index
+
+**Read Service - RSS Fetcher Database** (`rss_fetcher_service`):
+- `feeds`: RSS feed metadata and polling configuration
+- `user_feeds`: User subscriptions to feeds (max 100 per user)
+- `feed_items`: Pending feed items for extraction
+- `outbox`: Reliable content delivery queue using outbox pattern
+- Tiered polling strategy (hourly/6-hourly/daily)
+
 ## Key Implementation Details
 
 ### Explore Service - Feed Management
@@ -251,6 +294,32 @@ See: `services/explore/RECOMMENDER_PLAN.md` for detailed implementation plan
 - Account upgrade from device-only to email/password
 - Secure secrets management with HashiCorp Vault
 - Authorization middleware ensures users can only access their own data
+
+### Read Service - Content Management
+**Implementation Status**: ✅ COMPLETE
+
+The Read service consists of two microservices:
+
+**Content Service** (port 8080):
+- Stores cleaned article content using go-readability extraction
+- HTML sanitization with bluemonday
+- Content deduplication by hash + feed ID
+- User-specific metadata (status, favorites, scroll position)
+- Full-text search with PostgreSQL GIN index
+- Cursor-based pagination (20 items/page)
+- Content size limit (5MB)
+- Orphaned content cleanup (90-day retention)
+
+**RSS Fetcher Service** (port 8081):
+- User feed subscriptions (100 feed limit per user)
+- Tiered polling strategy: hourly (active), 6-hourly (moderate), daily (quiet)
+- Auto-disable feeds after 7 consecutive error days
+- Content extraction and processing
+- Outbox pattern for reliable content delivery
+- Circuit breaker for Content Service calls
+- Update detection via ETag/Last-Modified headers
+
+See: `services/read/README.md` for detailed documentation
 
 ### Mobile App - Theme System
 - Supports light and dark modes (follows system preference)
@@ -298,6 +367,43 @@ DELETE /users/{id}                     → Delete account (authenticated)
 # Health
 GET /health                            → Basic health check
 GET /ready                             → Readiness check (DB + Vault connectivity)
+```
+
+### Read Service - Content Service (port 8080)
+```
+# Health
+GET  /health/live                                           → Liveness check
+GET  /health/ready                                          → Readiness check (includes DB)
+
+# Content Management
+POST   /api/v1/users/{userID}/contents                      → Save new content
+GET    /api/v1/users/{userID}/contents                      → List user's contents (paginated)
+GET    /api/v1/users/{userID}/contents/{contentID}          → Get specific content with HTML
+PATCH  /api/v1/users/{userID}/contents/{contentID}          → Update content metadata
+       Body: {"status": "reading|completed|archived", "is_favorite": true, "scroll_position": 0.5, "notes": "..."}
+DELETE /api/v1/users/{userID}/contents/{contentID}          → Delete content from user's list
+POST   /api/v1/contents/bulk                                → Bulk save contents (RSS Fetcher integration)
+
+# Search
+GET  /api/v1/users/{userID}/contents/search?q=golang        → Full-text search
+```
+
+### Read Service - RSS Fetcher Service (port 8081)
+```
+# Health
+GET  /health/live                                           → Liveness check
+GET  /health/ready                                          → Readiness check (includes DB)
+
+# Feed Subscriptions
+POST   /api/v1/users/{userID}/feeds/subscribe               → Subscribe to feed
+       Body: {"feed_url": "https://..."}
+DELETE /api/v1/users/{userID}/feeds/{feedID}/unsubscribe    → Unsubscribe from feed
+GET    /api/v1/users/{userID}/feeds                         → List user's subscriptions
+GET    /api/v1/feeds/{feedID}                               → Get feed details
+
+# Feed Management (Admin)
+GET    /api/v1/feeds                                        → List all feeds
+POST   /api/v1/feeds/{feedID}/refresh                       → Manually trigger feed refresh
 ```
 
 ### OpenAPI/Swagger Documentation
@@ -463,6 +569,28 @@ JWT_ACCESS_LIFETIME=15m        # Access token lifetime
 JWT_REFRESH_LIFETIME=7d        # Refresh token lifetime
 ```
 
+### Read Service - Content Service
+```bash
+DATABASE_URL=postgres://...    # PostgreSQL connection string
+SERVER_PORT=8080               # HTTP server port
+LOG_LEVEL=info                 # Logging level
+MAX_CONTENT_SIZE=5242880       # 5MB content size limit
+ORPHANED_CONTENT_DAYS=90       # Days before deleting orphaned content
+```
+
+### Read Service - RSS Fetcher Service
+```bash
+DATABASE_URL=postgres://...    # PostgreSQL connection string
+SERVER_PORT=8081               # HTTP server port
+CONTENT_SERVICE_URL=...        # URL to Content Service
+LOG_LEVEL=info                 # Logging level
+MAX_FEEDS_PER_USER=100         # Maximum feeds per user
+FEED_ERROR_THRESHOLD=7         # Days of errors before disabling feed
+POLL_INTERVAL_TIER1=1h         # Active feeds poll interval
+POLL_INTERVAL_TIER2=6h         # Moderate feeds poll interval
+POLL_INTERVAL_TIER3=24h        # Quiet feeds poll interval
+```
+
 ## Important Implementation Notes
 
 ### Explore Service - Database Separation
@@ -498,7 +626,9 @@ The Explore service uses **two separate PostgreSQL databases**:
 - **Explore Service Plan**: `/services/explore/RECOMMENDER_PLAN.md` - Implementation roadmap
 - **Explore Service Requirements**: `/services/explore/requirements.md` - Detailed requirements
 - **User Service**: `/services/users/README.md` - Authentication and user management
-- **Read Service**: `/services/read/requirements.md` - Content storage requirements
+- **Read Service**: `/services/read/README.md` - Content storage and RSS feed management
+- **Read Service Requirements**: `/services/read/requirements.md` - Detailed specifications
+- **Read Service Implementation**: `/services/read/IMPLEMENTATION_PLAN.md` - Implementation details
 - **Mobile App Data Model**: See TypeScript interfaces in `/apps/mobile/src/types/`
 
 ## Next Steps and Planned Work
@@ -512,9 +642,10 @@ The Explore service uses **two separate PostgreSQL databases**:
   - Admin dashboard endpoints
 
 ### Read Service
-- Not yet implemented (see `/services/read/requirements.md` for specifications)
-- Will provide content storage and user-specific metadata
-- Integration with mobile app for article saving and reading
+- ✅ Content Service: COMPLETE (content storage, user metadata, search)
+- ✅ RSS Fetcher Service: COMPLETE (feed subscriptions, tiered polling, outbox pattern)
+- Integration with mobile app pending
+- Planned features: recommendation engine, import/export, GraphQL API
 
 ### User Service
 - ✅ Core authentication features implemented
