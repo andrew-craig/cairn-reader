@@ -44,8 +44,8 @@ services:
   # Content Service
   content-service:
     build:
-      context: ./services/content-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: content/Dockerfile
     container_name: cairn-content-service
     environment:
       PORT: 8080
@@ -67,8 +67,8 @@ services:
   # Content Service Worker (Background Jobs)
   content-worker:
     build:
-      context: ./services/content-service
-      dockerfile: Dockerfile.worker
+      context: .
+      dockerfile: content/Dockerfile.worker
     container_name: cairn-content-worker
     environment:
       DB_HOST: content-db
@@ -97,8 +97,8 @@ services:
   # RSS Fetcher Service
   rss-fetcher-service:
     build:
-      context: ./services/rss-fetcher-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: fetcher/Dockerfile
     container_name: cairn-rss-fetcher-service
     environment:
       PORT: 8081
@@ -120,8 +120,8 @@ services:
   # RSS Fetcher Service Worker (Background Jobs)
   rss-fetcher-worker:
     build:
-      context: ./services/rss-fetcher-service
-      dockerfile: Dockerfile.worker
+      context: .
+      dockerfile: fetcher/Dockerfile.worker
     container_name: cairn-rss-fetcher-worker
     environment:
       DB_HOST: rss-db
