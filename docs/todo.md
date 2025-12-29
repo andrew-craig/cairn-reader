@@ -6,141 +6,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Add Tests for Recommendation Engine
-**File:** `services/explore/recommender/internal/recommend/engine.go`
-
-**Issue:** The recommendation engine contains core business logic but has no test coverage. This is critical as it implements the quality scoring algorithm.
-
-**Implementation:**
-
-Create `services/explore/recommender/internal/recommend/engine_test.go`:
-
-```go
-package recommend
-
-import (
-    "context"
-    "testing"
-    "time"
-
-    "github.com/andrew-craig/cairn/explore/pkg/models"
-)
-
-func TestQualityScoreCalculation(t *testing.T) {
-    tests := []struct {
-        name        string
-        upvotes     int
-        downvotes   int
-        recommends  int
-        wantScore   float64
-    }{
-        {
-            name:       "high quality article",
-            upvotes:    10,
-            downvotes:  1,
-            recommends: 20,
-            wantScore:  0.65, // (10 + (1*3)) / 20 = 13/20
-        },
-        {
-            name:       "low quality article",
-            upvotes:    2,
-            downvotes:  5,
-            recommends: 30,
-            wantScore:  0.567, // (2 + (5*3)) / 30 = 17/30
-        },
-        {
-            name:       "no engagement",
-            upvotes:    0,
-            downvotes:  0,
-            recommends: 10,
-            wantScore:  0.0,
-        },
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            article := &models.Article{
-                Upvotes:    tt.upvotes,
-                Downvotes:  tt.downvotes,
-                Recommends: tt.recommends,
-            }
-
-            score := calculateQualityScore(article)
-
-            if score != tt.wantScore {
-                t.Errorf("calculateQualityScore() = %v, want %v", score, tt.wantScore)
-            }
-        })
-    }
-}
-
-func TestRecommendationSelection(t *testing.T) {
-    engine := &Engine{
-        // mock repositories
-    }
-
-    articles := []*models.Article{
-        {ID: "1", Upvotes: 10, Downvotes: 1, Recommends: 20},  // High quality
-        {ID: "2", Upvotes: 5, Downvotes: 2, Recommends: 15},   // Medium quality
-        {ID: "3", Upvotes: 2, Downvotes: 8, Recommends: 25},   // Low quality
-        {ID: "4", Upvotes: 0, Downvotes: 0, Recommends: 1},    // New article
-    }
-
-    recommendations, err := engine.GetRecommendations(context.Background(), "user123")
-    if err != nil {
-        t.Fatalf("GetRecommendations() error = %v", err)
-    }
-
-    if len(recommendations) != 5 {
-        t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
-    }
-
-    // Verify 4 high-quality + 1 low-recommends article
-    lowRecommendsCount := 0
-    for _, rec := range recommendations {
-        if rec.Recommends < 5 {
-            lowRecommendsCount++
-        }
-    }
-
-    if lowRecommendsCount != 1 {
-        t.Errorf("Expected 1 low-recommends article, got %d", lowRecommendsCount)
-    }
-}
-
-func TestRecommendationDiversity(t *testing.T) {
-    // Test that same user doesn't get same articles twice
-    // Test category diversity
-    // Test recency bias
-}
-
-func TestFilterDeletedArticles(t *testing.T) {
-    // Test that deleted articles are excluded
-}
-```
-
-Add integration test:
-```go
-func TestRecommendationEngineIntegration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-
-    // Setup test database
-    // Insert test articles
-    // Call engine.GetRecommendations()
-    // Verify results
-    // Verify recommends counter incremented
-}
-```
-
-Run tests:
-```bash
-cd services/explore/recommender
-go test ./internal/recommend/... -v
-go test ./internal/recommend/... -v -short  # Skip integration tests
-```
-
 ---
 
 ## High Priority
@@ -1602,3 +1467,16 @@ The following items have been successfully implemented and verified:
 ### Refactoring
 - **Delete Unused Gin Middleware** - Removed from explore service (user service middleware is actively used)
 - **Cache Internal User ID in Recommendation Flow** - Addressed by using external user ID from JWT token directly throughout the flow
+
+### Testing & Quality Assurance
+- **Add Tests for Recommendation Engine** - Created comprehensive test suite for `services/explore/recommender/internal/recommend/engine.go` including:
+  - Unit tests for quality score calculation (8 test cases covering edge cases)
+  - Unit tests for high-quality article selection (4 test cases)
+  - Integration tests for GetRecommendations (5 test scenarios):
+    - Returns correct number of recommendations when fewer than 5 articles available
+    - Includes exploration article (low exposure) along with 4 high-quality articles
+    - Filters out deleted articles from recommendations
+    - Prevents duplicate recommendations to the same user
+    - Properly increments recommends counter for each recommendation
+  - All unit tests pass in CI/CD without database dependency (use `-short` flag)
+  - Integration tests validate end-to-end recommendation algorithm with real database
