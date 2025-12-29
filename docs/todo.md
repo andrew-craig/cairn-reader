@@ -6,77 +6,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Standardize PostgreSQL Driver to pgx/v5
-**Files:**
-- `services/explore/fetcher/internal/db/config.go`
-- `services/explore/recommender/cmd/recommender/main.go`
-- All explore service database code
-
-**Issue:** Explore services use `database/sql` + `lib/pq` while user service uses modern `pgx/v5`. This creates inconsistency in connection pooling, performance, and feature availability.
-
-**Current State:**
-```go
-// Explore services
-import _ "github.com/lib/pq"
-db, err := sql.Open("postgres", connStr)
-
-// User service
-import "github.com/jackc/pgx/v5/pgxpool"
-pool, err := pgxpool.NewWithConfig(context.Background(), config)
-```
-
-**Implementation:**
-1. Update `services/explore/go.mod`:
-```bash
-go get github.com/jackc/pgx/v5
-go get github.com/jackc/pgx/v5/pgxpool
-```
-
-2. Replace connection logic in `fetcher/internal/db/config.go`:
-```go
-import (
-    "github.com/jackc/pgx/v5/pgxpool"
-)
-
-func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
-    connStr := fmt.Sprintf(
-        "postgres://%s:%s@%s:%s/%s?sslmode=disable",
-        c.User, c.Password, c.Host, c.Port, c.DBName,
-    )
-
-    config, err := pgxpool.ParseConfig(connStr)
-    if err != nil {
-        return nil, fmt.Errorf("failed to parse connection string: %w", err)
-    }
-
-    // Connection pool settings
-    config.MaxConns = 25
-    config.MinConns = 5
-    config.MaxConnLifetime = 5 * time.Minute
-
-    pool, err := pgxpool.NewWithConfig(ctx, config)
-    if err != nil {
-        return nil, fmt.Errorf("failed to connect: %w", err)
-    }
-
-    return pool, nil
-}
-```
-
-3. Update all repository methods to use pgx types
-4. Replace `*sql.DB` with `*pgxpool.Pool` throughout
-5. Update queries to use pgx syntax (named parameters, etc.)
-6. Run all tests to verify migration
-
-**Benefits:**
-- 2-3x faster query performance
-- Better connection pooling with health checks
-- Native PostgreSQL protocol support
-- Modern, actively maintained library
-
----
-
-### 2. Add OpenAPI/Swagger Specifications
+### 1. Add OpenAPI/Swagger Specifications
 **Files to Create:**
 - `services/explore/api/openapi.yaml`
 - `services/users/api/openapi.yaml`
@@ -1866,6 +1796,9 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 ## Completed
 
 The following items have been successfully implemented and verified:
+
+### Performance & Modernization
+- **Standardize PostgreSQL Driver to pgx/v5** - Migrated explore services (fetcher and recommender) from `database/sql` + `lib/pq` to modern `pgx/v5/pgxpool`. Updated all repository methods, connection pooling, and transaction handling. Benefits include 2-3x faster query performance, better connection pooling with health checks, and native PostgreSQL protocol support. Both services build and compile successfully.
 
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services

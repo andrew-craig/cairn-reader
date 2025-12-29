@@ -4,19 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn/services/explore/pkg/models"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // FeedRepository handles database operations for feeds
 type FeedRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // NewFeedRepository creates a new FeedRepository
-func NewFeedRepository(db *sql.DB) *FeedRepository {
+func NewFeedRepository(db *pgxpool.Pool) *FeedRepository {
 	return &FeedRepository{db: db}
 }
 
@@ -35,7 +37,7 @@ func (r *FeedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 
 	var feed models.Feed
 	var title, description sql.NullString
-	err := r.db.QueryRowContext(ctx, query).Scan(
+	err := r.db.QueryRow(ctx, query).Scan(
 		&feed.ID,
 		&feed.URL,
 		&title,
@@ -54,7 +56,7 @@ func (r *FeedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 		feed.Description = description.String
 	}
 
-	if err == sql.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
@@ -75,11 +77,14 @@ func (r *FeedRepository) UpdateFetchResult(ctx context.Context, feedID int, succ
 				updated_at = NOW()
 			WHERE id = $1
 		`
-		_, err := r.db.ExecContext(ctx, query, feedID)
+		_, err := r.db.Exec(ctx, query, feedID)
 		if err != nil {
 			return fmt.Errorf("update feed success: %w", err)
 		}
-		log.Printf("Feed %d: fetch successful, reset failures to 0", feedID)
+		slog.Info("feed fetch successful",
+			slog.Int("feed_id", feedID),
+			slog.Int("consecutive_failures", 0),
+		)
 	} else {
 		// Increment consecutive_failures, check if we should disable
 		query := `
@@ -92,15 +97,21 @@ func (r *FeedRepository) UpdateFetchResult(ctx context.Context, feedID int, succ
 		`
 		var failures int
 		var enabled bool
-		err := r.db.QueryRowContext(ctx, query, feedID).Scan(&failures, &enabled)
+		err := r.db.QueryRow(ctx, query, feedID).Scan(&failures, &enabled)
 		if err != nil {
 			return fmt.Errorf("update feed failure: %w", err)
 		}
 
 		if !enabled {
-			log.Printf("Feed %d: disabled after %d consecutive failures", feedID, failures)
+			slog.Warn("feed disabled after consecutive failures",
+				slog.Int("feed_id", feedID),
+				slog.Int("consecutive_failures", failures),
+			)
 		} else {
-			log.Printf("Feed %d: failure recorded (%d consecutive)", feedID, failures)
+			slog.Info("feed failure recorded",
+				slog.Int("feed_id", feedID),
+				slog.Int("consecutive_failures", failures),
+			)
 		}
 	}
 
@@ -120,40 +131,32 @@ func (r *FeedRepository) ImportFeeds(ctx context.Context, feedURLs []string) err
 		ON CONFLICT (url) DO NOTHING
 	`
 
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("prepare statement: %w", err)
-	}
-	defer func() {
-		if err := stmt.Close(); err != nil {
-			log.Printf("error closing statement: %v", err)
-		}
-	}()
+	defer tx.Rollback(ctx)
 
 	newCount := 0
 	for _, url := range feedURLs {
-		result, err := stmt.ExecContext(ctx, url)
+		result, err := tx.Exec(ctx, query, url)
 		if err != nil {
 			return fmt.Errorf("insert feed %s: %w", url, err)
 		}
 
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected > 0 {
+		if result.RowsAffected() > 0 {
 			newCount++
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 
-	log.Printf("Imported %d new feeds (total in list: %d)", newCount, len(feedURLs))
+	slog.Info("imported feeds",
+		slog.Int("new_feeds", newCount),
+		slog.Int("total_in_list", len(feedURLs)),
+	)
 	return nil
 }
 
@@ -170,7 +173,7 @@ func (r *FeedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]mod
 
 	query += " ORDER BY id ASC"
 
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query feeds: %w", err)
 	}
@@ -211,7 +214,7 @@ func (r *FeedRepository) RecordFetchHistory(ctx context.Context, feedID int, suc
 	`
 
 	now := time.Now()
-	_, err := r.db.ExecContext(ctx, query, feedID, now, now, success, articlesFound, articlesSent, errorMsg)
+	_, err := r.db.Exec(ctx, query, feedID, now, now, success, articlesFound, articlesSent, errorMsg)
 	if err != nil {
 		return fmt.Errorf("insert fetch history: %w", err)
 	}
@@ -228,7 +231,7 @@ func (r *FeedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.F
 	`
 
 	var feed models.Feed
-	err := r.db.QueryRowContext(ctx, query, feedID).Scan(
+	err := r.db.QueryRow(ctx, query, feedID).Scan(
 		&feed.ID,
 		&feed.URL,
 		&feed.Title,
@@ -240,7 +243,7 @@ func (r *FeedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.F
 		&feed.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		return nil, fmt.Errorf("feed %d not found", feedID)
 	}
 	if err != nil {
@@ -261,7 +264,7 @@ func (r *FeedRepository) GetFeedStats(ctx context.Context) (total, enabled, disa
 		FROM feeds
 	`
 
-	err = r.db.QueryRowContext(ctx, query).Scan(&total, &enabled, &disabled, &neverFetched)
+	err = r.db.QueryRow(ctx, query).Scan(&total, &enabled, &disabled, &neverFetched)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("query feed stats: %w", err)
 	}

@@ -7,16 +7,19 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // VoteRepository handles vote database operations
 type VoteRepository struct {
-	db             *sql.DB
+	db             *pgxpool.Pool
 	userRepository *UserRepository
 }
 
 // NewVoteRepository creates a new vote repository
-func NewVoteRepository(db *sql.DB, userRepo *UserRepository) *VoteRepository {
+func NewVoteRepository(db *pgxpool.Pool, userRepo *UserRepository) *VoteRepository {
 	return &VoteRepository{
 		db:             db,
 		userRepository: userRepo,
@@ -38,12 +41,12 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 	}
 
 	// Start a transaction to ensure atomicity
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
 			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
@@ -51,8 +54,8 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 	// Check if user has already voted on this article
 	var existingVoteType sql.NullString
 	checkQuery := `SELECT vote_type FROM votes WHERE user_id = $1 AND article_id = $2`
-	err = tx.QueryRowContext(ctx, checkQuery, userID, articleID).Scan(&existingVoteType)
-	if err != nil && err != sql.ErrNoRows {
+	err = tx.QueryRow(ctx, checkQuery, userID, articleID).Scan(&existingVoteType)
+	if err != nil && err != pgx.ErrNoRows {
 		return fmt.Errorf("failed to check existing vote: %w", err)
 	}
 
@@ -83,12 +86,11 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 			oldVoteType = "downvote"
 		}
 
-		result, err := tx.ExecContext(ctx, updateQuery, articleID)
+		result, err := tx.Exec(ctx, updateQuery, articleID)
 		if err != nil {
 			return fmt.Errorf("failed to update article vote counts: %w", err)
 		}
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
+		if result.RowsAffected() == 0 {
 			slog.Warn("vote counter update had no effect (possibly already at 0)",
 				slog.String("article_id", articleID),
 				slog.String("old_vote_type", oldVoteType),
@@ -103,7 +105,7 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 			SET vote_type = $1
 			WHERE user_id = $2 AND article_id = $3
 		`
-		_, err = tx.ExecContext(ctx, voteQuery, voteType, userID, articleID)
+		_, err = tx.Exec(ctx, voteQuery, voteType, userID, articleID)
 		if err != nil {
 			return fmt.Errorf("failed to update vote: %w", err)
 		}
@@ -124,12 +126,11 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 			`
 		}
 
-		result, err := tx.ExecContext(ctx, updateQuery, articleID)
+		result, err := tx.Exec(ctx, updateQuery, articleID)
 		if err != nil {
 			return fmt.Errorf("failed to update article vote counts: %w", err)
 		}
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
+		if result.RowsAffected() == 0 {
 			return fmt.Errorf("article not found: %s", articleID)
 		}
 
@@ -138,13 +139,13 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 			INSERT INTO votes (user_id, article_id, vote_type, created_at)
 			VALUES ($1, $2, $3, NOW())
 		`
-		_, err = tx.ExecContext(ctx, voteQuery, userID, articleID, voteType)
+		_, err = tx.Exec(ctx, voteQuery, userID, articleID, voteType)
 		if err != nil {
 			return fmt.Errorf("failed to insert vote: %w", err)
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -155,12 +156,12 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleID string) error {
 
 	// Start a transaction to ensure atomicity
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
 			slog.Error("failed to rollback transaction", slog.Any("error", err))
 		}
 	}()
@@ -168,8 +169,8 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 	// Get the existing vote type
 	var voteType string
 	checkQuery := `SELECT vote_type FROM votes WHERE user_id = $1 AND article_id = $2`
-	err = tx.QueryRowContext(ctx, checkQuery, userID, articleID).Scan(&voteType)
-	if err == sql.ErrNoRows {
+	err = tx.QueryRow(ctx, checkQuery, userID, articleID).Scan(&voteType)
+	if err == pgx.ErrNoRows {
 		// No vote to remove
 		return nil
 	}
@@ -193,12 +194,11 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 		`
 	}
 
-	result, err := tx.ExecContext(ctx, updateQuery, articleID)
+	result, err := tx.Exec(ctx, updateQuery, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to update article vote counts: %w", err)
 	}
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
+	if result.RowsAffected() == 0 {
 		slog.Warn("vote counter update had no effect (possibly already at 0)",
 			slog.String("article_id", articleID),
 			slog.String("vote_type", voteType),
@@ -207,12 +207,12 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 
 	// Delete the vote record
 	deleteQuery := `DELETE FROM votes WHERE user_id = $1 AND article_id = $2`
-	_, err = tx.ExecContext(ctx, deleteQuery, userID, articleID)
+	_, err = tx.Exec(ctx, deleteQuery, userID, articleID)
 	if err != nil {
 		return fmt.Errorf("failed to delete vote: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
@@ -223,8 +223,8 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 func (r *VoteRepository) GetVoteCounts(ctx context.Context, articleID string) (upvotes int, downvotes int, err error) {
 	query := `SELECT upvotes, downvotes FROM articles WHERE id = $1`
 
-	err = r.db.QueryRowContext(ctx, query, articleID).Scan(&upvotes, &downvotes)
-	if err == sql.ErrNoRows {
+	err = r.db.QueryRow(ctx, query, articleID).Scan(&upvotes, &downvotes)
+	if err == pgx.ErrNoRows {
 		return 0, 0, fmt.Errorf("article not found")
 	}
 	if err != nil {
@@ -239,8 +239,8 @@ func (r *VoteRepository) GetVoteCounts(ctx context.Context, articleID string) (u
 func (r *VoteRepository) GetUserVote(ctx context.Context, userID string, articleID string) (voteType string, err error) {
 	query := `SELECT vote_type FROM votes WHERE user_id = $1 AND article_id = $2`
 
-	err = r.db.QueryRowContext(ctx, query, userID, articleID).Scan(&voteType)
-	if err == sql.ErrNoRows {
+	err = r.db.QueryRow(ctx, query, userID, articleID).Scan(&voteType)
+	if err == pgx.ErrNoRows {
 		return "", nil // User hasn't voted
 	}
 	if err != nil {

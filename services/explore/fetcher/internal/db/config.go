@@ -1,13 +1,13 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Config holds database configuration
@@ -30,30 +30,41 @@ func NewConfigFromEnv() *Config {
 	}
 }
 
-// Connect establishes a database connection
-func (c *Config) Connect() (*sql.DB, error) {
+// Connect establishes a database connection pool
+func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	sslMode := getEnv("DB_SSLMODE", "require")
 	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.DBName, sslMode,
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		c.User, c.Password, c.Host, c.Port, c.DBName, sslMode,
 	)
 
-	db, err := sql.Open("postgres", connStr)
+	config, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("ping database: %w", err)
+	// Connection pool settings
+	config.MaxConns = 25
+	config.MinConns = 5
+	config.MaxConnLifetime = 5 * time.Minute
+	config.MaxConnIdleTime = 5 * time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	// Verify connection
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
 
-	log.Printf("Connected to fetcher database at %s:%s", c.Host, c.Port)
-	return db, nil
+	slog.Info("connected to fetcher database",
+		slog.String("host", c.Host),
+		slog.String("port", c.Port),
+	)
+	return pool, nil
 }
 
 func getEnv(key, defaultValue string) string {

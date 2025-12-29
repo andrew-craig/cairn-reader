@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,7 +16,6 @@ import (
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/cleanup"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -46,10 +43,11 @@ func main() {
 	}
 
 	// Connect to database
+	ctx := context.Background()
 	slog.Info("connecting to database",
 		slog.String("host", dbConfig.Host),
 	)
-	database, err := connectDB(dbConfig)
+	database, err := dbConfig.Connect(ctx)
 	if err != nil {
 		slog.Error("failed to connect to database", slog.Any("error", err))
 		os.Exit(1)
@@ -143,40 +141,6 @@ func main() {
 		slog.Error("server error", slog.Any("error", err))
 		os.Exit(1)
 	}
-}
-
-func connectDB(config db.Config) (*sql.DB, error) {
-	sslMode := os.Getenv("DB_SSLMODE")
-	if sslMode == "" {
-		sslMode = "require"
-	}
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		config.Host, config.Port, config.User, config.Password, config.DBName, sslMode)
-
-	database, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set connection pool settings
-	database.SetMaxOpenConns(25)
-	database.SetMaxIdleConns(5)
-	database.SetConnMaxLifetime(5 * time.Minute)
-
-	// Wait for database to be ready
-	for i := 0; i < 30; i++ {
-		if err := database.Ping(); err == nil {
-			slog.Info("component initialized", slog.String("component", "database"))
-			return database, nil
-		}
-		slog.Debug("waiting for database",
-			slog.Int("attempt", i+1),
-			slog.Int("max_attempts", 30),
-		)
-		time.Sleep(time.Second)
-	}
-
-	return nil, fmt.Errorf("database not ready after 30 seconds")
 }
 
 func getEnv(key, defaultValue string) string {

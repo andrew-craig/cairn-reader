@@ -3,7 +3,6 @@
 package api
 
 import (
-	"database/sql"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -11,11 +10,12 @@ import (
 	"github.com/andrew-craig/cairn/services/users/pkg/auth"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Server holds the API server dependencies
 type Server struct {
-	db             *sql.DB
+	db             *pgxpool.Pool
 	articleRepo    *db.ArticleRepository
 	userRepo       *db.UserRepository
 	voteRepo       *db.VoteRepository
@@ -25,7 +25,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server
-func NewServer(database *sql.DB, articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
+func NewServer(database *pgxpool.Pool, articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
 	return &Server{
 		db:             database,
 		articleRepo:    articleRepo,

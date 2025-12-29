@@ -2,20 +2,20 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // UserRepository handles user database operations
 type UserRepository struct {
-	db *sql.DB
+	db *pgxpool.Pool
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(db *sql.DB) *UserRepository {
+func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 	return &UserRepository{db: db}
 }
 
@@ -33,7 +33,7 @@ func (r *UserRepository) EnsureUserExists(ctx context.Context, userID string) er
 		ON CONFLICT (id) DO NOTHING
 	`
 
-	_, err := r.db.ExecContext(ctx, query, userID)
+	_, err := r.db.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to ensure user exists: %w", err)
 	}
@@ -56,7 +56,7 @@ func (r *UserRepository) MarkArticleAsRead(ctx context.Context, userID, articleI
 			read_at = $3
 	`
 
-	_, err := r.db.ExecContext(ctx, query, userID, articleID, time.Now())
+	_, err := r.db.Exec(ctx, query, userID, articleID, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to mark article as read: %w", err)
 	}
@@ -72,7 +72,7 @@ func (r *UserRepository) GetReadArticleIDs(ctx context.Context, userID string) (
 		WHERE user_id = $1 AND read = true
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get read articles: %w", err)
 	}
