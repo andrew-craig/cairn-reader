@@ -15,12 +15,12 @@ import (
 
 // Engine handles recommendation logic
 type Engine struct {
-	articleRepo *db.ArticleRepository
-	userRepo    *db.UserRepository
+	articleRepo db.ArticleRepositoryInterface
+	userRepo    db.UserRepositoryInterface
 }
 
 // NewEngine creates a new recommendation engine
-func NewEngine(articleRepo *db.ArticleRepository, userRepo *db.UserRepository) *Engine {
+func NewEngine(articleRepo db.ArticleRepositoryInterface, userRepo db.UserRepositoryInterface) *Engine {
 	return &Engine{
 		articleRepo: articleRepo,
 		userRepo:    userRepo,

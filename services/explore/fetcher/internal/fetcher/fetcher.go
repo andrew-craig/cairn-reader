@@ -21,7 +21,7 @@ import (
 // the RSS parser (for parsing feed content), and the recommender client
 // (for submitting articles to the recommender service).
 type Fetcher struct {
-	feedRepo          *db.FeedRepository
+	feedRepo          db.FeedRepositoryInterface
 	recommenderClient client.RecommenderClientInterface
 	parser            *gofeed.Parser
 	fetchInterval     time.Duration
@@ -29,7 +29,7 @@ type Fetcher struct {
 
 // NewFetcher creates a new fetcher instance with the specified fetch interval.
 // The interval determines how frequently feeds are fetched (e.g., 60s means 1 feed per minute).
-func NewFetcher(feedRepo *db.FeedRepository, recommenderClient client.RecommenderClientInterface, fetchInterval time.Duration) *Fetcher {
+func NewFetcher(feedRepo db.FeedRepositoryInterface, recommenderClient client.RecommenderClientInterface, fetchInterval time.Duration) *Fetcher {
 	return &Fetcher{
 		feedRepo:          feedRepo,
 		recommenderClient: recommenderClient,

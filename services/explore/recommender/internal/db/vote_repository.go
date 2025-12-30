@@ -12,15 +12,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// VoteRepository handles vote database operations
-type VoteRepository struct {
+// voteRepository handles vote database operations
+type voteRepository struct {
 	db             *pgxpool.Pool
-	userRepository *UserRepository
+	userRepository UserRepositoryInterface
 }
 
 // NewVoteRepository creates a new vote repository
-func NewVoteRepository(db *pgxpool.Pool, userRepo *UserRepository) *VoteRepository {
-	return &VoteRepository{
+func NewVoteRepository(db *pgxpool.Pool, userRepo UserRepositoryInterface) VoteRepositoryInterface {
+	return &voteRepository{
 		db:             db,
 		userRepository: userRepo,
 	}
@@ -29,7 +29,7 @@ func NewVoteRepository(db *pgxpool.Pool, userRepo *UserRepository) *VoteReposito
 // RecordVote inserts or updates a vote (upsert)
 // Updates articles.upvotes and articles.downvotes counts atomically
 // Implements Phase 3 voting logic with user auto-creation
-func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleID string, voteType string) error {
+func (r *voteRepository) RecordVote(ctx context.Context, userID string, articleID string, voteType string) error {
 	// Validate vote type
 	if voteType != "upvote" && voteType != "downvote" {
 		return fmt.Errorf("invalid vote type: %s (must be 'upvote' or 'downvote')", voteType)
@@ -153,7 +153,7 @@ func (r *VoteRepository) RecordVote(ctx context.Context, userID string, articleI
 }
 
 // RemoveVote deletes a vote and updates article counts
-func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleID string) error {
+func (r *voteRepository) RemoveVote(ctx context.Context, userID string, articleID string) error {
 
 	// Start a transaction to ensure atomicity
 	tx, err := r.db.Begin(ctx)
@@ -220,7 +220,7 @@ func (r *VoteRepository) RemoveVote(ctx context.Context, userID string, articleI
 }
 
 // GetVoteCounts returns upvote/downvote counts for an article
-func (r *VoteRepository) GetVoteCounts(ctx context.Context, articleID string) (upvotes int, downvotes int, err error) {
+func (r *voteRepository) GetVoteCounts(ctx context.Context, articleID string) (upvotes int, downvotes int, err error) {
 	query := `SELECT upvotes, downvotes FROM articles WHERE id = $1`
 
 	err = r.db.QueryRow(ctx, query, articleID).Scan(&upvotes, &downvotes)
@@ -236,7 +236,7 @@ func (r *VoteRepository) GetVoteCounts(ctx context.Context, articleID string) (u
 
 // GetUserVote returns the user's vote for an article (if any)
 // Returns empty string if user hasn't voted
-func (r *VoteRepository) GetUserVote(ctx context.Context, userID string, articleID string) (voteType string, err error) {
+func (r *voteRepository) GetUserVote(ctx context.Context, userID string, articleID string) (voteType string, err error) {
 	query := `SELECT vote_type FROM votes WHERE user_id = $1 AND article_id = $2`
 
 	err = r.db.QueryRow(ctx, query, userID, articleID).Scan(&voteType)

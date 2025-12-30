@@ -20,13 +20,13 @@ import (
 // The Kagi Small Web collection is a curated list of high-quality,
 // independent web feeds that forms the basis of content discovery.
 type FeedSyncer struct {
-	repo       *db.FeedRepository
+	repo       db.FeedRepositoryInterface
 	kagiURL    string
 	httpClient *http.Client
 }
 
 // NewFeedSyncer creates a new FeedSyncer
-func NewFeedSyncer(repo *db.FeedRepository, kagiURL string) *FeedSyncer {
+func NewFeedSyncer(repo db.FeedRepositoryInterface, kagiURL string) *FeedSyncer {
 	return &FeedSyncer{
 		repo:    repo,
 		kagiURL: kagiURL,

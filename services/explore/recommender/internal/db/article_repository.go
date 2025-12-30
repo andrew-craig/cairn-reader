@@ -12,26 +12,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ArticleRepository handles article database operations
-type ArticleRepository struct {
+// articleRepository handles article database operations
+type articleRepository struct {
 	db             *pgxpool.Pool
-	userRepository *UserRepository
+	userRepository UserRepositoryInterface
 }
 
 // NewArticleRepository creates a new article repository
-func NewArticleRepository(db *pgxpool.Pool) *ArticleRepository {
-	return &ArticleRepository{db: db}
+func NewArticleRepository(db *pgxpool.Pool) ArticleRepositoryInterface {
+	return &articleRepository{db: db}
 }
 
 // SetUserRepository sets the user repository (for dependency injection after creation)
-func (r *ArticleRepository) SetUserRepository(userRepo *UserRepository) {
+func (r *articleRepository) SetUserRepository(userRepo UserRepositoryInterface) {
 	r.userRepository = userRepo
 }
 
 // Create inserts a new article into the database
 // Implements Phase 2 deduplication: ON CONFLICT (link) DO UPDATE
 // Preserves vote counts, recommends, and deleted status on updates
-func (r *ArticleRepository) Create(ctx context.Context, article models.Article) error {
+func (r *articleRepository) Create(ctx context.Context, article models.Article) error {
 	query := `
 		INSERT INTO articles (
 			id, title, link, description, content, author, published,
@@ -72,7 +72,7 @@ func (r *ArticleRepository) Create(ctx context.Context, article models.Article) 
 // CreateBatch inserts multiple articles into the database
 // Implements Phase 2 deduplication: ON CONFLICT (link) DO UPDATE
 // Preserves vote counts, recommends, and deleted status on updates
-func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
+func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
 	if len(articles) == 0 {
 		return nil
 	}
@@ -130,7 +130,7 @@ func (r *ArticleRepository) CreateBatch(ctx context.Context, articles []models.A
 }
 
 // GetByID retrieves an article by its ID
-func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Article, error) {
+func (r *articleRepository) GetByID(ctx context.Context, id string) (*models.Article, error) {
 	query := `
 		SELECT id, title, link, description, content, author, published, feed_url, feed_title, categories, feed_id,
 		       upvotes, downvotes, recommends, deleted, created_at, updated_at
@@ -171,7 +171,7 @@ func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Art
 }
 
 // GetRecent retrieves the most recent articles
-func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.Article, error) {
+func (r *articleRepository) GetRecent(ctx context.Context, limit int) ([]models.Article, error) {
 	query := `
 		SELECT id, title, link, description, content, author, published, feed_url, feed_title, categories, feed_id,
 		       upvotes, downvotes, recommends, deleted, created_at, updated_at
@@ -190,7 +190,7 @@ func (r *ArticleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 }
 
 // GetUnreadForUser retrieves unread articles for a user
-func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, userID string, limit int) ([]models.Article, error) {
+func (r *articleRepository) GetUnreadForUser(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -213,7 +213,7 @@ func (r *ArticleRepository) GetUnreadForUser(ctx context.Context, userID string,
 
 // GetForRecommendation retrieves articles suitable for recommendation
 // Excludes deleted articles and articles already recommended to the user
-func (r *ArticleRepository) GetForRecommendation(ctx context.Context, userID string, limit int) ([]models.Article, error) {
+func (r *articleRepository) GetForRecommendation(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -249,7 +249,7 @@ func (r *ArticleRepository) GetForRecommendation(ctx context.Context, userID str
 
 // GetLowExposureArticles retrieves articles with the lowest recommend counts
 // Used for exploration/discovery in recommendation algorithm
-func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, userID string, limit int) ([]models.Article, error) {
+func (r *articleRepository) GetLowExposureArticles(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `
 		SELECT a.id, a.title, a.link, a.description, a.content, a.author, a.published,
 		       a.feed_url, a.feed_title, a.categories, a.feed_id,
@@ -272,7 +272,7 @@ func (r *ArticleRepository) GetLowExposureArticles(ctx context.Context, userID s
 }
 
 // IncrementRecommendCount increments the recommends counter for an article
-func (r *ArticleRepository) IncrementRecommendCount(ctx context.Context, articleID string) error {
+func (r *articleRepository) IncrementRecommendCount(ctx context.Context, articleID string) error {
 	query := `
 		UPDATE articles
 		SET recommends = recommends + 1
@@ -293,7 +293,7 @@ func (r *ArticleRepository) IncrementRecommendCount(ctx context.Context, article
 
 // RecordRecommendation tracks that an article was recommended to a user
 // Uses ON CONFLICT DO NOTHING to handle duplicate recommendations gracefully
-func (r *ArticleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) error {
+func (r *articleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) error {
 	query := `
 		INSERT INTO recommendations (user_id, article_id, recommended_at)
 		VALUES ($1, $2, NOW())
@@ -310,7 +310,7 @@ func (r *ArticleRepository) RecordRecommendation(ctx context.Context, userID str
 
 // MarkOldArticlesAsDeleted sets deleted=true for articles older than N days
 // Returns the number of articles marked as deleted
-func (r *ArticleRepository) MarkOldArticlesAsDeleted(ctx context.Context, days int) (int, error) {
+func (r *articleRepository) MarkOldArticlesAsDeleted(ctx context.Context, days int) (int, error) {
 	query := `
 		UPDATE articles
 		SET deleted = true, updated_at = NOW()
@@ -329,7 +329,7 @@ func (r *ArticleRepository) MarkOldArticlesAsDeleted(ctx context.Context, days i
 // HardDeleteOldArticles permanently removes articles older than N days
 // This is for maintenance and should be used with caution
 // Returns the number of articles deleted
-func (r *ArticleRepository) HardDeleteOldArticles(ctx context.Context, days int) (int, error) {
+func (r *articleRepository) HardDeleteOldArticles(ctx context.Context, days int) (int, error) {
 	query := `
 		DELETE FROM articles
 		WHERE created_at < NOW() - INTERVAL '1 day' * $1
@@ -345,7 +345,7 @@ func (r *ArticleRepository) HardDeleteOldArticles(ctx context.Context, days int)
 }
 
 // scanArticles is a helper to scan multiple article rows
-func (r *ArticleRepository) scanArticles(rows pgx.Rows) ([]models.Article, error) {
+func (r *articleRepository) scanArticles(rows pgx.Rows) ([]models.Article, error) {
 	articles := make([]models.Article, 0)
 
 	for rows.Next() {

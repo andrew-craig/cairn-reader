@@ -16,16 +16,16 @@ import (
 // Server holds the API server dependencies
 type Server struct {
 	db             *pgxpool.Pool
-	articleRepo    *db.ArticleRepository
-	userRepo       *db.UserRepository
-	voteRepo       *db.VoteRepository
+	articleRepo    db.ArticleRepositoryInterface
+	userRepo       db.UserRepositoryInterface
+	voteRepo       db.VoteRepositoryInterface
 	engine         *recommend.Engine
 	authMiddleware *auth.Middleware
 	logger         *slog.Logger
 }
 
 // NewServer creates a new API server
-func NewServer(database *pgxpool.Pool, articleRepo *db.ArticleRepository, userRepo *db.UserRepository, voteRepo *db.VoteRepository, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
+func NewServer(database *pgxpool.Pool, articleRepo db.ArticleRepositoryInterface, userRepo db.UserRepositoryInterface, voteRepo db.VoteRepositoryInterface, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
 	return &Server{
 		db:             database,
 		articleRepo:    articleRepo,
