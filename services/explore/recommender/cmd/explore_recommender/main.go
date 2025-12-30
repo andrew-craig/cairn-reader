@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -15,23 +14,29 @@ import (
 	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/cleanup"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/config"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
 )
 
 func main() {
+	// Load and validate configuration
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load configuration", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	// Initialize structured logger
 	logger := logging.NewLogger(logging.Config{
-		Level:       getEnv("LOG_LEVEL", "info"),
-		Format:      getEnv("LOG_FORMAT", "text"),
+		Level:       cfg.Logging.Level,
+		Format:      cfg.Logging.Format,
 		ServiceName: "recommender",
 	})
 	logging.SetDefault(logger)
 
-	port := getEnv("PORT", "8081")
-
 	slog.Info("starting service",
-		slog.String("port", port),
+		slog.String("port", cfg.Server.Port),
 	)
 
 	// Run database migrations
@@ -50,11 +55,11 @@ func main() {
 
 	// Database configuration
 	dbConfig := db.Config{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "cairn"),
-		Password: getEnv("DB_PASSWORD", "cairn_password"),
-		DBName:   getEnv("DB_NAME", "cairn_db"),
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password,
+		DBName:   cfg.Database.DBName,
 	}
 
 	// Connect to database
@@ -70,16 +75,12 @@ func main() {
 	defer database.Close()
 
 	// Initialize Vault client and fetch JWT public key for authentication
-	vaultAddr := getEnv("VAULT_ADDR", "http://localhost:8200")
-	vaultToken := getEnv("VAULT_TOKEN", "")
-	publicKeyPath := getEnv("JWT_PUBLIC_KEY_PATH", "secret/jwt/public-key")
-
 	slog.Info("connecting to vault",
-		slog.String("address", vaultAddr),
+		slog.String("address", cfg.Vault.Address),
 	)
 	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
-		Address: vaultAddr,
-		Token:   vaultToken,
+		Address: cfg.Vault.Address,
+		Token:   cfg.Vault.Token,
 	})
 	if err != nil {
 		slog.Error("failed to create vault client", slog.Any("error", err))
@@ -88,9 +89,9 @@ func main() {
 
 	// Fetch JWT public key from Vault
 	slog.Info("fetching JWT public key from vault",
-		slog.String("path", publicKeyPath),
+		slog.String("path", cfg.Vault.PublicKeyPath),
 	)
-	publicKey, err := vaultClient.GetPublicKey(publicKeyPath)
+	publicKey, err := vaultClient.GetPublicKey(cfg.Vault.PublicKeyPath)
 	if err != nil {
 		slog.Error("failed to get JWT public key from vault", slog.Any("error", err))
 		os.Exit(1)
@@ -111,19 +112,18 @@ func main() {
 	recommendEngine := recommend.NewEngine(articleRepo, userRepo)
 
 	// Initialize article cleanup job
-	retentionDays := getEnvAsInt("ARTICLE_RETENTION_DAYS", 90)
 	cleanupInterval := 24 * time.Hour // Run cleanup once per day
-	cleanupJob := cleanup.NewArticleCleanup(articleRepo, retentionDays, cleanupInterval)
+	cleanupJob := cleanup.NewArticleCleanup(articleRepo, cfg.ArticleRetentionDays, cleanupInterval)
 	cleanupJob.Start()
 	slog.Info("article cleanup job started",
-		slog.Int("retention_days", retentionDays),
+		slog.Int("retention_days", cfg.ArticleRetentionDays),
 		slog.Duration("interval", cleanupInterval),
 	)
 
 	// Initialize API server with auth middleware
 	server := api.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, logger)
 	httpServer := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + cfg.Server.Port,
 		Handler:      server.Routes(),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -141,7 +141,7 @@ func main() {
 		// Stop cleanup job
 		cleanupJob.Stop()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 		defer cancel()
 
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
@@ -150,34 +150,10 @@ func main() {
 	}()
 
 	slog.Info("service ready to accept requests",
-		slog.String("port", port),
+		slog.String("port", cfg.Server.Port),
 	)
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error", slog.Any("error", err))
 		os.Exit(1)
 	}
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvAsInt(key string, defaultValue int) int {
-	valueStr := os.Getenv(key)
-	if valueStr == "" {
-		return defaultValue
-	}
-	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		slog.Warn("invalid environment variable value",
-			slog.String("key", key),
-			slog.String("value", valueStr),
-			slog.Int("default", defaultValue),
-		)
-		return defaultValue
-	}
-	return value
 }

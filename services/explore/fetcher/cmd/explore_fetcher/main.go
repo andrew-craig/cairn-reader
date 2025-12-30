@@ -19,6 +19,7 @@ import (
 
 	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/client"
+	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/config"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/fetcher"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/sync"
@@ -27,23 +28,24 @@ import (
 )
 
 func main() {
+	// Load and validate configuration
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("failed to load configuration", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	// Initialize structured logger
 	logger := logging.NewLogger(logging.Config{
-		Level:       getEnv("LOG_LEVEL", "info"),
-		Format:      getEnv("LOG_FORMAT", "text"),
+		Level:       cfg.Logging.Level,
+		Format:      cfg.Logging.Format,
 		ServiceName: "fetcher",
 	})
 	logging.SetDefault(logger)
 
-	// Load configuration from environment variables with sensible defaults
-	port := getEnv("PORT", "8080")
-	recommenderURL := getEnv("RECOMMENDER_URL", "http://localhost:8081")
-	fetchInterval := getEnvDuration("FETCH_INTERVAL", 60) // Default: 60 seconds (1 feed per minute)
-	kagiFeedURL := getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt")
-
 	slog.Info("starting service",
-		slog.String("port", port),
-		slog.Duration("fetch_interval", fetchInterval),
+		slog.String("port", cfg.Server.Port),
+		slog.Duration("fetch_interval", cfg.FetchInterval),
 	)
 
 	// Run database migrations
@@ -63,7 +65,13 @@ func main() {
 	// Initialize database connection
 	ctx := context.Background()
 	slog.Info("connecting to database")
-	dbConfig := db.NewConfigFromEnv()
+	dbConfig := &db.Config{
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password,
+		DBName:   cfg.Database.DBName,
+	}
 	database, err := dbConfig.Connect(ctx)
 	if err != nil {
 		slog.Error("failed to connect to database", slog.Any("error", err))
@@ -76,7 +84,7 @@ func main() {
 	feedRepo := db.NewFeedRepository(database)
 
 	// Initialize feed syncer and start daily sync
-	feedSyncer := sync.NewFeedSyncer(feedRepo, kagiFeedURL)
+	feedSyncer := sync.NewFeedSyncer(feedRepo, cfg.KagiFeedURL)
 
 	// Start background processes
 	bgCtx, cancel := context.WithCancel(context.Background())
@@ -91,10 +99,10 @@ func main() {
 	}()
 
 	// Initialize HTTP client for communicating with recommender service
-	recommenderClient := client.NewRecommenderClient(recommenderURL)
+	recommenderClient := client.NewRecommenderClient(cfg.RecommenderURL)
 
 	// Initialize fetcher with configurable interval
-	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient, fetchInterval)
+	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient, cfg.FetchInterval)
 
 	// Start background fetcher (fetches 1 feed per minute)
 	slog.Info("starting feed fetcher background task")
@@ -156,7 +164,7 @@ func main() {
 	})
 
 	server := &http.Server{
-		Addr:         ":" + port,
+		Addr:         ":" + cfg.Server.Port,
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -171,7 +179,7 @@ func main() {
 		slog.Info("shutting down service")
 		cancel()
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 		defer shutdownCancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {
@@ -180,7 +188,7 @@ func main() {
 	}()
 
 	slog.Info("service ready to accept requests",
-		slog.String("port", port),
+		slog.String("port", cfg.Server.Port),
 	)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("server error", slog.Any("error", err))
@@ -241,24 +249,4 @@ func readinessHandler(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) 
 
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
-}
-
-// getEnv retrieves an environment variable or returns a default value if not set
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// getEnvDuration parses an environment variable as seconds and returns it as a Duration.
-// If the variable is not set or cannot be parsed, returns the default value.
-// NOTE: The value is expected to be in seconds (e.g., "60" for 60 seconds)
-func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if duration, err := time.ParseDuration(value + "s"); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
 }

@@ -6,669 +6,20 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. OpenAPI Generation
-**Status:** Deferred from API migration (completed 2026-01-01)
-
-**Background:** During the API v1 migration, all services were updated to use standardized endpoints following `docs/API_MIGRATION_PLAN.md`. OpenAPI spec generation was identified as desirable but requires additional tooling setup.
-
-**Goal:** Generate OpenAPI 3.0 specifications automatically from code for all services.
-
-**Current State:**
-- All services have been migrated to API v1 endpoints
-- Manual OpenAPI specs exist but may be outdated:
-  - `services/explore/api/openapi.yaml` (needs splitting into fetcher/recommender)
-  - `services/users/api/openapi.yaml`
-  - `services/read/content/api/openapi.yaml`
-  - `services/read/fetcher/api/openapi.yaml`
-
-**Implementation Options:**
-
-**Option 1: Code Annotations (Recommended for Go services)**
-Use `swaggo/swag` for annotation-based spec generation:
-
-```bash
-go install github.com/swaggo/swag/cmd/swag@latest
-```
-
-Add annotations to handlers:
-```go
-// @Summary Get user recommendations
-// @Description Returns 5 personalized article recommendations
-// @Tags explore
-// @Accept json
-// @Produce json
-// @Param user_id path string true "User ID (UUID)"
-// @Success 200 {object} RecommendationResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /api/v1/explore/recommendation/{user_id} [get]
-// @Security BearerAuth
-func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
-    // handler code
-}
-```
-
-Generate specs:
-```bash
-cd services/explore/recommender
-swag init -g cmd/explore_recommender/main.go -o api/
-```
-
-**Option 2: Runtime Generation**
-Use `go-chi/docgen` for chi-based services (Read services):
-```bash
-go get github.com/go-chi/docgen
-```
-
-**Option 3: Manual Maintenance**
-Continue maintaining OpenAPI specs manually, using validation tools:
-```bash
-npx @apidevtools/swagger-cli validate services/*/api/openapi.yaml
-```
-
-**Tasks:**
-1. Choose code generation approach (Option 1 recommended)
-2. Split Explore service spec into separate fetcher/recommender specs
-3. Add annotations to all handler functions across services
-4. Create Makefile targets for spec generation
-5. Set up CI/CD to validate specs match implementation
-6. Update documentation with spec generation workflow
-
-**Benefits:**
-- Single source of truth (code drives documentation)
-- Automatic API client generation
-- Contract testing capabilities
-- Always up-to-date API documentation
-
-**Estimated Effort:** 8-12 hours across all services
-
 ---
 
 ## High Priority
 
-### 2. Update response formats to follow a standard
-
-Refer to the standard response format proposed in `docs/API_MIGRATION_PLAN.md`. Implement this for all API endpoints. Implement it by:
-1. changing the backend service
-2. changing the mobile app
-
-There is no need to worry about backward compatability or migrations. Assume all users will be on the new mobile app version
-
-### 3. Article Detail Screen
-The current implementation has a placeholder for article navigation:
-```typescript
-const handleArticlePress = (article: Article) => {
-  // TODO: Navigate to article detail screen
-  console.log('Article pressed:', article.id);
-};
-```
-
-**Required:**
-- Create `ArticleDetailScreen.tsx` to display article content
-- Fetch full article content including cleaned HTML
-- Display reading position and allow scrolling
-- Add navigation from ReadScreen to ArticleDetailScreen
-
-### 4. Add Article Functionality
-Remaining task to implement the Read section in the mobile app and connect it to the Read backend.
-
-The add button currently has a placeholder:
-```typescript
-const handleAddPress = () => {
-  // TODO: Navigate to add article screen or show add modal
-  console.log('Add pressed');
-};
-```
-
-**Required:**
-- Create modal or screen to add articles manually
-- Allow user to paste URL
-- Call `ReadService.addContentToUser()` with the URL
-- Refresh article list after adding
-
-### 5. Search Functionality
-The search button currently has a placeholder:
-```typescript
-const handleSearchPress = () => {
-  // TODO: Navigate to search screen
-  console.log('Search pressed');
-};
-```
-
-**Required:**
-- Create search screen or modal
-- Implement search input with debouncing
-- Call `ReadService.searchUserContents()` with query
-- Display search results
-
-### 6. Article Actions
-Users should be able to:
-- Mark articles as favorite (swipe action or button)
-- Delete articles (swipe action)
-- Change article status (unread → reading → completed → archived)
-
-**Implementation:**
-- Add swipe actions to ArticleRow component
-- Call `ReadService.updateUserContent()` for status/favorite changes
-- Call `ReadService.deleteUserContent()` for deletion
-- Update local state optimistically
-
-### 7. Filter/Sort Options
-The design shows filtering/sorting controls that are not yet implemented:
-- Filter by status (unread, reading, completed, archived)
-- Filter by favorites
-- Sort by date added, title, etc.
-
-**Implementation:**
-- Add filter UI in header
-- Update `ReadService.listUserContents()` calls with filter params
-- Persist filter preferences
-
-### 8. Sync with Explore Service
-Currently, articles from the Explore service are separate from the Read service. Need to implement:
-- When user saves article from Explore, add to Read service
-- Integration point in ExploreScreen to call `ReadService.addContentToUser()`
-
 ---
 
 ## Medium Priority
-
-### 9. Environment-Aware HTTPS Enforcement (Security - Phase 8)
-**Status:** Required from security hardening assessment
-**Priority:** Medium
-**Effort:** 1-2 hours
-
-**Background:** Phase 8 Security Hardening identified that the HTTPS enforcement middleware blocks non-HTTPS requests in all environments, including development. This prevents local development and testing without TLS certificates.
-
-**Issue:** The `RequireHTTPS()` middleware in `services/users/internal/middleware/security.go` is applied globally without environment awareness, causing all HTTP requests to return 403 Forbidden in development environments.
-
-**Current Code:**
-```go
-// services/users/internal/middleware/security.go:10-32
-func RequireHTTPS() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        if c.Request.TLS != nil {
-            c.Next()
-            return
-        }
-        if c.GetHeader("X-Forwarded-Proto") == "https" {
-            c.Next()
-            return
-        }
-        c.JSON(http.StatusForbidden, gin.H{"error": "HTTPS required"})
-        c.Abort()
-    }
-}
-```
-
-**Implementation:**
-
-Update middleware to check environment configuration:
-
-```go
-func RequireHTTPS(cfg *config.Config) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Skip HTTPS check in development
-        if cfg.Server.Environment == "development" {
-            c.Next()
-            return
-        }
-
-        // Enforce HTTPS in production/staging
-        if c.Request.TLS != nil {
-            c.Next()
-            return
-        }
-        if c.GetHeader("X-Forwarded-Proto") == "https" {
-            c.Next()
-            return
-        }
-        c.JSON(http.StatusForbidden, gin.H{"error": "HTTPS required"})
-        c.Abort()
-    }
-}
-```
-
-Update router initialization in `services/users/internal/handlers/router.go`:
-
-```go
-// Apply HTTPS enforcement based on environment
-if cfg.Server.Environment == "production" || cfg.Server.Environment == "staging" {
-    router.Use(middleware.RequireHTTPS(cfg))
-}
-```
-
-**Benefits:**
-- Allows HTTP in development for easier local testing
-- Maintains strict HTTPS enforcement in production
-- Reduces friction in development workflow
-- Aligns with 12-factor app principles
-
-**Testing:**
-1. Test development environment accepts HTTP requests
-2. Test production environment rejects HTTP requests
-3. Test X-Forwarded-Proto header handling for proxies
-4. Verify HSTS headers still applied in production
-
-**Reference:** See `services/users/SECURITY_ASSESSMENT.md` Section 7 for detailed analysis.
-
----
-
-### 10. Vault Dependency Resilience (Security - Phase 8)
-**Status:** Required from security hardening assessment
-**Priority:** Medium (High impact for production reliability)
-**Effort:** 4-6 hours
-
-**Background:** Phase 8 Security Hardening identified that the User Service fails immediately if HashiCorp Vault is unavailable, creating a single point of failure in distributed deployments.
-
-**Issue:** The service performs a hard exit if Vault initialization fails during startup, preventing graceful degradation or retry logic.
-
-**Current Code:**
-```go
-// services/users/cmd/user-service/main.go:53-59
-vaultClient, err := initializeVault(cfg)
-if err != nil {
-    slog.Error("failed to initialize vault", slog.Any("error", err))
-    os.Exit(1)  // Hard failure - no retry
-}
-```
-
-**Implementation:**
-
-**Option 1: Retry Logic with Exponential Backoff (Recommended)**
-
-```go
-func initializeVaultWithRetry(cfg *config.Config) (*auth.VaultClient, error) {
-    maxRetries := 5
-    baseDelay := 1 * time.Second
-    maxDelay := 30 * time.Second
-
-    var lastErr error
-    for attempt := 0; attempt < maxRetries; attempt++ {
-        vaultClient, err := initializeVault(cfg)
-        if err == nil {
-            slog.Info("vault initialized successfully", slog.Int("attempt", attempt+1))
-            return vaultClient, nil
-        }
-
-        lastErr = err
-        if attempt < maxRetries-1 {
-            delay := time.Duration(math.Pow(2, float64(attempt))) * baseDelay
-            if delay > maxDelay {
-                delay = maxDelay
-            }
-            slog.Warn("vault initialization failed, retrying",
-                slog.Int("attempt", attempt+1),
-                slog.Duration("retry_in", delay),
-                slog.Any("error", err))
-            time.Sleep(delay)
-        }
-    }
-
-    return nil, fmt.Errorf("failed to initialize vault after %d attempts: %w", maxRetries, lastErr)
-}
-```
-
-**Option 2: Graceful Degradation with Cached Keys**
-
-```go
-type VaultWrapper struct {
-    client     *auth.VaultClient
-    cachedKeys *auth.JWTKeyPair
-    mu         sync.RWMutex
-}
-
-func (v *VaultWrapper) GetJWTKeys(ctx context.Context) (*auth.JWTKeyPair, error) {
-    // Try Vault first
-    if v.client != nil {
-        keys, err := v.client.GetJWTKeys(ctx)
-        if err == nil {
-            v.cacheKeys(keys)
-            return keys, nil
-        }
-        slog.Warn("vault unavailable, using cached keys", slog.Any("error", err))
-    }
-
-    // Fallback to cached keys
-    v.mu.RLock()
-    defer v.mu.RUnlock()
-    if v.cachedKeys != nil {
-        return v.cachedKeys, nil
-    }
-
-    return nil, fmt.Errorf("vault unavailable and no cached keys")
-}
-```
-
-**Option 3: Health Check Degradation**
-
-```go
-// Update health check to report degraded status
-func (h *HealthHandler) Ready(c *gin.Context) {
-    dbHealthy := h.checkDatabase()
-    vaultHealthy := h.checkVault()
-
-    status := "healthy"
-    if !dbHealthy || !vaultHealthy {
-        status = "degraded"
-    }
-
-    c.JSON(http.StatusOK, gin.H{
-        "status": status,
-        "checks": gin.H{
-            "database": dbHealthy,
-            "vault":    vaultHealthy,
-        },
-    })
-}
-```
-
-**Recommended Approach:**
-Combine Option 1 (retry logic) with Option 3 (health check degradation):
-- Retry Vault connection on startup with exponential backoff
-- Report degraded status if Vault unavailable but service running
-- Log all Vault connectivity issues for monitoring
-
-**Benefits:**
-- Prevents cascading failures in distributed deployments
-- Improves service availability during Vault maintenance
-- Better alignment with cloud-native resilience patterns
-- Allows service to continue operating during temporary Vault outages
-
-**Testing:**
-1. Test startup with Vault unavailable (should retry and eventually fail gracefully)
-2. Test runtime Vault failure (should use cached keys if available)
-3. Test health endpoint reports degraded status correctly
-4. Verify monitoring alerts trigger on Vault connectivity issues
-
-**Reference:** See `services/users/SECURITY_ASSESSMENT.md` Section 6 for detailed analysis.
-
----
-
-### 11. Standardize Security Event Logging (Security - Phase 8)
-**Status:** Required from security hardening assessment
-**Priority:** Medium (High importance for security monitoring)
-**Effort:** 3-4 hours
-
-**Background:** Phase 8 Security Hardening identified that critical security events use unstructured `fmt.Printf` statements instead of structured logging, making it difficult to monitor security events in production.
-
-**Issue:** Security-critical operations (token reuse detection, authorization failures, etc.) use inconsistent logging patterns that are hard to query and monitor.
-
-**Current Examples:**
-```go
-// services/users/internal/auth/refresh_token.go:158-160
-if err != nil {
-    fmt.Printf("failed to revoke token family on reuse: %v\n", err)
-}
-
-// Missing structured logging for:
-// - Token reuse detection
-// - Authorization failures
-// - Rate limit violations
-// - Failed authentication attempts
-// - Vault connectivity issues
-```
-
-**Implementation:**
-
-**1. Replace fmt.Printf with structured slog:**
-
-```go
-// services/users/internal/auth/refresh_token.go
-func (s *RefreshTokenService) ValidateAndRotateToken(...) {
-    if s.isTokenReused(tokenModel) {
-        // Log security event with structured data
-        slog.Warn("token_reuse_detected",
-            slog.String("user_id", tokenModel.UserID.String()),
-            slog.String("token_family", tokenModel.TokenFamily.String()),
-            slog.String("ip_address", ipAddress),
-            slog.String("device_info", deviceInfo),
-            slog.Time("last_used_at", *tokenModel.LastUsedAt),
-            slog.Time("detected_at", time.Now()),
-        )
-
-        // Revoke family
-        err := s.repo.RevokeTokenFamily(ctx, *tokenModel.TokenFamily)
-        if err != nil {
-            slog.Error("failed_to_revoke_token_family",
-                slog.String("user_id", tokenModel.UserID.String()),
-                slog.String("token_family", tokenModel.TokenFamily.String()),
-                slog.Any("error", err),
-            )
-        } else {
-            slog.Info("token_family_revoked",
-                slog.String("user_id", tokenModel.UserID.String()),
-                slog.String("token_family", tokenModel.TokenFamily.String()),
-                slog.String("reason", "token_reuse"),
-            )
-        }
-
-        return "", uuid.Nil, ErrTokenReused
-    }
-}
-```
-
-**2. Add structured logging to authentication handlers:**
-
-```go
-// services/users/internal/handlers/auth_handler.go
-func (h *AuthHandler) Login(c *gin.Context) {
-    var req LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        slog.Warn("login_invalid_request",
-            slog.String("ip", c.ClientIP()),
-            slog.Any("error", err),
-        )
-        c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request"})
-        return
-    }
-
-    response, err := h.authService.Login(c.Request.Context(), req.Email, req.Password, c.ClientIP(), "")
-    if err != nil {
-        slog.Warn("login_failed",
-            slog.String("email", req.Email),
-            slog.String("ip", c.ClientIP()),
-            slog.Any("error", err),
-        )
-        c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid credentials"})
-        return
-    }
-
-    slog.Info("login_successful",
-        slog.String("user_id", response.User.ID.String()),
-        slog.String("email", *response.User.Email),
-        slog.String("ip", c.ClientIP()),
-    )
-
-    c.JSON(http.StatusOK, response)
-}
-```
-
-**3. Add logging to authorization middleware:**
-
-```go
-// services/users/internal/middleware/authorization.go
-func RequireSameUser(c *gin.Context) {
-    requestingUserID, err := GetUserIDFromContext(c)
-    if err != nil {
-        slog.Warn("authorization_missing_user_id",
-            slog.String("path", c.Request.URL.Path),
-            slog.String("ip", c.ClientIP()),
-        )
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
-        c.Abort()
-        return
-    }
-
-    targetUserIDStr := c.Param("user_id")
-    targetUserID, err := uuid.Parse(targetUserIDStr)
-    if err != nil {
-        slog.Warn("authorization_invalid_user_id",
-            slog.String("target_user_id", targetUserIDStr),
-            slog.String("ip", c.ClientIP()),
-        )
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user ID format"})
-        c.Abort()
-        return
-    }
-
-    if requestingUserID != targetUserID {
-        slog.Warn("authorization_forbidden",
-            slog.String("requesting_user_id", requestingUserID.String()),
-            slog.String("target_user_id", targetUserID.String()),
-            slog.String("path", c.Request.URL.Path),
-            slog.String("ip", c.ClientIP()),
-        )
-        c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
-        c.Abort()
-        return
-    }
-
-    c.Next()
-}
-```
-
-**4. Add logging to rate limiting middleware:**
-
-```go
-// services/users/internal/middleware/rate_limit.go
-func (rl *RateLimiter) RateLimit(...) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        key := keyFunc(c)
-        if !rl.allow(key) {
-            slog.Warn("rate_limit_exceeded",
-                slog.String("key", key),
-                slog.String("path", c.Request.URL.Path),
-                slog.String("ip", c.ClientIP()),
-            )
-            c.JSON(http.StatusTooManyRequests, gin.H{
-                "error": "rate limit exceeded",
-                "retry_after": int(rl.window.Seconds()),
-            })
-            c.Abort()
-            return
-        }
-        c.Next()
-    }
-}
-```
-
-**5. Create security event constants:**
-
-```go
-// services/users/internal/security/events.go
-package security
-
-const (
-    EventLoginSuccess        = "login_successful"
-    EventLoginFailed         = "login_failed"
-    EventTokenReused         = "token_reuse_detected"
-    EventTokenFamilyRevoked  = "token_family_revoked"
-    EventAuthorizationFailed = "authorization_forbidden"
-    EventRateLimitExceeded   = "rate_limit_exceeded"
-    EventAccountUpgraded     = "account_upgraded"
-    EventAccountDeleted      = "account_deleted"
-)
-```
-
-**Benefits:**
-- Security events queryable in log aggregation systems (e.g., `event=token_reuse_detected`)
-- Easy to create alerts for specific security events
-- Structured data enables security analytics and dashboards
-- Consistent logging format across all security events
-- Better compliance with security logging requirements
-
-**Files to Update:**
-- `services/users/internal/auth/refresh_token.go` - Token reuse detection
-- `services/users/internal/handlers/auth_handler.go` - Authentication events
-- `services/users/internal/handlers/user_handler.go` - Account management events
-- `services/users/internal/middleware/authorization.go` - Authorization failures
-- `services/users/internal/middleware/rate_limit.go` - Rate limit violations
-
-**Testing:**
-1. Verify all security events emit structured logs
-2. Test log output is JSON-formatted in production mode
-3. Verify sensitive data (passwords, tokens) not logged
-4. Create test scenarios for each security event type
-
-**Reference:** See `services/users/SECURITY_ASSESSMENT.md` Section 8 for detailed analysis.
-
----
-
-### 12. Standardize Configuration Management
-**Files:**
-- `services/users/internal/config/config.go` (219 lines, sophisticated)
-- `services/explore/fetcher/cmd/fetcher/main.go` (inline getEnv calls)
-- `services/explore/recommender/cmd/recommender/main.go` (inline getEnv calls)
-
-**Issue:** User service has comprehensive configuration with validation, while explore services use simple inline environment variable reads.
-
-**Implementation:**
-
-Create `pkg/config/config.go` with shared patterns:
-```go
-package config
-
-import (
-    "fmt"
-    "os"
-    "strconv"
-)
-
-type DatabaseConfig struct {
-    Host     string
-    Port     string
-    User     string
-    Password string
-    DBName   string
-    SSLMode  string
-}
-
-func (c *DatabaseConfig) Validate() error {
-    if c.Host == "" {
-        return fmt.Errorf("DB_HOST is required")
-    }
-    if c.Port == "" {
-        return fmt.Errorf("DB_PORT is required")
-    }
-    // ... other validations
-    return nil
-}
-
-func LoadDatabaseConfig() (*DatabaseConfig, error) {
-    cfg := &DatabaseConfig{
-        Host:     getEnv("DB_HOST", "localhost"),
-        Port:     getEnv("DB_PORT", "5432"),
-        User:     getEnv("DB_USER", ""),
-        Password: getEnv("DB_PASSWORD", ""),
-        DBName:   getEnv("DB_NAME", ""),
-        SSLMode:  getEnv("DB_SSLMODE", "require"),
-    }
-
-    if err := cfg.Validate(); err != nil {
-        return nil, err
-    }
-
-    return cfg, nil
-}
-
-func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
-```
-
-Use in all services for consistent configuration handling with validation.
-
----
 
 ### 13. Consolidate Auth Middleware Implementations
 **Files:**
 - `services/users/internal/middleware/auth.go` (Gin framework)
 - `services/users/pkg/auth/middleware.go` (stdlib http)
 
-**Issue:** Two different auth middleware implementations exist with slight differences. 
+**Issue:** Two different auth middleware implementations exist with slight differences.
 
 **Current State:**
 ```go
@@ -688,8 +39,6 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 ```
 
 **Implementation:**
-
-To be confirmed - the read service users a third implementation. Validate and update before implementing
 
 Keep only `pkg/auth/middleware.go` (stdlib version) for reusability:
 1. Move stdlib middleware to `pkg/auth/middleware.go`
@@ -754,6 +103,53 @@ api.WriteError(w, http.StatusUnauthorized, "missing token", "AUTH_TOKEN_MISSING"
 ```
 
 Update all handlers to use consistent JSON error responses.
+
+---
+
+### 15. Add API Versioning
+**Files:** All API handlers in explore and user services
+
+**Issue:** No API versioning strategy exists. Current endpoints have no version prefix.
+
+**Current:**
+```
+/auth/login
+/explore/recommendations/{userID}
+```
+
+**Implementation:**
+
+1. Add `/v1/` prefix to all endpoints:
+```
+/v1/auth/login
+/v1/explore/recommendations/{userID}
+```
+
+2. Update route registration:
+```go
+// Before
+mux.HandleFunc("/explore/recommendations/", s.handleRecommendations)
+
+// After
+v1 := http.NewServeMux()
+v1.HandleFunc("/explore/recommendations/", s.handleRecommendations)
+mux.Handle("/v1/", http.StripPrefix("/v1", v1))
+```
+
+3. For Gin (user service):
+```go
+v1 := router.Group("/v1")
+{
+    auth := v1.Group("/auth")
+    {
+        auth.POST("/login", authHandler.Login)
+        auth.POST("/register", authHandler.Register)
+    }
+}
+```
+
+4. Keep current routes as aliases temporarily for backward compatibility
+5. Update all documentation and mobile app to use versioned endpoints
 
 ---
 
@@ -927,165 +323,8 @@ go test ./... -v -short       # Skip integration tests
 ```
 
 ---
-### 18. Update Postgres
-
-Update all Postgres databases (for all services) to Postgres 18. Resolve any conflicts during this migration.
-
----
 
 ## Low Priority
-
-### 25. Centralize Configuration Management in Read Service
-**Files:**
-- `services/read/content/cmd/content/main.go:89-126`
-- `services/read/fetcher/cmd/fetcher/main.go:89-126`
-
-**Issue:** Read Service implements configuration directly in main.go without centralized config package or validation. Engineering Principles recommend grouped config in `internal/config/config.go` following User Service pattern.
-
-**Current State:**
-```go
-// services/read/content/cmd/content/main.go
-type Config struct {
-    Port string
-    DB   database.Config
-}
-
-func loadConfig() Config {
-    return Config{
-        Port: getEnv("PORT", "8080"),
-        DB: database.Config{
-            Host:     getEnv("DB_HOST", "localhost"),
-            // ...
-        },
-    }
-}
-
-func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
-```
-
-**Implementation:**
-
-Create `services/read/content/internal/config/config.go`:
-```go
-package config
-
-import (
-    "fmt"
-    "os"
-    "strconv"
-
-    "github.com/andrew-craig/cairn/services/read/content/internal/database"
-)
-
-type Config struct {
-    Server   ServerConfig
-    Database database.Config
-}
-
-type ServerConfig struct {
-    Port string
-}
-
-func Load() (*Config, error) {
-    cfg := &Config{
-        Server: ServerConfig{
-            Port: getEnv("PORT", "8080"),
-        },
-        Database: database.Config{
-            Host:     getEnv("DB_HOST", "localhost"),
-            Port:     getEnvInt("DB_PORT", 5432),
-            User:     getEnv("DB_USER", "cairn_content"),
-            Password: getEnv("DB_PASSWORD", "cairn_content_pass"),
-            DBName:   getEnv("DB_NAME", "cairn_content"),
-            SSLMode:  getEnv("DB_SSL_MODE", "disable"),
-        },
-    }
-
-    if err := cfg.Validate(); err != nil {
-        return nil, fmt.Errorf("invalid configuration: %w", err)
-    }
-
-    return cfg, nil
-}
-
-func (c *Config) Validate() error {
-    if c.Server.Port == "" {
-        return fmt.Errorf("PORT is required")
-    }
-    if c.Database.Host == "" {
-        return fmt.Errorf("DB_HOST is required")
-    }
-    if c.Database.DBName == "" {
-        return fmt.Errorf("DB_NAME is required")
-    }
-    return nil
-}
-
-func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-    if value := os.Getenv(key); value != "" {
-        if intVal, err := strconv.Atoi(value); err == nil {
-            return intVal
-        }
-    }
-    return defaultValue
-}
-```
-
-Update main.go:
-```go
-package main
-
-import (
-    "github.com/andrew-craig/cairn/services/read/content/internal/config"
-    "github.com/andrew-craig/cairn/services/read/content/internal/database"
-)
-
-func main() {
-    // Load and validate configuration
-    cfg, err := config.Load()
-    if err != nil {
-        log.Fatalf("Failed to load configuration: %v", err)
-    }
-
-    // Initialize database with validated config
-    db, err := database.NewConnection(cfg.Database)
-    if err != nil {
-        log.Fatalf("Failed to connect to database: %v", err)
-    }
-    defer db.Close()
-
-    // Use cfg.Server.Port instead of cfg.Port
-    server := &http.Server{
-        Addr: ":" + cfg.Server.Port,
-        // ...
-    }
-}
-```
-
-Repeat for fetcher service.
-
-**Benefits:**
-- Centralized configuration management
-- Validation at startup prevents runtime errors
-- Consistent with User Service pattern
-- Easier to test configuration logic
-- Better organization
-
-**Note:** This is a low-priority improvement since the current approach is functional. Implement when refactoring or adding new configuration options.
-
----
 
 ### 12. Define Sentinel Errors for Common Cases
 **File:** `recommender/internal/db/article_repository.go`
@@ -1648,6 +887,7 @@ The following items have been successfully implemented and verified:
 - **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. This eliminates the coupling where explore service depended on users service code. Removed the `replace github.com/andrew-craig/cairn/services/users => ../users` directive from explore/go.mod. Updated imports in explore service (recommender) to use `pkg/auth` instead of `services/users/pkg/auth`. Added proper replace directives for pkg/auth, pkg/models, and pkg/logging in all service go.mod files. All services build successfully, eliminating the need for complex Dockerfile workarounds.
 - **Rename testhelpers to testutil for Consistency** - Renamed `internal/testhelpers/` to `internal/testutil/` in both Read Service components (content and fetcher). Updated package declarations and all import statements in integration test files. This aligns Read Service with documented standards and patterns used in User Service and Explore Service. All tests pass (content service tests pass completely; fetcher service has a pre-existing test failure in worker package unrelated to this change). Benefits include consistency across services, easier test utility discovery, and alignment with Go community conventions.
 - **Add Repository Interfaces to Explore Services** - Implemented repository interface pattern for all Explore service repositories, matching the pattern already used in User and Read services. Created `internal/db/interfaces.go` files defining `FeedRepositoryInterface` (fetcher), `ArticleRepositoryInterface`, `VoteRepositoryInterface`, and `UserRepositoryInterface` (recommender). Renamed concrete struct types to unexported names (e.g., `FeedRepository` → `feedRepository`) while keeping exported constructor functions that return interfaces. Updated all callers including handlers, recommendation engine, cleanup jobs, and sync components to use interface types instead of concrete types. Updated recommender cleanup command and integration test to use pgxpool.Pool for consistency with interface requirements. All services build successfully. Benefits include easier unit testing with mocks, better dependency injection, cleaner API surface, and consistency with established patterns across the codebase. Note: Read Service already follows this pattern correctly.
+- **Standardize Configuration Management** - Created shared `pkg/config/config.go` package with common configuration patterns including `DatabaseConfig`, `ServerConfig`, and `LoggingConfig` structs with validation methods. Implemented helper functions (`GetString`, `GetInt`, `GetBool`, `GetDuration`) for environment variable parsing. Created service-specific config packages for all services: `services/explore/fetcher/internal/config`, `services/explore/recommender/internal/config`, `services/read/content/internal/config`, and `services/read/fetcher/internal/config`. Each service config package uses the shared `pkg/config` package and adds service-specific configuration options. Updated all main.go files to use centralized configuration with validation at startup. Removed duplicate `getEnv` helper functions from all services. Added replace directives in service go.mod files to reference the shared config package. All services (explore/fetcher, explore/recommender, read/content, read/fetcher) build successfully. Benefits include centralized configuration management, validation at startup to prevent runtime errors, consistent patterns across all services, easier testing of configuration logic, and elimination of code duplication. This implementation combines tasks #12 (Standardize Configuration Management for Explore services) and #25 (Centralize Configuration Management in Read Service).
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
@@ -1687,6 +927,3 @@ The following items have been successfully implemented and verified:
 
 ### Documentation & Knowledge Sharing
 - **Document Read Service Technology Stack in Engineering Principles** - Added comprehensive documentation for Read Service specific libraries to `docs/ENGINEERING_PRINCIPLES.md`. Documented chi/v5 HTTP router, go-readability content extraction, bluemonday HTML sanitization, gobreaker circuit breaker, and robfig/cron job scheduling libraries. Updated HTTP Framework section to include all three frameworks (stdlib net/http, Gin, chi/v5) with rationale for each choice. Added "Why chi/v5?" section explaining architectural decision for lightweight router vs full framework.
-
-### Mobile App API Migration
-- **Update Mobile App to Use API v1 Endpoints** - Completed migration of all mobile app API clients to standardized API v1 endpoints. Updated User Service endpoints (`apps/mobile/src/services/auth.ts`) to use `/api/v1/auth/*` for all authentication operations (login, register, logout, refresh). Updated Explore Service endpoints (`apps/mobile/src/services/explore.ts`) to use `/api/v1/explore/*` for recommendations, voting, and read tracking - including breaking change where article_id moved from request body to URL path in mark-as-read endpoint. Updated Read Service endpoints (`apps/mobile/src/services/read.ts`) to use `/api/v1/content/*` for content management, search, and URL detection. All path parameters now use snake_case (`user_id`, `article_id`, `content_id`). Configuration properly set up in `apps/mobile/src/config/api.ts`. All API calls isolated in service files for maintainability. Mobile app is now fully compatible with the API v1 migration completed on 2026-01-01.
