@@ -15,7 +15,7 @@ import (
 	"github.com/andrew-craig/cairn/services/read/content/internal/api"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/content/internal/database"
-	"github.com/andrew-craig/cairn/services/read/content/internal/testhelpers"
+	"github.com/andrew-craig/cairn/services/read/content/internal/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func TestContentCreationIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	// Create test server
@@ -171,7 +171,7 @@ func TestUserContentIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	dbWrapper := &database.DB{DB: testDB.DB}
@@ -315,7 +315,7 @@ func TestSearchIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	dbWrapper := &database.DB{DB: testDB.DB}
@@ -421,7 +421,7 @@ func TestContentUpdatePropagation(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	dbWrapper := &database.DB{DB: testDB.DB}
@@ -556,7 +556,7 @@ func TestDeduplicationIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	dbWrapper := &database.DB{DB: testDB.DB}

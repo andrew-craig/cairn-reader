@@ -71,59 +71,6 @@ cp .env.example .env
 
 ## Medium Priority
 
-### 9. Rename testhelpers to testutil for Consistency
-**Files:**
-- `services/read/content/internal/testhelpers/database.go`
-- `services/read/fetcher/internal/testhelpers/database.go`
-- All test files importing testhelpers
-
-**Issue:** Read Service uses `internal/testhelpers/` while Engineering Principles document `internal/testutil/`. This creates inconsistency with other services and makes test utilities harder to find.
-
-**Current State:**
-```go
-// Read Service pattern (inconsistent)
-import "github.com/andrew-craig/cairn/services/read/content/internal/testhelpers"
-
-// Documented pattern (User Service, Explore Service)
-import "github.com/andrew-craig/cairn/users/internal/testutil"
-```
-
-**Implementation:**
-
-1. Rename directories:
-```bash
-cd services/read/content
-mv internal/testhelpers internal/testutil
-
-cd ../fetcher
-mv internal/testhelpers internal/testutil
-```
-
-2. Update all import statements:
-```bash
-# Find and replace in all test files
-find services/read -name "*_test.go" -exec sed -i 's/testhelpers/testutil/g' {} \;
-
-# Or use your IDE's refactor/rename feature
-```
-
-3. Verify tests still pass:
-```bash
-cd services/read/content
-go test ./...
-
-cd ../fetcher
-go test ./...
-```
-
-**Benefits:**
-- Consistency with documented standards
-- Matches User Service and Explore Service patterns
-- Easier for developers to locate test utilities
-- Follows Go community conventions
-
----
-
 ### 10. Standardize Database Architecture Pattern
 **Files:**
 - `infrastructure/docker/docker-compose.yml`
@@ -1320,6 +1267,7 @@ The following items have been successfully implemented and verified:
 - **Standardize Logging Library to log/slog in Read Service** - Migrated Read service from `go.uber.org/zap` to stdlib `log/slog`. Updated test file `cleanup_job_test.go` to use slog instead of zap for logger instantiation. Removed zap dependency from go.mod using `go mod edit -dropreplace` and `go mod tidy`. All tests pass and both services (content and fetcher) build successfully. Aligns with Engineering Principles preference for stdlib over external dependencies.
 - **Move Shared Models to Root Package** - Created `pkg/models/` at repository root and migrated all domain models (Article, User, Vote, Feed, RecommendationEvent) from `services/explore/pkg/models/`. Updated imports across explore service. Created go.mod for the new shared package. All services (explore, users, read) build successfully.
 - **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. This eliminates the coupling where explore service depended on users service code. Removed the `replace github.com/andrew-craig/cairn/services/users => ../users` directive from explore/go.mod. Updated imports in explore service (recommender) to use `pkg/auth` instead of `services/users/pkg/auth`. Added proper replace directives for pkg/auth, pkg/models, and pkg/logging in all service go.mod files. All services build successfully, eliminating the need for complex Dockerfile workarounds.
+- **Rename testhelpers to testutil for Consistency** - Renamed `internal/testhelpers/` to `internal/testutil/` in both Read Service components (content and fetcher). Updated package declarations and all import statements in integration test files. This aligns Read Service with documented standards and patterns used in User Service and Explore Service. All tests pass (content service tests pass completely; fetcher service has a pre-existing test failure in worker package unrelated to this change). Benefits include consistency across services, easier test utility discovery, and alignment with Go community conventions.
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
