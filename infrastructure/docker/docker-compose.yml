@@ -35,23 +35,60 @@ services:
     networks:
       - cairn-network
 
-  # PostgreSQL Database - Single instance for all services
-  postgres:
+  # User Service Database
+  users-db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}  # Default database
+      POSTGRES_USER: ${POSTGRES_USER_USERS}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_USERS}
+      POSTGRES_DB: ${POSTGRES_DB_USERS}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/00-init.sh
-      - ../../services/users/migrations:/docker-entrypoint-initdb.d/user-migrations
-      - ../../services/explore/recommender/migrations:/docker-entrypoint-initdb.d/recommender-migrations
-      - ../../services/explore/fetcher/migrations:/docker-entrypoint-initdb.d/fetcher-migrations
+      - users_db_data:/var/lib/postgresql/data
+      - ../../services/users/migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cairn -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_USERS} -d ${POSTGRES_DB_USERS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # Recommender Service Database
+  recommender-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_RECOMMENDER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RECOMMENDER}
+      POSTGRES_DB: ${POSTGRES_DB_RECOMMENDER}
+    ports:
+      - "5433:5432"
+    volumes:
+      - recommender_db_data:/var/lib/postgresql/data
+      - ../../services/explore/recommender/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RECOMMENDER} -d ${POSTGRES_DB_RECOMMENDER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # Fetcher Service Database
+  fetcher-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_FETCHER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_FETCHER}
+      POSTGRES_DB: ${POSTGRES_DB_FETCHER}
+    ports:
+      - "5434:5432"
+    volumes:
+      - fetcher_db_data:/var/lib/postgresql/data
+      - ../../services/explore/fetcher/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_FETCHER} -d ${POSTGRES_DB_FETCHER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,18 +104,18 @@ services:
       - "8082:8080"
     environment:
       - PORT=8080
-      - DB_HOST=postgres
+      - DB_HOST=users-db
       - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=cairn_users
+      - DB_USER=${POSTGRES_USER_USERS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_USERS}
+      - DB_NAME=${POSTGRES_DB_USERS}
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_ACCESS_LIFETIME=15m
       - JWT_REFRESH_LIFETIME=7d
       - SERVER_ENVIRONMENT=development
     depends_on:
-      postgres:
+      users-db:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
@@ -100,17 +137,18 @@ services:
       - "8081:8081"
     environment:
       - PORT=8081
-      - DB_HOST=postgres
+      - DB_HOST=recommender-db
       - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=cairn_recommender
+      - DB_USER=${POSTGRES_USER_RECOMMENDER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}
+      - DB_NAME=${POSTGRES_DB_RECOMMENDER}
+      - DB_SSLMODE=disable
       - ARTICLE_RETENTION_DAYS=90
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
-      postgres:
+      recommender-db:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
@@ -136,14 +174,15 @@ services:
       - FETCH_INTERVAL=60
       - FETCH_TIMEOUT=30
       - MAX_FETCH_ERRORS=10
-      - DB_HOST=postgres
+      - DB_HOST=fetcher-db
       - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=cairn_fetcher
+      - DB_USER=${POSTGRES_USER_FETCHER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
+      - DB_NAME=${POSTGRES_DB_FETCHER}
+      - DB_SSLMODE=disable
       - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
     depends_on:
-      postgres:
+      fetcher-db:
         condition: service_healthy
       recommender:
         condition: service_healthy
@@ -157,7 +196,9 @@ services:
       - cairn-network
 
 volumes:
-  postgres_data:
+  users_db_data:
+  recommender_db_data:
+  fetcher_db_data:
   vault-keys:
 
 networks:

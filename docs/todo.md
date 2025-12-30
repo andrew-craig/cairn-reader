@@ -71,42 +71,6 @@ cp .env.example .env
 
 ## Medium Priority
 
-### 10. Standardize Database Architecture Pattern
-**Files:**
-- `infrastructure/docker/docker-compose.yml`
-- `services/explore/docker-compose.yml`
-
-**Issue:** Two different deployment patterns exist for PostgreSQL databases, creating inconsistency.
-
-**Current State:**
-
-Explore service (separate instances - good pattern):
-```yaml
-postgres:           # Recommender DB
-  image: postgres:16-alpine
-  environment:
-    POSTGRES_DB: cairn_db
-
-fetcher_db:        # Separate instance for fetcher
-  image: postgres:16-alpine
-  environment:
-    POSTGRES_DB: fetcher_db
-```
-
-Infrastructure compose (single instance):
-```yaml
-postgres:          # Single instance
-  image: postgres:16-alpine
-  environment:
-    POSTGRES_DB: postgres
-  # Multiple databases created via init script
-```
-
-**Implementation:**
-Standardize on the explore service pattern (separate instances). Update infrastructure/docker-compose.yml to use separate PostgreSQL instances for each service, ensuring proper microservices isolation.
-
----
-
 ### 11. Add Repository Interfaces to Explore Services
 **Files:**
 - `services/explore/fetcher/internal/db/feed_repository.go`
@@ -1286,6 +1250,7 @@ The following items have been successfully implemented and verified:
 - **Implement Kubernetes-Style Health Endpoints** - Separate /health (liveness) and /ready (readiness) endpoints
 - **Add Request ID Propagation** - X-Request-ID header generation and context propagation for distributed tracing
 - **Validate User IDs as UUIDs** - UUID format validation in EnsureUserExists
+- **Standardize Database Architecture Pattern** - Migrated infrastructure docker-compose.yml from single PostgreSQL instance with multiple databases to separate PostgreSQL instances per service (users-db:5432, recommender-db:5433, fetcher-db:5434). This aligns with the microservices isolation pattern used in explore and read services. Benefits include independent scaling, better resource isolation, simplified deployment, and proper microservices boundaries. Updated .env.example with separate credentials for each database. Created MIGRATION.md guide for users upgrading from the old pattern. All services correctly depend on their specific database instances with proper health checks.
 
 ### Refactoring
 - **Delete Unused Gin Middleware** - Removed from explore service (user service middleware is actively used)
