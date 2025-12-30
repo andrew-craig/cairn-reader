@@ -418,8 +418,9 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 | `database/sql` | stdlib | Database abstraction | Standard library, no external deps |
 | `github.com/lib/pq` | v1.10.9 | PostgreSQL driver | Most mature Go postgres driver |
 | `github.com/jackc/pgx/v5` | v5.7.6 | PostgreSQL (User Service) | Better performance, native types |
-| `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
 | `net/http` | stdlib | HTTP (Explore Service) | Simple services don't need framework overhead |
+| `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
+| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (Read Service) | Lightweight, idiomatic, stdlib-compatible |
 | `log/slog` | stdlib | Structured logging | Standard library, structured, zero-config |
 | `github.com/golang-jwt/jwt/v5` | v5.3.0 | JWT tokens | Industry standard |
 | `github.com/mmcdole/gofeed` | v1.3.0 | RSS parsing | Handles multiple feed formats |
@@ -430,6 +431,23 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 - `testing` (stdlib) - All unit tests
 - `net/http/httptest` (stdlib) - HTTP handler testing
 - `github.com/stretchr/testify` (User Service) - Assertions and mocking
+
+**Read Service Specific Libraries:**
+
+| Library | Version | Purpose | Rationale |
+|---------|---------|---------|-----------|
+| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router | Lightweight, idiomatic Go, excellent middleware support, stdlib-compatible |
+| `github.com/go-shiori/go-readability` | latest | Content extraction | Extract readable content from HTML articles |
+| `github.com/microcosm-cc/bluemonday` | v1.0.27 | HTML sanitization | Security - XSS prevention, industry standard |
+| `github.com/sony/gobreaker` | v0.5.0 | Circuit breaker | Resilience for external API calls, prevents cascade failures |
+| `github.com/robfig/cron/v3` | v3.0.1 | Job scheduling | Background jobs (cleanup, polling), cron-compatible syntax |
+
+**Why chi/v5?**
+- Minimal overhead compared to full frameworks (Gin)
+- 100% compatible with stdlib http.Handler
+- Composable middleware chain
+- Path parameter extraction without string manipulation
+- Suitable for services with moderate routing needs (Read Service has ~10 endpoints)
 
 **Why Go?**
 - **Performance:** Fast startup, low memory footprint
