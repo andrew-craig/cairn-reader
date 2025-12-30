@@ -12,21 +12,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// FeedRepository handles database operations for feeds
-type FeedRepository struct {
+// feedRepository handles database operations for feeds
+type feedRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewFeedRepository creates a new FeedRepository
-func NewFeedRepository(db *pgxpool.Pool) *FeedRepository {
-	return &FeedRepository{db: db}
+// NewFeedRepository creates a new FeedRepositoryInterface
+func NewFeedRepository(db *pgxpool.Pool) FeedRepositoryInterface {
+	return &feedRepository{db: db}
 }
 
 // GetNextFeed returns the next feed to fetch
 // Prioritizes: 1) Never fetched (last_fetched_at IS NULL)
 //              2) Oldest fetched
 // Only returns enabled feeds
-func (r *FeedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) {
+func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) {
 	query := `
 		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, created_at, updated_at
 		FROM feeds
@@ -67,7 +67,7 @@ func (r *FeedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 }
 
 // UpdateFetchResult records fetch success or failure
-func (r *FeedRepository) UpdateFetchResult(ctx context.Context, feedID int, success bool) error {
+func (r *feedRepository) UpdateFetchResult(ctx context.Context, feedID int, success bool) error {
 	if success {
 		// Reset consecutive_failures to 0, update last_fetched_at
 		query := `
@@ -120,7 +120,7 @@ func (r *FeedRepository) UpdateFetchResult(ctx context.Context, feedID int, succ
 
 // ImportFeeds upserts feeds from Kagi list
 // Only adds new feeds, preserves existing feed metadata
-func (r *FeedRepository) ImportFeeds(ctx context.Context, feedURLs []string) error {
+func (r *feedRepository) ImportFeeds(ctx context.Context, feedURLs []string) error {
 	if len(feedURLs) == 0 {
 		return nil
 	}
@@ -161,7 +161,7 @@ func (r *FeedRepository) ImportFeeds(ctx context.Context, feedURLs []string) err
 }
 
 // ListFeeds returns all feeds with optional filtering
-func (r *FeedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]models.Feed, error) {
+func (r *feedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]models.Feed, error) {
 	query := `
 		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, created_at, updated_at
 		FROM feeds
@@ -207,7 +207,7 @@ func (r *FeedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]mod
 }
 
 // RecordFetchHistory logs fetch attempt details
-func (r *FeedRepository) RecordFetchHistory(ctx context.Context, feedID int, success bool, articlesFound, articlesSent int, errorMsg string) error {
+func (r *feedRepository) RecordFetchHistory(ctx context.Context, feedID int, success bool, articlesFound, articlesSent int, errorMsg string) error {
 	query := `
 		INSERT INTO fetch_history (feed_id, fetch_started_at, fetch_completed_at, success, articles_found, articles_sent, error_message)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -223,7 +223,7 @@ func (r *FeedRepository) RecordFetchHistory(ctx context.Context, feedID int, suc
 }
 
 // GetFeedByID returns a feed by its ID
-func (r *FeedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.Feed, error) {
+func (r *feedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.Feed, error) {
 	query := `
 		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, created_at, updated_at
 		FROM feeds
@@ -254,7 +254,7 @@ func (r *FeedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.F
 }
 
 // GetFeedStats returns statistics about feeds
-func (r *FeedRepository) GetFeedStats(ctx context.Context) (total, enabled, disabled, neverFetched int, err error) {
+func (r *feedRepository) GetFeedStats(ctx context.Context) (total, enabled, disabled, neverFetched int, err error) {
 	query := `
 		SELECT
 			COUNT(*) as total,

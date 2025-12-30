@@ -71,74 +71,6 @@ cp .env.example .env
 
 ## Medium Priority
 
-### 11. Add Repository Interfaces to Explore Services
-**Files:**
-- `services/explore/fetcher/internal/db/feed_repository.go`
-- `services/explore/recommender/internal/db/article_repository.go`
-- `services/explore/recommender/internal/db/vote_repository.go`
-
-**Issue:** User service defines repository interfaces for better testability, but explore services use concrete implementations directly.
-
-**User service pattern (good):**
-```go
-// users/internal/database/user_repository.go
-type UserRepository interface {
-    Create(ctx context.Context, user *models.User) error
-    GetByID(ctx context.Context, id string) (*models.User, error)
-    // ...
-}
-
-type postgresUserRepository struct {
-    db *pgxpool.Pool
-}
-```
-
-**Explore services (direct structs):**
-```go
-type FeedRepository struct {
-    db *sql.DB
-}
-```
-
-**Implementation:**
-
-1. Define interfaces in `internal/db/interfaces.go`:
-```go
-package db
-
-type FeedRepository interface {
-    Create(ctx context.Context, feed *models.Feed) error
-    List(ctx context.Context) ([]*models.Feed, error)
-    // ... other methods
-}
-
-type ArticleRepository interface {
-    Store(ctx context.Context, articles []*models.Article) error
-    GetRecommendations(ctx context.Context, userID string, limit int) ([]*models.Article, error)
-    // ... other methods
-}
-```
-
-2. Rename existing structs to implementation names:
-```go
-type postgresFeedRepository struct {
-    db *pgxpool.Pool
-}
-
-func NewFeedRepository(db *pgxpool.Pool) FeedRepository {
-    return &postgresFeedRepository{db: db}
-}
-```
-
-3. Update handlers to use interfaces instead of concrete types
-
-**Benefits:**
-- Easier unit testing with mocks
-- Better dependency injection
-- Cleaner API surface
-
----
-
 ### 12. Standardize Configuration Management
 **Files:**
 - `services/users/internal/config/config.go` (219 lines, sophisticated)
@@ -1232,6 +1164,7 @@ The following items have been successfully implemented and verified:
 - **Move Shared Models to Root Package** - Created `pkg/models/` at repository root and migrated all domain models (Article, User, Vote, Feed, RecommendationEvent) from `services/explore/pkg/models/`. Updated imports across explore service. Created go.mod for the new shared package. All services (explore, users, read) build successfully.
 - **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. This eliminates the coupling where explore service depended on users service code. Removed the `replace github.com/andrew-craig/cairn/services/users => ../users` directive from explore/go.mod. Updated imports in explore service (recommender) to use `pkg/auth` instead of `services/users/pkg/auth`. Added proper replace directives for pkg/auth, pkg/models, and pkg/logging in all service go.mod files. All services build successfully, eliminating the need for complex Dockerfile workarounds.
 - **Rename testhelpers to testutil for Consistency** - Renamed `internal/testhelpers/` to `internal/testutil/` in both Read Service components (content and fetcher). Updated package declarations and all import statements in integration test files. This aligns Read Service with documented standards and patterns used in User Service and Explore Service. All tests pass (content service tests pass completely; fetcher service has a pre-existing test failure in worker package unrelated to this change). Benefits include consistency across services, easier test utility discovery, and alignment with Go community conventions.
+- **Add Repository Interfaces to Explore Services** - Implemented repository interface pattern for all Explore service repositories, matching the pattern already used in User and Read services. Created `internal/db/interfaces.go` files defining `FeedRepositoryInterface` (fetcher), `ArticleRepositoryInterface`, `VoteRepositoryInterface`, and `UserRepositoryInterface` (recommender). Renamed concrete struct types to unexported names (e.g., `FeedRepository` → `feedRepository`) while keeping exported constructor functions that return interfaces. Updated all callers including handlers, recommendation engine, cleanup jobs, and sync components to use interface types instead of concrete types. Updated recommender cleanup command and integration test to use pgxpool.Pool for consistency with interface requirements. All services build successfully. Benefits include easier unit testing with mocks, better dependency injection, cleaner API surface, and consistency with established patterns across the codebase. Note: Read Service already follows this pattern correctly.
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)

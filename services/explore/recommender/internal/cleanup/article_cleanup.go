@@ -13,14 +13,14 @@ import (
 
 // ArticleCleanup handles periodic cleanup of old articles
 type ArticleCleanup struct {
-	articleRepo     *db.ArticleRepository
+	articleRepo     db.ArticleRepositoryInterface
 	retentionDays   int
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
 }
 
 // NewArticleCleanup creates a new article cleanup job
-func NewArticleCleanup(articleRepo *db.ArticleRepository, retentionDays int, cleanupInterval time.Duration) *ArticleCleanup {
+func NewArticleCleanup(articleRepo db.ArticleRepositoryInterface, retentionDays int, cleanupInterval time.Duration) *ArticleCleanup {
 	return &ArticleCleanup{
 		articleRepo:     articleRepo,
 		retentionDays:   retentionDays,

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -10,7 +9,7 @@ import (
 	"time"
 
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -44,11 +43,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer func() {
-		if err := database.Close(); err != nil {
-			log.Printf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 
 	// Initialize article repository
 	articleRepo := db.NewArticleRepository(database)
@@ -76,17 +71,18 @@ func main() {
 	log.Println("Cleanup completed successfully")
 }
 
-func connectDB(config db.Config) (*sql.DB, error) {
+func connectDB(config db.Config) (*pgxpool.Pool, error) {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		config.Host, config.Port, config.User, config.Password, config.DBName)
 
-	database, err := sql.Open("postgres", connStr)
+	ctx := context.Background()
+	database, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Test connection
-	if err := database.Ping(); err != nil {
+	if err := database.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 

@@ -9,19 +9,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// UserRepository handles user database operations
-type UserRepository struct {
+// userRepository handles user database operations
+type userRepository struct {
 	db *pgxpool.Pool
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(db *pgxpool.Pool) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *pgxpool.Pool) UserRepositoryInterface {
+	return &userRepository{db: db}
 }
 
 // EnsureUserExists creates a user if they don't already exist
 // This implements the auto-create user behavior required by Phase 3
-func (r *UserRepository) EnsureUserExists(ctx context.Context, userID string) error {
+func (r *userRepository) EnsureUserExists(ctx context.Context, userID string) error {
 	// Validate UUID format
 	if _, err := uuid.Parse(userID); err != nil {
 		return fmt.Errorf("invalid user ID format (must be UUID): %w", err)
@@ -42,7 +42,7 @@ func (r *UserRepository) EnsureUserExists(ctx context.Context, userID string) er
 }
 
 // MarkArticleAsRead marks an article as read for a user
-func (r *UserRepository) MarkArticleAsRead(ctx context.Context, userID, articleID string) error {
+func (r *userRepository) MarkArticleAsRead(ctx context.Context, userID, articleID string) error {
 	// Ensure user exists first
 	if err := r.EnsureUserExists(ctx, userID); err != nil {
 		return fmt.Errorf("failed to ensure user exists: %w", err)
@@ -65,7 +65,7 @@ func (r *UserRepository) MarkArticleAsRead(ctx context.Context, userID, articleI
 }
 
 // GetReadArticleIDs returns the IDs of articles a user has read
-func (r *UserRepository) GetReadArticleIDs(ctx context.Context, userID string) ([]string, error) {
+func (r *userRepository) GetReadArticleIDs(ctx context.Context, userID string) ([]string, error) {
 	query := `
 		SELECT article_id
 		FROM user_articles

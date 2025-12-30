@@ -3,7 +3,6 @@ package recommender_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -18,17 +17,16 @@ import (
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
-
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Integration test configuration
 type IntegrationTestSuite struct {
-	database    *sql.DB
+	database    *pgxpool.Pool
 	server      *httptest.Server
-	articleRepo *db.ArticleRepository
-	userRepo    *db.UserRepository
-	voteRepo    *db.VoteRepository
+	articleRepo db.ArticleRepositoryInterface
+	userRepo    db.UserRepositoryInterface
+	voteRepo    db.VoteRepositoryInterface
 	engine      *recommend.Engine
 }
 
@@ -43,13 +41,14 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost, dbPort, dbUser, dbPassword, dbName)
 
-	database, err := sql.Open("postgres", connStr)
+	ctx := context.Background()
+	database, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		t.Fatalf("Failed to connect to test database: %v", err)
 	}
 
 	// Verify connection
-	if err := database.Ping(); err != nil {
+	if err := database.Ping(ctx); err != nil {
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
 
@@ -92,12 +91,10 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 func (suite *IntegrationTestSuite) teardown() {
 	cleanupTestData(nil, suite.database)
 	suite.server.Close()
-	if err := suite.database.Close(); err != nil {
-		fmt.Printf("error closing database: %v\n", err)
-	}
+	suite.database.Close()
 }
 
-func cleanupTestData(t *testing.T, db *sql.DB) {
+func cleanupTestData(t *testing.T, db *pgxpool.Pool) {
 	queries := []string{
 		"DELETE FROM recommendations",
 		"DELETE FROM votes",
@@ -107,8 +104,9 @@ func cleanupTestData(t *testing.T, db *sql.DB) {
 		"DELETE FROM users",
 	}
 
+	ctx := context.Background()
 	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil && t != nil {
+		if _, err := db.Exec(ctx, query); err != nil && t != nil {
 			t.Logf("Warning: cleanup query failed: %v", err)
 		}
 	}
@@ -468,7 +466,7 @@ func TestDeletedArticlesExcluded(t *testing.T) {
 	}
 
 	// Mark the second article as deleted using SQL
-	_, err := suite.database.Exec("UPDATE articles SET deleted = true WHERE id = $1", deletedArticle.ID)
+	_, err := suite.database.Exec(ctx, "UPDATE articles SET deleted = true WHERE id = $1", deletedArticle.ID)
 	if err != nil {
 		t.Fatalf("Failed to mark article as deleted: %v", err)
 	}
