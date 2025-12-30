@@ -71,50 +71,6 @@ cp .env.example .env
 
 ## Medium Priority
 
-### 8. Document Read Service Technology Stack in Engineering Principles
-**File:** `docs/ENGINEERING_PRINCIPLES.md`
-
-**Issue:** Read Service uses several libraries not documented in the Engineering Principles Technology Stack section. This makes it unclear what libraries are approved and creates knowledge gaps for new developers.
-
-**Libraries Missing Documentation:**
-- `github.com/go-chi/chi/v5 v5.2.3` - HTTP router (core framework choice)
-- `github.com/sony/gobreaker v0.5.0` - Circuit breaker pattern
-- `github.com/robfig/cron/v3 v3.0.1` - Job scheduling
-- `github.com/microcosm-cc/bluemonday v1.0.27` - HTML sanitization
-- `github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0` - Content extraction
-
-**Implementation:**
-
-Add to `docs/ENGINEERING_PRINCIPLES.md` Technology Stack section (after line 440):
-
-```markdown
-### Read Service Specific Libraries
-
-| Library | Version | Purpose | Rationale |
-|---------|---------|---------|-----------|
-| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router | Lightweight, idiomatic Go, excellent middleware support, stdlib-compatible |
-| `github.com/go-shiori/go-readability` | latest | Content extraction | Extract readable content from HTML articles |
-| `github.com/microcosm-cc/bluemonday` | v1.0.27 | HTML sanitization | Security - XSS prevention, industry standard |
-| `github.com/sony/gobreaker` | v0.5.0 | Circuit breaker | Resilience for external API calls, prevents cascade failures |
-| `github.com/robfig/cron/v3` | v3.0.1 | Job scheduling | Background jobs (cleanup, polling), cron-compatible syntax |
-
-**Why chi/v5?**
-- Minimal overhead compared to full frameworks (Gin)
-- 100% compatible with stdlib http.Handler
-- Composable middleware chain
-- Path parameter extraction without string manipulation
-- Suitable for services with moderate routing needs (Read Service has ~10 endpoints)
-```
-
-Update the HTTP Framework section:
-```markdown
-| `net/http` | stdlib | HTTP (Explore Service) | Simple services don't need framework overhead |
-| `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
-| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (Read Service) | Lightweight, idiomatic, stdlib-compatible |
-```
-
----
-
 ### 9. Rename testhelpers to testutil for Consistency
 **Files:**
 - `services/read/content/internal/testhelpers/database.go`
@@ -1399,3 +1355,6 @@ The following items have been successfully implemented and verified:
     - Properly increments recommends counter for each recommendation
   - All unit tests pass in CI/CD without database dependency (use `-short` flag)
   - Integration tests validate end-to-end recommendation algorithm with real database
+
+### Documentation & Knowledge Sharing
+- **Document Read Service Technology Stack in Engineering Principles** - Added comprehensive documentation for Read Service specific libraries to `docs/ENGINEERING_PRINCIPLES.md`. Documented chi/v5 HTTP router, go-readability content extraction, bluemonday HTML sanitization, gobreaker circuit breaker, and robfig/cron job scheduling libraries. Updated HTTP Framework section to include all three frameworks (stdlib net/http, Gin, chi/v5) with rationale for each choice. Added "Why chi/v5?" section explaining architectural decision for lightweight router vs full framework.
