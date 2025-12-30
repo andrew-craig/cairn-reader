@@ -17,7 +17,7 @@ import (
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/testhelpers"
+	"github.com/andrew-craig/cairn/services/read/fetcher/internal/testutil"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -62,7 +62,7 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	feedRepo := repository.NewFeedRepository(testDB.DB)
@@ -212,7 +212,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	ctx := context.Background()
@@ -338,7 +338,7 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	ctx := context.Background()
@@ -524,7 +524,7 @@ func TestFeedPollingIntegration(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 
-	testDB := testhelpers.SetupTestDatabase(t)
+	testDB := testutil.SetupTestDatabase(t)
 	defer testDB.Cleanup()
 
 	ctx := context.Background()
