@@ -107,6 +107,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfigRef.current}
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
     </SafeAreaView>
   );

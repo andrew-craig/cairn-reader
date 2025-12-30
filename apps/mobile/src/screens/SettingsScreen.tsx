@@ -42,6 +42,7 @@ export const SettingsScreen: React.FC = () => {
   return (
     <ScrollView
       style={[GlobalStyles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: 100 }}
     >
       <View style={GlobalStyles.section}>
         <Text style={[GlobalStyles.sectionTitle, { color: colors.text }]}>
