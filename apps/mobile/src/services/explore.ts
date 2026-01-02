@@ -33,10 +33,6 @@ export interface VoteRequest {
   vote_type: 'upvote' | 'downvote';
 }
 
-export interface MarkAsReadRequest {
-  article_id: string;
-}
-
 export class ExploreService {
   private static async fetchWithAuth(
     url: string,
@@ -93,7 +89,7 @@ export class ExploreService {
       }
 
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/explore/recommendations/${userId}`
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/recommendation/${userId}`
       );
 
       if (!response.ok) {
@@ -114,10 +110,9 @@ export class ExploreService {
   static async markAsRead(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/explore/articles/read`,
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/read`,
         {
           method: 'POST',
-          body: JSON.stringify({ article_id: articleId } as MarkAsReadRequest),
         }
       );
 
@@ -137,7 +132,7 @@ export class ExploreService {
   ): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/explore/articles/${articleId}/vote`,
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'POST',
           body: JSON.stringify({ vote_type: voteType } as VoteRequest),
@@ -157,7 +152,7 @@ export class ExploreService {
   static async removeVote(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/explore/articles/${articleId}/vote`,
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'DELETE',
         }
@@ -178,7 +173,7 @@ export class ExploreService {
   ): Promise<{ upvotes: number; downvotes: number; user_vote?: string }> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/explore/articles/${articleId}/votes`
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`
       );
 
       if (!response.ok) {

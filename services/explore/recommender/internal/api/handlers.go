@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/pkg/models"
@@ -17,40 +19,56 @@ const (
 	maxSimpleRequestSize = 1 << 10  // 1KB for simple JSON requests
 )
 
-// handleHealth returns the health status (liveness probe)
+// handleLiveness returns the liveness status (liveness probe)
 // This endpoint indicates if the process is running
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+// Used by orchestrators to determine if the service should be restarted
+func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{
-		"status":  "healthy",
-		"service": "recommender",
+		"status": "healthy",
 	}); err != nil {
-		slog.Error("failed to encode health response", slog.Any("error", err))
+		slog.Error("failed to encode liveness response", slog.Any("error", err))
 	}
 }
 
-// handleReady returns the readiness status (readiness probe)
-// This endpoint checks if dependencies (database) are available
-func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
+// handleReadiness returns the readiness status (readiness probe)
+// This endpoint checks if dependencies (database, vault) are available
+// Returns 503 Service Unavailable if dependencies are unreachable
+// Used by load balancers to determine if traffic should be routed to this instance
+func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check database connectivity with 5s timeout
+	ctx, cancel := r.Context(), func() {}
+	if _, hasDeadline := r.Context().Deadline(); !hasDeadline {
+		var cancelFunc context.CancelFunc
+		ctx, cancelFunc = context.WithTimeout(r.Context(), 5*time.Second)
+		cancel = cancelFunc
+	}
+	defer cancel()
+
+	checks := make(map[string]string)
+	status := "healthy"
+	statusCode := http.StatusOK
+
 	// Check database connectivity
-	if err := s.db.Ping(r.Context()); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		if err := json.NewEncoder(w).Encode(map[string]string{
-			"status": "not ready",
-			"error":  "database unavailable",
-		}); err != nil {
-			slog.Error("failed to encode readiness response", slog.Any("error", err))
-		}
-		return
+	if err := s.db.Ping(ctx); err != nil {
+		checks["database"] = "error"
+		status = "unhealthy"
+		statusCode = http.StatusServiceUnavailable
+		slog.Warn("database health check failed", slog.Any("error", err))
+	} else {
+		checks["database"] = "ok"
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
-		"status":  "ready",
-		"service": "recommender",
+	// TODO: Add Vault connectivity check if needed
+	// For now, we only check database as Vault is only used at startup
+
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": status,
+		"checks": checks,
 	}); err != nil {
 		slog.Error("failed to encode readiness response", slog.Any("error", err))
 	}
@@ -140,6 +158,7 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleMarkAsRead marks an article as read for a user
+// POST /api/v1/explore/article/{article_id}/read
 func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -150,30 +169,15 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Limit request body size to prevent DoS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+	// Extract article ID from path: /api/v1/explore/article/{article_id}/read
+	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/read")
 
-	var payload struct {
-		ArticleID string `json:"article_id"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			slog.Warn("request body too large", slog.Int64("limit", maxBytesErr.Limit))
-			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if payload.ArticleID == "" {
+	if articleID == "" {
 		http.Error(w, "article_id is required", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.userRepo.MarkArticleAsRead(r.Context(), userID, payload.ArticleID); err != nil {
+	if err := s.userRepo.MarkArticleAsRead(r.Context(), userID, articleID); err != nil {
 		slog.Error("failed to mark article as read", slog.Any("error", err))
 		http.Error(w, "Failed to mark article as read", http.StatusInternalServerError)
 		return
@@ -190,7 +194,7 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleVote handles upvoting or downvoting an article
-// POST /explore/articles/:id/vote
+// POST /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -201,8 +205,8 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /explore/articles/{articleID}/vote
-	articleID := extractPathParam(r.URL.Path, "/explore/articles/", "/vote")
+	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
+	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
 		http.Error(w, "Article ID is required", http.StatusBadRequest)
@@ -249,7 +253,7 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRemoveVote removes a user's vote from an article
-// DELETE /explore/articles/:id/vote
+// DELETE /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -260,8 +264,8 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /explore/articles/{articleID}/vote
-	articleID := extractPathParam(r.URL.Path, "/explore/articles/", "/vote")
+	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
+	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
 		http.Error(w, "Article ID is required", http.StatusBadRequest)
@@ -285,19 +289,15 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetVotes returns vote counts for an article
-// GET /explore/articles/:id/votes
-//
-// NOTE: This endpoint is protected by auth middleware. The user_id query parameter
-// allows fetching the authenticated user's vote status. Consider using the JWT user ID
-// directly instead of the query parameter for better security.
+// GET /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract article ID from path: /explore/articles/{articleID}/votes
-	articleID := extractPathParam(r.URL.Path, "/explore/articles/", "/votes")
+	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
+	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
 		http.Error(w, "Article ID is required", http.StatusBadRequest)

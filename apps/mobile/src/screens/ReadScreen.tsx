@@ -1,69 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Alert } from 'react-native';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
+import { AddLinkModal } from '../components/AddLinkModal';
 import { Article } from '../types';
+import { ReadService } from '../services/read';
+
+const PAGE_SIZE = 20;
 
 export const ReadScreen: React.FC = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     loadReadArticles();
   }, []);
 
-  const loadReadArticles = async () => {
+  const loadReadArticles = async (reset = false) => {
     try {
-      // TODO: Replace with actual storage/API call
-      // For now, using mock data
-      const mockArticles: Article[] = [
-        {
-          id: '1',
-          title: "Agenda: Word's largest wooden structure to be burned as chips...",
-          author: 'Dezeen',
-          url: 'https://example.com/article1',
-          imageUrl: 'https://via.placeholder.com/64',
-          tags: [],
-          isRead: true,
-          isFavorite: false,
-          addedAt: Date.now(),
-        },
-        {
-          id: '2',
-          title: 'TBM 396: So You Want To Define "The Problem"?',
-          author: 'John Cutler from The Beautiful Mess',
-          url: 'https://example.com/article2',
-          imageUrl: 'https://via.placeholder.com/64',
-          tags: [],
-          isRead: true,
-          isFavorite: false,
-          addedAt: Date.now(),
-        },
-        {
-          id: '3',
-          title: 'TBM 396: So You Want To Define "The Problem"?',
-          author: 'John Cutler from The Beautiful Mess',
-          url: 'https://example.com/article3',
-          imageUrl: 'https://via.placeholder.com/64',
-          tags: [],
-          isRead: true,
-          isFavorite: false,
-          addedAt: Date.now(),
-        },
-      ];
-      setArticles(mockArticles);
+      const currentOffset = reset ? 0 : offset;
+
+      if (reset) {
+        setLoading(true);
+        setOffset(0);
+        setHasMore(true);
+      }
+
+      const response = await ReadService.listUserContents({
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+      });
+
+      const transformedArticles = response.contents.map((content) =>
+        ReadService.transformToArticle(content)
+      );
+
+      if (reset) {
+        setArticles(transformedArticles);
+      } else {
+        setArticles((prev) => [...prev, ...transformedArticles]);
+      }
+
+      // Check if there are more items to load
+      setHasMore(response.contents.length === PAGE_SIZE);
+      setOffset(currentOffset + response.contents.length);
     } catch (error) {
       console.error('Error loading read articles:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load articles. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadReadArticles();
-  };
+    loadReadArticles(true);
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && hasMore && !loading) {
+      setLoadingMore(true);
+      loadReadArticles(false);
+    }
+  }, [loadingMore, hasMore, loading, offset]);
 
   const handleArticlePress = (article: Article) => {
     // TODO: Navigate to article detail screen
@@ -71,8 +81,39 @@ export const ReadScreen: React.FC = () => {
   };
 
   const handleAddPress = () => {
-    // TODO: Navigate to add article screen or show add modal
-    console.log('Add pressed');
+    setModalVisible(true);
+  };
+
+  const handleAddArticle = async (url: string) => {
+    try {
+      await ReadService.addContentToUser({
+        url,
+        source_type: 'manual',
+      });
+
+      Alert.alert(
+        'Success',
+        'Article added successfully',
+        [{ text: 'OK' }]
+      );
+
+      // Refresh the list to show the new article
+      handleRefresh();
+    } catch (error) {
+      console.error('Error adding article:', error);
+      throw error; // Re-throw to let modal handle the error
+    }
+  };
+
+  const handleFindFeed = async (url: string) => {
+    // TODO: Implement feed discovery - will scan the URL for RSS/Atom feeds
+    // For now, show a placeholder message
+    Alert.alert(
+      'Coming Soon',
+      'Feed discovery will be implemented in a future update. For now, please use the RSS feed URL directly.',
+      [{ text: 'OK' }]
+    );
+    console.log('Find feed for URL:', url);
   };
 
   const handleSearchPress = () => {
@@ -88,15 +129,25 @@ export const ReadScreen: React.FC = () => {
   );
 
   return (
-    <ArticleListScreen
-      title="Read"
-      articles={articles}
-      loading={loading}
-      headerActions={headerActions}
-      onArticlePress={handleArticlePress}
-      onRefresh={handleRefresh}
-      refreshing={refreshing}
-      emptyMessage="No saved articles yet"
-    />
+    <>
+      <ArticleListScreen
+        title="Read"
+        articles={articles}
+        loading={loading}
+        headerActions={headerActions}
+        onArticlePress={handleArticlePress}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        emptyMessage="No saved articles yet"
+        onEndReached={handleLoadMore}
+        loadingMore={loadingMore}
+      />
+      <AddLinkModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onAddArticle={handleAddArticle}
+        onFindFeed={handleFindFeed}
+      />
+    </>
   );
 };

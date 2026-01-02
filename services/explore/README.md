@@ -6,12 +6,12 @@ A system for fetching RSS feeds and recommending content to users. These service
 
 This project consists of two microservices:
 
-### 1. Fetcher Service
+### 1. Explore Fetcher (explore_fetcher)
 - Discovers and fetches content from RSS feeds
 - Parses feed items and extracts relevant metadata
 - Sends discovered content to the Recommender service via HTTP API
 
-### 2. Recommender Service
+### 2. Explore Recommender (explore_recommender)
 - Receives content from the Fetcher service
 - Stores content in the PostgreSQL database
 - Implements recommendation algorithm to suggest the next 5 articles for users
@@ -75,11 +75,11 @@ go run cmd/recommender/main.go
 
 ## API Endpoints
 
-### Fetcher Service
+### Explore Fetcher (explore_fetcher)
 - `GET /health` - Health check
 - `POST /fetch` - Trigger manual fetch
 
-### Recommender Service
+### Explore Recommender (explore_recommender)
 - `GET /health` - Health check
 - `POST /explore/articles` - Submit new articles (called by fetcher)
 - `GET /explore/recommendations/:userID` - Get 5 recommended articles for a user

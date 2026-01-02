@@ -37,41 +37,44 @@ func NewServer(database *pgxpool.Pool, articleRepo db.ArticleRepositoryInterface
 	}
 }
 
-// Routes sets up the HTTP routes
+// Routes sets up the HTTP routes (v1 API)
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check endpoints - public
-	mux.HandleFunc("/health", s.handleHealth)
-	mux.HandleFunc("/ready", s.handleReady)
+	// Health check endpoints (Kubernetes-compatible) - public
+	mux.HandleFunc("/health/live", s.handleLiveness)
+	mux.HandleFunc("/health/ready", s.handleReadiness)
 
 	// Public API routes - no authentication required
-	mux.HandleFunc("/explore/articles", s.handleArticles)
+	mux.HandleFunc("/api/v1/explore/article", s.handleArticles)
 
 	// Protected API routes - require authentication
-	mux.Handle("/explore/recommendations/", s.authMiddleware.RequireAuth(
+	mux.Handle("/api/v1/explore/recommendation/", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(s.handleRecommendations),
 	))
-	mux.Handle("/explore/articles/read", s.authMiddleware.RequireAuth(
-		http.HandlerFunc(s.handleMarkAsRead),
-	))
 
-	// Voting routes (Phase 3) - require authentication
+	// Voting routes - require authentication
 	// Note: These routes need to be registered in a specific order for proper matching
-	mux.Handle("/explore/articles/", s.authMiddleware.RequireAuth(
+	mux.Handle("/api/v1/explore/article/", s.authMiddleware.RequireAuth(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Route voting endpoints based on path patterns and HTTP method
+			// Route voting and read endpoints based on path patterns and HTTP method
 			if strings.HasSuffix(r.URL.Path, "/vote") {
 				switch r.Method {
 				case http.MethodPost:
 					s.handleVote(w, r)
 				case http.MethodDelete:
 					s.handleRemoveVote(w, r)
+				case http.MethodGet:
+					s.handleGetVotes(w, r)
 				default:
 					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				}
-			} else if strings.HasSuffix(r.URL.Path, "/votes") {
-				s.handleGetVotes(w, r)
+			} else if strings.HasSuffix(r.URL.Path, "/read") {
+				if r.Method == http.MethodPost {
+					s.handleMarkAsRead(w, r)
+				} else {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				}
 			} else {
 				http.NotFound(w, r)
 			}

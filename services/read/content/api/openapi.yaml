@@ -22,7 +22,63 @@ tags:
     description: Bulk content operations for RSS Fetcher Service
 
 paths:
-  /api/v1/contents:
+  /health/live:
+    get:
+      summary: Liveness probe
+      description: Simple health check to verify the process is running
+      operationId: healthLive
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      description: Health check that verifies database connectivity and service readiness
+      operationId: healthReady
+      responses:
+        '200':
+          description: Service is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "ok"
+        '503':
+          description: Service is not ready (database unavailable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "unhealthy"
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: "error"
+
+  /api/v1/content:
     post:
       tags:
         - Contents
@@ -76,7 +132,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/contents/{id}:
+  /api/v1/content/{content_id}:
     get:
       tags:
         - Contents
@@ -84,7 +140,7 @@ paths:
       description: Retrieve a specific content item by its ID
       operationId: getContent
       parameters:
-        - name: id
+        - name: content_id
           in: path
           required: true
           schema:
@@ -118,7 +174,7 @@ paths:
       description: Update an existing content item (preserves user-content relationships)
       operationId: updateContent
       parameters:
-        - name: id
+        - name: content_id
           in: path
           required: true
           schema:
@@ -157,7 +213,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/contents/bulk:
+  /api/v1/content/bulk:
     post:
       tags:
         - Bulk Operations
@@ -190,7 +246,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/contents/check-duplicates:
+  /api/v1/content/check-duplicate:
     post:
       tags:
         - Bulk Operations
@@ -223,7 +279,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/users/{user_id}/contents:
+  /api/v1/content/user/{user_id}:
     get:
       tags:
         - User Contents
@@ -328,7 +384,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/users/{user_id}/contents/{content_id}:
+  /api/v1/content/user/{user_id}/{content_id}:
     patch:
       tags:
         - User Contents
@@ -419,7 +475,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/users/{user_id}/contents/search:
+  /api/v1/content/user/{user_id}/search:
     get:
       tags:
         - User Contents

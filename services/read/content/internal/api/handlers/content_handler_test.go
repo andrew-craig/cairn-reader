@@ -291,7 +291,7 @@ func TestUpdateContent_Success(t *testing.T) {
 
 	// Set up chi router context
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", contentID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -319,7 +319,7 @@ func TestUpdateContent_InvalidID(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "invalid-uuid")
+	rctx.URLParams.Add("content_id", "invalid-uuid")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -350,7 +350,7 @@ func TestUpdateContent_NotFound(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", contentID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -379,7 +379,7 @@ func TestUpdateContent_MissingFields(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", contentID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -413,7 +413,7 @@ func TestGetContent_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/contents/"+contentID.String(), nil)
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", contentID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -435,7 +435,7 @@ func TestGetContent_InvalidID(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/contents/invalid-uuid", nil)
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "invalid-uuid")
+	rctx.URLParams.Add("content_id", "invalid-uuid")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()
@@ -458,7 +458,7 @@ func TestGetContent_NotFound(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/contents/"+contentID.String(), nil)
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", contentID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	w := httptest.NewRecorder()

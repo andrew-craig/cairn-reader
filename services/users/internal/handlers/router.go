@@ -49,9 +49,9 @@ func Router(config RouterConfig) *gin.Engine {
 	authHandler := NewAuthHandler(config.AuthService)
 	userHandler := NewUserHandler(config.UserService)
 
-	// Health endpoints
-	router.GET("/health", healthHandler.HealthCheck)
-	router.GET("/ready", healthHandler.ReadyCheck)
+	// Health endpoints (Kubernetes-compatible)
+	router.GET("/health/live", healthHandler.LivenessCheck)
+	router.GET("/health/ready", healthHandler.ReadinessCheck)
 
 	// Set default rate limit values if not provided
 	authRateLimit := config.AuthRateLimit
@@ -63,30 +63,35 @@ func Router(config RouterConfig) *gin.Engine {
 		authRateLimitWindow = 1 * time.Minute // Default: 1 minute window
 	}
 
-	// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
-	// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
-	auth := router.Group("/auth")
-	auth.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
+	// API v1 routes
+	v1 := router.Group("/api/v1")
 	{
-		auth.POST("/register", authHandler.Register)           // Create account with email/password
-		auth.POST("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
-		auth.POST("/login", authHandler.Login)                 // Authenticate with email/password
-		auth.POST("/login/mobile", authHandler.LoginMobile)    // Authenticate with device ID
-		auth.POST("/refresh", authHandler.Refresh)             // Exchange refresh token for new access token
-		auth.POST("/logout", authHandler.Logout)               // Revoke a specific refresh token
-		// logout-all requires authentication since it needs to know which user's tokens to revoke
-		auth.POST("/logout-all", middleware.JWTAuth(config.JWTManager), authHandler.LogoutAll)
-	}
+		// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
+		// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
+		auth := v1.Group("/auth")
+		auth.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
+		{
+			auth.POST("/register", authHandler.Register)           // Create account with email/password
+			auth.POST("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
+			auth.POST("/login", authHandler.Login)                 // Authenticate with email/password
+			auth.POST("/login/mobile", authHandler.LoginMobile)    // Authenticate with device ID
+			auth.POST("/refresh", authHandler.Refresh)             // Exchange refresh token for new access token
+			auth.POST("/logout", authHandler.Logout)               // Revoke a specific refresh token
+			// logout-all requires authentication since it needs to know which user's tokens to revoke
+			auth.POST("/logout-all", middleware.JWTAuth(config.JWTManager), authHandler.LogoutAll)
+		}
 
-	// User management endpoints - all routes require JWT authentication
-	// Authorization (ensuring users can only access their own data) is handled in the service layer
-	users := router.Group("/users")
-	users.Use(middleware.JWTAuth(config.JWTManager))
-	{
-		users.GET("/:id", userHandler.GetUser)           // Get user profile
-		users.PATCH("/:id", userHandler.UpdateUser)      // Update user email
-		users.POST("/:id/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
-		users.DELETE("/:id", userHandler.DeleteUser)     // Delete user account and all associated data
+		// User management endpoints - all routes require JWT authentication
+		// Authorization (ensuring users can only access their own data) is handled in the service layer
+		// Note: Using :user_id parameter for consistency with API standards
+		users := v1.Group("/user")
+		users.Use(middleware.JWTAuth(config.JWTManager))
+		{
+			users.GET("/:user_id", userHandler.GetUser)           // Get user profile
+			users.PATCH("/:user_id", userHandler.UpdateUser)      // Update user email
+			users.POST("/:user_id/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
+			users.DELETE("/:user_id", userHandler.DeleteUser)     // Delete user account and all associated data
+		}
 	}
 
 	return router

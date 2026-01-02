@@ -9,6 +9,9 @@ export const API_CONFIG = {
   // Recommender service base URL
   RECOMMENDER_SERVICE_URL: 'https://cairn.seatrain.net',
 
+  // Read service base URL (Content Service)
+  READ_SERVICE_URL: 'https://cairn.seatrain.net',
+
   // Request timeout in milliseconds
   REQUEST_TIMEOUT: 30000,
 };

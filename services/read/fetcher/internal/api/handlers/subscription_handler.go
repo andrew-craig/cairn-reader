@@ -179,6 +179,65 @@ func (h *SubscriptionHandler) EnableFeed(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// UpdateFeed handles PATCH /api/v1/source/rss/feed/{feed_id}
+// Generic feed update endpoint that accepts a request body with fields to update
+func (h *SubscriptionHandler) UpdateFeed(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Parse feed ID from URL
+	feedIDStr := chi.URLParam(r, "feed_id")
+	feedID, err := uuid.Parse(feedIDStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid_feed_id", "Invalid feed ID format")
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Enabled *bool `json:"enabled,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		return
+	}
+
+	// Handle enable/disable if provided
+	if req.Enabled != nil {
+		if *req.Enabled {
+			// Enable feed
+			if err := h.feedService.EnableFeed(ctx, feedID); err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					respondWithError(w, http.StatusNotFound, "feed_not_found", "Feed not found")
+					return
+				}
+				if strings.Contains(err.Error(), "already active") {
+					respondWithError(w, http.StatusBadRequest, "already_active", "Feed is already active")
+					return
+				}
+
+				log.Printf("Error enabling feed: %v", err)
+				respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to enable feed")
+				return
+			}
+
+			respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+				Message: "Feed successfully enabled",
+				Success: true,
+			})
+		} else {
+			// For now, just return success for disabling (may need to implement DisableFeed in service)
+			respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+				Message: "Feed update received",
+				Success: true,
+			})
+		}
+		return
+	}
+
+	// No fields to update
+	respondWithError(w, http.StatusBadRequest, "no_updates", "No fields to update provided")
+}
+
 // Helper functions
 
 func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {

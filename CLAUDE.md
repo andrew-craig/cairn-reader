@@ -11,6 +11,42 @@ Cairn is a read-it-later application consisting of:
   - **Read Service**: Article storage and user-specific metadata
   - **User Service**: Authentication and account management
 
+## Quick Start - Running All Backend Services
+
+The easiest way to run all backend services is using the centralized Docker Compose setup:
+
+```bash
+cd infrastructure/docker
+
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env and set secure passwords
+
+# Start all services (Vault, databases, and all backend services)
+docker-compose up --build -d
+
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+This starts:
+- HashiCorp Vault (port 8200) with auto-initialization
+- All PostgreSQL databases (ports 5432-5436)
+- User Service (port 8082)
+- Explore Recommender Service (port 8081)
+- Explore Fetcher Service (port 8080)
+- Content Service (port 8083)
+- Ingest RSS Service (port 8085)
+- Background workers (ports 8084, 8086)
+
+See [infrastructure/docker/README.md](infrastructure/docker/README.md) for detailed documentation.
+
 ## Common Commands
 
 ### Mobile App (apps/mobile)
@@ -36,8 +72,8 @@ npm run type-check           # TypeScript type checking (tsc --noEmit)
 cd services/explore
 
 # Development (requires PostgreSQL running)
-make run-fetcher             # Start fetcher service (port 8080)
-make run-recommender         # Start recommender service (port 8081)
+make run-fetcher             # Start explore_fetcher service (port 8080)
+make run-recommender         # Start explore_recommender service (port 8081)
 make run-cleanup             # Run article cleanup utility
 
 # Build
@@ -151,13 +187,13 @@ Mobile App (React Native) → REST APIs → Backend Services
 The Explore service consists of two microservices with **separate databases**:
 
 ```
-Fetcher DB ← Fetcher Service (8080) → HTTP POST → Recommender Service (8081) → Recommender DB
+Fetcher DB ← Explore Fetcher (8080) → HTTP POST → Explore Recommender (8081) → Recommender DB
 ```
 
 **Key architectural principle**: Each service owns its own database. Services communicate only via HTTP APIs.
 
-- **Fetcher Service**: Manages feed sources in its own PostgreSQL database, fetches RSS content (1 feed/minute), sends successfully fetched articles to recommender via HTTP POST
-- **Recommender Service**: Stores articles in its own PostgreSQL database, manages user engagement (upvotes/downvotes), serves personalized recommendations
+- **Explore Fetcher** (explore_fetcher): Manages feed sources in its own PostgreSQL database, fetches RSS content (1 feed/minute), sends successfully fetched articles to recommender via HTTP POST
+- **Explore Recommender** (explore_recommender): Stores articles in its own PostgreSQL database, manages user engagement (upvotes/downvotes), serves personalized recommendations
 
 ### Mobile App Structure
 ```
@@ -255,7 +291,7 @@ interface Article {
 - Supports content deduplication by hash and feed ID
 - Full-text search with PostgreSQL GIN index
 
-**Read Service - RSS Fetcher Database** (`rss_fetcher_service`):
+**Read Service - Ingest RSS Database** (`ingest_rss`):
 - `feeds`: RSS feed metadata and polling configuration
 - `user_feeds`: User subscriptions to feeds (max 100 per user)
 - `feed_items`: Pending feed items for extraction
@@ -310,7 +346,7 @@ The Read service consists of two microservices:
 - Content size limit (5MB)
 - Orphaned content cleanup (90-day retention)
 
-**RSS Fetcher Service** (port 8081):
+**Ingest RSS Service** (ingest_rss, port 8081):
 - User feed subscriptions (100 feed limit per user)
 - Tiered polling strategy: hourly (active), 6-hourly (moderate), daily (quiet)
 - Auto-disable feeds after 7 consecutive error days
@@ -328,82 +364,129 @@ See: `services/read/README.md` for detailed documentation
 
 ## API Endpoints
 
-### Explore Service - Fetcher (port 8080)
+> **Note:** All services have been migrated to API v1 with standardized endpoints. Health checks now use `/health/live` (liveness) and `/health/ready` (readiness) for all services.
+
+### Explore Service - Explore Fetcher (explore_fetcher, port 8080)
 ```
-GET  /health              → Health check
-POST /fetch               → Manually trigger feed fetch
+# Health
+GET  /health/live                        → Liveness check
+GET  /health/ready                       → Readiness check (includes DB)
+
+# Feed Management
+POST /api/v1/explore/feed/fetch          → Manually trigger feed fetch
+POST /api/v1/explore/feed/sync           → Sync feeds from Kagi Small Web
+GET  /api/v1/explore/feed/stats          → Get feed statistics
 ```
 
-### Explore Service - Recommender (port 8081)
+### Explore Service - Explore Recommender (explore_recommender, port 8081)
 ```
-GET  /health                               → Health check
-POST /explore/articles                     → Submit articles (from fetcher)
-GET  /explore/recommendations/{userID}     → Get 5 recommendations (requires auth)
-POST /explore/articles/read                → Mark article as read (requires auth)
-     Body: {"article_id": "..."} (user_id from JWT)
-POST /explore/articles/{articleID}/vote    → Vote on article (requires auth)
+# Health
+GET  /health/live                                   → Liveness check
+GET  /health/ready                                  → Readiness check (includes DB)
+
+# Article Management
+POST /api/v1/explore/article                        → Submit article (from fetcher)
+     Body: {"id": "...", "link": "...", "title": "...", "description": "...", ...}
+
+# Recommendations
+GET  /api/v1/explore/recommendation/{user_id}       → Get 5 recommendations (requires auth)
+
+# User Interactions
+POST /api/v1/explore/article/{article_id}/read      → Mark article as read (requires auth)
+     user_id extracted from JWT
+
+POST /api/v1/explore/article/{article_id}/vote      → Vote on article (requires auth)
      Body: {"vote_type": "upvote|downvote"} (user_id from JWT)
-DELETE /explore/articles/{articleID}/vote  → Remove vote (requires auth)
-GET  /explore/articles/{articleID}/votes   → Get vote counts (requires auth)
+
+DELETE /api/v1/explore/article/{article_id}/vote    → Remove vote (requires auth)
+
+GET  /api/v1/explore/article/{article_id}/vote      → Get vote counts (requires auth)
 ```
 
-### User Service (port 8080)
+### User Service (port 8082)
 ```
+# Health
+GET  /health/live                            → Liveness check
+GET  /health/ready                           → Readiness check (DB + Vault connectivity)
+
 # Authentication
-POST /auth/register                    → Create account with email/password
-POST /auth/register/mobile             → Create mobile-only account (Expo device ID)
-POST /auth/login                       → Login and return tokens
-POST /auth/login/mobile                → Authenticate with device ID
-POST /auth/refresh                     → Exchange refresh token for new access token
-POST /auth/logout                      → Revoke specific refresh token
-POST /auth/logout-all                  → Revoke all refresh tokens
+POST /api/v1/auth/register                   → Create account with email/password
+POST /api/v1/auth/register/mobile            → Create mobile-only account (Expo device ID)
+POST /api/v1/auth/login                      → Login and return tokens
+POST /api/v1/auth/login/mobile               → Authenticate with device ID
+POST /api/v1/auth/refresh                    → Exchange refresh token for new access token
+POST /api/v1/auth/logout                     → Revoke specific refresh token
+POST /api/v1/auth/logout-all                 → Revoke all refresh tokens
 
 # User Management
-GET    /users/{id}                     → Get user profile (authenticated)
-PATCH  /users/{id}                     → Update user profile (authenticated)
-POST   /users/{id}/upgrade             → Add email/password to mobile-only account
-DELETE /users/{id}                     → Delete account (authenticated)
-
-# Health
-GET /health                            → Basic health check
-GET /ready                             → Readiness check (DB + Vault connectivity)
+GET    /api/v1/user/{user_id}                → Get user profile (authenticated)
+PATCH  /api/v1/user/{user_id}                → Update user profile (authenticated)
+POST   /api/v1/user/{user_id}/upgrade        → Add email/password to mobile-only account
+DELETE /api/v1/user/{user_id}                → Delete account (authenticated)
 ```
 
-### Read Service - Content Service (port 8080)
+### Read Service - Content Service (port 8083)
 ```
 # Health
 GET  /health/live                                           → Liveness check
 GET  /health/ready                                          → Readiness check (includes DB)
 
-# Content Management
-POST   /api/v1/users/{userID}/contents                      → Save new content
-GET    /api/v1/users/{userID}/contents                      → List user's contents (paginated)
-GET    /api/v1/users/{userID}/contents/{contentID}          → Get specific content with HTML
-PATCH  /api/v1/users/{userID}/contents/{contentID}          → Update content metadata
+# Content Management (Direct)
+POST   /api/v1/content                                      → Create content from HTML/URL
+       Body: {"html": "...", "source_url": "...", "title": "...", ...}
+
+GET    /api/v1/content/{content_id}                         → Get content by ID
+
+PUT    /api/v1/content/{content_id}                         → Update existing content
+
+POST   /api/v1/content/bulk                                 → Bulk create/update contents
+       Body: [{"html": "...", "source_url": "...", ...}, ...]
+
+POST   /api/v1/content/check-duplicate                      → Check for duplicate content
+       Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
+
+# User Content Management
+POST   /api/v1/content/user/{user_id}                       → Add content to user's list
+       Body: {"url": "...", "html": "...", "source_type": "rss|manual|web"}
+
+GET    /api/v1/content/user/{user_id}                       → List user's contents (paginated)
+       Query params: ?status=..., ?is_favorite=true, ?limit=20, ?offset=0
+
+GET    /api/v1/content/user/{user_id}/search                → Full-text search user's contents
+       Query params: ?q=golang, ?limit=20, ?offset=0
+
+PATCH  /api/v1/content/user/{user_id}/{content_id}          → Update user-content metadata
        Body: {"status": "reading|completed|archived", "is_favorite": true, "scroll_position": 0.5, "notes": "..."}
-DELETE /api/v1/users/{userID}/contents/{contentID}          → Delete content from user's list
-POST   /api/v1/contents/bulk                                → Bulk save contents (RSS Fetcher integration)
 
-# Search
-GET  /api/v1/users/{userID}/contents/search?q=golang        → Full-text search
+DELETE /api/v1/content/user/{user_id}/{content_id}          → Remove content from user's list
+
+POST   /api/v1/content/user/bulk                            → Bulk add contents to multiple users
+       Body: [{"user_id": "...", "url": "...", "title": "...", ...}, ...]
 ```
 
-### Read Service - RSS Fetcher Service (port 8081)
+### Read Service - Ingest RSS Service (port 8085)
 ```
 # Health
-GET  /health/live                                           → Liveness check
-GET  /health/ready                                          → Readiness check (includes DB)
+GET  /health/live                                                    → Liveness check
+GET  /health/ready                                                   → Readiness check (includes DB)
 
 # Feed Subscriptions
-POST   /api/v1/users/{userID}/feeds/subscribe               → Subscribe to feed
+POST   /api/v1/source/rss/user/{user_id}/subscription               → Subscribe to feed
        Body: {"feed_url": "https://..."}
-DELETE /api/v1/users/{userID}/feeds/{feedID}/unsubscribe    → Unsubscribe from feed
-GET    /api/v1/users/{userID}/feeds                         → List user's subscriptions
-GET    /api/v1/feeds/{feedID}                               → Get feed details
 
-# Feed Management (Admin)
-GET    /api/v1/feeds                                        → List all feeds
-POST   /api/v1/feeds/{feedID}/refresh                       → Manually trigger feed refresh
+DELETE /api/v1/source/rss/user/{user_id}/subscription/{feed_id}     → Unsubscribe from feed
+
+GET    /api/v1/source/rss/user/{user_id}/subscription               → List user's subscriptions
+
+# Feed Management
+GET    /api/v1/source/rss/feed                                      → List all feeds (admin)
+
+GET    /api/v1/source/rss/feed/{feed_id}                            → Get feed details
+
+PATCH  /api/v1/source/rss/feed/{feed_id}                            → Update feed (enable/disable)
+       Body: {"enabled": true|false}
+
+POST   /api/v1/source/rss/feed/{feed_id}/refresh                    → Manually trigger feed refresh
 ```
 
 ### OpenAPI/Swagger Documentation
@@ -461,12 +544,12 @@ npx @apidevtools/swagger-cli validate services/read/api/openapi.yaml
 6. Linting: `npm run lint`
 
 ### Testing Backend Changes
-1. Start services: `cd services/explore && docker-compose up --build`
+1. Start services: `cd infrastructure/docker && docker-compose up --build`
 2. View logs: `docker-compose logs -f`
-3. Trigger fetch: `curl -X POST http://localhost:8080/fetch`
-4. Check recommendations: `curl -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/recommendations/user123`
-5. Mark as read: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/read -d '{"article_id":"..."}'`
-6. Vote on article: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/explore/articles/{id}/vote -d '{"vote_type":"upvote"}'`
+3. Trigger fetch: `curl -X POST http://localhost:8080/api/v1/explore/feed/fetch`
+4. Check recommendations: `curl -H "Authorization: Bearer <JWT>" http://localhost:8081/api/v1/explore/recommendation/user123`
+5. Mark as read: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/api/v1/explore/article/{article_id}/read`
+6. Vote on article: `curl -X POST -H "Authorization: Bearer <JWT>" http://localhost:8081/api/v1/explore/article/{article_id}/vote -d '{"vote_type":"upvote"}'`
 7. Run tests: `make test` or `go test ./...`
 
 ### Database Migrations
@@ -529,7 +612,7 @@ make migrate-version         # Check current version
 
 ## Environment Variables
 
-### Explore Service - Fetcher
+### Explore Service - Explore Fetcher (explore_fetcher)
 ```bash
 PORT=8080                      # HTTP server port
 RECOMMENDER_URL=...            # URL to recommender service
@@ -544,7 +627,7 @@ DB_NAME=fetcher_db
 KAGI_FEED_URL=...              # URL to Kagi Small Web feed list
 ```
 
-### Explore Service - Recommender
+### Explore Service - Explore Recommender (explore_recommender)
 ```bash
 PORT=8081                      # HTTP server port
 DB_HOST=postgres               # PostgreSQL host
@@ -552,7 +635,12 @@ DB_PORT=5432
 DB_USER=cairn
 DB_PASSWORD=cairn_password
 DB_NAME=cairn_db
+DB_SSLMODE=disable             # SSL mode for local dev
 ARTICLE_RETENTION_DAYS=90      # Delete articles after 90 days
+# Vault configuration (REQUIRED for JWT authentication)
+VAULT_ADDR=http://localhost:8200       # HashiCorp Vault address
+VAULT_TOKEN=...                        # Vault token
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key  # Path to JWT public key in Vault
 ```
 
 ### User Service
@@ -563,10 +651,12 @@ DB_PORT=5432
 DB_USER=cairn_user
 DB_PASSWORD=...                # Database password
 DB_NAME=cairn_users
-VAULT_ADDR=...                 # HashiCorp Vault address
-VAULT_TOKEN=...                # Vault token
+# Vault configuration (REQUIRED for JWT key generation and storage)
+VAULT_ADDR=http://localhost:8200      # HashiCorp Vault address
+VAULT_TOKEN=...                       # Vault token
 JWT_ACCESS_LIFETIME=15m        # Access token lifetime
 JWT_REFRESH_LIFETIME=7d        # Refresh token lifetime
+SERVER_ENVIRONMENT=development # Environment mode
 ```
 
 ### Read Service - Content Service
@@ -578,7 +668,7 @@ MAX_CONTENT_SIZE=5242880       # 5MB content size limit
 ORPHANED_CONTENT_DAYS=90       # Days before deleting orphaned content
 ```
 
-### Read Service - RSS Fetcher Service
+### Read Service - Ingest RSS Service (ingest_rss)
 ```bash
 DATABASE_URL=postgres://...    # PostgreSQL connection string
 SERVER_PORT=8081               # HTTP server port
@@ -593,10 +683,43 @@ POLL_INTERVAL_TIER3=24h        # Quiet feeds poll interval
 
 ## Important Implementation Notes
 
+### HashiCorp Vault Dependency
+
+**CRITICAL**: The User Service and Explore Recommender Service require HashiCorp Vault for JWT authentication.
+
+**What Vault is used for:**
+- User Service: Generates and stores RS256 JWT signing keys
+- Explore Recommender Service: Retrieves JWT public key for token verification
+- All services: Secret management in production
+
+**Development Setup:**
+
+The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml](infrastructure/docker/docker-compose.yml)) includes:
+1. Vault container running in dev mode (port 8200)
+2. Automated `vault-init` service that generates RSA keys and stores them in Vault
+3. All services configured to use the shared Vault instance
+
+**Running services individually:**
+
+If you need to run services outside Docker Compose:
+
+1. Start Vault in dev mode:
+   ```bash
+   docker run -d --name vault -p 8200:8200 \
+     -e VAULT_DEV_ROOT_TOKEN_ID=dev-root-token \
+     hashicorp/vault:latest server -dev
+   ```
+
+2. Initialize Vault with JWT keys (see `infrastructure/docker/scripts/init-vault.sh`)
+
+3. Configure services with Vault environment variables
+
+**Production:** Use a properly configured Vault cluster with persistent storage, TLS, and proper authentication.
+
 ### Explore Service - Database Separation
 The Explore service uses **two separate PostgreSQL databases**:
-- Fetcher maintains its own database for feed management and crawling state
-- Recommender has its own database for articles and user engagement
+- Explore Fetcher (explore_fetcher) maintains its own database for feed management and crawling state
+- Explore Recommender (explore_recommender) has its own database for articles and user engagement
 - Services communicate only via HTTP APIs, never direct database access
 - This enables independent scaling, clearer separation of concerns, and simpler deployment
 
@@ -634,8 +757,8 @@ The Explore service uses **two separate PostgreSQL databases**:
 ## Next Steps and Planned Work
 
 ### Explore Service
-- ✅ Fetcher service: COMPLETE (all features implemented and tested)
-- 🔄 Recommender service: See `/services/explore/RECOMMENDER_PLAN.md` for detailed plan
+- ✅ Explore Fetcher (explore_fetcher): COMPLETE (all features implemented and tested)
+- 🔄 Explore Recommender (explore_recommender): See `/services/explore/RECOMMENDER_PLAN.md` for detailed plan
   - Implement voting system (upvote/downvote API)
   - Enhanced recommendation algorithm with quality scoring
   - Article cleanup (90-day retention)
@@ -643,7 +766,7 @@ The Explore service uses **two separate PostgreSQL databases**:
 
 ### Read Service
 - ✅ Content Service: COMPLETE (content storage, user metadata, search)
-- ✅ RSS Fetcher Service: COMPLETE (feed subscriptions, tiered polling, outbox pattern)
+- ✅ Ingest RSS (ingest_rss): COMPLETE (feed subscriptions, tiered polling, outbox pattern)
 - Integration with mobile app pending
 - Planned features: recommendation engine, import/export, GraphQL API
 

@@ -73,7 +73,7 @@ func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
 // UpdateContent handles PUT /api/v1/contents/:id
 func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 	// Get content ID from URL
-	idStr := chi.URLParam(r, "id")
+	idStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(idStr)
 	if err != nil {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid content ID", nil)
@@ -111,7 +111,7 @@ func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 // GetContent handles GET /api/v1/contents/:id
 func (h *ContentHandler) GetContent(w http.ResponseWriter, r *http.Request) {
 	// Get content ID from URL
-	idStr := chi.URLParam(r, "id")
+	idStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(idStr)
 	if err != nil {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid content ID", nil)

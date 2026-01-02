@@ -20,13 +20,13 @@ build-content-worker: ## Build content worker
 	@echo "Building content worker..."
 	cd content && go build -o ../bin/content-worker ./cmd/worker
 
-build-fetcher: ## Build fetcher service
-	@echo "Building fetcher service..."
-	cd fetcher && go build -o ../bin/fetcher ./cmd/fetcher
+build-fetcher: ## Build ingest_rss service
+	@echo "Building ingest_rss service..."
+	cd fetcher && go build -o ../bin/ingest_rss ./cmd/ingest_rss
 
-build-fetcher-worker: ## Build fetcher worker
-	@echo "Building fetcher worker..."
-	cd fetcher && go build -o ../bin/fetcher-worker ./cmd/worker
+build-fetcher-worker: ## Build ingest_rss worker
+	@echo "Building ingest_rss worker..."
+	cd fetcher && go build -o ../bin/ingest_rss_worker ./cmd/ingest_rss_worker
 
 build-all: build-content build-content-worker build-fetcher build-fetcher-worker ## Build all services
 	@echo "All services built successfully!"

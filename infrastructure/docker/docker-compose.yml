@@ -1,3 +1,4 @@
+name: cairn
 services:
   # HashiCorp Vault - Secrets management
   vault:
@@ -55,8 +56,8 @@ services:
     networks:
       - cairn-network
 
-  # Recommender Service Database
-  recommender-db:
+  # Explore Recommender Service Database
+  explore-recommender-db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_RECOMMENDER}
@@ -65,7 +66,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - recommender_db_data:/var/lib/postgresql/data
+      - explore_recommender_db_data:/var/lib/postgresql/data
       - ../../services/explore/recommender/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RECOMMENDER} -d ${POSTGRES_DB_RECOMMENDER}"]
@@ -75,8 +76,8 @@ services:
     networks:
       - cairn-network
 
-  # Fetcher Service Database
-  fetcher-db:
+  # Explore Fetcher Service Database
+  explore-fetcher-db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_FETCHER}
@@ -85,7 +86,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - fetcher_db_data:/var/lib/postgresql/data
+      - explore_fetcher_db_data:/var/lib/postgresql/data
       - ../../services/explore/fetcher/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_FETCHER} -d ${POSTGRES_DB_FETCHER}"]
@@ -95,11 +96,51 @@ services:
     networks:
       - cairn-network
 
+  # Content Service Database
+  content-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_CONTENT}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CONTENT}
+      POSTGRES_DB: ${POSTGRES_DB_CONTENT}
+    ports:
+      - "5435:5432"
+    volumes:
+      - content_db_data:/var/lib/postgresql/data
+      - ../../services/read/content/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CONTENT} -d ${POSTGRES_DB_CONTENT}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # Ingest RSS Database
+  ingest-rss-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_RSS}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RSS}
+      POSTGRES_DB: ${POSTGRES_DB_RSS}
+    ports:
+      - "5436:5432"
+    volumes:
+      - ingest_rss_db_data:/var/lib/postgresql/data
+      - ../../services/read/fetcher/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RSS} -d ${POSTGRES_DB_RSS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
   # User Service - Authentication and account management
   user-service:
     build:
-      context: ../../services
-      dockerfile: users/Dockerfile
+      context: ../..
+      dockerfile: services/users/Dockerfile
     ports:
       - "8082:8080"
     environment:
@@ -120,7 +161,7 @@ services:
       vault-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -128,16 +169,16 @@ services:
     networks:
       - cairn-network
 
-  # Recommender Service - Article storage and recommendations
-  recommender:
+  # Explore Recommender Service - Article storage and recommendations
+  explore-recommender:
     build:
-      context: ../../services
-      dockerfile: explore/recommender/Dockerfile
+      context: ../..
+      dockerfile: services/explore/recommender/Dockerfile
     ports:
-      - "8081:8081"
+      - "8087:8081"
     environment:
       - PORT=8081
-      - DB_HOST=recommender-db
+      - DB_HOST=explore-recommender-db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER_RECOMMENDER}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}
@@ -148,12 +189,12 @@ services:
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
-      recommender-db:
+      explore-recommender-db:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -161,20 +202,20 @@ services:
     networks:
       - cairn-network
 
-  # Fetcher Service - RSS feed fetching
-  fetcher:
+  # Explore Fetcher Service - RSS feed fetching for discovery
+  explore-fetcher:
     build:
-      context: ../../services
-      dockerfile: explore/fetcher/Dockerfile
+      context: ../..
+      dockerfile: services/explore/fetcher/Dockerfile
     ports:
-      - "8080:8080"
+      - "8088:8080"
     environment:
       - PORT=8080
-      - RECOMMENDER_URL=http://recommender:8081
+      - RECOMMENDER_URL=http://explore-recommender:8081
       - FETCH_INTERVAL=60
       - FETCH_TIMEOUT=30
       - MAX_FETCH_ERRORS=10
-      - DB_HOST=fetcher-db
+      - DB_HOST=explore-fetcher-db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER_FETCHER}
       - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
@@ -182,12 +223,12 @@ services:
       - DB_SSLMODE=disable
       - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
     depends_on:
-      fetcher-db:
+      explore-fetcher-db:
         condition: service_healthy
-      recommender:
+      explore-recommender:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -195,10 +236,128 @@ services:
     networks:
       - cairn-network
 
+  # Content Service - Article content storage and management
+  content-service:
+    build:
+      context: ../..
+      dockerfile: services/read/content/Dockerfile
+    ports:
+      - "8083:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=content-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_CONTENT}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
+      - DB_NAME=${POSTGRES_DB_CONTENT}
+      - DB_SSL_MODE=disable
+    depends_on:
+      content-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Content Service Worker - Background jobs for content cleanup
+  content-worker:
+    build:
+      context: ../..
+      dockerfile: services/read/content/Dockerfile.worker
+    environment:
+      - DB_HOST=content-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_CONTENT}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
+      - DB_NAME=${POSTGRES_DB_CONTENT}
+      - DB_SSL_MODE=disable
+      - CLEANUP_CRON=0 2 * * *
+      - HEALTH_PORT=8084
+    ports:
+      - "8084:8084"
+    depends_on:
+      content-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Ingest RSS Service - Feed subscription and polling
+  ingest-rss:
+    build:
+      context: ../..
+      dockerfile: services/read/fetcher/Dockerfile
+    ports:
+      - "8085:8081"
+    environment:
+      - PORT=8081
+      - DB_HOST=ingest-rss-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_RSS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
+      - DB_NAME=${POSTGRES_DB_RSS}
+      - DB_SSL_MODE=disable
+    depends_on:
+      ingest-rss-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Ingest RSS Worker - Background jobs for feed polling and processing
+  ingest-rss-worker:
+    build:
+      context: ../..
+      dockerfile: services/read/fetcher/Dockerfile.worker
+    environment:
+      - DB_HOST=ingest-rss-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_RSS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
+      - DB_NAME=${POSTGRES_DB_RSS}
+      - DB_SSL_MODE=disable
+      - CONTENT_SERVICE_URL=http://content-service:8080
+      - HEALTH_PORT=8086
+      - OUTBOX_CLEANUP_CRON=0 3 * * *
+      - FEED_ITEMS_CLEANUP_CRON=0 4 * * *
+    ports:
+      - "8086:8086"
+    depends_on:
+      ingest-rss-db:
+        condition: service_healthy
+      content-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
 volumes:
   users_db_data:
-  recommender_db_data:
-  fetcher_db_data:
+  explore_recommender_db_data:
+  explore_fetcher_db_data:
+  content_db_data:
+  ingest_rss_db_data:
   vault-keys:
 
 networks:

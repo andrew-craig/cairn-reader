@@ -1,5 +1,8 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.23-alpine AS builder
+
+# Set GOTOOLCHAIN to auto to allow using newer Go versions
+ENV GOTOOLCHAIN=auto
 
 # Install build dependencies
 RUN apk add --no-cache git
@@ -7,15 +10,17 @@ RUN apk add --no-cache git
 # Set working directory
 WORKDIR /build
 
-# Copy go mod files from root
-COPY go.mod go.sum ./
+# Copy go mod files from service directory
+COPY services/read/go.mod services/read/go.sum ./
+
+# Copy pkg directory for dependencies (placed at /pkg to match replace directive)
+COPY pkg/ /pkg/
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY content/ ./content/
-COPY pkg/ ./pkg/
+COPY services/read/content/ ./content/
 
 # Build the application
 WORKDIR /build/content

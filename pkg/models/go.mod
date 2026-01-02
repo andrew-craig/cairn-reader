@@ -1,3 +1,3 @@
 module github.com/andrew-craig/cairn/pkg/models
 
-go 1.24.7
+go 1.23

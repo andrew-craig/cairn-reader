@@ -20,16 +20,16 @@ Cairn is a microservices-based read-it-later application backend designed for sc
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Client Layer                         │
-│                    (Mobile App / Web App)                    │
+│                         Client Layer                        │
+│                    (Mobile App / Web App)                   │
 └────────────────────────────┬────────────────────────────────┘
                              │
             ┌────────────────┼────────────────┐
             │                │                │
-    ┌───────▼──────┐  ┌──────▼──────┐  ┌─────▼────────┐
-    │ User Service │  │   Explore   │  │     Read     │
-    │    :8082     │  │   Service   │  │   Service    │
-    │              │  │  :8080/:8081│  │  :8083/:8084 │
+    ┌───────▼──────┐  ┌──────▼───────┐  ┌─────▼────────┐
+    │ User Service │  │   Explore    │  │     Read     │
+    │    :8082     │  │   Service    │  │   Service    │
+    │              │  │  :8080/:8081 │  │  :8083/:8084 │
     │  - Auth      │  │              │  │              │
     │  - Users     │  │  - RSS Feeds │  │  - Content   │
     │  - JWT       │  │  - Recommend │  │  - Articles  │

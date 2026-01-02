@@ -1,6 +1,6 @@
 module github.com/andrew-craig/cairn/services/users
 
-go 1.24.7
+go 1.24.0
 
 require (
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000

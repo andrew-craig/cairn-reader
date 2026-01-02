@@ -41,7 +41,7 @@ func NewRecommenderClient(baseURL string) *RecommenderClient {
 }
 
 // SubmitArticles sends a batch of articles to the recommender service.
-// Articles are submitted as a JSON payload to POST /explore/articles.
+// Articles are submitted as a JSON payload to POST /api/v1/explore/article.
 // Returns nil if successful or if the articles slice is empty.
 // Accepts both 200 OK and 201 Created as success responses.
 func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []models.Article) error {
@@ -58,7 +58,7 @@ func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []model
 	}
 
 	// Build and send HTTP request
-	url := fmt.Sprintf("%s/explore/articles", c.baseURL)
+	url := fmt.Sprintf("%s/api/v1/explore/article", c.baseURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

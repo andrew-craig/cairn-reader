@@ -1,24 +1,30 @@
-.PHONY: help build run test clean deps lint fmt vet migrate-up migrate-down docker-build docker-run
+.PHONY: help build run test test-unit test-integration test-integration-up test-integration-down test-security clean deps lint fmt vet migrate-up migrate-down docker-build docker-run
 
 # Default target
 help:
 	@echo "Available targets:"
-	@echo "  build        - Build the user service binary"
-	@echo "  run          - Run the user service"
-	@echo "  test         - Run all tests"
-	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  clean        - Remove build artifacts"
-	@echo "  deps         - Download and tidy dependencies"
-	@echo "  lint         - Run golangci-lint"
-	@echo "  fmt          - Format code with gofmt"
-	@echo "  vet          - Run go vet"
-	@echo "  migrate-up   - Run database migrations (up)"
-	@echo "  migrate-down - Rollback database migrations"
-	@echo "  migrate-version - Check current migration version"
-	@echo "  db-create    - Create database and user"
-	@echo "  db-drop      - Drop database"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run service in Docker"
+	@echo "  build                 - Build the user service binary"
+	@echo "  run                   - Run the user service"
+	@echo "  test                  - Run unit tests only"
+	@echo "  test-unit             - Run unit tests only (alias for test)"
+	@echo "  test-integration      - Run integration tests (requires Docker)"
+	@echo "  test-integration-up   - Start integration test environment"
+	@echo "  test-integration-down - Stop integration test environment"
+	@echo "  test-all              - Run all tests (unit + integration)"
+	@echo "  test-coverage         - Run unit tests with coverage report"
+	@echo "  test-security         - Run security penetration tests (requires running service)"
+	@echo "  clean                 - Remove build artifacts"
+	@echo "  deps                  - Download and tidy dependencies"
+	@echo "  lint                  - Run golangci-lint"
+	@echo "  fmt                   - Format code with gofmt"
+	@echo "  vet                   - Run go vet"
+	@echo "  migrate-up            - Run database migrations (up)"
+	@echo "  migrate-down          - Rollback database migrations"
+	@echo "  migrate-version       - Check current migration version"
+	@echo "  db-create             - Create database and user"
+	@echo "  db-drop               - Drop database"
+	@echo "  docker-build          - Build Docker image"
+	@echo "  docker-run            - Run service in Docker"
 
 # Build the service
 build:
@@ -31,17 +37,62 @@ run:
 	@echo "Running user service..."
 	go run cmd/user-service/main.go
 
-# Run tests
+# Run unit tests only (excludes integration tests)
 test:
-	@echo "Running tests..."
-	go test -v ./...
+	@echo "Running unit tests..."
+	go test -v ./internal/... ./pkg/...
 
-# Run tests with coverage
+# Alias for test
+test-unit: test
+
+# Run integration tests (requires Docker)
+test-integration:
+	@echo "Running integration tests..."
+	@echo "Starting test environment..."
+	cd test/integration && docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "Running integration tests..."
+	cd test/integration && go test -v -timeout 5m ./...
+	@echo "Stopping test environment..."
+	cd test/integration && docker-compose -f docker-compose.test.yml down
+
+# Start integration test environment
+test-integration-up:
+	@echo "Starting integration test environment..."
+	cd test/integration && docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@echo "Test environment ready!"
+	@echo "Database: localhost:5433 (cairn_users_test)"
+	@echo "Vault: http://localhost:8201 (token: test-root-token)"
+
+# Stop integration test environment
+test-integration-down:
+	@echo "Stopping integration test environment..."
+	cd test/integration && docker-compose -f docker-compose.test.yml down -v
+	@echo "Test environment stopped and cleaned up"
+
+# Run all tests (unit + integration)
+test-all:
+	@echo "Running all tests (unit + integration)..."
+	@$(MAKE) test-unit
+	@$(MAKE) test-integration
+
+# Run tests with coverage (unit tests only)
 test-coverage:
-	@echo "Running tests with coverage..."
-	go test -v -coverprofile=coverage.out ./...
+	@echo "Running unit tests with coverage..."
+	go test -v -coverprofile=coverage.out ./internal/... ./pkg/...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
+
+# Run security penetration tests
+test-security:
+	@echo "Running security penetration tests..."
+	@echo "Note: This requires the User Service to be running at USER_SERVICE_URL"
+	@echo "Default: http://localhost:8080"
+	@echo ""
+	cd test/security && ./run_all_tests.sh
 
 # Clean build artifacts
 clean:

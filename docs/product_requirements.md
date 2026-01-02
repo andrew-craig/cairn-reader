@@ -7,22 +7,42 @@ Cairn is a read-it-later mobile application that helps users discover and read l
 1. **Explore**: Discover curated articles from across the web
 2. **Read**: Subscribe to RSS feeds and build a personal reading library
 
-## Target Users
+Target Users: People who want to read thoughtful, long-form content
 
-- People who want to read thoughtful, long-form content
-- Users who follow multiple blogs and websites via RSS
-- Readers seeking discovery of quality articles beyond mainstream sources
-- Anyone building a personal knowledge library
+## Product Requirements - Reading Experience (for both Explore and Read)
 
-## Core User Features
+The core principles of the reading experience are:
+- **Optimise for readability**: Articles processed for optimal readability
+- **Reading progress saved and synced**
+- **Original Source**: Link to original article always available
 
-### 1. Content Discovery (Explore)
+Optimise for readability
+- Removes ads, navigation, and clutter
+- Preserves images, formatting, and structure
+- Article images displayed inline
+- All HTML sanitized to prevent security issues
+
+Reading progress saved and synced
+- **Reading Status**: Articles can be unread, read, or archived. Statuses will be synced across devices
+- **Scroll Position**: Reading position automatically saved
+  - Resume reading on any device
+  - Character-based position for consistent experience across screen sizes
+- **Favorites**: Star articles for quick access. Favorites synced across devices
+- **Offline availability**: saved content is stored on device for access offline. Changes are synced when the connection is restored
+
+
+## Product Requirements - Content Discovery (Explore)
+
+#### Article Curation
+- Content will ffocus on independent blogs, personal websites, and thoughtful writing
+  - Articles will initially be sourced from [Kagi Small Web Text collection](https://github.com/kagisearch/smallweb/blob/main/smallweb.txt)
+- Content will be removed after 90 days
 
 #### Article Recommendations
-- Users receive 5 personalized article recommendations
-- Recommendations balance quality content with exploration:
-  - 4 high-quality articles based on community engagement
-  - 1 exploratory article to discover new content
+- Users receive personalized article recommendations
+- Recommendations balance quality content with exploration. Initial split is:
+  - 80% high-quality articles based on community engagement
+  - 20% exploratory article to discover new content
 - Fresh content added continuously (new articles fetched every minute)
 - Content sourced from curated collection of independent blogs and websites
 
@@ -34,100 +54,69 @@ Cairn is a read-it-later mobile application that helps users discover and read l
   - One vote per article per user
 - Voting influences future recommendations for all users
 
-#### Content Curation
-- Articles sourced from [Kagi Small Web Text collection](https://github.com/kagisearch/smallweb/blob/main/smallweb.txt)
-- Focus on independent blogs, personal websites, and thoughtful writing
-- Automatic content cleanup after 90 days
 
-### 2. Personal Reading Library (Read)
+## Product Requirements - Personal Reading Library (Read)
 
-#### RSS Feed Subscriptions
+The personal reading library (Req 2.1) allows users to maintain a list of must-read content that combines
+- content they have saved to read later (Req 2.2)
+- content from trusted sources that they know they will want to read from RSS feeds (Req. 2.3), email newsletters (Req 2.4) or other sources
+
+#### 2.1 Personal Library
+
+Users will have a personal library of content which they can manage. This library will be accessible as a list of articles/content in the Read tab of the app.
+
+Users will be able to:
+- **Search** the list of articles (initially title and author, but target state includes full text)
+- **Filter** by status (unread, read, archived) and favorites. The default will be to show all non-archived content
+- **Add** new content by either saving an article, or adding a new source
+
+Opening an article will the app's reading experience (see above)
+
+
+#### 2.2 Saving - Read Later
+
+- Graceful handling of paywalled or restricted content
+
+
+#### 2.3 Ingestion - RSS Feeds
 - **Subscribe to Feeds**: Add any RSS feed via URL
-- **Feed Limit**: Maximum 100 feeds per user
 - **Auto-Delivery**: New articles automatically appear in reading list
-- **Smart Polling**: Active feeds checked more frequently than quiet feeds
-  - Hourly for active feeds (published in last 7 days)
-  - Every 6 hours for moderate feeds (published in last 30 days)
-  - Daily for quiet feeds (no recent publications)
+  - service silently and automatically retries on fetch failures
+- Manage feeds:
+  - View all subscribed feeds
+  - Unsubscribe from feeds
+  - Feeds auto-disable after 7 consecutive days of errors
+  - Re-enable or remove disabled feeds
 
-#### Feed Management
-- View all subscribed feeds
-- Unsubscribe from feeds
-- Feeds auto-disable after 7 consecutive days of errors
-- Re-enable or remove disabled feeds
+Content extraction
+- If full article is not available in the RSS feed, we will attempt to extract it from the source. If this fails, we will fallback to RSS summary if full article unavailable
 
-#### Reading Experience
-- **Clean Content**: Articles processed for optimal readability
-  - Removes ads, navigation, and clutter
-  - Preserves images, formatting, and structure
-- **Security**: All HTML sanitized to prevent security issues
-- **Original Source**: Link to original article always available
-- **Images**: Article images displayed inline
+Secondary requirements
+- Update handling
+  - **Update Detection**: System detects when articles are updated at source
+  - **Automatic Updates**: Updated articles refreshed automatically
+  - **Preserved Progress**: Reading position maintained when content updates
 
-#### Reading Progress
-- **Reading Status**: Mark articles as unread, read, or archived
-- **Scroll Position**: Reading position automatically saved
-  - Resume reading on any device
-  - Character-based position for consistent experience across screen sizes
-- **Favorites**: Star articles for quick access
+#### 2.4 Ingestion - Email
 
-#### Organization & Discovery
-- **Search**: Full-text search across saved articles (title and author)
-- **Filters**:
-  - View by status (unread, read, archived)
-  - View favorites
-  - Filter by date range
-- **Pagination**: Browse content in manageable chunks (20 items per page)
-
-#### Content Management
+#### 2.5 Content Management
 - **Delete Articles**: Remove articles from personal reading list
 - **Notes**: Add personal notes to articles (future enhancement)
 - **Tags**: Organize with custom tags (future enhancement)
 
-### 3. Content Quality & Safety
 
-#### Readable Content
-- Automatic content extraction and cleaning
-- Fallback to RSS summary if full article unavailable
-- Maximum article size: 5MB
-- Graceful handling of paywalled or restricted content
+## Product Requirements - Profile > Content
 
-#### Security & Privacy
-- HTML sanitization prevents malicious content
-- No tracking scripts or external resources in saved content
-- User data isolated (users only see their own content)
-- Safe link validation (HTTP/HTTPS only)
+## Product Requirements - Settings
 
-#### Content Freshness
-- **Update Detection**: System detects when articles are updated at source
-- **Automatic Updates**: Updated articles refreshed automatically
-- **Preserved Progress**: Reading position maintained when content updates
-- **Smart Caching**: Uses HTTP headers (ETag, Last-Modified) to minimize bandwidth
 
-### 4. Cross-Platform Sync
-
-- Reading status synced across devices
-- Scroll position synced across devices
-- Favorites synced across devices
-- Subscribe to feeds on any device
 
 ### 5. Reliability & Performance
-
-#### Feed Reliability
-- Automatic retry on temporary failures
-- Feeds disabled only after persistent errors (7+ days)
-- Users can re-enable disabled feeds
-- Background processing doesn't block user actions
 
 #### Content Deduplication
 - Same article from same feed stored only once
 - Multiple users can save the same content
 - Shared storage with individual user metadata
-
-#### Offline Resilience
-- Content stored persistently
-- Reading possible even during network issues
-- Changes sync when connection restored
 
 ## User Workflows
 

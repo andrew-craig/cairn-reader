@@ -34,7 +34,7 @@ type UpgradeAccountRequest struct {
 	Password string `json:"password" binding:"required,min=8"`
 }
 
-// GetUser handles GET /users/{id}
+// GetUser handles GET /api/v1/user/{user_id}
 // Retrieves user profile information for the authenticated user
 func (h *UserHandler) GetUser(c *gin.Context) {
 	// Get authenticated user ID from context
@@ -47,7 +47,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	}
 
 	// Parse target user ID from URL parameter
-	targetUserIDStr := c.Param("id")
+	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
@@ -80,7 +80,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// UpdateUser handles PATCH /users/{id}
+// UpdateUser handles PATCH /api/v1/user/{user_id}
 // Updates user profile information
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Get authenticated user ID from context
@@ -93,7 +93,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	// Parse target user ID from URL parameter
-	targetUserIDStr := c.Param("id")
+	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
@@ -155,7 +155,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// UpgradeAccount handles POST /users/{id}/upgrade
+// UpgradeAccount handles POST /api/v1/user/{user_id}/upgrade
 // Upgrades a mobile-only account to a hybrid account with email/password
 func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	// Get authenticated user ID from context
@@ -168,7 +168,7 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	}
 
 	// Parse target user ID from URL parameter
-	targetUserIDStr := c.Param("id")
+	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
@@ -240,7 +240,7 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-// DeleteUser handles DELETE /users/{id}
+// DeleteUser handles DELETE /api/v1/user/{user_id}
 // Deletes a user account and all associated data
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// Get authenticated user ID from context
@@ -253,7 +253,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	}
 
 	// Parse target user ID from URL parameter
-	targetUserIDStr := c.Param("id")
+	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{

@@ -35,20 +35,29 @@ func NewRouter(db *database.DB) http.Handler {
 	// Initialize handlers
 	subscriptionHandler := handlers.NewSubscriptionHandler(feedService)
 
-	// Health check endpoint
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		// Check database connection
+	// Health check endpoints (Kubernetes-compatible)
+	// Liveness probe - indicates if the process is running
+	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy"}`)
+	})
+
+	// Readiness probe - indicates if the service is ready to accept traffic
+	// Returns 503 Service Unavailable if dependencies are unreachable
+	r.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Check database connection with timeout
 		ctx := r.Context()
 		if err := db.Ping(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"error","service":"rss-fetcher-service","message":"Database connection failed","error":"%s"}`, err.Error())
+			fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ok","service":"rss-fetcher-service"}`)
+		fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
 	})
 
 	// Root endpoint
@@ -58,18 +67,19 @@ func NewRouter(db *database.DB) http.Handler {
 		fmt.Fprintf(w, `{"service":"rss-fetcher-service","version":"0.1.0","status":"running"}`)
 	})
 
-	// API v1 routes
-	r.Route("/api/v1", func(r chi.Router) {
+	// API v1 routes with /source/rss prefix
+	// This service is internal-facing, accessed through Content Service gateway
+	r.Route("/api/v1/source/rss", func(r chi.Router) {
 		// User feed subscription routes
-		r.Route("/users/{user_id}/feeds", func(r chi.Router) {
-			r.Post("/subscribe", subscriptionHandler.Subscribe)
+		r.Route("/user/{user_id}/subscription", func(r chi.Router) {
+			r.Post("/", subscriptionHandler.Subscribe)
 			r.Get("/", subscriptionHandler.ListSubscriptions)
 			r.Delete("/{feed_id}", subscriptionHandler.Unsubscribe)
 		})
 
-		// Feed management routes
-		r.Route("/feeds/{feed_id}", func(r chi.Router) {
-			r.Patch("/enable", subscriptionHandler.EnableFeed)
+		// Feed management routes (generic PATCH for updates)
+		r.Route("/feed/{feed_id}", func(r chi.Router) {
+			r.Patch("/", subscriptionHandler.UpdateFeed)
 		})
 	})
 

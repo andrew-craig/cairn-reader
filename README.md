@@ -65,14 +65,14 @@ cairn/
 │
 ├── services/
 │   ├── explore/             # RSS Fetcher & Recommendation Engine
-│   │   ├── fetcher/         # RSS feed fetching service
-│   │   ├── recommender/     # Content recommendation service
+│   │   ├── fetcher/         # Explore Fetcher (explore_fetcher) - RSS feed fetching
+│   │   ├── recommender/     # Explore Recommender (explore_recommender) - Content recommendations
 │   │   ├── pkg/             # Shared packages
 │   │   └── README.md        # Explore service documentation
 │   │
 │   ├── read/                # Content Storage & RSS Feed Management
 │   │   ├── content/         # Content Service (storage, search, user metadata)
-│   │   ├── fetcher/         # RSS Fetcher Service (feed subscriptions, polling)
+│   │   ├── fetcher/         # Ingest RSS (ingest_rss) - feed subscriptions, polling
 │   │   ├── api/             # OpenAPI specifications
 │   │   └── README.md        # Read service documentation
 │   │
@@ -213,8 +213,8 @@ See the documentation for each service:
 
 ### Explore Service
 The Explore service consists of two microservices:
-- **Fetcher**: Discovers and fetches content from RSS feeds
-- **Recommender**: Stores content and implements recommendation algorithms
+- **Explore Fetcher** (explore_fetcher): Discovers and fetches content from RSS feeds
+- **Explore Recommender** (explore_recommender): Stores content and implements recommendation algorithms
 
 Features:
 - Automatic RSS feed polling
@@ -236,7 +236,7 @@ The Read service is a comprehensive article storage and RSS feed management syst
 - Cursor-based pagination
 - Orphaned content cleanup (90-day retention)
 
-**RSS Fetcher Service** (port 8081):
+**Ingest RSS Service** (ingest_rss, port 8081):
 - User feed subscriptions (100 feed limit per user)
 - Tiered polling strategy (hourly/6-hourly/daily)
 - Content extraction and processing
@@ -344,13 +344,13 @@ Cairn follows a microservices architecture:
     ┌────┴─────────────────────────────────┐
     │                                      │
     │                                      │
-┌───▼────────┐  ┌──────────────┐  ┌───────▼──────┐
-│   User     │  │   Explore    │  │     Read     │
-│  Service   │  │   Service    │  │   Service    │
-│            │  │              │  │              │
-│  - Auth    │  │  - Fetcher   │  │  - Content   │
-│  - JWT     │  │  - Recommender│  │  - Storage   │
-└─────┬──────┘  └──────┬───────┘  └──────┬───────┘
+┌───▼────────┐  ┌─────────────────────┐  ┌───────▼──────┐
+│   User     │  │   Explore Service   │  │  Read Service│
+│  Service   │  │                     │  │              │
+│            │  │  - explore_fetcher  │  │  - Content   │
+│  - Auth    │  │  - explore_recommender│ │  - ingest_rss│
+│  - JWT     │  │                     │  │              │
+└─────┬──────┘  └──────┬──────────────┘  └──────┬───────┘
       │                │                  │
       │                │                  │
       └────────────────┼──────────────────┘

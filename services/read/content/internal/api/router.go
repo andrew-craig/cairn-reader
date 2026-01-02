@@ -35,20 +35,29 @@ func NewRouter(db *database.DB) http.Handler {
 	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 
-	// Health check endpoint
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		// Check database connection
+	// Health check endpoints (Kubernetes-compatible)
+	// Liveness probe - indicates if the process is running
+	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"status":"healthy"}`)
+	})
+
+	// Readiness probe - indicates if the service is ready to accept traffic
+	// Returns 503 Service Unavailable if dependencies are unreachable
+	r.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		// Check database connection with timeout
 		ctx := r.Context()
 		if err := db.Ping(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"error","service":"content-service","message":"Database connection failed","error":"%s"}`, err.Error())
+			fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ok","service":"content-service","message":"Phase 1.4: Bulk Operations complete"}`)
+		fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
 	})
 
 	// Root endpoint
@@ -58,19 +67,19 @@ func NewRouter(db *database.DB) http.Handler {
 		fmt.Fprintf(w, `{"service":"content-service","version":"0.4.0","status":"Phase 1.4 - Bulk Operations complete"}`)
 	})
 
-	// API v1 routes
-	r.Route("/api/v1", func(r chi.Router) {
-		// Content routes
-		r.Post("/contents", contentHandler.CreateContent)
-		r.Get("/contents/{id}", contentHandler.GetContent)
-		r.Put("/contents/{id}", contentHandler.UpdateContent)
+	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
+	r.Route("/api/v1/content", func(r chi.Router) {
+		// Content management routes
+		r.Post("/", contentHandler.CreateContent)
+		r.Get("/{content_id}", contentHandler.GetContent)
+		r.Put("/{content_id}", contentHandler.UpdateContent)
 
 		// Bulk operation routes
-		r.Post("/contents/bulk", bulkHandler.BulkCreateContent)
-		r.Post("/contents/check-duplicates", bulkHandler.CheckDuplicates)
+		r.Post("/bulk", bulkHandler.BulkCreateContent)
+		r.Post("/check-duplicate", bulkHandler.CheckDuplicates)
 
-		// User-content routes
-		r.Route("/users/{user_id}/contents", func(r chi.Router) {
+		// User-content routes (nested under /user/{user_id})
+		r.Route("/user/{user_id}", func(r chi.Router) {
 			r.Get("/", userContentHandler.ListUserContents)
 			r.Post("/", userContentHandler.AddContentToUser)
 			r.Get("/search", userContentHandler.SearchUserContents)
@@ -79,7 +88,7 @@ func NewRouter(db *database.DB) http.Handler {
 		})
 
 		// Bulk user-content routes
-		r.Post("/users/bulk/contents", bulkHandler.BulkAddToUsers)
+		r.Post("/user/bulk", bulkHandler.BulkAddToUsers)
 	})
 
 	return r

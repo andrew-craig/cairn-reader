@@ -20,8 +20,8 @@ Cairn consists of two main microservices:
 
 ```
 ┌─────────────────────┐         ┌──────────────────────┐
-│  Content Service    │         │  RSS Fetcher Service │
-│                     │         │                      │
+│  Content Service    │         │   Ingest RSS Service │
+│                     │         │    (ingest_rss)      │
 │  - Content Storage  │◄────────│  - Feed Polling      │
 │  - User Lists       │  REST   │  - Content Extraction│
 │  - Search           │   API   │  - Subscription Mgmt │
@@ -31,7 +31,7 @@ Cairn consists of two main microservices:
            │                               │
      ┌─────▼─────┐                   ┌─────▼─────┐
      │ PostgreSQL│                   │ PostgreSQL│
-     │ (Content) │                   │ (Fetcher) │
+     │ (Content) │                   │(ingest_rss)│
      └───────────┘                   └───────────┘
 ```
 
@@ -50,12 +50,12 @@ Manages article content and user reading lists:
   - Handle content deduplication by hash and feed ID
   - Support bulk operations for RSS Fetcher integration
 
-#### RSS Fetcher Service (`services/rss-fetcher-service/`)
+#### Ingest RSS Service (ingest_rss) (`services/rss-fetcher-service/`)
 
 Manages RSS feed subscriptions and content delivery:
 
 - **Port**: 8081
-- **Database**: PostgreSQL (rss_fetcher_service)
+- **Database**: PostgreSQL (ingest_rss)
 - **Responsibilities**:
   - Subscribe/unsubscribe users to RSS feeds
   - Poll feeds using tiered strategy (hourly, 6-hourly, daily)
@@ -97,7 +97,7 @@ docker-compose up -d
 
 This will start:
 - Content Service (http://localhost:8080)
-- RSS Fetcher Service (http://localhost:8081)
+- Ingest RSS Service (http://localhost:8081)
 - PostgreSQL databases for both services
 - Background workers for feed polling and content delivery
 
@@ -107,7 +107,7 @@ This will start:
 # Check Content Service health
 curl http://localhost:8080/health/ready
 
-# Check RSS Fetcher Service health
+# Check Ingest RSS Service health
 curl http://localhost:8081/health/ready
 ```
 
@@ -128,30 +128,46 @@ make migrate-status
 ### Subscribe to a Feed
 
 ```bash
-curl -X POST http://localhost:8081/api/v1/users/550e8400-e29b-41d4-a716-446655440000/feeds/subscribe \
+curl -X POST http://localhost:8085/api/v1/source/rss/user/550e8400-e29b-41d4-a716-446655440000/subscription \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "feed_url": "https://blog.golang.org/feed.atom"
+  }'
+```
+
+### Add Content to User's List
+
+```bash
+curl -X POST http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "url": "https://example.com/article",
+    "source_type": "manual"
   }'
 ```
 
 ### List User's Contents
 
 ```bash
-curl http://localhost:8080/api/v1/users/550e8400-e29b-41d4-a716-446655440000/contents?limit=20
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  "http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000?limit=20"
 ```
 
 ### Search User's Contents
 
 ```bash
-curl "http://localhost:8080/api/v1/users/550e8400-e29b-41d4-a716-446655440000/contents/search?q=golang"
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  "http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000/search?q=golang"
 ```
 
 ### Update Reading Status
 
 ```bash
-curl -X PATCH http://localhost:8080/api/v1/users/550e8400-e29b-41d4-a716-446655440000/contents/123e4567-e89b-12d3-a456-426614174001 \
+curl -X PATCH http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000/123e4567-e89b-12d3-a456-426614174001 \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "status": "completed",
     "is_favorite": true
@@ -163,7 +179,7 @@ curl -X PATCH http://localhost:8080/api/v1/users/550e8400-e29b-41d4-a716-4466554
 Comprehensive API documentation is available in OpenAPI 3.0 format:
 
 - **Content Service API**: [services/content-service/api/openapi.yaml](services/content-service/api/openapi.yaml)
-- **RSS Fetcher Service API**: [services/rss-fetcher-service/api/openapi.yaml](services/rss-fetcher-service/api/openapi.yaml)
+- **Ingest RSS Service API**: [services/rss-fetcher-service/api/openapi.yaml](services/rss-fetcher-service/api/openapi.yaml)
 
 You can view these specifications using any OpenAPI viewer like [Swagger Editor](https://editor.swagger.io/).
 
@@ -186,7 +202,7 @@ cairn/services/read/
 │   │   ├── migrations/           # Database migrations
 │   │   └── Dockerfile
 │   │
-│   └── rss-fetcher-service/      # RSS Fetcher Service
+│   └── rss-fetcher-service/      # Ingest RSS Service (ingest_rss)
 │       ├── api/                   # OpenAPI specs
 │       ├── cmd/                   # Entry points
 │       ├── internal/              # Internal packages
@@ -215,9 +231,9 @@ cairn/services/read/
 cd services/content-service
 go build -o bin/content-service ./cmd/server
 
-# Build RSS Fetcher Service
+# Build Ingest RSS Service
 cd services/rss-fetcher-service
-go build -o bin/rss-fetcher ./cmd/server
+go build -o bin/ingest-rss ./cmd/server
 ```
 
 ### Running Tests
@@ -268,8 +284,8 @@ DATABASE_URL=postgres://user:pass@localhost:5432/content_service?sslmode=disable
 SERVER_PORT=8080
 LOG_LEVEL=info
 
-# RSS Fetcher Service
-DATABASE_URL=postgres://user:pass@localhost:5433/rss_fetcher_service?sslmode=disable
+# Ingest RSS Service
+DATABASE_URL=postgres://user:pass@localhost:5433/ingest_rss?sslmode=disable
 SERVER_PORT=8081
 CONTENT_SERVICE_URL=http://content-service:8080
 LOG_LEVEL=info
@@ -315,7 +331,7 @@ curl http://localhost:8081/health/ready
 
 - **Orphaned Content Cleanup**: Runs daily at 2 AM, deletes content orphaned for 90+ days
 
-### RSS Fetcher Service
+### Ingest RSS Service
 
 - **Feed Polling Worker**: Continuously polls feeds based on tiered schedule
   - Tier 1 (Active): Every 1 hour
@@ -375,7 +391,7 @@ docker-compose logs -f
 
 # View specific service logs
 docker-compose logs -f content-service
-docker-compose logs -f rss-fetcher-service
+docker-compose logs -f ingest-rss
 
 # Filter logs by level
 docker-compose logs -f | grep ERROR
@@ -387,8 +403,8 @@ docker-compose logs -f | grep ERROR
 # Connect to Content Service database
 docker-compose exec postgres-content psql -U cairn -d content_service
 
-# Connect to RSS Fetcher database
-docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service
+# Connect to Ingest RSS database
+docker-compose exec postgres-fetcher psql -U cairn -d ingest_rss
 ```
 
 ## Troubleshooting
@@ -436,7 +452,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - `github.com/go-chi/chi` - HTTP routing
 - `github.com/golang-migrate/migrate/v4` - Database migrations
 
-#### RSS Fetcher Service
+#### Ingest RSS Service
 - `github.com/mmcdole/gofeed` - RSS/Atom parsing
 - `github.com/lib/pq` - PostgreSQL driver
 - `github.com/go-chi/chi` - HTTP routing

@@ -6,14 +6,26 @@ This directory contains the complete Docker setup for all Cairn backend services
 
 The Docker Compose configuration includes:
 
-- **Vault**: HashiCorp Vault for secrets management (dev mode)
+### Core Infrastructure
+- **Vault**: HashiCorp Vault for secrets management (dev mode, port 8200)
+
+### Backend Services
 - **User Service**: Authentication and account management (port 8082)
-- **Recommender Service**: Article storage and recommendations (port 8081)
-- **Fetcher Service**: RSS feed fetching (port 8080)
-- **PostgreSQL**: Single database instance with separate databases (port 5432)
-  - `cairn_users` - User service database
-  - `cairn_recommender` - Recommender service database
-  - `cairn_fetcher` - Fetcher service database
+- **Explore Recommender**: Article storage and recommendations (port 8087)
+- **Explore Fetcher**: RSS feed fetching for Explore (port 8088)
+- **Content Service**: Article content storage for Read (port 8083)
+- **Ingest RSS**: Feed subscription management (port 8085)
+
+### Background Workers
+- **Content Worker**: Article cleanup jobs (health port 8084)
+- **Ingest RSS Worker**: Feed polling and processing (health port 8086)
+
+### Databases (PostgreSQL)
+- `users-db` (port 5432) - User service database
+- `recommender-db` (port 5433) - Explore Recommender database
+- `fetcher-db` (port 5434) - Explore Fetcher database
+- `content-db` (port 5435) - Content service database
+- `rss-db` (port 5436) - Ingest RSS database
 
 ## Architecture
 
@@ -23,23 +35,33 @@ The Docker Compose configuration includes:
 │   :8200     │
 └──────┬──────┘
        │
-       ├──────────────────────────────┐
-       │                              │
-┌──────▼──────┐  ┌───────────┐  ┌────▼──────────┐
-│User Service │  │  Fetcher  │  │  Recommender  │
-│   :8082     │  │   :8080   │──│     :8081     │
-└──────┬──────┘  └─────┬─────┘  └───────┬───────┘
-       │               │                │
-       └───────────────┼────────────────┘
-                       │
-              ┌────────▼─────────┐
-              │   PostgreSQL     │
-              │      :5432       │
-              ├──────────────────┤
-              │ cairn_users      │
-              │ cairn_recommender│
-              │ cairn_fetcher    │
-              └──────────────────┘
+       ├───────────────────────────────────────────┐
+       │                                           │
+┌──────▼────────┐  ┌────────────────┐  ┌──────────▼─────────┐
+│ User Service  │  │ Explore Fetcher│  │ Explore Recommender│
+│   :8082       │  │     :8088      │─▶│      :8087         │
+└───────┬───────┘  └────────┬───────┘  └──────────┬─────────┘
+        │                   │                     │
+        │                   │                     │
+   ┌────▼─────┐      ┌──────▼──────┐      ┌──────▼──────┐
+   │users-db  │      │fetcher-db   │      │recommender-db│
+   │  :5432   │      │   :5434     │      │    :5433     │
+   └──────────┘      └─────────────┘      └──────────────┘
+
+┌──────────────────┐           ┌────────────────────┐
+│ Ingest RSS       │──────────▶│  Content Service   │
+│   :8085          │           │      :8083         │
+└────────┬─────────┘           └──────────┬─────────┘
+         │                                │
+         │                                │
+    ┌────▼────────┐                ┌─────▼──────┐
+    │ingest-rss-db│                │content-db  │
+    │   :5436     │                │  :5435     │
+    └─────────────┘                └────────────┘
+
+Background Workers:
+├── Content Worker (:8084) - Content cleanup
+└── Ingest RSS Worker (:8086) - Feed polling
 ```
 
 ## Quick Start
@@ -84,16 +106,28 @@ Once running, services are available at:
   - Health: http://localhost:8082/health
   - API: http://localhost:8082/auth/* and http://localhost:8082/users/*
 
-- **Recommender Service**: http://localhost:8081
-  - Health: http://localhost:8081/health
-  - API: http://localhost:8081/api/v1/*
+- **Explore Recommender**: http://localhost:8087
+  - Health: http://localhost:8087/health
+  - API: http://localhost:8087/explore/*
 
-- **Fetcher Service**: http://localhost:8080
-  - Health: http://localhost:8080/health
-  - Manual fetch: http://localhost:8080/fetch
+- **Explore Fetcher**: http://localhost:8088
+  - Health: http://localhost:8088/health
+  - Manual fetch: http://localhost:8088/fetch
+
+- **Content Service**: http://localhost:8083
+  - Health: http://localhost:8083/health/live
+  - API: http://localhost:8083/api/v1/users/{userID}/contents
+
+- **Ingest RSS**: http://localhost:8085
+  - Health: http://localhost:8085/health/live
+  - API: http://localhost:8085/api/v1/users/{userID}/feeds
+
+- **Content Worker**: http://localhost:8084/health/ready (health check only)
+
+- **Ingest RSS Worker**: http://localhost:8086/health/ready (health check only)
 
 - **Vault UI**: http://localhost:8200/ui
-  - Token: `dev-token` (dev mode only)
+  - Token: Value from `.env` file (default: `dev-root-token` in dev mode)
 
 ## First-Time Setup
 
@@ -121,16 +155,16 @@ Keys are stored at:
 
 ## Database Structure
 
-The PostgreSQL instance hosts three separate databases:
+Each service has its own dedicated PostgreSQL database:
 
-### cairn_users
+### users-db (cairn_users, port 5432)
 User service database containing:
 - `users` - User accounts
 - `refresh_tokens` - JWT refresh token management
 
 **Migrations**: `services/users/migrations/`
 
-### cairn_recommender
+### explore-recommender-db (cairn_recommender, port 5433)
 Recommender service database containing:
 - `users` - User activity tracking
 - `articles` - RSS articles with metadata
@@ -140,12 +174,28 @@ Recommender service database containing:
 
 **Migrations**: `services/explore/recommender/migrations/`
 
-### cairn_fetcher
+### explore-fetcher-db (cairn_fetcher, port 5434)
 Fetcher service database containing:
 - `feeds` - RSS feed sources
 - `fetch_history` - Fetch attempt tracking
 
 **Migrations**: `services/explore/fetcher/migrations/`
+
+### content-db (content_service, port 5435)
+Content service database containing:
+- `contents` - Cleaned article content
+- `user_contents` - User-specific metadata
+
+**Migrations**: Managed by Content Service
+
+### ingest-rss-db (ingest_rss, port 5436)
+Ingest RSS service database containing:
+- `feeds` - RSS feed metadata
+- `user_feeds` - User subscriptions
+- `feed_items` - Pending feed items
+- `outbox` - Content delivery queue
+
+**Migrations**: Managed by Ingest RSS Service
 
 ### Resetting Databases
 
@@ -176,33 +226,83 @@ Key configurations:
 
 ### User Service
 - `PORT=8080` (internal), exposed as 8082
-- `DB_HOST=postgres`
-- `DB_NAME=cairn_users`
-- `DB_USER=cairn`
-- `DB_PASSWORD=cairn_password`
+- `DB_HOST=users-db`
+- `DB_PORT=5432`
+- `DB_NAME=${POSTGRES_DB_USERS}`
+- `DB_USER=${POSTGRES_USER_USERS}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_USERS}`
 - `VAULT_ADDR=http://vault:8200`
+- `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
 - `JWT_ACCESS_LIFETIME=15m`
 - `JWT_REFRESH_LIFETIME=7d`
+- `SERVER_ENVIRONMENT=development`
 
-### Recommender Service
-- `PORT=8081`
-- `DB_HOST=postgres`
-- `DB_NAME=cairn_recommender`
-- `DB_USER=cairn`
-- `DB_PASSWORD=cairn_password`
+### Explore Recommender (explore-recommender)
+- `PORT=8081` (internal), exposed as 8087
+- `DB_HOST=explore-recommender-db`
+- `DB_PORT=5432`
+- `DB_NAME=${POSTGRES_DB_RECOMMENDER}`
+- `DB_USER=${POSTGRES_USER_RECOMMENDER}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}`
+- `DB_SSLMODE=disable`
 - `VAULT_ADDR=http://vault:8200`
+- `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
+- `JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key`
 - `ARTICLE_RETENTION_DAYS=90`
 
-### Fetcher Service
-- `PORT=8080`
-- `DB_HOST=postgres`
-- `DB_NAME=cairn_fetcher`
-- `DB_USER=cairn`
-- `DB_PASSWORD=cairn_password`
-- `RECOMMENDER_URL=http://recommender:8081`
+### Explore Fetcher (explore-fetcher)
+- `PORT=8080` (internal), exposed as 8088
+- `DB_HOST=explore-fetcher-db`
+- `DB_PORT=5432`
+- `DB_NAME=${POSTGRES_DB_FETCHER}`
+- `DB_USER=${POSTGRES_USER_FETCHER}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}`
+- `DB_SSLMODE=disable`
+- `RECOMMENDER_URL=http://explore-recommender:8081`
 - `FETCH_INTERVAL=60` (seconds)
 - `FETCH_TIMEOUT=30` (seconds)
 - `MAX_FETCH_ERRORS=10`
+- `KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt`
+
+### Content Service (content-service)
+- `PORT=8080` (internal), exposed as 8083
+- `DB_HOST=content-db`
+- `DB_PORT=5432`
+- `DB_USER=${POSTGRES_USER_CONTENT}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
+- `DB_NAME=${POSTGRES_DB_CONTENT}`
+- `DB_SSL_MODE=disable`
+
+### Content Worker (content-worker)
+- `DB_HOST=content-db`
+- `DB_PORT=5432`
+- `DB_USER=${POSTGRES_USER_CONTENT}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
+- `DB_NAME=${POSTGRES_DB_CONTENT}`
+- `DB_SSL_MODE=disable`
+- `CLEANUP_CRON=0 2 * * *` (runs at 2 AM daily)
+- `HEALTH_PORT=8084`
+
+### Ingest RSS Service (ingest-rss)
+- `PORT=8081` (internal), exposed as 8085
+- `DB_HOST=ingest-rss-db`
+- `DB_PORT=5432`
+- `DB_USER=${POSTGRES_USER_RSS}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
+- `DB_NAME=${POSTGRES_DB_RSS}`
+- `DB_SSL_MODE=disable`
+
+### Ingest RSS Worker (ingest-rss-worker)
+- `DB_HOST=ingest-rss-db`
+- `DB_PORT=5432`
+- `DB_USER=${POSTGRES_USER_RSS}`
+- `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
+- `DB_NAME=${POSTGRES_DB_RSS}`
+- `DB_SSL_MODE=disable`
+- `CONTENT_SERVICE_URL=http://content-service:8080`
+- `HEALTH_PORT=8086`
+- `OUTBOX_CLEANUP_CRON=0 3 * * *` (runs at 3 AM daily)
+- `FEED_ITEMS_CLEANUP_CRON=0 4 * * *` (runs at 4 AM daily)
 
 ## Viewing Logs
 
@@ -214,8 +314,8 @@ docker compose logs -f
 View logs for a specific service:
 ```bash
 docker compose logs -f user-service
-docker compose logs -f recommender
-docker compose logs -f fetcher
+docker compose logs -f explore-recommender
+docker compose logs -f explore-fetcher
 docker compose logs -f vault
 ```
 
@@ -227,17 +327,23 @@ docker compose logs -f vault
 # User Service
 curl http://localhost:8082/health
 
-# Recommender Service
-curl http://localhost:8081/health
+# Explore Recommender
+curl http://localhost:8087/health
 
-# Fetcher Service
-curl http://localhost:8080/health
+# Explore Fetcher
+curl http://localhost:8088/health
+
+# Content Service
+curl http://localhost:8083/health/live
+
+# Ingest RSS Service
+curl http://localhost:8085/health/live
 ```
 
 ### 2. Trigger Manual Feed Fetch
 
 ```bash
-curl -X POST http://localhost:8080/fetch
+curl -X POST http://localhost:8088/fetch
 ```
 
 ### 3. Get Recommendations
@@ -245,7 +351,7 @@ curl -X POST http://localhost:8080/fetch
 ```bash
 # Note: This endpoint requires JWT authentication
 # You'll need to register a user and get a token first
-curl http://localhost:8081/api/v1/recommendations/ \
+curl http://localhost:8087/api/v1/recommendations/ \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -365,7 +471,11 @@ Located at: `infrastructure/docker/scripts/init-postgres.sh`
 
 Persistent data is stored in Docker volumes:
 
-- `postgres_data`: All PostgreSQL data (users, recommender, fetcher databases)
+- `users_db_data`: User service PostgreSQL data
+- `explore_recommender_db_data`: Explore recommender PostgreSQL data
+- `explore_fetcher_db_data`: Explore fetcher PostgreSQL data
+- `content_db_data`: Content service PostgreSQL data
+- `ingest_rss_db_data`: Ingest RSS service PostgreSQL data
 - `vault-keys`: Generated JWT keys (temporary, recreated on volume reset)
 
 ## Networking
@@ -374,10 +484,16 @@ All services communicate on the `cairn-network` bridge network.
 
 Internal service communication uses service names as hostnames:
 - `vault:8200`
-- `postgres:5432`
-- `recommender:8081`
+- `users-db:5432`
+- `explore-recommender-db:5432`
+- `explore-fetcher-db:5432`
+- `content-db:5432`
+- `ingest-rss-db:5432`
 - `user-service:8080`
-- `fetcher:8080`
+- `explore-recommender:8081`
+- `explore-fetcher:8080`
+- `content-service:8080`
+- `ingest-rss:8081`
 
 ## Support
 

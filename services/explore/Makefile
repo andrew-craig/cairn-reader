@@ -7,22 +7,22 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build both services
-	@echo "Building fetcher..."
-	@go build -o bin/fetcher ./fetcher/cmd/fetcher
-	@echo "Building recommender..."
-	@go build -o bin/recommender ./recommender/cmd/recommender
+	@echo "Building explore_fetcher..."
+	@go build -o bin/explore_fetcher ./fetcher/cmd/explore_fetcher
+	@echo "Building explore_recommender..."
+	@go build -o bin/explore_recommender ./recommender/cmd/explore_recommender
 	@echo "Building cleanup utility..."
-	@go build -o bin/cleanup ./recommender/cmd/cleanup
+	@go build -o bin/explore_cleanup ./recommender/cmd/explore_cleanup
 	@echo "Build complete!"
 
 run-fetcher: ## Run the fetcher service locally
-	@go run ./fetcher/cmd/fetcher/main.go
+	@go run ./fetcher/cmd/explore_fetcher/main.go
 
 run-recommender: ## Run the recommender service locally
-	@go run ./recommender/cmd/recommender/main.go
+	@go run ./recommender/cmd/explore_recommender/main.go
 
 run-cleanup: ## Run the article cleanup utility
-	@go run ./recommender/cmd/cleanup/main.go
+	@go run ./recommender/cmd/explore_cleanup/main.go
 
 test: ## Run unit tests
 	@go test -v ./...

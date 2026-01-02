@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Cairn RSS Fetcher Service API
+  title: Cairn Ingest RSS Service API
   description: |
-    The RSS Fetcher Service is responsible for managing RSS feed subscriptions,
+    The Ingest RSS Service is responsible for managing RSS feed subscriptions,
     polling feeds for new content, and delivering content to the Content Service.
     It implements a tiered polling strategy based on feed activity and uses an outbox pattern
     for reliable content delivery.

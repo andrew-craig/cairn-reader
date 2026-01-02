@@ -46,7 +46,7 @@ export class AuthService {
   static async loginWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${API_BASE_URL}/auth/login/mobile`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ export class AuthService {
   static async registerWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${API_BASE_URL}/auth/register/mobile`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ export class AuthService {
   }
 
   static async loginWithEmail(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ export class AuthService {
   }
 
   static async registerWithEmail(credentials: RegisterRequest): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -142,7 +142,7 @@ export class AuthService {
   static async logout(): Promise<void> {
     if (this.refreshToken) {
       try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
+        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -197,7 +197,7 @@ export class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
