@@ -30,6 +30,9 @@ WORKDIR /root/
 # Copy the binary from builder
 COPY --from=builder /app/services/explore/explore_recommender .
 
+# Copy migrations
+COPY --from=builder /app/services/explore/recommender/migrations ./migrations
+
 EXPOSE 8081
 
 CMD ["./explore_recommender"]

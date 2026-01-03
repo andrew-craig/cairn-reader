@@ -47,7 +47,6 @@ services:
       - "5432:5432"
     volumes:
       - users_db_data:/var/lib/postgresql/data
-      - ../../services/users/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_USERS} -d ${POSTGRES_DB_USERS}"]
       interval: 10s
@@ -67,7 +66,6 @@ services:
       - "5433:5432"
     volumes:
       - explore_recommender_db_data:/var/lib/postgresql/data
-      - ../../services/explore/recommender/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RECOMMENDER} -d ${POSTGRES_DB_RECOMMENDER}"]
       interval: 10s
@@ -87,7 +85,6 @@ services:
       - "5434:5432"
     volumes:
       - explore_fetcher_db_data:/var/lib/postgresql/data
-      - ../../services/explore/fetcher/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_FETCHER} -d ${POSTGRES_DB_FETCHER}"]
       interval: 10s
@@ -107,7 +104,6 @@ services:
       - "5435:5432"
     volumes:
       - content_db_data:/var/lib/postgresql/data
-      - ../../services/read/content/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CONTENT} -d ${POSTGRES_DB_CONTENT}"]
       interval: 10s
@@ -127,7 +123,6 @@ services:
       - "5436:5432"
     volumes:
       - ingest_rss_db_data:/var/lib/postgresql/data
-      - ../../services/read/fetcher/migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RSS} -d ${POSTGRES_DB_RSS}"]
       interval: 10s

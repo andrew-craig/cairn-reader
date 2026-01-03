@@ -29,11 +29,13 @@ func NewRouter(db *database.DB) http.Handler {
 
 	// Initialize services
 	contentService := service.NewContentService(contentRepo, db.DB)
+	urlDetector := service.NewURLDetector()
 
 	// Initialize handlers
 	contentHandler := handlers.NewContentHandler(contentService)
 	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
+	detectionHandler := handlers.NewDetectionHandler(urlDetector)
 
 	// Health check endpoints (Kubernetes-compatible)
 	// Liveness probe - indicates if the process is running
@@ -69,6 +71,9 @@ func NewRouter(db *database.DB) http.Handler {
 
 	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
 	r.Route("/api/v1/content", func(r chi.Router) {
+		// URL detection endpoint
+		r.Post("/detect", detectionHandler.DetectURL)
+
 		// Content management routes
 		r.Post("/", contentHandler.CreateContent)
 		r.Get("/{content_id}", contentHandler.GetContent)

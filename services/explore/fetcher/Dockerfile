@@ -30,6 +30,9 @@ WORKDIR /root/
 # Copy the binary from builder
 COPY --from=builder /app/services/explore/explore_fetcher .
 
+# Copy migrations
+COPY --from=builder /app/services/explore/fetcher/migrations ./migrations
+
 EXPOSE 8080
 
 CMD ["./explore_fetcher"]

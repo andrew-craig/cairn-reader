@@ -36,6 +36,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/content-service .
 
+# Copy migrations
+COPY --from=builder /build/services/read/content/migrations ./migrations
+
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 

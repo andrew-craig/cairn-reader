@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -43,6 +44,20 @@ func main() {
 		slog.String("port", port),
 		slog.Duration("fetch_interval", fetchInterval),
 	)
+
+	// Run database migrations
+	slog.Info("running database migrations")
+	migrationsPath, err := filepath.Abs("migrations")
+	if err != nil {
+		slog.Error("failed to get migrations path", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	if err := db.RunMigrations(migrationsPath); err != nil {
+		slog.Error("failed to run migrations", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slog.Info("database migrations completed")
 
 	// Initialize database connection
 	ctx := context.Background()

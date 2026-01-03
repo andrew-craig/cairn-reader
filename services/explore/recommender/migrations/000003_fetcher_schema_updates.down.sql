@@ -1,0 +1,1 @@
+-- Rollback for fetcher_schema_updates
