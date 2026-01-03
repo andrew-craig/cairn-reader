@@ -38,7 +38,7 @@ services:
 
   # User Service Database
   users-db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_USERS}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_USERS}
@@ -58,7 +58,7 @@ services:
 
   # Explore Recommender Service Database
   explore-recommender-db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_RECOMMENDER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RECOMMENDER}
@@ -78,7 +78,7 @@ services:
 
   # Explore Fetcher Service Database
   explore-fetcher-db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_FETCHER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_FETCHER}
@@ -98,7 +98,7 @@ services:
 
   # Content Service Database
   content-db:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_CONTENT}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CONTENT}
@@ -118,7 +118,7 @@ services:
 
   # Ingest RSS Database
   ingest-rss-db:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER_RSS}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RSS}
