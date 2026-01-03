@@ -1,0 +1,9 @@
+# Compiled binaries
+ingest-rss
+
+# Test coverage
+coverage.html
+coverage.out
+
+# Build artifacts
+bin/

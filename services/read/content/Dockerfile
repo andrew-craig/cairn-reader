@@ -10,21 +10,16 @@ RUN apk add --no-cache git
 # Set working directory
 WORKDIR /build/services/read
 
-# Copy go mod files
-COPY services/read/go.mod services/read/go.sum ./
-
-# Copy pkg directory to match replace directive location (../../pkg from services/read)
+# Copy read service and pkg directory
+COPY services/read/ ./
 COPY pkg/ ../../pkg/
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
-COPY services/read/content/ ./content/
-
 # Build the application
 WORKDIR /build/services/read/content
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /build/content-service ./cmd/content
+RUN CGO_ENABLED=0 GOOS=linux go build -o /build/content-service ./cmd/content
 
 # Final stage
 FROM alpine:latest

@@ -1,0 +1,10 @@
+# Compiled binaries
+content
+content-worker
+
+# Test coverage
+coverage.html
+coverage.out
+
+# Build artifacts
+bin/

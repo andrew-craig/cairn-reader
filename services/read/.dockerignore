@@ -1,0 +1,35 @@
+# Build artifacts
+**/bin/
+**/*.exe
+**/content/content
+**/content/content-worker
+**/fetcher/ingest-rss
+
+# Test files and coverage
+**/*_test.go
+**/coverage.html
+**/coverage.out
+**/testdata/
+
+# Development files
+**/.env
+**/.env.local
+**/tmp/
+**/temp/
+
+# IDE and editor files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/.DS_Store
+
+# Git
+**/.git/
+**/.gitignore
+
+# Documentation (not needed in build)
+**/README.md
+**/IMPLEMENTATION_PLAN.md
+**/INTEGRATION_TESTS.md
+**/URL_DETECTION_PLAN.md

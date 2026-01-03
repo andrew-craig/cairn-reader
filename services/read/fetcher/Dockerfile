@@ -10,21 +10,16 @@ RUN apk add --no-cache git gcc musl-dev
 # Set working directory
 WORKDIR /build/services/read
 
-# Copy go mod files
-COPY services/read/go.mod services/read/go.sum ./
-
-# Copy pkg directory to match replace directive location (../../pkg from services/read)
+# Copy read service and pkg directory
+COPY services/read/ ./
 COPY pkg/ ../../pkg/
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code
-COPY services/read/fetcher/ ./fetcher/
-
 # Build the application
 WORKDIR /build/services/read/fetcher
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /build/ingest-rss ./cmd/ingest_rss
+RUN CGO_ENABLED=0 GOOS=linux go build -o /build/ingest-rss ./cmd/ingest_rss
 
 # Final stage
 FROM alpine:latest
