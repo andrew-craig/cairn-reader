@@ -7,6 +7,9 @@ import {
   UpdateUserContentRequest,
   SearchParams,
   ListContentsParams,
+  DetectURLResponse,
+  AddURLRequest,
+  AddURLResponse,
 } from '../types/read';
 import { API_CONFIG } from '../config/api';
 
@@ -224,6 +227,75 @@ export class ReadService {
       }
     } catch (error) {
       console.error('Error deleting content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect URL type (feed or page)
+   * Non-blocking with 10s timeout
+   */
+  static async detectURL(url: string): Promise<DetectURLResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+    try {
+      const response = await fetch(
+        `${READ_SERVICE_BASE_URL}/api/v1/content/detect`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error('Detection failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // On timeout or error, return unknown
+      return {
+        url,
+        type: 'unknown',
+        title: null,
+      };
+    }
+  }
+
+  /**
+   * Add URL to user's content (handles both feeds and pages)
+   */
+  static async addURL(request: AddURLRequest): Promise<AddURLResponse> {
+    try {
+      const userId = await AuthService.getUserId();
+
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await this.fetchWithAuth(
+        `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(request),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to add URL: ${error}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error adding URL:', error);
       throw error;
     }
   }

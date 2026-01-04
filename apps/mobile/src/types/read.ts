@@ -42,6 +42,42 @@ export interface UserContentsListResponse {
   next_cursor?: string;
 }
 
+// URL Detection Types
+export type URLType = 'feed' | 'page' | 'unknown';
+
+export interface DetectURLResponse {
+  url: string;
+  type: URLType;
+  title: string | null;
+}
+
+export interface AddURLRequest {
+  url: string;
+  type?: URLType;
+  title?: string;
+}
+
+export interface AddFeedResponse {
+  type: 'feed';
+  feed_id: string;
+  subscription: {
+    id: string;
+    user_id: string;
+    feed_id: string;
+    feed_url: string;
+    title: string;
+    subscribed_at: string;
+  };
+}
+
+export interface AddPageResponse {
+  type: 'page';
+  content: UserContentResponse;
+}
+
+export type AddURLResponse = AddFeedResponse | AddPageResponse;
+
+// Legacy: Direct content addition (requires pre-created content)
 export interface AddContentToUserRequest {
   url: string;
   html?: string;

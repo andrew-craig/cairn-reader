@@ -84,36 +84,9 @@ export const ReadScreen: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleAddArticle = async (url: string) => {
-    try {
-      await ReadService.addContentToUser({
-        url,
-        source_type: 'manual',
-      });
-
-      Alert.alert(
-        'Success',
-        'Article added successfully',
-        [{ text: 'OK' }]
-      );
-
-      // Refresh the list to show the new article
-      handleRefresh();
-    } catch (error) {
-      console.error('Error adding article:', error);
-      throw error; // Re-throw to let modal handle the error
-    }
-  };
-
-  const handleFindFeed = async (url: string) => {
-    // TODO: Implement feed discovery - will scan the URL for RSS/Atom feeds
-    // For now, show a placeholder message
-    Alert.alert(
-      'Coming Soon',
-      'Feed discovery will be implemented in a future update. For now, please use the RSS feed URL directly.',
-      [{ text: 'OK' }]
-    );
-    console.log('Find feed for URL:', url);
+  const handleAddSuccess = () => {
+    // Refresh the list to show the new article or subscription
+    handleRefresh();
   };
 
   const handleSearchPress = () => {
@@ -145,8 +118,7 @@ export const ReadScreen: React.FC = () => {
       <AddLinkModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onAddArticle={handleAddArticle}
-        onFindFeed={handleFindFeed}
+        onSuccess={handleAddSuccess}
       />
     </>
   );
