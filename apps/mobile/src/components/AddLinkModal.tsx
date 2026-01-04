@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -10,29 +10,79 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { Button } from './common/Button';
+import { ReadService } from '../services/read';
+import { DetectURLResponse } from '../types/read';
 
 interface AddLinkModalProps {
   visible: boolean;
   onClose: () => void;
-  onAddArticle: (url: string) => Promise<void>;
-  onFindFeed: (url: string) => Promise<void>;
+  onSuccess?: () => void; // Optional callback after successful add
 }
 
 export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   visible,
   onClose,
-  onAddArticle,
-  onFindFeed,
+  onSuccess,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
+
+  // Trigger URL detection when URL changes
+  useEffect(() => {
+    if (!url.trim()) {
+      setDetectionResult(null);
+      return;
+    }
+
+    // Only detect if URL is valid
+    if (!isValidUrl(url)) {
+      setDetectionResult(null);
+      return;
+    }
+
+    const normalizedUrl = normalizeUrl(url);
+    let cancelled = false;
+
+    const detectURL = async () => {
+      setDetecting(true);
+      try {
+        const result = await ReadService.detectURL(normalizedUrl);
+        if (!cancelled) {
+          setDetectionResult(result);
+        }
+      } catch (err) {
+        console.error('URL detection error:', err);
+        // Silently fail - user can still submit
+        if (!cancelled) {
+          setDetectionResult({
+            url: normalizedUrl,
+            type: 'unknown',
+            title: null,
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setDetecting(false);
+        }
+      }
+    };
+
+    detectURL();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
 
   const isValidUrl = (urlString: string): boolean => {
     try {
@@ -69,11 +119,48 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
     try {
       const normalizedUrl = normalizeUrl(url);
-      await onAddArticle(normalizedUrl);
+      const response = await ReadService.addURL({
+        url: normalizedUrl,
+        type: detectionResult?.type,
+        title: detectionResult?.title ?? undefined,
+      });
+
+      // Show success message based on response type
+      if (response.type === 'feed') {
+        Alert.alert(
+          'Success',
+          `Subscribed to ${response.subscription.title}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Success',
+          'Article added to reading list',
+          [{ text: 'OK' }]
+        );
+      }
+
       setUrl('');
+      setDetectionResult(null);
       onClose();
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add article');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+      // Handle specific error messages
+      if (errorMessage.includes('already subscribed')) {
+        setError('Already subscribed to this feed');
+      } else if (errorMessage.includes('Failed to subscribe')) {
+        setError('Failed to subscribe to feed');
+      } else if (errorMessage.includes('Failed to add')) {
+        setError('Failed to add article');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -90,22 +177,66 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
     try {
       const normalizedUrl = normalizeUrl(url);
-      await onFindFeed(normalizedUrl);
+
+      // Force feed type for "Find feed" button
+      const response = await ReadService.addURL({
+        url: normalizedUrl,
+        type: 'feed', // Always try to add as feed
+        title: detectionResult?.title ?? undefined,
+      });
+
+      if (response.type === 'feed') {
+        Alert.alert(
+          'Success',
+          `Subscribed to ${response.subscription.title}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Info',
+          'This URL is not an RSS feed. Added as an article instead.',
+          [{ text: 'OK' }]
+        );
+      }
+
       setUrl('');
+      setDetectionResult(null);
       onClose();
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to find feed');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+      if (errorMessage.includes('already subscribed')) {
+        setError('Already subscribed to this feed');
+      } else if (errorMessage.includes('invalid_feed')) {
+        setError('This URL is not a valid RSS/Atom feed');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
-    if (!loading) {
+    if (!loading && !detecting) {
       setUrl('');
       setError(null);
+      setDetectionResult(null);
       onClose();
     }
+  };
+
+  // Button text changes based on detection
+  const getSubmitButtonText = () => {
+    if (loading) return 'Adding...';
+    if (detecting) return 'Detecting...';
+    if (detectionResult?.type === 'feed') return 'Add Feed';
+    return 'Add';
   };
 
   return (
@@ -192,10 +323,10 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                   disabled={loading || !url.trim()}
                   activeOpacity={0.7}
                 >
-                  {loading ? (
+                  {loading || detecting ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>Add</Text>
+                    <Text style={styles.primaryButtonText}>{getSubmitButtonText()}</Text>
                   )}
                 </TouchableOpacity>
               </View>
