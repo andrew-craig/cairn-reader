@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/andrew-craig/cairn/pkg/api v0.0.0
+	github.com/andrew-craig/cairn/pkg/config v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
@@ -68,3 +69,5 @@ require (
 replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
 
 replace github.com/andrew-craig/cairn/pkg/api => ../../pkg/api
+
+replace github.com/andrew-craig/cairn/pkg/config => ../../pkg/config

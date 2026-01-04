@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn/pkg/config v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/models v0.0.0-00010101000000-000000000000
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -84,3 +85,5 @@ replace github.com/andrew-craig/cairn/pkg/auth => ../../pkg/auth
 replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
 
 replace github.com/andrew-craig/cairn/pkg/models => ../../pkg/models
+
+replace github.com/andrew-craig/cairn/pkg/config => ../../pkg/config
