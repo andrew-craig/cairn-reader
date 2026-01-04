@@ -160,11 +160,115 @@ Junction table mapping users to content with user-specific metadata:
 - **mark_content_orphaned**: Automatically marks content as orphaned when the last user-content relationship is deleted
 - **clear_orphaned_status**: Clears the orphaned status when content is re-saved by a user
 
+## URL Detection Feature
+
+The Content Service now includes smart URL detection and submission capabilities:
+
+### URL Detection Endpoint
+
+**POST /api/v1/content/detect**
+
+Determines if a URL is an RSS/Atom feed or a web page:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/content/detect \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/feed.xml"}'
+```
+
+Response:
+```json
+{
+  "url": "https://example.com/feed.xml",
+  "type": "feed",
+  "title": "Example Blog"
+}
+```
+
+Possible types: `feed`, `page`, `unknown` (on timeout/error)
+
+### Smart URL Submission
+
+**POST /api/v1/content/user/{user_id}**
+
+Automatically routes URLs based on type:
+- **feed**: Subscribes user to RSS feed via Ingest RSS service
+- **page**: Extracts and saves article content
+
+```bash
+# Auto-detect and add
+curl -X POST http://localhost:8080/api/v1/content/user/{user_id} \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/article"}'
+
+# With type hint (from detection)
+curl -X POST http://localhost:8080/api/v1/content/user/{user_id} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/feed.xml",
+    "type": "feed",
+    "title": "Example Blog"
+  }'
+```
+
+Feed response:
+```json
+{
+  "type": "feed",
+  "feed_id": "...",
+  "subscription": {
+    "id": "...",
+    "user_id": "...",
+    "feed_id": "...",
+    "feed_url": "https://example.com/feed.xml",
+    "title": "Example Blog",
+    "subscribed_at": "2025-01-04T10:00:00Z"
+  }
+}
+```
+
+Page response:
+```json
+{
+  "type": "page",
+  "content": {
+    "user_id": "...",
+    "content_id": "...",
+    "status": "unread",
+    "content": {
+      "title": "Article Title",
+      "cleaned_html": "...",
+      ...
+    }
+  }
+}
+```
+
+### Implementation Details
+
+- **Timeout**: 10 seconds for URL detection (non-blocking)
+- **Feed Detection**: Uses gofeed parser for RSS/Atom feeds
+- **Page Extraction**: go-readability for article content
+- **Feed Management**: Integrates with Ingest RSS service for subscriptions
+- **Error Handling**: Returns specific error codes for duplicate subscriptions, feed limits, etc.
+
+### Mobile Integration
+
+The mobile app uses these endpoints to provide a seamless "Add" experience:
+1. User enters URL
+2. App calls `/detect` endpoint (non-blocking, 10s timeout)
+3. UI updates button text ("Add" → "Add Feed" if feed detected)
+4. User submits with detected type hint
+5. Backend routes to appropriate handler
+
+See `apps/mobile/src/components/AddLinkModal.tsx` for implementation.
+
 ### Next Steps
 
-- **Phase 1.2**: Content processing (readability, sanitization, deduplication)
-- **Phase 1.3**: REST API - Basic operations
-- **Phase 1.4**: REST API - Bulk operations
+- **Phase 1.2**: Content processing (readability, sanitization, deduplication) ✅ Complete
+- **Phase 1.3**: REST API - Basic operations ✅ Complete
+- **Phase 1.4**: REST API - Bulk operations ✅ Complete
+- **URL Detection**: Smart URL submission and feed detection ✅ Complete
 
 ## Development
 
