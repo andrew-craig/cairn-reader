@@ -49,9 +49,10 @@ services:
       - users_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_USERS} -d ${POSTGRES_DB_USERS}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - cairn-network
 
@@ -68,9 +69,10 @@ services:
       - explore_recommender_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RECOMMENDER} -d ${POSTGRES_DB_RECOMMENDER}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - cairn-network
 
@@ -87,9 +89,10 @@ services:
       - explore_fetcher_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_FETCHER} -d ${POSTGRES_DB_FETCHER}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - cairn-network
 
@@ -106,9 +109,10 @@ services:
       - content_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CONTENT} -d ${POSTGRES_DB_CONTENT}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - cairn-network
 
@@ -125,9 +129,10 @@ services:
       - ingest_rss_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RSS} -d ${POSTGRES_DB_RSS}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     networks:
       - cairn-network
 
