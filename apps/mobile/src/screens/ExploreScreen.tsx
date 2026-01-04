@@ -29,6 +29,8 @@ export const ExploreScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisibleIndex, setLastVisibleIndex] = useState(0);
   const isFetchingRef = useRef(false);
+  const articlesRef = useRef<Article[]>([]);
+  const loadMoreRef = useRef<((minArticles?: number) => Promise<void>) | null>(null);
 
   const loadMoreUntilBuffer = useCallback(async (minArticles?: number) => {
     if (isFetchingRef.current) return;
@@ -119,6 +121,15 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [loadMoreUntilBuffer]);
 
+  // Keep refs updated with latest values
+  useEffect(() => {
+    articlesRef.current = articles;
+  }, [articles]);
+
+  useEffect(() => {
+    loadMoreRef.current = loadMoreUntilBuffer;
+  }, [loadMoreUntilBuffer]);
+
   useEffect(() => {
     loadExploreArticles();
   }, [loadExploreArticles]);
@@ -141,14 +152,17 @@ export const ExploreScreen: React.FC = () => {
   }) => {
     if (info.viewableItems.length > 0) {
       const lastVisible = info.viewableItems[info.viewableItems.length - 1];
-      const index = articles.findIndex(a => a.id === lastVisible.item.id);
+      // Use ref to get current articles array
+      const currentArticles = articlesRef.current;
+      const index = currentArticles.findIndex(a => a.id === lastVisible.item.id);
       if (index !== -1) {
         setLastVisibleIndex(index);
 
         // Check if we need to load more articles
-        const remainingArticles = articles.length - index;
+        const remainingArticles = currentArticles.length - index;
         if (remainingArticles < MIN_LOOKAHEAD_ARTICLES && !isFetchingRef.current) {
-          loadMoreUntilBuffer();
+          // Use ref to get current loadMore function
+          loadMoreRef.current?.();
         }
       }
     }
