@@ -20,6 +20,8 @@ tags:
     description: User-specific content operations
   - name: Bulk Operations
     description: Bulk content operations for RSS Fetcher Service
+  - name: URL Detection
+    description: URL type detection and smart submission
 
 paths:
   /health/live:
@@ -77,6 +79,57 @@ paths:
                       database:
                         type: string
                         example: "error"
+
+  /api/v1/content/detect:
+    post:
+      tags:
+        - URL Detection
+      summary: Detect URL type
+      description: |
+        Determines if a URL is an RSS/Atom feed or a web page. This is a non-blocking operation
+        with a 10-second timeout. Used by mobile apps to provide smart URL submission (e.g.,
+        showing "Add Feed" vs "Add" button).
+      operationId: detectURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetectURLRequest'
+            example:
+              url: "https://example.com/feed.xml"
+      responses:
+        '200':
+          description: URL detection completed (may return "unknown" on timeout/error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetectURLResponse'
+              examples:
+                feedDetected:
+                  summary: RSS/Atom feed detected
+                  value:
+                    url: "https://example.com/feed.xml"
+                    type: "feed"
+                    title: "Example Blog"
+                pageDetected:
+                  summary: Web page detected
+                  value:
+                    url: "https://example.com/article"
+                    type: "page"
+                    title: "Example Article Title"
+                unknownType:
+                  summary: Detection failed or timed out
+                  value:
+                    url: "https://example.com"
+                    type: "unknown"
+                    title: null
+        '400':
+          description: Bad request - invalid URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/content:
     post:
@@ -342,7 +395,15 @@ paths:
       tags:
         - User Contents
       summary: Add content to user's list
-      description: Add an existing content item to a user's reading list
+      description: |
+        Add content to a user's reading list. Supports two modes:
+
+        **URL-based submission (recommended)**: Provide a URL with optional type hint. The service will:
+        - Detect if the URL is a feed or page (if type not provided)
+        - Subscribe to feed (if type=feed) via Ingest RSS service
+        - Extract and add page content (if type=page or unknown)
+
+        **Content-ID-based submission (legacy)**: Provide a pre-created content_id to add existing content.
       operationId: addContentToUser
       parameters:
         - name: user_id
@@ -358,21 +419,78 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AddContentToUserRequest'
+            examples:
+              urlBasedFeed:
+                summary: Add RSS feed (URL-based)
+                value:
+                  url: "https://example.com/feed.xml"
+                  type: "feed"
+                  title: "Example Blog"
+              urlBasedPage:
+                summary: Add web page (URL-based)
+                value:
+                  url: "https://example.com/article"
+                  type: "page"
+              urlBasedAuto:
+                summary: Auto-detect type
+                value:
+                  url: "https://example.com/some-url"
+              contentIdBased:
+                summary: Add pre-created content (legacy)
+                value:
+                  content_id: "123e4567-e89b-12d3-a456-426614174000"
       responses:
         '201':
-          description: Content added to user's list
+          description: Content added to user's list or feed subscribed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserContentResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/AddFeedResponse'
+                  - $ref: '#/components/schemas/AddPageResponse'
+                  - $ref: '#/components/schemas/UserContentResponse'
+              examples:
+                feedSubscribed:
+                  summary: Feed subscription created
+                  value:
+                    type: "feed"
+                    feed_id: "123e4567-e89b-12d3-a456-426614174000"
+                    subscription:
+                      id: "123e4567-e89b-12d3-a456-426614174001"
+                      user_id: "123e4567-e89b-12d3-a456-426614174002"
+                      feed_id: "123e4567-e89b-12d3-a456-426614174000"
+                      feed_url: "https://example.com/feed.xml"
+                      title: "Example Blog"
+                      subscribed_at: "2025-01-04T10:00:00Z"
+                pageAdded:
+                  summary: Page content added
+                  value:
+                    type: "page"
+                    content:
+                      user_id: "123e4567-e89b-12d3-a456-426614174002"
+                      content_id: "123e4567-e89b-12d3-a456-426614174003"
+                      status: "unread"
+                      scroll_position: 0
+                      is_favorite: false
+                      added_at: "2025-01-04T10:00:00Z"
+                      content:
+                        id: "123e4567-e89b-12d3-a456-426614174003"
+                        title: "Example Article"
+                        source_url: "https://example.com/article"
         '400':
-          description: Bad request - invalid input
+          description: Bad request - invalid input or feed limit reached
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Content not found
+          description: Content not found (content_id mode only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict - already subscribed to feed or content already in list
           content:
             application/json:
               schema:
@@ -694,15 +812,141 @@ components:
                 type: boolean
                 description: Whether content exists
 
-    AddContentToUserRequest:
+    URLType:
+      type: string
+      enum: [feed, page, unknown]
+      description: |
+        Type of URL:
+        - feed: RSS/Atom feed
+        - page: Web page/article
+        - unknown: Could not determine (timeout or error)
+
+    DetectURLRequest:
       type: object
       required:
-        - content_id
+        - url
       properties:
+        url:
+          type: string
+          format: uri
+          description: URL to detect type for
+
+    DetectURLResponse:
+      type: object
+      required:
+        - url
+        - type
+        - title
+      properties:
+        url:
+          type: string
+          format: uri
+          description: The URL that was checked (may differ if redirected)
+        type:
+          $ref: '#/components/schemas/URLType'
+        title:
+          type: string
+          nullable: true
+          description: Feed or page title if detected, null otherwise
+
+    AddContentToUserRequest:
+      type: object
+      oneOf:
+        - required: [url]
+        - required: [content_id]
+      properties:
+        # URL-based submission (recommended)
+        url:
+          type: string
+          format: uri
+          description: URL to add (feed or page)
+        type:
+          $ref: '#/components/schemas/URLType'
+          description: Optional type hint from detection
+        title:
+          type: string
+          description: Optional pre-detected title
+
+        # Content-ID-based submission (legacy)
         content_id:
           type: string
           format: uuid
-          description: Content ID to add
+          description: Content ID to add (legacy mode)
+
+        # Common metadata
+        status:
+          type: string
+          enum: [unread, reading, completed, archived]
+          description: Initial reading status (default unread)
+        scroll_position:
+          type: integer
+          minimum: 0
+          description: Initial scroll position
+        is_favorite:
+          type: boolean
+          description: Initial favorite flag
+
+    AddFeedResponse:
+      type: object
+      required:
+        - type
+        - feed_id
+        - subscription
+      properties:
+        type:
+          type: string
+          enum: [feed]
+          description: Always "feed"
+        feed_id:
+          type: string
+          format: uuid
+          description: Feed ID
+        subscription:
+          type: object
+          required:
+            - id
+            - user_id
+            - feed_id
+            - feed_url
+            - title
+            - subscribed_at
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Subscription ID
+            user_id:
+              type: string
+              format: uuid
+              description: User ID
+            feed_id:
+              type: string
+              format: uuid
+              description: Feed ID
+            feed_url:
+              type: string
+              format: uri
+              description: Feed URL
+            title:
+              type: string
+              description: Feed title
+            subscribed_at:
+              type: string
+              format: date-time
+              description: Subscription timestamp
+
+    AddPageResponse:
+      type: object
+      required:
+        - type
+        - content
+      properties:
+        type:
+          type: string
+          enum: [page]
+          description: Always "page"
+        content:
+          $ref: '#/components/schemas/UserContentResponse'
 
     UpdateUserContentRequest:
       type: object

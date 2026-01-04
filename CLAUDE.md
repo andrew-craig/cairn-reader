@@ -431,6 +431,12 @@ DELETE /api/v1/user/{user_id}                → Delete account (authenticated)
 GET  /health/live                                           → Liveness check
 GET  /health/ready                                          → Readiness check (includes DB)
 
+# URL Detection (Smart Submission)
+POST   /api/v1/content/detect                               → Detect URL type (feed or page)
+       Body: {"url": "https://example.com/feed.xml"}
+       Returns: {"url": "...", "type": "feed|page|unknown", "title": "..."}
+       Timeout: 10 seconds (non-blocking)
+
 # Content Management (Direct)
 POST   /api/v1/content                                      → Create content from HTML/URL
        Body: {"html": "...", "source_url": "...", "title": "...", ...}
@@ -445,9 +451,15 @@ POST   /api/v1/content/bulk                                 → Bulk create/upda
 POST   /api/v1/content/check-duplicate                      → Check for duplicate content
        Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
 
-# User Content Management
-POST   /api/v1/content/user/{user_id}                       → Add content to user's list
-       Body: {"url": "...", "html": "...", "source_type": "rss|manual|web"}
+# User Content Management (Smart URL Submission)
+POST   /api/v1/content/user/{user_id}                       → Add URL to user's list (auto-detects feed vs page)
+       URL-based (recommended): {"url": "...", "type": "feed|page|unknown", "title": "..."}
+       - If type=feed: Subscribes to RSS feed via Ingest RSS service
+       - If type=page|unknown: Extracts page content and adds to reading list
+       Legacy mode: {"content_id": "uuid"} for pre-created content
+       Returns different response based on type:
+       - Feed: {"type": "feed", "feed_id": "...", "subscription": {...}}
+       - Page: {"type": "page", "content": {...}}
 
 GET    /api/v1/content/user/{user_id}                       → List user's contents (paginated)
        Query params: ?status=..., ?is_favorite=true, ?limit=20, ?offset=0

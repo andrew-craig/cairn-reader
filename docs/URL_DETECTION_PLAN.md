@@ -653,6 +653,9 @@ If needed, we can support both formats by checking the request body:
 6. ✅ **Phase 6:** Mobile UI Component
 7. ✅ **Phase 7:** Integration Testing
 8. ✅ **Phase 8:** Documentation Updates
+   - OpenAPI specification (services/read/content/api/openapi.yaml)
+   - CLAUDE.md API endpoints section
+   - URL_DETECTION_PLAN.md completion status
 
 ---
 
