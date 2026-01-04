@@ -150,6 +150,14 @@ export class ExploreService {
     }
   }
 
+  static async upvoteArticle(articleId: string): Promise<void> {
+    return this.voteOnArticle(articleId, 'upvote');
+  }
+
+  static async downvoteArticle(articleId: string): Promise<void> {
+    return this.voteOnArticle(articleId, 'downvote');
+  }
+
   static async removeVote(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(

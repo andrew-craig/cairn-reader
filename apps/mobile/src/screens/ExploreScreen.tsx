@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, ViewToken } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
-import { Article } from '../types';
+import { Article, RootStackParamList } from '../types';
 import { ExploreService } from '../services';
+
+type ExploreScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
 const MIN_LOOKAHEAD_ARTICLES = 5; // Minimum articles to keep ahead of current scroll position
 const ESTIMATED_ARTICLE_HEIGHT = 95; // Estimated height of ArticleRow in pixels
@@ -23,6 +27,7 @@ const calculateInitialArticleCount = (): number => {
 };
 
 export const ExploreScreen: React.FC = () => {
+  const navigation = useNavigation<ExploreScreenNavigationProp>();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -169,8 +174,8 @@ export const ExploreScreen: React.FC = () => {
   }).current;
 
   const handleArticlePress = async (article: Article) => {
-    // TODO: Navigate to article detail screen or open in browser
-    console.log('Article pressed:', article.id);
+    // Navigate to the Explore article detail screen
+    navigation.navigate('ExploreArticleDetail', { article });
 
     // Mark as read in the backend
     try {

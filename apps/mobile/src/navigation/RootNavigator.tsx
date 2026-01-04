@@ -3,7 +3,7 @@ import { useColorScheme, TouchableOpacity, ActivityIndicator, View } from 'react
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { AddArticleScreen, ArticleDetailScreen, LoginScreen } from '../screens';
+import { AddArticleScreen, ArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen } from '../screens';
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
@@ -57,6 +57,14 @@ export default function RootNavigator() {
         component={ArticleDetailScreen}
         options={{
           title: 'Article',
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="ExploreArticleDetail"
+        component={ExploreArticleDetailScreen}
+        options={{
+          headerShown: false,
           presentation: 'card',
         }}
       />
