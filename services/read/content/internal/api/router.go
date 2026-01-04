@@ -15,7 +15,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *database.DB) http.Handler {
+func NewRouter(db *database.DB, ingestRSSServiceURL string) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply global middleware
@@ -30,10 +30,11 @@ func NewRouter(db *database.DB) http.Handler {
 	// Initialize services
 	contentService := service.NewContentService(contentRepo, db.DB)
 	urlDetector := service.NewURLDetector()
+	ingestRSSClient := service.NewIngestRSSClient(ingestRSSServiceURL)
 
 	// Initialize handlers
 	contentHandler := handlers.NewContentHandler(contentService)
-	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo)
+	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, contentService, urlDetector, ingestRSSClient)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 	detectionHandler := handlers.NewDetectionHandler(urlDetector)
 
