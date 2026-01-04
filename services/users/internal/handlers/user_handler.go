@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/users/internal/database"
 	"github.com/andrew-craig/cairn/services/users/internal/middleware"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
@@ -40,9 +41,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	// Get authenticated user ID from context
 	requestingUserID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "authentication required",
-		})
+		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
@@ -50,9 +49,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid user ID format",
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid user ID format", nil, "v1")
 		return
 	}
 
@@ -60,24 +57,18 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	user, err := h.userService.GetUser(c.Request.Context(), requestingUserID, targetUserID)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorized) {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: "you can only access your own user data",
-			})
+			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only access your own user data", nil, "v1")
 			return
 		}
 		if errors.Is(err, database.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Error: "user not found",
-			})
+			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to retrieve user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to retrieve user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	api.GinWriteSuccess(c, http.StatusOK, user, "v1")
 }
 
 // UpdateUser handles PATCH /api/v1/user/{user_id}
@@ -86,9 +77,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Get authenticated user ID from context
 	requestingUserID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "authentication required",
-		})
+		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
@@ -96,26 +85,20 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid user ID format",
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid user ID format", nil, "v1")
 		return
 	}
 
 	// Parse request body
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Validate that at least one field is being updated
 	if req.Email == nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "no fields to update",
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "no fields to update", nil, "v1")
 		return
 	}
 
@@ -123,36 +106,26 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	user, err := h.userService.UpdateUser(c.Request.Context(), requestingUserID, targetUserID, req.Email)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorized) {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: "you can only update your own user data",
-			})
+			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only update your own user data", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrAccountExists) {
-			c.JSON(http.StatusConflict, ErrorResponse{
-				Error: "an account with this email already exists",
-			})
+			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, database.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Error: "user not found",
-			})
+			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to update user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to update user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	api.GinWriteSuccess(c, http.StatusOK, user, "v1")
 }
 
 // UpgradeAccount handles POST /api/v1/user/{user_id}/upgrade
@@ -161,9 +134,7 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	// Get authenticated user ID from context
 	requestingUserID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "authentication required",
-		})
+		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
@@ -171,18 +142,14 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid user ID format",
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid user ID format", nil, "v1")
 		return
 	}
 
 	// Parse request body
 	var req UpgradeAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -196,48 +163,34 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorized) {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: "you can only upgrade your own account",
-			})
+			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only upgrade your own account", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrNotMobileAccount) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "account is not a mobile-only account",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "account is not a mobile-only account", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrAccountExists) {
-			c.JSON(http.StatusConflict, ErrorResponse{
-				Error: "an account with this email already exists",
-			})
+			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrWeakPassword) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: err.Error(),
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 			return
 		}
 		if errors.Is(err, database.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Error: "user not found",
-			})
+			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to upgrade account",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to upgrade account", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	api.GinWriteSuccess(c, http.StatusOK, user, "v1")
 }
 
 // DeleteUser handles DELETE /api/v1/user/{user_id}
@@ -246,9 +199,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// Get authenticated user ID from context
 	requestingUserID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "authentication required",
-		})
+		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
@@ -256,9 +207,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	targetUserIDStr := c.Param("user_id")
 	targetUserID, err := uuid.Parse(targetUserIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid user ID format",
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid user ID format", nil, "v1")
 		return
 	}
 
@@ -266,24 +215,18 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	err = h.userService.DeleteUser(c.Request.Context(), requestingUserID, targetUserID)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorized) {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: "you can only delete your own account",
-			})
+			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only delete your own account", nil, "v1")
 			return
 		}
 		if errors.Is(err, database.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Error: "user not found",
-			})
+			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to delete user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to delete user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.GinWriteSuccess(c, http.StatusOK, gin.H{
 		"message": "user account successfully deleted",
-	})
+	}, "v1")
 }

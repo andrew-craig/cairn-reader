@@ -54,12 +54,13 @@ export class AuthService {
       body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Device login failed: ${error}`);
+      throw new Error(result.message || result.error || 'Device login failed');
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = result.data;
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -79,12 +80,13 @@ export class AuthService {
       body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Device registration failed: ${error}`);
+      throw new Error(result.message || result.error || 'Device registration failed');
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = result.data;
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -102,12 +104,13 @@ export class AuthService {
       body: JSON.stringify(credentials),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Email login failed: ${error}`);
+      throw new Error(result.message || result.error || 'Email login failed');
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = result.data;
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -125,12 +128,13 @@ export class AuthService {
       body: JSON.stringify(credentials),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Email registration failed: ${error}`);
+      throw new Error(result.message || result.error || 'Email registration failed');
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = result.data;
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -205,12 +209,14 @@ export class AuthService {
       body: JSON.stringify({ refresh_token: this.refreshToken }),
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
       await this.clearTokens();
-      throw new Error('Failed to refresh token');
+      throw new Error(result.message || result.error || 'Failed to refresh token');
     }
 
-    const data: LoginResponse = await response.json();
+    const data: LoginResponse = result.data;
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,

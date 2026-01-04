@@ -92,12 +92,13 @@ export class ExploreService {
         `${RECOMMENDER_BASE_URL}/api/v1/explore/recommendation/${userId}`
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to get recommendations: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to get recommendations');
       }
 
-      const data: RecommendationsResponse = await response.json();
+      const data: RecommendationsResponse = result.data;
 
       // Transform backend articles to mobile Article format
       return data.recommendations.map((article) => this.transformArticle(article));
@@ -176,12 +177,13 @@ export class ExploreService {
         `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to get vote counts: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to get vote counts');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error getting vote counts:', error);
       throw error;

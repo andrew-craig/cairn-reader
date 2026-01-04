@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/content/internal/models"
@@ -29,13 +30,13 @@ func NewContentHandler(contentService service.ContentService) *ContentHandler {
 func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate required fields
 	if req.URL == "" {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "URL is required", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL is required", nil, "v1")
 		return
 	}
 
@@ -44,7 +45,7 @@ func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !middleware.ValidateSourceType(req.SourceType) {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Invalid source_type. Must be 'rss' or 'web'", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid source_type. Must be 'rss' or 'web'", nil, "v1")
 		return
 	}
 
@@ -61,13 +62,13 @@ func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "creation_failed", "Failed to create content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to create content: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Convert to response DTO
 	response := contentToResponse(content)
-	middleware.WriteJSON(w, http.StatusCreated, response)
+	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
 // UpdateContent handles PUT /api/v1/contents/:id
@@ -76,19 +77,19 @@ func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(idStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid content ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
 		return
 	}
 
 	var req dto.UpdateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate required fields
 	if req.URL == "" || req.HTML == "" {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "URL and HTML are required", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL and HTML are required", nil, "v1")
 		return
 	}
 
@@ -96,16 +97,16 @@ func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 	content, err := h.contentService.UpdateContent(r.Context(), contentID, req.URL, req.HTML, req.PublishedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			middleware.WriteError(w, http.StatusNotFound, "not_found", "Content not found", nil)
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Content not found", nil, "v1")
 			return
 		}
-		middleware.WriteError(w, http.StatusInternalServerError, "update_failed", "Failed to update content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to update content: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Convert to response DTO
 	response := contentToResponse(content)
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // GetContent handles GET /api/v1/contents/:id
@@ -114,7 +115,7 @@ func (h *ContentHandler) GetContent(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(idStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_id", "Invalid content ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
 		return
 	}
 
@@ -122,16 +123,16 @@ func (h *ContentHandler) GetContent(w http.ResponseWriter, r *http.Request) {
 	content, err := h.contentService.GetByID(r.Context(), contentID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			middleware.WriteError(w, http.StatusNotFound, "not_found", "Content not found", nil)
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Content not found", nil, "v1")
 			return
 		}
-		middleware.WriteError(w, http.StatusInternalServerError, "fetch_failed", "Failed to fetch content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch content: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Convert to response DTO
 	response := contentToResponse(content)
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // contentToResponse converts a models.Content to dto.ContentResponse

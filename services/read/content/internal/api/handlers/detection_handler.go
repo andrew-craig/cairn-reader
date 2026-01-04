@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/content/internal/service"
@@ -26,13 +27,13 @@ func NewDetectionHandler(urlDetector service.URLDetector) *DetectionHandler {
 func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
 	var req dto.DetectURLRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate URL
 	if req.URL == "" {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "URL is required", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL is required", nil, "v1")
 		return
 	}
 
@@ -58,5 +59,5 @@ func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
 		Title: result.Title,
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }

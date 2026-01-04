@@ -3,6 +3,7 @@ module github.com/andrew-craig/cairn/services/users
 go 1.24.0
 
 require (
+	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -77,5 +78,7 @@ require (
 
 // Use local version of shared cairn packages
 replace github.com/andrew-craig/cairn => ../..
+
+replace github.com/andrew-craig/cairn/pkg/api => ../../pkg/api
 
 replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
