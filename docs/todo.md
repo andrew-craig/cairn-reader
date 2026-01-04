@@ -6,89 +6,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Update the mobile app to use the new API endpoints
-**Status:** Required after API v1 migration (completed 2026-01-01)
-
-**Background:** All backend services have been migrated to standardized API v1 endpoints following `docs/API_MIGRATION_PLAN.md`. The mobile app currently uses the old endpoint structure and needs to be updated to use the new paths.
-
-**Goal:** Update mobile app API client to use new v1 endpoints across all services.
-
-**Key Changes Required:**
-
-**User Service** (`apps/mobile/src/services/auth.ts` or similar):
-```typescript
-// OLD: POST /auth/login
-// NEW: POST /api/v1/auth/login
-
-// OLD: GET /user/{id}
-// NEW: GET /api/v1/user/{user_id}
-
-// OLD: /health
-// NEW: /health/ready (for readiness checks)
-```
-
-**Explore Service** (`apps/mobile/src/services/explore.ts` or similar):
-```typescript
-// OLD: GET /explore/recommendation/{userID}
-// NEW: GET /api/v1/explore/recommendation/{user_id}
-
-// OLD: POST /explore/article/read (with article_id in body)
-// NEW: POST /api/v1/explore/article/{article_id}/read (BREAKING: article_id now in path)
-
-// OLD: POST /explore/article/{articleID}/vote
-// NEW: POST /api/v1/explore/article/{article_id}/vote
-```
-
-**Read Service** (`apps/mobile/src/services/read.ts` or similar):
-```typescript
-// Content Service endpoints already use /api/v1 prefix
-// Main change: {id} → {content_id} for consistency
-
-// OLD: GET /api/v1/content/{id}
-// NEW: GET /api/v1/content/{content_id}
-
-// Ingest RSS Service (if used):
-// OLD: /api/v1/user/{user_id}/feed/subscription
-// NEW: /api/v1/source/rss/user/{user_id}/subscription
-```
-
-**Configuration Updates:**
-- Update `apps/mobile/src/config/api.ts` with new base paths
-- Ensure all services use `/api/v1` prefix
-- Update path parameter names to snake_case (`user_id`, `article_id`, `content_id`)
-
-**Breaking Changes:**
-1. **Explore Service - Mark as Read**: Article ID moved from request body to URL path parameter
-   ```typescript
-   // OLD:
-   fetch('/explore/article/read', {
-     method: 'POST',
-     body: JSON.stringify({ article_id: '...' })
-   })
-
-   // NEW:
-   fetch(`/api/v1/explore/article/${articleId}/read`, {
-     method: 'POST'
-   })
-   ```
-
-2. **Health Checks**: Use `/health/ready` for service availability checks instead of `/health`
-
-**Testing Requirements:**
-1. Test all authentication flows (register, login, logout, refresh)
-2. Test article recommendations and interactions (upvote, downvote, mark as read)
-3. Test content management (save, retrieve, search, update metadata)
-4. Test RSS feed subscriptions (subscribe, unsubscribe, list)
-5. Verify error handling works with new JSON error response format
-
-**Reference:**
-- Full endpoint mapping: `docs/API_MIGRATION_PLAN.md` Appendix A
-- Updated API documentation: `CLAUDE.md` API Endpoints section
-- Health check standards: `docs/API_MIGRATION_PLAN.md` section 5
-
-**Estimated Effort:** 4-6 hours
-
-### 2. OpenAPI Generation
+### 1. OpenAPI Generation
 **Status:** Deferred from API migration (completed 2026-01-01)
 
 **Background:** During the API v1 migration, all services were updated to use standardized endpoints following `docs/API_MIGRATION_PLAN.md`. OpenAPI spec generation was identified as desirable but requires additional tooling setup.
@@ -1769,3 +1687,6 @@ The following items have been successfully implemented and verified:
 
 ### Documentation & Knowledge Sharing
 - **Document Read Service Technology Stack in Engineering Principles** - Added comprehensive documentation for Read Service specific libraries to `docs/ENGINEERING_PRINCIPLES.md`. Documented chi/v5 HTTP router, go-readability content extraction, bluemonday HTML sanitization, gobreaker circuit breaker, and robfig/cron job scheduling libraries. Updated HTTP Framework section to include all three frameworks (stdlib net/http, Gin, chi/v5) with rationale for each choice. Added "Why chi/v5?" section explaining architectural decision for lightweight router vs full framework.
+
+### Mobile App API Migration
+- **Update Mobile App to Use API v1 Endpoints** - Completed migration of all mobile app API clients to standardized API v1 endpoints. Updated User Service endpoints (`apps/mobile/src/services/auth.ts`) to use `/api/v1/auth/*` for all authentication operations (login, register, logout, refresh). Updated Explore Service endpoints (`apps/mobile/src/services/explore.ts`) to use `/api/v1/explore/*` for recommendations, voting, and read tracking - including breaking change where article_id moved from request body to URL path in mark-as-read endpoint. Updated Read Service endpoints (`apps/mobile/src/services/read.ts`) to use `/api/v1/content/*` for content management, search, and URL detection. All path parameters now use snake_case (`user_id`, `article_id`, `content_id`). Configuration properly set up in `apps/mobile/src/config/api.ts`. All API calls isolated in service files for maintainability. Mobile app is now fully compatible with the API v1 migration completed on 2026-01-01.
