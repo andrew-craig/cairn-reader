@@ -90,12 +90,13 @@ export class ReadService {
 
       const response = await this.fetchWithAuth(url);
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to list user contents: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to list user contents');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error listing user contents:', error);
       throw error;
@@ -124,12 +125,13 @@ export class ReadService {
 
       const response = await this.fetchWithAuth(url);
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to search contents: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to search contents');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error searching contents:', error);
       throw error;
@@ -157,12 +159,13 @@ export class ReadService {
         }
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to add content: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to add content');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error adding content:', error);
       throw error;
@@ -191,12 +194,13 @@ export class ReadService {
         }
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to update content: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to update content');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error updating content:', error);
       throw error;
@@ -252,11 +256,13 @@ export class ReadService {
 
       clearTimeout(timeoutId);
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Detection failed');
+        throw new Error(result.message || result.error || 'Detection failed');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       clearTimeout(timeoutId);
 
@@ -288,12 +294,13 @@ export class ReadService {
         }
       );
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to add URL: ${error}`);
+        throw new Error(result.message || result.error || 'Failed to add URL');
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error('Error adding URL:', error);
       throw error;

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/content/internal/models"
@@ -48,7 +49,7 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
 		return
 	}
 
@@ -74,7 +75,7 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 
 	if statusStr := r.URL.Query().Get("status"); statusStr != "" {
 		if !middleware.ValidateStatus(statusStr) {
-			middleware.WriteError(w, http.StatusBadRequest, "invalid_status", "Invalid status. Must be 'unread', 'read', or 'archived'", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
 			return
 		}
 		status = &statusStr
@@ -93,14 +94,14 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 	// Get user contents with filters
 	userContents, err := h.userContentRepo.ListByUserWithFilter(r.Context(), userID, status, isFavorite, limit, offset)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "fetch_failed", "Failed to fetch user contents: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Get total count
 	totalCount, err := h.userContentRepo.CountByUser(r.Context(), userID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "count_failed", "Failed to count user contents: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to count user contents: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -128,22 +129,22 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		responses = append(responses, response)
 	}
 
-	// Build response
-	listResponse := &dto.UserContentsListResponse{
-		Contents:   responses,
-		TotalCount: totalCount,
-		Limit:      limit,
-		Offset:     offset,
-	}
-
-	// Add next cursor if there are more items
+	// Build pagination info
+	cursor := ""
 	if offset+limit < int(totalCount) {
 		nextOffset := offset + limit
-		cursor := strconv.Itoa(nextOffset)
-		listResponse.NextCursor = &cursor
+		cursor = strconv.Itoa(nextOffset)
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, listResponse)
+	paginationInfo := api.PaginationInfo{
+		Cursor:  cursor,
+		HasMore: offset+limit < int(totalCount),
+		Limit:   limit,
+		Offset:  offset,
+		Total:   int(totalCount),
+	}
+
+	api.WritePaginated(w, http.StatusOK, responses, paginationInfo, "v1")
 }
 
 // AddContentToUser handles POST /api/v1/content/user/:user_id
@@ -155,13 +156,13 @@ func (h *UserContentHandler) AddContentToUser(w http.ResponseWriter, r *http.Req
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
 		return
 	}
 
 	var req dto.AddContentToUserRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
@@ -173,7 +174,7 @@ func (h *UserContentHandler) AddContentToUser(w http.ResponseWriter, r *http.Req
 		// LEGACY FLOW: Content-ID-based submission
 		h.handleContentIDBasedSubmission(w, r, userID, &req)
 	} else {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Either 'url' or 'content_id' is required", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Either 'url' or 'content_id' is required", nil, "v1")
 	}
 }
 
@@ -218,13 +219,13 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 		// Map errors to user-friendly messages
 		errMsg := err.Error()
 		if errMsg == "already subscribed to this feed" {
-			middleware.WriteError(w, http.StatusConflict, "already_subscribed", "Already subscribed to this feed", nil)
+			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "Already subscribed to this feed", nil, "v1")
 		} else if errMsg == "feed limit reached (max 100 feeds per user)" {
-			middleware.WriteError(w, http.StatusBadRequest, "feed_limit_reached", "Feed limit reached (max 100 feeds per user)", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Feed limit reached (max 100 feeds per user)", nil, "v1")
 		} else if errMsg == "invalid feed URL or not a valid RSS/Atom feed" {
-			middleware.WriteError(w, http.StatusBadRequest, "invalid_feed", "Invalid feed URL or not a valid RSS/Atom feed", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid feed URL or not a valid RSS/Atom feed", nil, "v1")
 		} else {
-			middleware.WriteError(w, http.StatusInternalServerError, "feed_subscription_failed", "Failed to subscribe to feed: "+err.Error(), nil)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed: "+err.Error(), nil, "v1")
 		}
 		return
 	}
@@ -243,7 +244,7 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 		},
 	}
 
-	middleware.WriteJSON(w, http.StatusCreated, response)
+	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
 // handlePageSubmission extracts content from a web page and adds to reading list
@@ -251,18 +252,18 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 	// Create content from URL using ContentService
 	content, err := h.contentService.CreateFromURL(r.Context(), url, "manual", nil, nil)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "content_extraction_failed", "Failed to extract content from URL: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to extract content from URL: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Check if user already has this content
 	existing, err := h.userContentRepo.GetByUserAndContent(r.Context(), userID, content.ID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "check_failed", "Failed to check existing content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to check existing content: "+err.Error(), nil, "v1")
 		return
 	}
 	if existing != nil {
-		middleware.WriteError(w, http.StatusConflict, "already_exists", "User already has this content", nil)
+		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "User already has this content", nil, "v1")
 		return
 	}
 
@@ -282,7 +283,7 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 	}
 
 	if err := h.userContentRepo.Create(r.Context(), userContent); err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "creation_failed", "Failed to add content to user: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to add content to user: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -302,7 +303,7 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 		},
 	}
 
-	middleware.WriteJSON(w, http.StatusCreated, response)
+	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
 // handleContentIDBasedSubmission handles legacy content-ID-based submission
@@ -313,21 +314,21 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 	_, err := h.contentRepo.GetByID(r.Context(), contentID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			middleware.WriteError(w, http.StatusNotFound, "content_not_found", "Content not found", nil)
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Content not found", nil, "v1")
 			return
 		}
-		middleware.WriteError(w, http.StatusInternalServerError, "fetch_failed", "Failed to fetch content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch content: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Check if user already has this content
 	existing, err := h.userContentRepo.GetByUserAndContent(r.Context(), userID, contentID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "check_failed", "Failed to check existing content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to check existing content: "+err.Error(), nil, "v1")
 		return
 	}
 	if existing != nil {
-		middleware.WriteError(w, http.StatusConflict, "already_exists", "User already has this content", nil)
+		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "User already has this content", nil, "v1")
 		return
 	}
 
@@ -339,7 +340,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 
 	// Validate status
 	if !middleware.ValidateStatus(status) {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_status", "Invalid status. Must be 'unread', 'read', or 'archived'", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
 		return
 	}
 
@@ -353,7 +354,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 	}
 
 	if err := h.userContentRepo.Create(r.Context(), userContent); err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "creation_failed", "Failed to add content to user: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to add content to user: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -372,7 +373,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 		Content:        contentToResponse(content),
 	}
 
-	middleware.WriteJSON(w, http.StatusCreated, response)
+	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
 // UpdateUserContent handles PATCH /api/v1/users/:user_id/contents/:content_id
@@ -381,51 +382,51 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
 		return
 	}
 
 	contentIDStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(contentIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_content_id", "Invalid content ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
 		return
 	}
 
 	var req dto.UpdateUserContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate status if provided
 	if req.Status != nil && !middleware.ValidateStatus(*req.Status) {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_status", "Invalid status. Must be 'unread', 'read', or 'archived'", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
 		return
 	}
 
 	// Get existing user-content
 	userContent, err := h.userContentRepo.GetByUserAndContent(r.Context(), userID, contentID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "fetch_failed", "Failed to fetch user-content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user-content: "+err.Error(), nil, "v1")
 		return
 	}
 	if userContent == nil {
-		middleware.WriteError(w, http.StatusNotFound, "not_found", "User content not found", nil)
+		api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "User content not found", nil, "v1")
 		return
 	}
 
 	// Update metadata
 	err = h.userContentRepo.UpdateMetadata(r.Context(), userContent.ID, req.Status, req.ScrollPosition, req.IsFavorite)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "update_failed", "Failed to update user-content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to update user-content: "+err.Error(), nil, "v1")
 		return
 	}
 
 	// Get updated user-content
 	userContent, err = h.userContentRepo.GetByID(r.Context(), userContent.ID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "fetch_failed", "Failed to fetch updated user-content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch updated user-content: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -444,7 +445,7 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 		Content:        contentToResponse(content),
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // DeleteUserContent handles DELETE /api/v1/users/:user_id/contents/:content_id
@@ -453,21 +454,21 @@ func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Re
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
 		return
 	}
 
 	contentIDStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(contentIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_content_id", "Invalid content ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
 		return
 	}
 
 	// Delete user-content
 	err = h.userContentRepo.Delete(r.Context(), userID, contentID)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "delete_failed", "Failed to delete user-content: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to delete user-content: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -480,14 +481,14 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
 		return
 	}
 
 	// Get search query
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		middleware.WriteError(w, http.StatusBadRequest, "missing_query", "Search query 'q' is required", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Search query 'q' is required", nil, "v1")
 		return
 	}
 
@@ -510,7 +511,7 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 	// Search user contents
 	userContents, err := h.userContentRepo.Search(r.Context(), userID, query, limit, offset)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "search_failed", "Failed to search user contents: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -538,5 +539,5 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 		responses = append(responses, response)
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, responses)
+	api.WriteSuccess(w, http.StatusOK, responses, "v1")
 }

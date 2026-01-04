@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -32,20 +33,20 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
 		return
 	}
 
 	// Parse request body
 	var req dto.SubscribeFeedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate feed URL
 	if strings.TrimSpace(req.FeedURL) == "" {
-		respondWithError(w, http.StatusBadRequest, "invalid_feed_url", "Feed URL is required")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Feed URL is required", nil, "v1")
 		return
 	}
 
@@ -54,20 +55,20 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		// Check for specific errors
 		if strings.Contains(err.Error(), "maximum feed limit") {
-			respondWithError(w, http.StatusBadRequest, "feed_limit_reached", err.Error())
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, err.Error(), nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "already subscribed") {
-			respondWithError(w, http.StatusConflict, "already_subscribed", err.Error())
+			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, err.Error(), nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "failed to validate feed") || strings.Contains(err.Error(), "failed to parse feed") {
-			respondWithError(w, http.StatusBadRequest, "invalid_feed", "Feed URL is not a valid RSS/Atom feed")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Feed URL is not a valid RSS/Atom feed", nil, "v1")
 			return
 		}
 
 		log.Printf("Error subscribing to feed: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to subscribe to feed")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed", nil, "v1")
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 	response := dto.ToSubscribeFeedResponse(result)
 
 	// Return response
-	respondWithJSON(w, http.StatusCreated, response)
+	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
 // Unsubscribe handles DELETE /api/v1/users/:user_id/feeds/:feed_id
@@ -86,7 +87,7 @@ func (h *SubscriptionHandler) Unsubscribe(w http.ResponseWriter, r *http.Request
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
 		return
 	}
 
@@ -94,27 +95,27 @@ func (h *SubscriptionHandler) Unsubscribe(w http.ResponseWriter, r *http.Request
 	feedIDStr := chi.URLParam(r, "feed_id")
 	feedID, err := uuid.Parse(feedIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_feed_id", "Invalid feed ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid feed ID format", nil, "v1")
 		return
 	}
 
 	// Unsubscribe from feed
 	if err := h.feedService.Unsubscribe(ctx, userID, feedID); err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			respondWithError(w, http.StatusNotFound, "subscription_not_found", "Subscription not found")
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Subscription not found", nil, "v1")
 			return
 		}
 
 		log.Printf("Error unsubscribing from feed: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to unsubscribe from feed")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to unsubscribe from feed", nil, "v1")
 		return
 	}
 
 	// Return success response
-	respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+	api.WriteSuccess(w, http.StatusOK, dto.MessageResponse{
 		Message: "Successfully unsubscribed from feed",
 		Success: true,
-	})
+	}, "v1")
 }
 
 // ListSubscriptions handles GET /api/v1/users/:user_id/feeds
@@ -125,7 +126,7 @@ func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_user_id", "Invalid user ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
 		return
 	}
 
@@ -133,7 +134,7 @@ func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	subscriptions, err := h.feedService.ListUserSubscriptions(ctx, userID)
 	if err != nil {
 		log.Printf("Error listing subscriptions: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to list subscriptions")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to list subscriptions", nil, "v1")
 		return
 	}
 
@@ -141,7 +142,7 @@ func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	response := dto.ToListFeedSubscriptionsResponse(subscriptions)
 
 	// Return response
-	respondWithJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // EnableFeed handles PATCH /api/v1/feeds/:feed_id/enable
@@ -152,31 +153,31 @@ func (h *SubscriptionHandler) EnableFeed(w http.ResponseWriter, r *http.Request)
 	feedIDStr := chi.URLParam(r, "feed_id")
 	feedID, err := uuid.Parse(feedIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_feed_id", "Invalid feed ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid feed ID format", nil, "v1")
 		return
 	}
 
 	// Enable feed
 	if err := h.feedService.EnableFeed(ctx, feedID); err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			respondWithError(w, http.StatusNotFound, "feed_not_found", "Feed not found")
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Feed not found", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "already active") {
-			respondWithError(w, http.StatusBadRequest, "already_active", "Feed is already active")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Feed is already active", nil, "v1")
 			return
 		}
 
 		log.Printf("Error enabling feed: %v", err)
-		respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to enable feed")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to enable feed", nil, "v1")
 		return
 	}
 
 	// Return success response
-	respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+	api.WriteSuccess(w, http.StatusOK, dto.MessageResponse{
 		Message: "Feed successfully enabled",
 		Success: true,
-	})
+	}, "v1")
 }
 
 // UpdateFeed handles PATCH /api/v1/source/rss/feed/{feed_id}
@@ -188,7 +189,7 @@ func (h *SubscriptionHandler) UpdateFeed(w http.ResponseWriter, r *http.Request)
 	feedIDStr := chi.URLParam(r, "feed_id")
 	feedID, err := uuid.Parse(feedIDStr)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_feed_id", "Invalid feed ID format")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid feed ID format", nil, "v1")
 		return
 	}
 
@@ -197,7 +198,7 @@ func (h *SubscriptionHandler) UpdateFeed(w http.ResponseWriter, r *http.Request)
 		Enabled *bool `json:"enabled,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid_request", "Invalid request body")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
@@ -207,51 +208,33 @@ func (h *SubscriptionHandler) UpdateFeed(w http.ResponseWriter, r *http.Request)
 			// Enable feed
 			if err := h.feedService.EnableFeed(ctx, feedID); err != nil {
 				if strings.Contains(err.Error(), "not found") {
-					respondWithError(w, http.StatusNotFound, "feed_not_found", "Feed not found")
+					api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Feed not found", nil, "v1")
 					return
 				}
 				if strings.Contains(err.Error(), "already active") {
-					respondWithError(w, http.StatusBadRequest, "already_active", "Feed is already active")
+					api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Feed is already active", nil, "v1")
 					return
 				}
 
 				log.Printf("Error enabling feed: %v", err)
-				respondWithError(w, http.StatusInternalServerError, "internal_error", "Failed to enable feed")
+				api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to enable feed", nil, "v1")
 				return
 			}
 
-			respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+			api.WriteSuccess(w, http.StatusOK, dto.MessageResponse{
 				Message: "Feed successfully enabled",
 				Success: true,
-			})
+			}, "v1")
 		} else {
 			// For now, just return success for disabling (may need to implement DisableFeed in service)
-			respondWithJSON(w, http.StatusOK, dto.MessageResponse{
+			api.WriteSuccess(w, http.StatusOK, dto.MessageResponse{
 				Message: "Feed update received",
 				Success: true,
-			})
+			}, "v1")
 		}
 		return
 	}
 
 	// No fields to update
-	respondWithError(w, http.StatusBadRequest, "no_updates", "No fields to update provided")
-}
-
-// Helper functions
-
-func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("Error encoding JSON response: %v", err)
-	}
-}
-
-func respondWithError(w http.ResponseWriter, statusCode int, errorCode, message string) {
-	respondWithJSON(w, statusCode, dto.ErrorResponse{
-		Error:   errorCode,
-		Message: message,
-		Code:    statusCode,
-	})
+	api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "No fields to update provided", nil, "v1")
 }

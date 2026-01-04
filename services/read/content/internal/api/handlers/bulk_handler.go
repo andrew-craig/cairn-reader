@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
 	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
 	"github.com/andrew-craig/cairn/services/read/content/internal/models"
@@ -31,17 +32,17 @@ func NewBulkHandler(contentService service.ContentService, userContentRepo repos
 func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) {
 	var req dto.BulkCreateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate max 100 items
 	if len(req.Contents) == 0 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Contents array cannot be empty", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Contents array cannot be empty", nil, "v1")
 		return
 	}
 	if len(req.Contents) > 100 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Maximum 100 items allowed per bulk request", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per bulk request", nil, "v1")
 		return
 	}
 
@@ -50,7 +51,7 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 	for i, item := range req.Contents {
 		// Validate required fields
 		if item.URL == "" || item.HTML == "" {
-			middleware.WriteError(w, http.StatusBadRequest, "validation_error", "URL and HTML are required for all items", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL and HTML are required for all items", nil, "v1")
 			return
 		}
 
@@ -60,7 +61,7 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 		}
 
 		if !middleware.ValidateSourceType(item.SourceType) {
-			middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Invalid source_type. Must be 'rss' or 'web'", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid source_type. Must be 'rss' or 'web'", nil, "v1")
 			return
 		}
 
@@ -76,7 +77,7 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 	// Process bulk creation
 	contents, errors, err := h.contentService.BulkCreateFromHTML(r.Context(), serviceItems)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "bulk_creation_failed", "Failed to bulk create contents: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to bulk create contents: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -105,24 +106,24 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // CheckDuplicates handles POST /api/v1/contents/check-duplicates
 func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 	var req dto.CheckDuplicatesRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate max 100 items
 	if len(req.Items) == 0 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Items array cannot be empty", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Items array cannot be empty", nil, "v1")
 		return
 	}
 	if len(req.Items) > 100 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Maximum 100 items allowed per request", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per request", nil, "v1")
 		return
 	}
 
@@ -138,7 +139,7 @@ func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Check duplicates
 	existingContents, err := h.contentService.CheckDuplicates(r.Context(), serviceItems)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "check_failed", "Failed to check duplicates: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to check duplicates: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -162,24 +163,24 @@ func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 		response.Results = append(response.Results, result)
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // BulkAddToUsers handles POST /api/v1/users/bulk/contents
 func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 	var req dto.BulkAddToUsersRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
-		middleware.WriteError(w, http.StatusBadRequest, "invalid_request", "Invalid request body", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	// Validate max 100 items
 	if len(req.Items) == 0 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Items array cannot be empty", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Items array cannot be empty", nil, "v1")
 		return
 	}
 	if len(req.Items) > 100 {
-		middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Maximum 100 items allowed per request", nil)
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per request", nil, "v1")
 		return
 	}
 
@@ -192,7 +193,7 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 			status = models.StatusUnread // Default to unread
 		}
 		if !models.ValidateStatus(status) {
-			middleware.WriteError(w, http.StatusBadRequest, "validation_error", "Invalid status. Must be 'unread', 'read', or 'archived'", nil)
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
 			return
 		}
 
@@ -209,7 +210,7 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 	// Bulk create user-content relationships
 	err := h.userContentRepo.BulkCreate(r.Context(), userContents)
 	if err != nil {
-		middleware.WriteError(w, http.StatusInternalServerError, "bulk_add_failed", "Failed to bulk add contents to users: "+err.Error(), nil)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to bulk add contents to users: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -224,5 +225,5 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 		response.Succeeded = append(response.Succeeded, uc.ID)
 	}
 
-	middleware.WriteJSON(w, http.StatusOK, response)
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }

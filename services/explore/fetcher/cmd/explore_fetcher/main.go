@@ -8,7 +8,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/client"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/fetcher"
@@ -117,7 +118,7 @@ func main() {
 	})
 	mux.HandleFunc("/api/v1/explore/feed/fetch", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			api.WriteError(w, http.StatusMethodNotAllowed, api.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 			return
 		}
 		go func() {
@@ -125,22 +126,25 @@ func main() {
 				slog.Error("error in fetch goroutine", slog.Any("error", err))
 			}
 		}()
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(`{"status":"fetch triggered"}`))
+		api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "fetch triggered"}, "v1")
 	})
 	mux.HandleFunc("/api/v1/explore/feed/stats", func(w http.ResponseWriter, r *http.Request) {
 		total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to retrieve feed statistics", nil, "v1")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(fmt.Sprintf(`{"total":%d,"enabled":%d,"disabled":%d,"never_fetched":%d}`,
-			total, enabled, disabled, neverFetched)))
+		stats := map[string]int{
+			"total":         total,
+			"enabled":       enabled,
+			"disabled":      disabled,
+			"never_fetched": neverFetched,
+		}
+		api.WriteSuccess(w, http.StatusOK, stats, "v1")
 	})
 	mux.HandleFunc("/api/v1/explore/feed/sync", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			api.WriteError(w, http.StatusMethodNotAllowed, api.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 			return
 		}
 		go func() {
@@ -148,8 +152,7 @@ func main() {
 				slog.Error("error in sync goroutine", slog.Any("error", err))
 			}
 		}()
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(`{"status":"sync triggered"}`))
+		api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "sync triggered"}, "v1")
 	})
 
 	server := &http.Server{
@@ -190,7 +193,16 @@ func main() {
 func livenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"healthy","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+
+	response := struct {
+		Status    string `json:"status"`
+		Timestamp string `json:"timestamp"`
+	}{
+		Status:    "healthy",
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // readinessHandler checks if the service is ready to accept traffic
@@ -217,32 +229,18 @@ func readinessHandler(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) 
 		checks["database"] = "ok"
 	}
 
-	response := fmt.Sprintf(`{"status":"%s","timestamp":"%s","checks":%s}`,
-		status,
-		time.Now().Format(time.RFC3339),
-		formatChecks(checks))
+	response := struct {
+		Status    string            `json:"status"`
+		Timestamp string            `json:"timestamp"`
+		Checks    map[string]string `json:"checks"`
+	}{
+		Status:    status,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Checks:    checks,
+	}
 
 	w.WriteHeader(statusCode)
-	w.Write([]byte(response))
-}
-
-// formatChecks converts a map of checks to JSON format
-func formatChecks(checks map[string]string) string {
-	if len(checks) == 0 {
-		return "{}"
-	}
-
-	result := "{"
-	first := true
-	for key, value := range checks {
-		if !first {
-			result += ","
-		}
-		result += fmt.Sprintf(`"%s":"%s"`, key, value)
-		first = false
-	}
-	result += "}"
-	return result
+	json.NewEncoder(w).Encode(response)
 }
 
 // getEnv retrieves an environment variable or returns a default value if not set

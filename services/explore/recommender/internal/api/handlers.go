@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	pkgapi "github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/pkg/models"
 )
@@ -77,7 +78,7 @@ func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
 // handleArticles receives articles from the fetcher
 func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -92,45 +93,38 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			slog.Warn("request body too large", slog.Int64("limit", maxBytesErr.Limit))
-			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			pkgapi.WriteError(w, http.StatusRequestEntityTooLarge, pkgapi.ErrCodeBadRequest, "Request body too large", nil, "v1")
 			return
 		}
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	if len(payload.Articles) == 0 {
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(map[string]string{"status": "no articles to process"}); err != nil {
-			slog.Error("failed to encode empty articles response", slog.Any("error", err))
-		}
+		pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{"status": "no articles to process"}, "v1")
 		return
 	}
 
 	// Store articles in database
 	if err := s.articleRepo.CreateBatch(r.Context(), payload.Articles); err != nil {
 		slog.Error("failed to store articles", slog.Any("error", err))
-		http.Error(w, "Failed to store articles", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to store articles", nil, "v1")
 		return
 	}
 
 	slog.Info("successfully stored articles", slog.Int("count", len(payload.Articles)))
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	pkgapi.WriteSuccess(w, http.StatusCreated, map[string]interface{}{
 		"status":  "success",
 		"count":   len(payload.Articles),
 		"message": "Articles stored successfully",
-	}); err != nil {
-		slog.Error("failed to encode articles response", slog.Any("error", err))
-	}
+	}, "v1")
 }
 
 // handleRecommendations returns recommended articles for a user
 func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -142,26 +136,22 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	recommendations, err := s.engine.GetRecommendations(r.Context(), userID)
 	if err != nil {
 		slog.Error("failed to get recommendations", slog.String("user_id", userID), slog.Any("error", err))
-		http.Error(w, "Failed to get recommendations", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get recommendations", nil, "v1")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
 		"user_id":         userID,
 		"recommendations": recommendations,
 		"count":           len(recommendations),
-	}); err != nil {
-		slog.Error("failed to encode recommendations response", slog.Any("error", err))
-	}
+	}, "v1")
 }
 
 // handleMarkAsRead marks an article as read for a user
 // POST /api/v1/explore/article/{article_id}/read
 func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -173,31 +163,27 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/read")
 
 	if articleID == "" {
-		http.Error(w, "article_id is required", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "article_id is required", nil, "v1")
 		return
 	}
 
 	if err := s.userRepo.MarkArticleAsRead(r.Context(), userID, articleID); err != nil {
 		slog.Error("failed to mark article as read", slog.Any("error", err))
-		http.Error(w, "Failed to mark article as read", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to mark article as read", nil, "v1")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Article marked as read",
-	}); err != nil {
-		slog.Error("failed to encode mark-as-read response", slog.Any("error", err))
-	}
+	}, "v1")
 }
 
 // handleVote handles upvoting or downvoting an article
 // POST /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -209,7 +195,7 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
-		http.Error(w, "Article ID is required", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
 		return
 	}
 
@@ -224,39 +210,35 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			slog.Warn("request body too large", slog.Int64("limit", maxBytesErr.Limit))
-			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			pkgapi.WriteError(w, http.StatusRequestEntityTooLarge, pkgapi.ErrCodeBadRequest, "Request body too large", nil, "v1")
 			return
 		}
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
 
 	if payload.VoteType != "upvote" && payload.VoteType != "downvote" {
-		http.Error(w, "vote_type must be 'upvote' or 'downvote'", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, "vote_type must be 'upvote' or 'downvote'", nil, "v1")
 		return
 	}
 
 	if err := s.voteRepo.RecordVote(r.Context(), userID, articleID, payload.VoteType); err != nil {
 		slog.Error("failed to record vote", slog.Any("error", err))
-		http.Error(w, "Failed to record vote", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to record vote", nil, "v1")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Vote recorded successfully",
-	}); err != nil {
-		slog.Error("failed to encode vote response", slog.Any("error", err))
-	}
+	}, "v1")
 }
 
 // handleRemoveVote removes a user's vote from an article
 // DELETE /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -268,31 +250,27 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
-		http.Error(w, "Article ID is required", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
 		return
 	}
 
 	if err := s.voteRepo.RemoveVote(r.Context(), userID, articleID); err != nil {
 		slog.Error("failed to remove vote", slog.Any("error", err))
-		http.Error(w, "Failed to remove vote", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to remove vote", nil, "v1")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]string{
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Vote removed successfully",
-	}); err != nil {
-		slog.Error("failed to encode remove-vote response", slog.Any("error", err))
-	}
+	}, "v1")
 }
 
 // handleGetVotes returns vote counts for an article
 // GET /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 		return
 	}
 
@@ -300,14 +278,14 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
 
 	if articleID == "" {
-		http.Error(w, "Article ID is required", http.StatusBadRequest)
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
 		return
 	}
 
 	upvotes, downvotes, err := s.voteRepo.GetVoteCounts(r.Context(), articleID)
 	if err != nil {
 		slog.Error("failed to get vote counts", slog.Any("error", err))
-		http.Error(w, "Failed to get vote counts", http.StatusInternalServerError)
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get vote counts", nil, "v1")
 		return
 	}
 
@@ -334,11 +312,7 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 		response["user_vote"] = userVote
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		slog.Error("failed to encode votes response", slog.Any("error", err))
-	}
+	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // extractPathParam extracts a path parameter from a URL path

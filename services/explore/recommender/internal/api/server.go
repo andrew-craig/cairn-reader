@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	pkgapi "github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
@@ -67,16 +68,16 @@ func (s *Server) Routes() http.Handler {
 				case http.MethodGet:
 					s.handleGetVotes(w, r)
 				default:
-					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 				}
 			} else if strings.HasSuffix(r.URL.Path, "/read") {
 				if r.Method == http.MethodPost {
 					s.handleMarkAsRead(w, r)
 				} else {
-					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
 				}
 			} else {
-				http.NotFound(w, r)
+				pkgapi.WriteError(w, http.StatusNotFound, pkgapi.ErrCodeNotFound, "Endpoint not found", nil, "v1")
 			}
 		}),
 	))

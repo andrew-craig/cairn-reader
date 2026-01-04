@@ -3,6 +3,7 @@ module github.com/andrew-craig/cairn/services/explore
 go 1.24.0
 
 require (
+	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/auth v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn/pkg/models v0.0.0-00010101000000-000000000000
@@ -76,6 +77,8 @@ require (
 replace github.com/andrew-craig/cairn => ../..
 
 // Use local versions of pkg packages
+replace github.com/andrew-craig/cairn/pkg/api => ../../pkg/api
+
 replace github.com/andrew-craig/cairn/pkg/auth => ../../pkg/auth
 
 replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging

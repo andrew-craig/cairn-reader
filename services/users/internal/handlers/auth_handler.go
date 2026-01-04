@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/services/users/internal/middleware"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
@@ -64,9 +65,7 @@ type ErrorResponse struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -74,30 +73,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	authResp, err := h.authService.Register(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrAccountExists) {
-			c.JSON(http.StatusConflict, ErrorResponse{
-				Error: "an account with this email already exists",
-			})
+			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrWeakPassword) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: err.Error(),
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to register user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusCreated, authResp)
+	api.GinWriteSuccess(c, http.StatusCreated, authResp, "v1")
 }
 
 // RegisterMobile handles POST /auth/register/mobile
@@ -105,9 +96,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) RegisterMobile(c *gin.Context) {
 	var req RegisterMobileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -124,24 +113,18 @@ func (h *AuthHandler) RegisterMobile(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrAccountExists) {
-			c.JSON(http.StatusConflict, ErrorResponse{
-				Error: "an account with this device ID already exists",
-			})
+			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this device ID already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to register mobile user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register mobile user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusCreated, authResp)
+	api.GinWriteSuccess(c, http.StatusCreated, authResp, "v1")
 }
 
 // Login handles POST /auth/login
@@ -149,9 +132,7 @@ func (h *AuthHandler) RegisterMobile(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -169,24 +150,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "invalid email or password",
-			})
+			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid email or password", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to authenticate user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, authResp)
+	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
 }
 
 // LoginMobile handles POST /auth/login/mobile
@@ -194,9 +169,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) LoginMobile(c *gin.Context) {
 	var req LoginMobileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -213,30 +186,22 @@ func (h *AuthHandler) LoginMobile(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "invalid device ID",
-			})
+			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid device ID", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrHybridAccountDeviceLogin) {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: "device login not allowed for accounts with email/password",
-			})
+			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "device login not allowed for accounts with email/password", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to authenticate user",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, authResp)
+	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
 }
 
 // Refresh handles POST /auth/refresh
@@ -244,9 +209,7 @@ func (h *AuthHandler) LoginMobile(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -263,36 +226,26 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "invalid or expired refresh token",
-			})
+			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "token reuse detected") {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "token reuse detected - all tokens have been revoked",
-			})
+			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "expired") {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "refresh token has expired",
-			})
+			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to refresh access token",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, authResp)
+	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
 }
 
 // Logout handles POST /auth/logout
@@ -300,9 +253,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid request: " + err.Error(),
-		})
+		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -310,20 +261,16 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	err := h.authService.Logout(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidInput) {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: "invalid input provided",
-			})
+			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to logout",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.GinWriteSuccess(c, http.StatusOK, gin.H{
 		"message": "successfully logged out",
-	})
+	}, "v1")
 }
 
 // LogoutAll handles POST /auth/logout-all
@@ -332,22 +279,18 @@ func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	// Get user ID from context (set by JWT middleware)
 	userID, err := middleware.GetUserIDFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "authentication required",
-		})
+		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
 	// Revoke all user tokens
 	err = h.authService.LogoutAll(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error: "failed to logout from all devices",
-		})
+		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout from all devices", nil, "v1")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	api.GinWriteSuccess(c, http.StatusOK, gin.H{
 		"message": "successfully logged out from all devices",
-	})
+	}, "v1")
 }
