@@ -65,7 +65,7 @@ func main() {
 	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Create router
-	router := api.NewRouter(db)
+	router := api.NewRouter(db, cfg.IngestRSSServiceURL)
 
 	// Create HTTP server
 	server := &http.Server{
@@ -108,14 +108,16 @@ func main() {
 
 // Config holds the application configuration
 type Config struct {
-	Port string
-	DB   database.Config
+	Port                 string
+	IngestRSSServiceURL  string
+	DB                   database.Config
 }
 
 // loadConfig loads configuration from environment variables
 func loadConfig() Config {
 	return Config{
-		Port: getEnv("PORT", "8080"),
+		Port:                getEnv("PORT", "8080"),
+		IngestRSSServiceURL: getEnv("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
 		DB: database.Config{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnvInt("DB_PORT", 5432),
