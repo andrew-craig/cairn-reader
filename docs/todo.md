@@ -6,6 +6,128 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
+### 1. Fix Unchecked Error Returns in Explore Service - Fetcher
+**Files:**
+- `fetcher/internal/db/feed_repository.go:133`
+- `fetcher/internal/db/feed_repository_test.go:14`
+- `fetcher/internal/client/recommender_client.go:60`
+- `fetcher/internal/sync/feed_sync.go:74`
+- `fetcher/internal/fetcher/fetcher.go:71,72,88,89,98,99`
+- `fetcher/cmd/fetcher/main.go:71,90`
+- `fetcher/internal/sync/feed_sync_test.go:16,24,59,67,108`
+
+**Issue:** 20 instances of unchecked error returns that could lead to resource leaks, silent failures, and data inconsistencies.
+
+**Impact:**
+- Resource leaks from unchecked `Close()` calls on HTTP response bodies and database connections can exhaust connection pools
+- Silent failures in database operations (`UpdateFetchResult`, `RecordFetchHistory`) leading to incorrect state
+- Data loss from errors ignored in critical paths like feed fetching and article submission
+
+**Implementation:**
+
+For defer Close() calls:
+```go
+// Before
+defer resp.Body.Close()
+
+// After
+defer func() {
+    if err := resp.Body.Close(); err != nil {
+        slog.Warn("error closing response body", "error", err)
+    }
+}()
+```
+
+For database operations:
+```go
+// Before
+f.feedRepo.UpdateFetchResult(ctx, feed.ID, false)
+
+// After
+if err := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); err != nil {
+    slog.Error("error updating fetch result", "feed_id", feed.ID, "error", err)
+    // Consider: return error or implement retry logic
+}
+```
+
+For goroutines:
+```go
+// Before
+go feedFetcher.FetchSingleFeed(ctx)
+
+// After
+go func() {
+    if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
+        slog.Error("error in fetch goroutine", "error", err)
+    }
+}()
+```
+
+**Verification:**
+```bash
+cd services/explore
+golangci-lint run ./fetcher/...
+make test
+```
+
+**Effort:** 3-4 hours
+
+---
+
+### 2. Fix Unchecked Error Returns in Explore Service - Recommender
+**Files:**
+- `recommender/internal/db/article_repository.go:82,102,188,220,256`
+- `recommender/internal/db/vote_repository.go:43,145`
+- `recommender/internal/api/handlers.go:17,41,56`
+- `recommender/cmd/cleanup/main.go:47`
+- `recommender/integration_test.go:91,144`
+- `recommender/internal/db/article_repository_test.go:27,58`
+
+**Issue:** 12 instances of unchecked error returns that could lead to resource leaks, malformed HTTP responses, and data corruption.
+
+**Impact:**
+- Resource leaks from unchecked `Close()` and `Rollback()` calls can exhaust database connection pool
+- HTTP response encoding errors could send malformed responses without error notification
+- Transaction rollback errors are ignored, potentially leaving database in inconsistent state
+
+**Implementation:**
+
+For defer Rollback() calls:
+```go
+// Before
+defer tx.Rollback()
+
+// After
+defer func() {
+    if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+        slog.Error("error rolling back transaction", "error", err)
+    }
+}()
+```
+
+For JSON encoding in HTTP handlers:
+```go
+// Before
+json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+
+// After
+if err := json.NewEncoder(w).Encode(map[string]string{"status": "healthy"}); err != nil {
+    slog.Error("error encoding response", "error", err)
+    http.Error(w, "Internal server error", http.StatusInternalServerError)
+    return
+}
+```
+
+**Verification:**
+```bash
+cd services/explore
+golangci-lint run ./recommender/...
+make test
+curl http://localhost:8081/health/live
+```
+
+**Effort:** 2-3 hours
+
 ---
 
 ## High Priority
@@ -13,6 +135,241 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 ---
 
 ## Medium Priority
+
+### 3. Fix Type Safety Violations in Mobile App
+**Files:**
+- `src/components/ArticleListScreen.tsx:24` - `onArticlePress` parameter uses `any`
+- `src/components/ArticleListScreen.tsx:29-39` - `onViewableItemsChanged` uses `any`
+- `src/screens/ExploreScreen.tsx:139` - `onViewableItemsChanged` callback uses `any`
+
+**Issue:** 3 instances of explicit `any` types that reduce TypeScript's type safety and ability to catch errors at compile time.
+
+**Impact:**
+- Reduced type safety (bypasses TypeScript's type checking)
+- Runtime errors that could be caught at compile time may only surface at runtime
+- Poor IDE support (autocomplete and refactoring tools work less effectively)
+
+**Implementation:**
+
+Add imports at the top of each file:
+```typescript
+import { ViewToken } from 'react-native';
+import { Article } from '../types/article';
+```
+
+Update ArticleListScreen.tsx:
+```typescript
+// Before
+onArticlePress?: (article: any) => void;
+onViewableItemsChanged?: (info: any) => void;
+
+// After
+onArticlePress?: (article: Article) => void;
+onViewableItemsChanged?: (info: {
+  viewableItems: ViewToken[];
+  changed: ViewToken[];
+}) => void;
+```
+
+Update ExploreScreen.tsx:
+```typescript
+// Before
+onViewableItemsChanged={(info: any) => {
+  handleViewableItemsChanged(info);
+}}
+
+// After
+onViewableItemsChanged={(info: {
+  viewableItems: ViewToken[];
+  changed: ViewToken[];
+}) => {
+  handleViewableItemsChanged(info);
+}}
+```
+
+**Verification:**
+```bash
+cd apps/mobile
+npm run type-check  # Should pass without any type errors
+npm run lint        # Should not show warnings for explicit any
+```
+
+**Effort:** 1-2 hours
+
+---
+
+### 4. Fix React Hook Dependency Warning in ExploreScreen
+**File:** `src/screens/ExploreScreen.tsx:35`
+
+**Issue:** `useEffect` hook has a missing dependency (`loadExploreArticles`) that could cause stale closures or missed re-renders.
+
+**Impact:**
+- Stale closures (effect may capture old version of function)
+- Incorrect behavior (changes to dependencies won't trigger effect re-run)
+- React warnings in development mode
+
+**Implementation:**
+
+Wrap function in useCallback (Recommended):
+```typescript
+const loadExploreArticles = useCallback(async (minArticles?: number) => {
+  if (loadingRef.current) return;
+
+  setLoading(true);
+  loadingRef.current = true;
+  setError(null);
+
+  try {
+    // ... existing logic
+  } catch (err) {
+    // ... existing error handling
+  } finally {
+    setLoading(false);
+    loadingRef.current = false;
+  }
+}, [/* add dependencies that loadExploreArticles uses */]);
+
+useEffect(() => {
+  loadExploreArticles();
+}, [loadExploreArticles]);
+```
+
+**Verification:**
+```bash
+cd apps/mobile
+npm run lint        # Should show no React hooks warnings
+npm start           # Test in development mode
+```
+
+**Effort:** 30 minutes
+
+---
+
+### 5. Remove Unused Functions in User Service
+**Files:**
+- `pkg/auth/examples/explore-service/main.go:90` - Unused variable `pathUserID` (BLOCKS COMPILATION)
+- `internal/database/user_repository_test.go:56` - `cleanupTestUserByEmail` function unused
+- `internal/database/user_repository_test.go:64` - `cleanupTestUserByDeviceID` function unused
+- `internal/middleware/auth.go:161` - `extractTokenFromHeader` function unused
+
+**Issue:** 4 unused functions and 1 unused variable that contribute to code clutter and can confuse developers. One unused variable prevents compilation.
+
+**Impact:**
+- Dead code increases codebase size without adding value
+- Maintenance burden (developers may waste time reading/updating dead code)
+- **Compilation error** in example code (unused variable blocks build)
+- Confusion (developers may assume these functions are used somewhere)
+
+**Implementation:**
+
+Fix compilation error (Priority 1):
+```go
+// Option 1: Remove if not needed
+// Delete line 90: pathUserID := r.PathValue("id")
+
+// Option 2: Use the variable
+pathUserID := r.PathValue("id")
+slog.Info("processing request", "user_id", pathUserID)
+// ... use pathUserID in the handler logic
+```
+
+For test cleanup functions:
+```go
+// Option 1: Remove unused functions (delete lines 56-69)
+
+// Option 2: Add to test cleanup (if useful)
+func TestCreateUser(t *testing.T) {
+    // ... test code ...
+    t.Cleanup(func() {
+        cleanupTestUserByEmail(t, db, "test@example.com")
+    })
+}
+```
+
+For middleware helper:
+```go
+// If truly unused, remove the entire function (delete lines 161-174)
+```
+
+**Verification:**
+```bash
+cd services/users
+go build ./...        # Check compilation
+staticcheck ./...     # Check for unused code
+make test
+```
+
+**Effort:** 30 minutes
+
+---
+
+### 6. Fix Context Key Type Safety in User Service
+**Files:**
+- `pkg/auth/middleware_test.go:345`
+- `pkg/auth/middleware_test.go:352`
+
+**Issue:** Middleware tests use built-in `string` type as context keys, which can cause collisions if different packages use the same string key.
+
+**Impact:**
+- Potential collisions (different packages using same string key will overwrite each other's values)
+- Subtle bugs (context value collisions are hard to debug)
+- Best practice violation (Go documentation recommends custom types for context keys)
+
+**Implementation:**
+
+Create custom context key type in `pkg/auth/middleware.go` or `pkg/auth/context.go`:
+```go
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+// Context key constants
+const (
+    userIDKey contextKey = "userID"
+)
+
+// SetUserIDInContext adds the user ID to the request context
+func SetUserIDInContext(ctx context.Context, userID string) context.Context {
+    return context.WithValue(ctx, userIDKey, userID)
+}
+
+// GetUserIDFromContext retrieves the user ID from the request context
+func GetUserIDFromContext(ctx context.Context) (string, bool) {
+    userID, ok := ctx.Value(userIDKey).(string)
+    return userID, ok
+}
+```
+
+Update middleware code:
+```go
+// Before
+ctx := context.WithValue(r.Context(), "userID", userID)
+
+// After
+ctx := SetUserIDInContext(r.Context(), userID)
+```
+
+Update code that reads from context:
+```go
+// Before
+userID := r.Context().Value("userID").(string)
+
+// After
+userID, ok := GetUserIDFromContext(r.Context())
+if !ok {
+    // handle missing user ID
+}
+```
+
+**Verification:**
+```bash
+cd services/users
+staticcheck ./...     # Should show no SA1029 warnings
+make test
+```
+
+**Effort:** 30 minutes
+
+---
 
 ### 13. Consolidate Auth Middleware Implementations
 **Files:**
@@ -325,6 +682,168 @@ go test ./... -v -short       # Skip integration tests
 ---
 
 ## Low Priority
+
+### 7. Clean Up Unused Code in Mobile App
+**Files:**
+- `src/components/common/ArticleRow.tsx:11` - Unused imports (Spacing, FontSizes, BorderRadius)
+- `src/screens/ExploreScreen.tsx:72` - Variable should be const
+- `package.json:27` - Unused dependency `expo-linking`
+- `src/navigation/index.ts` - Unused file (never imported)
+- `src/services/explore.ts` - Potentially unused exported types (7 types)
+- `src/types/article.ts` - Potentially unused exported types (3 types)
+
+**Issue:** Unused code including variables, imports, dependencies, and potentially unused exported types.
+
+**Impact:**
+- Bundle size increases from unused imports and dependencies
+- Code clarity reduced by unused variables
+- Maintenance burden for dead code
+- Install time increases with unused npm dependencies
+
+**Implementation:**
+
+Fix unused imports:
+```typescript
+// Before
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
+
+// After (only import what's used)
+import { Colors, FontFamily } from '../../constants';
+```
+
+Fix variable declaration:
+```typescript
+// Before
+let shouldContinue = true;  // Never reassigned
+
+// After
+const shouldContinue = true;  // Or remove if unnecessary
+```
+
+Remove unused dependency:
+```bash
+cd apps/mobile
+npm uninstall expo-linking  # Only if truly unused
+```
+
+Document or remove types:
+```typescript
+/**
+ * Backend article response format.
+ * @todo Used when backend integration is complete
+ */
+export interface BackendArticle {
+  // ...
+}
+```
+
+Configure ESLint auto-fix in `.vscode/settings.json`:
+```json
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "eslint.validate": [
+    "typescript",
+    "typescriptreact"
+  ]
+}
+```
+
+**Verification:**
+```bash
+cd apps/mobile
+npm run type-check
+npm run lint
+npm start
+```
+
+**Effort:** 1 hour
+
+---
+
+### 8. Apply Code Optimizations in Explore Service
+**Files:**
+- `fetcher/internal/fetcher/fetcher.go:166` - Loop can be simplified
+- `fetcher/internal/fetcher/fetcher_test.go:487` - Potential nil pointer dereference
+- `recommender/internal/api/server.go:56` - Use tagged switch instead of if-else chain
+
+**Issue:** 3 code optimization opportunities identified by staticcheck that would improve code quality and maintainability.
+
+**Impact:**
+- Readability (clearer, more idiomatic Go code)
+- Performance (minor improvements from loop optimization)
+- Bug prevention (fixing potential nil pointer dereference)
+
+**Implementation:**
+
+Loop simplification (fetcher.go:166):
+```go
+// Before (4 lines, loop overhead)
+categories := make([]string, 0, len(item.Categories))
+for _, cat := range item.Categories {
+    categories = append(categories, cat)
+}
+
+// After (1 line, no loop)
+categories := append([]string(nil), item.Categories...)
+```
+
+Nil safety (fetcher_test.go:484-487):
+```go
+// Before (potential panic)
+if lastFetchedAfter == nil {
+    t.Error("...")
+}
+if !lastFetchedAfter.After(lastFetch) {  // Could panic if nil!
+    t.Errorf("...")
+}
+
+// After (safe)
+if lastFetchedAfter == nil {
+    t.Fatal("...")  // Stops test immediately
+}
+if !lastFetchedAfter.After(lastFetch) {  // Safe - can't be nil here
+    t.Errorf("...")
+}
+```
+
+Switch clarity (server.go:56):
+```go
+// Before (if-else chain)
+if r.Method == http.MethodPost {
+    handleVoteSubmit(w, r)
+} else if r.Method == http.MethodDelete {
+    handleVoteRemove(w, r)
+} else if r.Method == http.MethodGet {
+    handleVoteQuery(w, r)
+} else {
+    http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// After (clean switch)
+switch r.Method {
+case http.MethodPost:
+    handleVoteSubmit(w, r)
+case http.MethodDelete:
+    handleVoteRemove(w, r)
+case http.MethodGet:
+    handleVoteQuery(w, r)
+default:
+    http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+```
+
+**Verification:**
+```bash
+cd services/explore
+make test
+staticcheck ./...  # Should show no S1011, SA5011, QF1003 warnings
+```
+
+**Effort:** 1 hour
+
+---
 
 ### 12. Define Sentinel Errors for Common Cases
 **File:** `recommender/internal/db/article_repository.go`
@@ -839,34 +1358,7 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 - Run `make test` and `make lint` after each fix
 - Update docker-compose.yml to set `DB_SSLMODE=disable` when SSL mode default changes
 
----
 
-## Summary
-
-**Total Issues:** 45 (4 Critical, 7 High, 19 Medium, 15 Low)
-
-**Quick Wins (Can be done in <1 hour each):**
-- Critical #1: Consolidate logging package
-- High #4: Move shared models
-- High #5: Standardize Read Service logging to slog
-- High #6: Remove hardcoded secrets
-- Medium #8: Rename testhelpers to testutil
-- Low #20: Consolidate getEnv helpers
-- Low #21: Add package documentation
-
-**High Impact (Address first):**
-- Critical #2: Standardize on pgx/v5 driver
-- Critical #3: Add OpenAPI specs
-- Critical #4: Add recommendation engine tests
-- High #5: Standardize Read Service logging (consistency across all services)
-- Medium #7: Document Read Service tech stack (knowledge sharing)
-- Medium #15: Add API versioning
-- Medium #16: Add input validation
-
-**Long-term Improvements:**
-- Medium #10-14: Architecture standardization
-- Medium #17: Testcontainers setup
-- Low #18-24: Code quality improvements
 
 ---
 
