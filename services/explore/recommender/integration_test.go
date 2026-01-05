@@ -3,6 +3,7 @@ package recommender_test
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -17,17 +18,20 @@ import (
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Integration test configuration
 type IntegrationTestSuite struct {
-	database    *pgxpool.Pool
-	server      *httptest.Server
+	database   *pgxpool.Pool
+	server     *httptest.Server
 	articleRepo db.ArticleRepositoryInterface
-	userRepo    db.UserRepositoryInterface
-	voteRepo    db.VoteRepositoryInterface
-	engine      *recommend.Engine
+	userRepo   db.UserRepositoryInterface
+	voteRepo   db.VoteRepositoryInterface
+	engine     *recommend.Engine
+	jwtHelper  *testJWTHelper
 }
 
 func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
@@ -66,16 +70,20 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	// Initialize recommendation engine
 	engine := recommend.NewEngine(articleRepo, userRepo)
 
-	// Create a mock auth middleware that allows all requests for testing
-	mockAuthMiddleware := &auth.Middleware{}
-	// Note: In production tests, you'd want to properly initialize this with test keys
-	// For now, we'll use a minimal setup that allows requests through
+	// Create test JWT setup
+	jwtHelper, validator, err := createTestJWTHelper(t)
+	if err != nil {
+		t.Fatalf("Failed to create test JWT helper: %v", err)
+	}
+
+	// Create auth middleware with test validator
+	authMiddleware := auth.NewMiddleware(validator)
 
 	// Create a test logger
 	testLogger := slog.Default()
 
 	// Setup HTTP server
-	apiServer := api.NewServer(database, articleRepo, userRepo, voteRepo, engine, mockAuthMiddleware, testLogger)
+	apiServer := api.NewServer(database, articleRepo, userRepo, voteRepo, engine, authMiddleware, testLogger)
 	server := httptest.NewServer(apiServer.Routes())
 
 	return &IntegrationTestSuite{
@@ -85,6 +93,7 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 		userRepo:    userRepo,
 		voteRepo:    voteRepo,
 		engine:      engine,
+		jwtHelper:   jwtHelper,
 	}
 }
 
@@ -119,6 +128,132 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+// testJWTHelper helps generate JWT tokens for integration tests
+type testJWTHelper struct {
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
+}
+
+// createTestJWTHelper creates a test JWT helper with test RSA keys
+func createTestJWTHelper(t *testing.T) (*testJWTHelper, *auth.Validator, error) {
+	// Create test RSA keys (simplified for testing)
+	privateKeyPEM := `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF6IrhvNSPp4n/5dTKV+QMAtZGOqB
+e7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5RzLd4mxQqHNxJxdNTN2r7TQ6Kt1Wl
+DQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfzxKv9gZGTRCkHjhGNpLFjNXRKQcLT
+MEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQPJmAdwq4V6RxKKdvb1LQKvXWS3fCp
+lQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLSXN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ
++5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xODwIDAQABAoIBAAqNL7qNKWLmkVQU
+vEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9
+S0pCMPKCbN6LWFQhOBvJxdTxJ5rVSWqaL7DVJqG+xZhLMFIhOTGZU6Zw2qwNfXEJ
+r5TJ4Vl0qOcHmNaY3KMJ+VWdRhKZTvU4yQpvLZ5LGZaKQmxqvLJqO7J2UXoE0bRZ
+nQYxKy+kWmZL9YhH7+qN8KYiV/CqFUm+pQ6FwFJKQYL9nZHC3wF8UZWmYv+j9yQV
+qMn8L2VhQFWpCmJ+TFmV3VQv9LhTJnGV0kK7QnXvqC8s4PJGZsHQnZF7vCpXwLMR
+9qJ7TQECgYEA7Z3xJVEZXQvvJJZoZ3L5fKLq7Oq+ZE3yV5+mQJ5WqYQxLQH6fW7y
+K5Fq7lqJZH2iq2IUhQS9xQG8GQkZQ9L7QwU9vQQ6LZ5bT6aZ6Q+mVbxZFqQWq9BL
+RvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8ZmQxL6aJ7TQECgYEA4YQx
+L6aZ6Q+mVbxZFqQWq9BLRvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8Z
+mQxL6aJ7TQE8s4PJGZsHQnZF7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
+qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
+8CgYEAtZ+QxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf
+0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCb
+N7qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjl
+FEGAoGAQxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
+qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
+qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFE
+-----END RSA PRIVATE KEY-----`
+
+	publicKeyPEM := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn/ygWy
+F6IrhvNSPp4n/5dTKV+QMAtZGOqBe7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5R
+zLd4mxQqHNxJxdNTN2r7TQ6Kt1WlDQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfz
+xKv9gZGTRCkHjhGNpLFjNXRKQcLTMEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQP
+JmAdwq4V6RxKKdvb1LQKvXWS3fCplQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLS
+XN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ+5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xO
+DwIDAQAB
+-----END PUBLIC KEY-----`
+
+	// Parse private key
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Parse public key
+	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(publicKeyPEM))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	// Create helper
+	helper := &testJWTHelper{
+		privateKey: privateKey,
+		publicKey:  publicKey,
+	}
+
+	// Create validator
+	validator := auth.NewValidator(publicKey)
+
+	return helper, validator, nil
+}
+
+// GenerateToken generates a test JWT token for the given user ID
+func (h *testJWTHelper) GenerateToken(userID uuid.UUID) (string, error) {
+	now := time.Now()
+	claims := &auth.Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "cairn-user-service",
+			Audience:  jwt.ClaimStrings{"cairn-api"},
+			Subject:   userID.String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			NotBefore: jwt.NewNumericDate(now),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	signedToken, err := token.SignedString(h.privateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %w", err)
+	}
+
+	return signedToken, nil
+}
+
+// makeAuthenticatedRequest creates an HTTP request with JWT authentication
+func makeAuthenticatedRequest(method, url, userID string, body []byte, jwtHelper *testJWTHelper) (*http.Request, error) {
+	var req *http.Request
+	var err error
+
+	if body != nil {
+		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate JWT token for the user
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	token, err := jwtHelper.GenerateToken(userUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// Add auth header
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	return req, nil
+}
+
 // Test 1 & 2: Article submission and deduplication
 func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	suite := setupIntegrationTest(t)
@@ -141,7 +276,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 
 	// Submit article via HTTP API (simulating fetcher)
 	payload, _ := json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err := http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err := http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit article: %v", err)
 	}
@@ -168,7 +303,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	// Submit same article again (test deduplication)
 	article.Title = "Updated Title"
 	payload, _ = json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err = http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err = http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit duplicate article: %v", err)
 	}
@@ -321,17 +456,20 @@ func TestUpvotingFlow(t *testing.T) {
 		t.Fatalf("Failed to create article: %v", err)
 	}
 
-	// Upvote via API
+	// Upvote via API (with authentication)
 	votePayload := map[string]string{
-		"user_id":   userID,
 		"vote_type": "upvote",
 	}
 	payload, _ := json.Marshal(votePayload)
-	resp, err := http.Post(
-		suite.server.URL+"/explore/articles/"+article.ID+"/vote",
-		"application/json",
-		bytes.NewBuffer(payload),
-	)
+
+	// Create authenticated request
+	client := &http.Client{}
+	req, err := makeAuthenticatedRequest("POST", suite.server.URL+"/api/v1/explore/article/"+article.ID+"/vote", userID, payload, suite.jwtHelper)
+	if err != nil {
+		t.Fatalf("Failed to create authenticated request: %v", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to submit vote: %v", err)
 	}
@@ -393,17 +531,20 @@ func TestDownvotingFlow(t *testing.T) {
 		t.Fatalf("Failed to create bad article: %v", err)
 	}
 
-	// Downvote the bad article
+	// Downvote the bad article (with authentication)
 	votePayload := map[string]string{
-		"user_id":   userID,
 		"vote_type": "downvote",
 	}
 	payload, _ := json.Marshal(votePayload)
-	resp, err := http.Post(
-		suite.server.URL+"/explore/articles/"+badArticle.ID+"/vote",
-		"application/json",
-		bytes.NewBuffer(payload),
-	)
+
+	// Create authenticated request
+	client := &http.Client{}
+	req, err := makeAuthenticatedRequest("POST", suite.server.URL+"/api/v1/explore/article/"+badArticle.ID+"/vote", userID, payload, suite.jwtHelper)
+	if err != nil {
+		t.Fatalf("Failed to create authenticated request: %v", err)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to submit downvote: %v", err)
 	}
@@ -552,7 +693,7 @@ func TestEndToEndFlow(t *testing.T) {
 	}
 
 	payload, _ := json.Marshal(map[string][]models.Article{"articles": articles})
-	resp, err := http.Post(suite.server.URL+"/explore/articles", "application/json", bytes.NewBuffer(payload))
+	resp, err := http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Fatalf("Failed to submit articles: %v", err)
 	}
@@ -564,8 +705,14 @@ func TestEndToEndFlow(t *testing.T) {
 		t.Errorf("Expected status 201, got %d", resp.StatusCode)
 	}
 
-	// 2. User gets recommendations
-	resp, err = http.Get(suite.server.URL + "/explore/recommendations/" + userID)
+	// 2. User gets recommendations (with authentication)
+	client := &http.Client{}
+	req, err := makeAuthenticatedRequest("GET", suite.server.URL+"/api/v1/explore/recommendation/"+userID, userID, nil, suite.jwtHelper)
+	if err != nil {
+		t.Fatalf("Failed to create authenticated request: %v", err)
+	}
+
+	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
@@ -589,18 +736,19 @@ func TestEndToEndFlow(t *testing.T) {
 		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
 	}
 
-	// 3. User upvotes first article
+	// 3. User upvotes first article (with authentication)
 	if len(recommendations) > 0 {
 		votePayload := map[string]string{
-			"user_id":   userID,
 			"vote_type": "upvote",
 		}
 		payload, _ := json.Marshal(votePayload)
-		resp, err := http.Post(
-			suite.server.URL+"/explore/articles/"+recommendations[0].ID+"/vote",
-			"application/json",
-			bytes.NewBuffer(payload),
-		)
+
+		req, err := makeAuthenticatedRequest("POST", suite.server.URL+"/api/v1/explore/article/"+recommendations[0].ID+"/vote", userID, payload, suite.jwtHelper)
+		if err != nil {
+			t.Fatalf("Failed to create authenticated request: %v", err)
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			t.Fatalf("Failed to submit vote: %v", err)
 		}
