@@ -51,11 +51,11 @@ tags:
 
 paths:
   # Health Endpoints
-  /health:
+  /health/live:
     get:
       tags:
         - Health
-      summary: Health check
+      summary: Liveness check
       description: Basic health check endpoint (liveness probe)
       operationId: healthCheck
       responses:
@@ -70,7 +70,7 @@ paths:
                     type: string
                     example: healthy
 
-  /ready:
+  /health/ready:
     get:
       tags:
         - Health
@@ -104,7 +104,7 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   # Authentication Endpoints
-  /auth/register:
+  /api/v1/auth/register:
     post:
       tags:
         - Authentication
@@ -160,7 +160,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/register/mobile:
+  /api/v1/auth/register/mobile:
     post:
       tags:
         - Authentication
@@ -208,7 +208,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/login:
+  /api/v1/auth/login:
     post:
       tags:
         - Authentication
@@ -261,7 +261,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/login/mobile:
+  /api/v1/auth/login/mobile:
     post:
       tags:
         - Authentication
@@ -315,7 +315,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/refresh:
+  /api/v1/auth/refresh:
     post:
       tags:
         - Authentication
@@ -376,7 +376,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/logout:
+  /api/v1/auth/logout:
     post:
       tags:
         - Authentication
@@ -420,7 +420,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /auth/logout-all:
+  /api/v1/auth/logout-all:
     post:
       tags:
         - Authentication
@@ -456,7 +456,7 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   # User Management Endpoints
-  /users/{id}:
+  /api/v1/user/{user_id}:
     get:
       tags:
         - User Management
@@ -466,7 +466,7 @@ paths:
         Users can only access their own profile.
       operationId: getUser
       parameters:
-        - name: id
+        - name: user_id
           in: path
           required: true
           description: User ID (must match authenticated user)
@@ -522,7 +522,7 @@ paths:
         Users can only update their own profile.
       operationId: updateUser
       parameters:
-        - name: id
+        - name: user_id
           in: path
           required: true
           description: User ID (must match authenticated user)
@@ -597,7 +597,7 @@ paths:
         This action is irreversible.
       operationId: deleteUser
       parameters:
-        - name: id
+        - name: user_id
           in: path
           required: true
           description: User ID (must match authenticated user)
@@ -648,7 +648,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /users/{id}/upgrade:
+  /api/v1/user/{user_id}/upgrade:
     post:
       tags:
         - User Management
@@ -659,7 +659,7 @@ paths:
         Device login is disabled for hybrid accounts.
       operationId: upgradeAccount
       parameters:
-        - name: id
+        - name: user_id
           in: path
           required: true
           description: User ID (must match authenticated user)
