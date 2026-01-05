@@ -2,31 +2,29 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/andrew-craig/cairn/pkg/models"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // setupTestDB creates a test database connection and runs migrations
-func setupTestDB(t *testing.T) *sql.DB {
+func setupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
 	// Connect to test database
 	// In a real scenario, you'd use a test database or docker container
 	// For this test, we'll use a local PostgreSQL instance
 	connStr := "host=localhost port=5432 user=cairn password=cairn_password dbname=cairn_test sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		t.Skipf("Skipping test: could not connect to test database: %v", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		if closeErr := db.Close(); closeErr != nil {
-			t.Logf("error closing database: %v", closeErr)
-		}
+	if err := db.Ping(ctx); err != nil {
+		db.Close()
 		t.Skipf("Skipping test: could not ping test database: %v", err)
 	}
 
@@ -37,29 +35,30 @@ func setupTestDB(t *testing.T) *sql.DB {
 }
 
 // cleanupTestDB removes all test data from the database
-func cleanupTestDB(t *testing.T, db *sql.DB) {
+func cleanupTestDB(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
 
+	ctx := context.Background()
 	queries := []string{
+		"DELETE FROM recommendations",
+		"DELETE FROM votes",
 		"DELETE FROM user_articles",
 		"DELETE FROM articles",
 		"DELETE FROM users",
 	}
 
 	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
+		if _, err := db.Exec(ctx, query); err != nil {
 			t.Logf("Warning: failed to clean up: %v", err)
 		}
 	}
 }
 
 // teardownTestDB cleans up and closes the database connection
-func teardownTestDB(t *testing.T, db *sql.DB) {
+func teardownTestDB(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
 	cleanupTestDB(t, db)
-	if err := db.Close(); err != nil {
-		t.Logf("error closing database: %v", err)
-	}
+	db.Close()
 }
 
 // createTestArticle creates a test article with default values
@@ -138,7 +137,7 @@ func TestCreate_DuplicateLink_UpdatesArticle(t *testing.T) {
 	}
 
 	// Manually set some engagement metrics
-	_, err = db.Exec("UPDATE articles SET upvotes = 5, downvotes = 2, recommends = 10 WHERE id = $1", article1.ID)
+	_, err = db.Exec(ctx, "UPDATE articles SET upvotes = 5, downvotes = 2, recommends = 10 WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to update metrics: %v", err)
 	}
@@ -209,7 +208,7 @@ func TestCreate_DuplicateLink_DeletedArticle_NotUpdated(t *testing.T) {
 	}
 
 	// Mark the article as deleted
-	_, err = db.Exec("UPDATE articles SET deleted = true WHERE id = $1", article1.ID)
+	_, err = db.Exec(ctx, "UPDATE articles SET deleted = true WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to mark article as deleted: %v", err)
 	}
@@ -286,7 +285,7 @@ func TestCreateBatch_WithDuplicates(t *testing.T) {
 	}
 
 	// Set engagement metrics
-	_, err = db.Exec("UPDATE articles SET upvotes = 10, downvotes = 3, recommends = 20 WHERE id = $1", article1.ID)
+	_, err = db.Exec(ctx, "UPDATE articles SET upvotes = 10, downvotes = 3, recommends = 20 WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to update metrics: %v", err)
 	}
