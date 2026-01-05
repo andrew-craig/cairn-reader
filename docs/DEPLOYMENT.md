@@ -30,15 +30,6 @@ docker compose up --build
 
 This starts all services with automatic database migrations and Vault initialization.
 
-**Current Status** (as of Dec 29, 2024):
-- ✅ Vault for secrets management - **OPERATIONAL**
-- ✅ PostgreSQL with 3 databases - **OPERATIONAL**
-- ✅ JWT keys auto-generated - **WORKING**
-- ✅ Database migrations auto-run - **WORKING**
-- ✅ User Service - **OPERATIONAL**
-- ✅ Recommender Service - **OPERATIONAL**
-- ✅ Fetcher Service - **OPERATIONAL** (27,399+ feeds loaded)
-
 ### Service Endpoints
 
 After deployment, services are available at:
@@ -66,20 +57,6 @@ After deployment, services are available at:
 - **Go**: 1.21 or later
 - **PostgreSQL**: 15 or later (if running database locally without Docker)
 - **Make**: For using Makefile commands (optional)
-
-### System Requirements
-
-**Minimum**:
-- CPU: 2 cores
-- RAM: 4GB
-- Disk: 20GB
-- OS: Linux, macOS, or Windows with WSL2
-
-**Recommended for Production**:
-- CPU: 4 cores
-- RAM: 8GB
-- Disk: 50GB SSD
-- OS: Ubuntu 22.04 LTS or similar
 
 ---
 
