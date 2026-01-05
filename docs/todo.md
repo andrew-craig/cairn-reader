@@ -1030,6 +1030,153 @@ go test ./... -v -short       # Skip integration tests
 
 ---
 
+### 9. Complete Logging Migration to log/slog
+**Reference:** `docs/LOGGING_STRATEGY.md` - See detailed migration strategy and implementation patterns
+
+**Status:** ~70% complete - Phase 1 complete, Phase 2 partial, Phase 3 not started
+
+**Issue:** Migration to structured logging with `log/slog` is incomplete. While main service entry points and the `pkg/logging` package are fully implemented per spec, many internal components still use old logging patterns (`log.Printf`, `log.Println`, `fmt.Printf`).
+
+**Current State:**
+- ✅ **Phase 1 Complete** - Shared `pkg/logging` package created with all recommended components:
+  - `pkg/logging/logger.go` - Logger initialization and configuration
+  - `pkg/logging/middleware.go` - Gin HTTP middleware
+  - `pkg/logging/chi_middleware.go` - Chi HTTP middleware
+  - `pkg/logging/context.go` - Context helpers
+- 🟡 **Phase 2 Partial** - Service main.go files migrated, internals incomplete:
+  - User Service: 95% (3 files remaining)
+  - Explore Services: 90% (3 files remaining)
+  - Read Content Service: 85% (2 files remaining)
+  - Read Ingest RSS: 40% (18 files remaining)
+- ❌ **Phase 3 Not Started** - Old logging patterns not cleaned up:
+  - **214 occurrences** of old logging across **32 files**
+  - Old prefixes still in use (`AUTH_SUCCESS`, `[DB]`, etc.)
+
+**Impact:**
+- Inconsistent log formatting across services
+- Cannot filter logs by severity level in production
+- Logs not machine-parseable (no JSON support in old code)
+- Harder to search and correlate logs across services
+- Old middleware files add confusion and maintenance burden
+
+**Files Requiring Migration:**
+
+**User Service** (3 files):
+- `services/users/internal/middleware/logging.go` - **DELETE** (replaced by `pkg/logging`)
+  - Contains old `log.Printf` patterns with `AUTH_SUCCESS`, `AUTH_FAILURE` prefixes
+  - Superseded by `pkg/logging.RequestLogger()` already in use
+- `services/users/cmd/migrate/main.go` - Migrate to slog
+- `services/users/pkg/auth/examples/` - Low priority example files
+
+**Explore Service** (3 files):
+- `services/explore/recommender/cmd/explore_cleanup/main.go` - Uses `log.Printf`
+- `services/explore/recommender/internal/cleanup/article_cleanup.go` - Uses `log.Printf`
+- `services/explore/fetcher/internal/client/recommender_client.go` - Uses `log.Printf`
+
+**Read Service - Content** (2 files):
+- `services/read/content/internal/api/middleware/error_handler.go` - Uses `log.Printf`
+- `services/read/content/internal/database/connection.go` - Uses `log.Printf`
+
+**Read Service - Ingest RSS** (18 files - HIGHEST PRIORITY):
+- `internal/fetcher/feed_fetcher.go:99,123,141,144` - Multiple `log.Printf` calls
+- `internal/processor/item_processor.go`
+- `internal/processor/update_detector.go`
+- `internal/scheduler/poll_scheduler.go`
+- `internal/scheduler/tier_manager.go`
+- `internal/worker/feed_worker.go`
+- `internal/worker/outbox_worker.go`
+- `internal/jobs/content_extraction_job.go`
+- `internal/jobs/feed_items_cleanup_job.go`
+- `internal/jobs/feed_items_cleanup_scheduler.go`
+- `internal/jobs/outbox_cleanup_job.go`
+- `internal/jobs/outbox_cleanup_scheduler.go`
+- `internal/api/middleware/recovery.go`
+- `internal/api/handlers/subscription_handler.go`
+- `cmd/ingest_rss_worker/main.go`
+- `cmd/worker/main.go`
+
+**Implementation:**
+
+Follow patterns from `docs/LOGGING_STRATEGY.md`:
+
+```go
+// Before (old logging)
+log.Printf("Fetching feed %s (%s)", feed.ID, feed.FeedURL)
+log.Printf("Error processing feed item %s: %v", item.GUID, err)
+fmt.Printf("warning: failed to update timestamp: %v\n", err)
+
+// After (structured slog)
+slog.Info("fetching feed",
+    slog.String("feed_id", feed.ID),
+    slog.String("feed_url", feed.FeedURL),
+)
+slog.Error("failed to process feed item",
+    slog.String("feed_item_guid", item.GUID),
+    slog.Any("error", err),
+)
+slog.Warn("failed to update timestamp",
+    slog.Any("error", err),
+)
+```
+
+For old middleware file:
+```bash
+# Delete the obsolete middleware file
+rm services/users/internal/middleware/logging.go
+
+# Verify no imports reference it
+grep -r "internal/middleware" services/users/
+```
+
+**Standard Attribute Names** (use consistently):
+- `service` - Service name (user-service, fetcher, recommender)
+- `component` - Logical component (auth, recommendations, db)
+- `request_id` - UUID for request tracing
+- `user_id` - User identifier
+- `article_id` - Article identifier
+- `feed_id` - Feed identifier
+- `duration` - Operation duration
+- `error` - Error object
+- `status` - HTTP status code
+- `method` - HTTP method
+- `path` - URL path
+- `client_ip` - Client IP address
+- `count` - Count of items
+- `operation` - DB/API operation name
+
+**Verification:**
+```bash
+# Check for remaining old patterns (should return 0 or minimal)
+grep -r "log\.Printf\|log\.Println" services --include="*.go" | wc -l
+
+# Verify all services use pkg/logging
+grep -r "pkg/logging" services/*/cmd/*/main.go
+
+# Test services still work
+cd infrastructure/docker && docker-compose up --build
+```
+
+**Effort:** 4-6 hours
+- User Service: 30 minutes (mostly deletion)
+- Explore Services: 1 hour
+- Read Content Service: 30 minutes
+- Read Ingest RSS: 3 hours (most work)
+
+**Priority Order:**
+1. **Read/Ingest RSS internals** (highest impact - 18 files)
+2. **Delete obsolete User Service middleware** (quick win)
+3. **Explore Service utilities** (cleanup jobs)
+4. **Read Content Service middleware** (minor fixes)
+5. **Example files** (lowest priority)
+
+**Reference:** See `docs/LOGGING_STRATEGY.md` for:
+- Complete migration strategy
+- Log level guidelines (DEBUG, INFO, WARN, ERROR)
+- Environment configuration (LOG_LEVEL, LOG_FORMAT)
+- Output examples (JSON for prod, text for dev)
+
+---
+
 ## Low Priority
 
 ### 7. Clean Up Unused Dependency in Mobile App
