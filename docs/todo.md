@@ -136,7 +136,356 @@ curl http://localhost:8081/health/live
 
 ## Medium Priority
 
-### 3. Fix Type Safety Violations in Mobile App
+### 3. Complete API v1 Migration - Update OpenAPI Specifications
+**Files:**
+- `services/explore/api/openapi.yaml`
+- `services/users/api/openapi.yaml`
+
+**Issue:** OpenAPI specifications have not been updated to reflect the new API v1 structure that was implemented in the code. Service routes were successfully migrated, but documentation specs still show old paths.
+
+**Impact:**
+- API documentation is out of sync with implementation
+- API consumers (including mobile app developers) see incorrect endpoint paths
+- OpenAPI validation tools will fail against actual endpoints
+- Developer onboarding is more difficult due to inaccurate documentation
+
+**Current State:**
+✅ **Service code fully migrated** (100% complete):
+- All routes use `/api/v1` prefix
+- Health checks use `/health/live` and `/health/ready`
+- Path parameters use snake_case (`{user_id}`, `{article_id}`)
+
+❌ **OpenAPI specs not updated**:
+
+**Explore Service** (`services/explore/api/openapi.yaml`):
+- Still uses `/health` instead of `/health/live`
+- Still uses `/fetch` instead of `/api/v1/explore/feed/fetch`
+- Still uses `/feeds/stats` instead of `/api/v1/explore/feed/stats`
+- Still uses `/ready` instead of `/health/ready`
+- Still uses `/explore/articles` instead of `/api/v1/explore/article`
+- Still uses `{userID}` instead of `{user_id}`
+- Still uses `{articleID}` instead of `{article_id}`
+
+**User Service** (`services/users/api/openapi.yaml`):
+- Still uses `/health` instead of `/health/live`
+- Still uses `/ready` instead of `/health/ready`
+- Missing `/api/v1` prefix on all auth and user endpoints
+
+**Implementation:**
+
+Update Explore Service OpenAPI spec:
+```yaml
+paths:
+  # Health endpoints
+  /health/live:
+    get:
+      summary: Liveness check (Fetcher)
+      # ...
+
+  /health/ready:
+    get:
+      summary: Readiness check (Fetcher)
+      # ...
+
+  # Fetcher endpoints
+  /api/v1/explore/feed/fetch:
+    post:
+      summary: Trigger manual feed fetch
+      # ...
+
+  /api/v1/explore/feed/stats:
+    get:
+      summary: Get feed statistics
+      # ...
+
+  /api/v1/explore/feed/sync:
+    post:
+      summary: Sync feeds from Kagi Small Web
+      # ...
+
+  # Recommender endpoints
+  /api/v1/explore/article:
+    post:
+      summary: Submit articles (internal)
+      # ...
+
+  /api/v1/explore/recommendation/{user_id}:
+    get:
+      summary: Get recommendations
+      parameters:
+        - name: user_id
+          in: path
+          # ...
+
+  /api/v1/explore/article/{article_id}/read:
+    post:
+      summary: Mark article as read
+      parameters:
+        - name: article_id
+          in: path
+          # ...
+
+  /api/v1/explore/article/{article_id}/vote:
+    post:
+      summary: Vote on article
+      parameters:
+        - name: article_id
+          in: path
+          # ...
+    delete:
+      summary: Remove vote
+      # ...
+    get:
+      summary: Get vote counts
+      # ...
+```
+
+Update User Service OpenAPI spec:
+```yaml
+paths:
+  # Health endpoints
+  /health/live:
+    get:
+      summary: Liveness check
+      # ...
+
+  /health/ready:
+    get:
+      summary: Readiness check
+      # ...
+
+  # Authentication endpoints
+  /api/v1/auth/register:
+    post:
+      summary: Register with email/password
+      # ...
+
+  /api/v1/auth/register/mobile:
+    post:
+      summary: Register with device ID
+      # ...
+
+  /api/v1/auth/login:
+    post:
+      summary: Login with email/password
+      # ...
+
+  # ... continue for all auth endpoints
+
+  # User management endpoints
+  /api/v1/user/{user_id}:
+    get:
+      summary: Get user profile
+      parameters:
+        - name: user_id
+          in: path
+          schema:
+            type: string
+            format: uuid
+          # ...
+```
+
+**Verification:**
+```bash
+# Validate updated specs
+npx @apidevtools/swagger-cli validate services/explore/api/openapi.yaml
+npx @apidevtools/swagger-cli validate services/users/api/openapi.yaml
+
+# View specs in Swagger UI (optional)
+docker run -p 8082:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/services/explore/api:/api swaggerapi/swagger-ui
+
+docker run -p 8083:8080 -e SWAGGER_JSON=/api/openapi.yaml \
+  -v $(pwd)/services/users/api:/api swaggerapi/swagger-ui
+```
+
+**Effort:** 2-3 hours
+
+**Note:** Read Service OpenAPI specs (content and fetcher) are already updated and compliant.
+
+---
+
+### 4. Complete API v1 Migration - Update Integration Tests
+**File:** `services/explore/recommender/integration_test.go`
+
+**Issue:** Integration tests use old API paths that don't match the current implementation, causing tests to fail.
+
+**Impact:**
+- Integration tests cannot verify the actual API endpoints
+- False negatives (tests fail even though code works)
+- Reduced confidence in deployment safety
+- CI/CD pipeline may fail or provide misleading results
+
+**Current Test Paths (❌ Incorrect):**
+```go
+// Line 144
+resp, err := http.Post(suite.server.URL+"/explore/articles", ...)
+
+// Line 171
+resp, err = http.Post(suite.server.URL+"/explore/articles", ...)
+
+// Line 327
+resp, err := http.Post(suite.server.URL+"/explore/articles/"+article.ID+"/vote", ...)
+
+// Line 395
+resp, err := http.Post(suite.server.URL+"/explore/articles/"+badArticle.ID+"/vote", ...)
+
+// Line 543
+resp, err := http.Post(suite.server.URL+"/explore/articles", ...)
+
+// Line 554
+resp, err = http.Get(suite.server.URL + "/explore/recommendations/" + userID)
+
+// Line 582
+resp, err := http.Post(suite.server.URL+"/explore/articles/"+recommendations[0].ID+"/vote", ...)
+```
+
+**Implementation:**
+
+Update all HTTP test requests to use v1 API paths:
+```go
+// Article submission (lines 144, 171, 543)
+resp, err := http.Post(suite.server.URL+"/api/v1/explore/article", ...)
+
+// Get recommendations (line 554)
+resp, err = http.Get(suite.server.URL + "/api/v1/explore/recommendation/" + userID)
+
+// Vote endpoints (lines 327, 395, 582)
+resp, err := http.Post(suite.server.URL+"/api/v1/explore/article/"+article.ID+"/vote", ...)
+```
+
+**Note:** These tests also need JWT authentication to work with the current implementation. Consider:
+1. Generating test JWT tokens using the auth middleware
+2. Adding `Authorization: Bearer <token>` header to authenticated requests
+3. Updating the mock auth middleware in test setup to properly validate tokens
+
+**Verification:**
+```bash
+cd services/explore
+go test -v ./recommender/integration_test.go
+```
+
+**Effort:** 1-2 hours
+
+---
+
+### 5. Complete API v1 Migration - Update Service README Files
+**Files:**
+- `services/explore/README.md`
+- `services/users/README.md`
+
+**Issue:** Service-specific README files have not been updated with the new API v1 endpoints and examples.
+
+**Impact:**
+- Developers reading service-specific docs see incorrect curl examples
+- Service README files contradict CLAUDE.md (which is updated)
+- Confusion during local development and testing
+- Harder onboarding for new contributors
+
+**Current State:**
+- ❌ `services/explore/README.md` - No `/api/v1` paths found, no `/health/live` endpoints
+- ❌ `services/users/README.md` - No `/api/v1` paths found
+- ✅ `CLAUDE.md` - Already updated with all new paths
+
+**Implementation:**
+
+Update all example curl commands in each README to match the new API structure:
+
+**Explore Service README:**
+```markdown
+# Example API Calls
+
+## Fetcher Service (port 8080)
+
+# Health checks
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+
+# Manual feed fetch
+curl -X POST http://localhost:8080/api/v1/explore/feed/fetch
+
+# Feed statistics
+curl http://localhost:8080/api/v1/explore/feed/stats
+
+# Sync feeds
+curl -X POST http://localhost:8080/api/v1/explore/feed/sync
+
+## Recommender Service (port 8081)
+
+# Health checks
+curl http://localhost:8081/health/live
+curl http://localhost:8081/health/ready
+
+# Get recommendations (requires auth)
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/user123
+
+# Mark article as read (requires auth)
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/article/{article_id}/read
+
+# Vote on article (requires auth)
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"vote_type":"upvote"}' \
+  http://localhost:8081/api/v1/explore/article/{article_id}/vote
+```
+
+**User Service README:**
+```markdown
+# Example API Calls
+
+# Health checks
+curl http://localhost:8082/health/live
+curl http://localhost:8082/health/ready
+
+# Register user
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"securepass123"}' \
+  http://localhost:8082/api/v1/auth/register
+
+# Login
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"securepass123"}' \
+  http://localhost:8082/api/v1/auth/login
+
+# Get user profile (requires auth)
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8082/api/v1/user/{user_id}
+
+# Update user profile (requires auth)
+curl -X PATCH \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"newemail@example.com"}' \
+  http://localhost:8082/api/v1/user/{user_id}
+```
+
+Also update any endpoint documentation tables and architecture diagrams.
+
+**Verification:**
+```bash
+# Test each curl command manually to ensure it works
+# Or create a script to test all endpoints
+
+# services/explore/test-api.sh
+#!/bin/bash
+curl -f http://localhost:8080/health/live || echo "❌ Fetcher health check failed"
+curl -f http://localhost:8081/health/ready || echo "❌ Recommender health check failed"
+# ... etc
+```
+
+**Effort:** 1-2 hours
+
+**Reference:** See `docs/API_MIGRATION_PLAN.md` (to be deleted after this task) for complete migration details.
+
+---
+
+### 6. Fix Type Safety Violations in Mobile App
 **Files:**
 - `src/components/ArticleListScreen.tsx:24` - `onArticlePress` parameter uses `any`
 - `src/components/ArticleListScreen.tsx:29-39` - `onViewableItemsChanged` uses `any`
