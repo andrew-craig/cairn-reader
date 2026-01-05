@@ -172,7 +172,11 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to submit duplicate article: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("error closing response body: %v", err)
+		}
+	}()
 
 	// Verify title was updated
 	stored, err = suite.articleRepo.GetByID(ctx, article.ID)
@@ -331,7 +335,11 @@ func TestUpvotingFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to submit vote: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -399,7 +407,11 @@ func TestDownvotingFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to submit downvote: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -544,7 +556,9 @@ func TestEndToEndFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to submit articles: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Logf("error closing response body: %v", err)
+	}
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Errorf("Expected status 201, got %d", resp.StatusCode)
@@ -555,7 +569,11 @@ func TestEndToEndFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Logf("error closing response body: %v", err)
+		}
+	}()
 
 	var recResp struct {
 		UserID          string           `json:"user_id"`
@@ -586,7 +604,11 @@ func TestEndToEndFlow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to submit vote: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				t.Logf("error closing response body: %v", err)
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200 for vote, got %d", resp.StatusCode)

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/andrew-craig/cairn/pkg/models"
-	"github.com/jackc/pgx/v5"
 )
 
 // ArticleRepositoryInterface defines the contract for article database operations
@@ -85,8 +84,3 @@ var (
 	_ VoteRepositoryInterface    = (*voteRepository)(nil)
 	_ UserRepositoryInterface    = (*userRepository)(nil)
 )
-
-// Helper type for article scanning (internal use)
-type articleScanner interface {
-	scanArticles(rows pgx.Rows) ([]models.Article, error)
-}

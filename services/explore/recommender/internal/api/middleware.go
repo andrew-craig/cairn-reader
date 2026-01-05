@@ -9,6 +9,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const (
+	requestIDKey contextKey = "request_id"
+)
+
 // loggingMiddleware logs all HTTP requests and manages request ID propagation
 func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +29,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Request-ID", requestID)
 
 		// Add request ID to context for downstream logging
-		ctx := context.WithValue(r.Context(), "request_id", requestID)
+		ctx := context.WithValue(r.Context(), requestIDKey, requestID)
 		r = r.WithContext(ctx)
 
 		// Create a response writer wrapper to capture status code

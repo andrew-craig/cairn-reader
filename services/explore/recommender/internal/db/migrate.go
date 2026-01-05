@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -29,7 +30,11 @@ func RunMigrations(migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Error("failed to close database connection", slog.Any("error", err))
+		}
+	}()
 
 	// Create postgres driver instance
 	driver, err := postgres.WithInstance(db, &postgres.Config{})

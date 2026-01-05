@@ -6,60 +6,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Fix Unchecked Error Returns in Explore Service - Recommender
-**Files:**
-- `recommender/internal/db/article_repository.go:82,102,188,220,256`
-- `recommender/internal/db/vote_repository.go:43,145`
-- `recommender/internal/api/handlers.go:17,41,56`
-- `recommender/cmd/cleanup/main.go:47`
-- `recommender/integration_test.go:91,144`
-- `recommender/internal/db/article_repository_test.go:27,58`
-
-**Issue:** 12 instances of unchecked error returns that could lead to resource leaks, malformed HTTP responses, and data corruption.
-
-**Impact:**
-- Resource leaks from unchecked `Close()` and `Rollback()` calls can exhaust database connection pool
-- HTTP response encoding errors could send malformed responses without error notification
-- Transaction rollback errors are ignored, potentially leaving database in inconsistent state
-
-**Implementation:**
-
-For defer Rollback() calls:
-```go
-// Before
-defer tx.Rollback()
-
-// After
-defer func() {
-    if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-        slog.Error("error rolling back transaction", "error", err)
-    }
-}()
-```
-
-For JSON encoding in HTTP handlers:
-```go
-// Before
-json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
-
-// After
-if err := json.NewEncoder(w).Encode(map[string]string{"status": "healthy"}); err != nil {
-    slog.Error("error encoding response", "error", err)
-    http.Error(w, "Internal server error", http.StatusInternalServerError)
-    return
-}
-```
-
-**Verification:**
-```bash
-cd services/explore
-golangci-lint run ./recommender/...
-make test
-curl http://localhost:8081/health/live
-```
-
-**Effort:** 2-3 hours
-
 ---
 
 ## High Priority
@@ -1797,6 +1743,7 @@ The following items have been successfully implemented and verified:
 - **Extract URL Path Parsing Helper** - Implemented extractPathParam helper function
 - **Log Warning for Silent Vote Counter Failures** - Added slog.Warn for rowsAffected == 0 cases
 - **Fix Unchecked Error Returns in Explore Service - Fetcher** - Fixed unchecked error returns that could lead to resource leaks, silent failures, and data inconsistencies. Added proper error handling for transaction rollback in feed_repository.go with pgx.ErrTxClosed check. Migrated recommender_client.go from log.Printf to slog.Warn for structured logging of response body close errors. Added error handling for json.NewEncoder().Encode() in main.go health check handlers (liveness and readiness). All services compile successfully. Benefits include prevention of resource leaks from unchecked transaction rollbacks, consistent error logging with structured logging (slog), and prevention of silent JSON encoding failures in HTTP responses.
+- **Fix Unchecked Error Returns in Explore Service - Recommender** - Fixed unchecked error returns and compilation issues in the recommender service. Key changes include: (1) Migrated article_repository_test.go from database/sql to pgxpool.Pool for consistency with the repository interface after pgx migration; (2) Fixed 6 unchecked resp.Body.Close() errors in integration_test.go by adding proper error handling with defer functions; (3) Fixed unchecked db.Close() error in migrate.go by adding error logging; (4) Fixed context key type safety issue in middleware.go by creating a custom contextKey type to avoid collisions; (5) Removed unused articleScanner interface and pgx import from interfaces.go. All golangci-lint issues resolved (0 issues), and all unit tests pass. Benefits include prevention of resource leaks from unchecked Close() calls, better type safety for context values, and cleaner codebase without unused code.
 
 ### Infrastructure & Architecture
 - **Add Connection Pool Configuration to Fetcher** - Configured MaxOpenConns, MaxIdleConns, and ConnMaxLifetime
