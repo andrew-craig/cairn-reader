@@ -42,11 +42,11 @@ tags:
 
 paths:
   # Fetcher Service Endpoints (Port 8080)
-  /health:
+  /health/live:
     get:
       tags:
         - Health
-      summary: Health check (Fetcher)
+      summary: Liveness check (Fetcher)
       description: Returns the health status of the fetcher service (liveness probe)
       operationId: fetcherHealth
       responses:
@@ -64,7 +64,42 @@ paths:
                     type: string
                     example: fetcher
 
-  /fetch:
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check (Fetcher)
+      description: Checks if the fetcher service is ready (readiness probe). Verifies database connectivity.
+      operationId: fetcherReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  service:
+                    type: string
+                    example: fetcher
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not ready
+                  error:
+                    type: string
+                    example: database unavailable
+
+  /api/v1/explore/feed/fetch:
     post:
       tags:
         - Fetcher
@@ -85,7 +120,7 @@ paths:
         '405':
           description: Method not allowed
 
-  /feeds/stats:
+  /api/v1/explore/feed/stats:
     get:
       tags:
         - Fetcher
@@ -119,7 +154,7 @@ paths:
         '500':
           description: Internal server error
 
-  /feeds/sync:
+  /api/v1/explore/feed/sync:
     post:
       tags:
         - Fetcher
@@ -141,42 +176,7 @@ paths:
           description: Method not allowed
 
   # Recommender Service Endpoints (Port 8081)
-  /ready:
-    get:
-      tags:
-        - Health
-      summary: Readiness check (Recommender)
-      description: Checks if the recommender service is ready (readiness probe). Verifies database connectivity.
-      operationId: recommenderReady
-      responses:
-        '200':
-          description: Service is ready
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ready
-                  service:
-                    type: string
-                    example: recommender
-        '503':
-          description: Service not ready
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: not ready
-                  error:
-                    type: string
-                    example: database unavailable
-
-  /explore/articles:
+  /api/v1/explore/article:
     post:
       tags:
         - Articles
@@ -222,7 +222,7 @@ paths:
         '500':
           description: Failed to store articles
 
-  /explore/recommendations/{userID}:
+  /api/v1/explore/recommendation/{user_id}:
     get:
       tags:
         - Recommendations
@@ -232,7 +232,7 @@ paths:
         The algorithm returns 4 high-quality articles plus 1 new article with low recommend count.
       operationId: getRecommendations
       parameters:
-        - name: userID
+        - name: user_id
           in: path
           required: true
           description: User ID (extracted from JWT token)
@@ -266,27 +266,22 @@ paths:
         '500':
           description: Failed to get recommendations
 
-  /explore/articles/read:
+  /api/v1/explore/article/{article_id}/read:
     post:
       tags:
         - Articles
       summary: Mark article as read
-      description: Marks an article as read for the authenticated user
+      description: Marks an article as read for the authenticated user (user_id extracted from JWT)
       operationId: markArticleAsRead
+      parameters:
+        - name: article_id
+          in: path
+          required: true
+          description: ID of the article to mark as read
+          schema:
+            type: string
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                article_id:
-                  type: string
-                  description: ID of the article to mark as read
-              required:
-                - article_id
       responses:
         '200':
           description: Article marked as read
@@ -302,17 +297,15 @@ paths:
                     type: string
                     example: Article marked as read
         '400':
-          description: Invalid request body or missing article_id
+          description: Invalid article_id
         '401':
           description: Unauthorized
         '405':
           description: Method not allowed
-        '413':
-          description: Request body too large
         '500':
           description: Failed to mark article as read
 
-  /explore/articles/{articleID}/vote:
+  /api/v1/explore/article/{article_id}/vote:
     post:
       tags:
         - Votes
@@ -322,7 +315,7 @@ paths:
         If the user has already voted, the vote is updated.
       operationId: voteOnArticle
       parameters:
-        - name: articleID
+        - name: article_id
           in: path
           required: true
           description: ID of the article to vote on
@@ -375,7 +368,7 @@ paths:
       description: Removes the authenticated user's vote from an article
       operationId: removeVote
       parameters:
-        - name: articleID
+        - name: article_id
           in: path
           required: true
           description: ID of the article to remove vote from
@@ -406,7 +399,6 @@ paths:
         '500':
           description: Failed to remove vote
 
-  /explore/articles/{articleID}/votes:
     get:
       tags:
         - Votes
@@ -416,7 +408,7 @@ paths:
         If authenticated, also returns the user's current vote.
       operationId: getVoteCounts
       parameters:
-        - name: articleID
+        - name: article_id
           in: path
           required: true
           description: ID of the article

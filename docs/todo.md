@@ -14,176 +14,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Medium Priority
 
-### 3. Complete API v1 Migration - Update OpenAPI Specifications
-**Files:**
-- `services/explore/api/openapi.yaml`
-- `services/users/api/openapi.yaml`
-
-**Issue:** OpenAPI specifications have not been updated to reflect the new API v1 structure that was implemented in the code. Service routes were successfully migrated, but documentation specs still show old paths.
-
-**Impact:**
-- API documentation is out of sync with implementation
-- API consumers (including mobile app developers) see incorrect endpoint paths
-- OpenAPI validation tools will fail against actual endpoints
-- Developer onboarding is more difficult due to inaccurate documentation
-
-**Current State:**
-✅ **Service code fully migrated** (100% complete):
-- All routes use `/api/v1` prefix
-- Health checks use `/health/live` and `/health/ready`
-- Path parameters use snake_case (`{user_id}`, `{article_id}`)
-
-❌ **OpenAPI specs not updated**:
-
-**Explore Service** (`services/explore/api/openapi.yaml`):
-- Still uses `/health` instead of `/health/live`
-- Still uses `/fetch` instead of `/api/v1/explore/feed/fetch`
-- Still uses `/feeds/stats` instead of `/api/v1/explore/feed/stats`
-- Still uses `/ready` instead of `/health/ready`
-- Still uses `/explore/articles` instead of `/api/v1/explore/article`
-- Still uses `{userID}` instead of `{user_id}`
-- Still uses `{articleID}` instead of `{article_id}`
-
-**User Service** (`services/users/api/openapi.yaml`):
-- Still uses `/health` instead of `/health/live`
-- Still uses `/ready` instead of `/health/ready`
-- Missing `/api/v1` prefix on all auth and user endpoints
-
-**Implementation:**
-
-Update Explore Service OpenAPI spec:
-```yaml
-paths:
-  # Health endpoints
-  /health/live:
-    get:
-      summary: Liveness check (Fetcher)
-      # ...
-
-  /health/ready:
-    get:
-      summary: Readiness check (Fetcher)
-      # ...
-
-  # Fetcher endpoints
-  /api/v1/explore/feed/fetch:
-    post:
-      summary: Trigger manual feed fetch
-      # ...
-
-  /api/v1/explore/feed/stats:
-    get:
-      summary: Get feed statistics
-      # ...
-
-  /api/v1/explore/feed/sync:
-    post:
-      summary: Sync feeds from Kagi Small Web
-      # ...
-
-  # Recommender endpoints
-  /api/v1/explore/article:
-    post:
-      summary: Submit articles (internal)
-      # ...
-
-  /api/v1/explore/recommendation/{user_id}:
-    get:
-      summary: Get recommendations
-      parameters:
-        - name: user_id
-          in: path
-          # ...
-
-  /api/v1/explore/article/{article_id}/read:
-    post:
-      summary: Mark article as read
-      parameters:
-        - name: article_id
-          in: path
-          # ...
-
-  /api/v1/explore/article/{article_id}/vote:
-    post:
-      summary: Vote on article
-      parameters:
-        - name: article_id
-          in: path
-          # ...
-    delete:
-      summary: Remove vote
-      # ...
-    get:
-      summary: Get vote counts
-      # ...
-```
-
-Update User Service OpenAPI spec:
-```yaml
-paths:
-  # Health endpoints
-  /health/live:
-    get:
-      summary: Liveness check
-      # ...
-
-  /health/ready:
-    get:
-      summary: Readiness check
-      # ...
-
-  # Authentication endpoints
-  /api/v1/auth/register:
-    post:
-      summary: Register with email/password
-      # ...
-
-  /api/v1/auth/register/mobile:
-    post:
-      summary: Register with device ID
-      # ...
-
-  /api/v1/auth/login:
-    post:
-      summary: Login with email/password
-      # ...
-
-  # ... continue for all auth endpoints
-
-  # User management endpoints
-  /api/v1/user/{user_id}:
-    get:
-      summary: Get user profile
-      parameters:
-        - name: user_id
-          in: path
-          schema:
-            type: string
-            format: uuid
-          # ...
-```
-
-**Verification:**
-```bash
-# Validate updated specs
-npx @apidevtools/swagger-cli validate services/explore/api/openapi.yaml
-npx @apidevtools/swagger-cli validate services/users/api/openapi.yaml
-
-# View specs in Swagger UI (optional)
-docker run -p 8082:8080 -e SWAGGER_JSON=/api/openapi.yaml \
-  -v $(pwd)/services/explore/api:/api swaggerapi/swagger-ui
-
-docker run -p 8083:8080 -e SWAGGER_JSON=/api/openapi.yaml \
-  -v $(pwd)/services/users/api:/api swaggerapi/swagger-ui
-```
-
-**Effort:** 2-3 hours
-
-**Note:** Read Service OpenAPI specs (content and fetcher) are already updated and compliant.
-
----
-
-### 4. Complete API v1 Migration - Update Integration Tests
+### 3. Complete API v1 Migration - Update Integration Tests
 **File:** `services/explore/recommender/integration_test.go`
 
 **Issue:** Integration tests use old API paths that don't match the current implementation, causing tests to fail.
@@ -247,7 +78,7 @@ go test -v ./recommender/integration_test.go
 
 ---
 
-### 5. Complete API v1 Migration - Update Service README Files
+### 4. Complete API v1 Migration - Update Service README Files
 **Files:**
 - `services/explore/README.md`
 - `services/users/README.md`
@@ -363,7 +194,7 @@ curl -f http://localhost:8081/health/ready || echo "❌ Recommender health check
 
 ---
 
-### 6. Fix Type Safety Violations in Mobile App
+### 5. Fix Type Safety Violations in Mobile App
 **Files:**
 - `src/components/ArticleListScreen.tsx:24` - `onArticlePress` parameter uses `any`
 - `src/components/ArticleListScreen.tsx:29-39` - `onViewableItemsChanged` uses `any`
@@ -425,7 +256,7 @@ npm run lint        # Should not show warnings for explicit any
 
 ---
 
-### 4. Fix React Hook Dependency Warning in ExploreScreen
+### 6. Fix React Hook Dependency Warning in ExploreScreen
 **File:** `src/screens/ExploreScreen.tsx:35`
 
 **Issue:** `useEffect` hook has a missing dependency (`loadExploreArticles`) that could cause stale closures or missed re-renders.
@@ -472,7 +303,7 @@ npm start           # Test in development mode
 
 ---
 
-### 5. Remove Unused Functions in User Service
+### 7. Remove Unused Functions in User Service
 **Files:**
 - `pkg/auth/examples/explore-service/main.go:90` - Unused variable `pathUserID` (BLOCKS COMPILATION)
 - `internal/database/user_repository_test.go:56` - `cleanupTestUserByEmail` function unused
@@ -530,7 +361,7 @@ make test
 
 ---
 
-### 6. Fix Context Key Type Safety in User Service
+### 8. Fix Context Key Type Safety in User Service
 **Files:**
 - `pkg/auth/middleware_test.go:345`
 - `pkg/auth/middleware_test.go:352`
@@ -598,7 +429,7 @@ make test
 
 ---
 
-### 13. Consolidate Auth Middleware Implementations
+### 9. Consolidate Auth Middleware Implementations
 **Files:**
 - `services/users/internal/middleware/auth.go` (Gin framework)
 - `services/users/pkg/auth/middleware.go` (stdlib http)
@@ -643,7 +474,7 @@ func GinAuthMiddleware(m *Middleware) gin.HandlerFunc {
 
 ---
 
-### 14. Standardize Error Response Format
+### 10. Standardize Error Response Format
 **Files:**
 - `services/users/internal/api/handlers.go` (Gin JSON responses)
 - `services/explore/recommender/internal/api/handlers.go` (plain text responses)
@@ -690,7 +521,7 @@ Update all handlers to use consistent JSON error responses.
 
 ---
 
-### 15. Add API Versioning
+### 11. Add API Versioning
 **Files:** All API handlers in explore and user services
 
 **Issue:** No API versioning strategy exists. Current endpoints have no version prefix.
@@ -737,7 +568,7 @@ v1 := router.Group("/v1")
 
 ---
 
-### 16. Add Input Validation Library
+### 12. Add Input Validation Library
 **Files:** All API handlers
 
 **Issue:** Manual validation in each handler is error-prone and inconsistent.
@@ -806,7 +637,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 ---
 
-### 17. Setup Testcontainers for Integration Tests
+### 13. Setup Testcontainers for Integration Tests
 **Files:** All `*_integration_test.go` files
 
 **Issue:** Integration tests require manually running PostgreSQL, causing test failures in CI/CD.
@@ -908,7 +739,7 @@ go test ./... -v -short       # Skip integration tests
 
 ---
 
-### 9. Complete Logging Migration to log/slog
+### 14. Complete Logging Migration to log/slog
 **Reference:** `docs/LOGGING_STRATEGY.md` - See detailed migration strategy and implementation patterns
 
 **Status:** ~70% complete - Phase 1 complete, Phase 2 partial, Phase 3 not started
@@ -1721,6 +1552,7 @@ The following items have been successfully implemented and verified:
 
 ### Documentation & API
 - **Add OpenAPI/Swagger Specifications** - Created comprehensive OpenAPI 3.0 specifications for both Explore and User services (`services/explore/api/openapi.yaml` and `services/users/api/openapi.yaml`). Documented all endpoints with request/response schemas, authentication requirements, and examples. Added documentation section to CLAUDE.md with instructions for viewing specs with Swagger UI and validation commands. Both specs validated successfully with @apidevtools/swagger-cli.
+- **Complete API v1 Migration - Update OpenAPI Specifications** - Updated OpenAPI specifications to reflect the new API v1 structure that was implemented in the code. Migrated Explore Service spec from old paths (`/health`, `/fetch`, `/feeds/stats`, `/explore/articles`, `{userID}`, `{articleID}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/explore/feed/fetch`, `/api/v1/explore/feed/stats`, `/api/v1/explore/article`, `{user_id}`, `{article_id}`). Migrated User Service spec from old paths (`/health`, `/ready`, `/auth/*`, `/users/{id}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/auth/*`, `/api/v1/user/{user_id}`). Added health/ready endpoint documentation for fetcher service. Both specs validated successfully with @apidevtools/swagger-cli. API documentation now accurately reflects actual endpoint implementation, making it easier for API consumers and improving developer onboarding.
 
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
