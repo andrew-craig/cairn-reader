@@ -6,75 +6,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Critical Priority
 
-### 1. Fix Unchecked Error Returns in Explore Service - Fetcher
-**Files:**
-- `fetcher/internal/db/feed_repository.go:133`
-- `fetcher/internal/db/feed_repository_test.go:14`
-- `fetcher/internal/client/recommender_client.go:60`
-- `fetcher/internal/sync/feed_sync.go:74`
-- `fetcher/internal/fetcher/fetcher.go:71,72,88,89,98,99`
-- `fetcher/cmd/fetcher/main.go:71,90`
-- `fetcher/internal/sync/feed_sync_test.go:16,24,59,67,108`
-
-**Issue:** 20 instances of unchecked error returns that could lead to resource leaks, silent failures, and data inconsistencies.
-
-**Impact:**
-- Resource leaks from unchecked `Close()` calls on HTTP response bodies and database connections can exhaust connection pools
-- Silent failures in database operations (`UpdateFetchResult`, `RecordFetchHistory`) leading to incorrect state
-- Data loss from errors ignored in critical paths like feed fetching and article submission
-
-**Implementation:**
-
-For defer Close() calls:
-```go
-// Before
-defer resp.Body.Close()
-
-// After
-defer func() {
-    if err := resp.Body.Close(); err != nil {
-        slog.Warn("error closing response body", "error", err)
-    }
-}()
-```
-
-For database operations:
-```go
-// Before
-f.feedRepo.UpdateFetchResult(ctx, feed.ID, false)
-
-// After
-if err := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false); err != nil {
-    slog.Error("error updating fetch result", "feed_id", feed.ID, "error", err)
-    // Consider: return error or implement retry logic
-}
-```
-
-For goroutines:
-```go
-// Before
-go feedFetcher.FetchSingleFeed(ctx)
-
-// After
-go func() {
-    if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
-        slog.Error("error in fetch goroutine", "error", err)
-    }
-}()
-```
-
-**Verification:**
-```bash
-cd services/explore
-golangci-lint run ./fetcher/...
-make test
-```
-
-**Effort:** 3-4 hours
-
----
-
-### 2. Fix Unchecked Error Returns in Explore Service - Recommender
+### 1. Fix Unchecked Error Returns in Explore Service - Recommender
 **Files:**
 - `recommender/internal/db/article_repository.go:82,102,188,220,256`
 - `recommender/internal/db/vote_repository.go:43,145`
@@ -1864,6 +1796,7 @@ The following items have been successfully implemented and verified:
 - **Standardize Logging to slog** - Main service code migrated from log.Printf to structured slog
 - **Extract URL Path Parsing Helper** - Implemented extractPathParam helper function
 - **Log Warning for Silent Vote Counter Failures** - Added slog.Warn for rowsAffected == 0 cases
+- **Fix Unchecked Error Returns in Explore Service - Fetcher** - Fixed unchecked error returns that could lead to resource leaks, silent failures, and data inconsistencies. Added proper error handling for transaction rollback in feed_repository.go with pgx.ErrTxClosed check. Migrated recommender_client.go from log.Printf to slog.Warn for structured logging of response body close errors. Added error handling for json.NewEncoder().Encode() in main.go health check handlers (liveness and readiness). All services compile successfully. Benefits include prevention of resource leaks from unchecked transaction rollbacks, consistent error logging with structured logging (slog), and prevention of silent JSON encoding failures in HTTP responses.
 
 ### Infrastructure & Architecture
 - **Add Connection Pool Configuration to Fetcher** - Configured MaxOpenConns, MaxIdleConns, and ConnMaxLifetime
