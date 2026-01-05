@@ -135,7 +135,11 @@ func (r *feedRepository) ImportFeeds(ctx context.Context, feedURLs []string) err
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
+			slog.Error("error rolling back transaction", "error", err)
+		}
+	}()
 
 	newCount := 0
 	for _, url := range feedURLs {

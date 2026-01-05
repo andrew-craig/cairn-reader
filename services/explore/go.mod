@@ -1,6 +1,6 @@
 module github.com/andrew-craig/cairn/services/explore
 
-go 1.24.0
+go 1.24.7
 
 require (
 	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
