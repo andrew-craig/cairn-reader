@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -72,7 +72,7 @@ func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []model
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Printf("error closing response body: %v", err)
+			slog.Warn("error closing response body", "error", err)
 		}
 	}()
 

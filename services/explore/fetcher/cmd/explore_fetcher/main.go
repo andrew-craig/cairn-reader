@@ -210,7 +210,9 @@ func livenessHandler(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("error encoding response", "error", err)
+	}
 }
 
 // readinessHandler checks if the service is ready to accept traffic
@@ -248,5 +250,7 @@ func readinessHandler(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool) 
 	}
 
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("error encoding response", "error", err)
+	}
 }
