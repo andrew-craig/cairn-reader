@@ -1032,82 +1032,58 @@ go test ./... -v -short       # Skip integration tests
 
 ## Low Priority
 
-### 7. Clean Up Unused Code in Mobile App
-**Files:**
-- `src/components/common/ArticleRow.tsx:11` - Unused imports (Spacing, FontSizes, BorderRadius)
-- `src/screens/ExploreScreen.tsx:72` - Variable should be const
-- `package.json:27` - Unused dependency `expo-linking`
-- `src/navigation/index.ts` - Unused file (never imported)
-- `src/services/explore.ts` - Potentially unused exported types (7 types)
-- `src/types/article.ts` - Potentially unused exported types (3 types)
+### 7. Clean Up Unused Dependency in Mobile App
+**File:**
+- `apps/mobile/package.json:27` - Unused dependency `expo-linking`
 
-**Issue:** Unused code including variables, imports, dependencies, and potentially unused exported types.
+**Issue:** The `expo-linking` package is installed but never imported or used in the codebase. This increases node_modules size and installation time.
+
+**Status:**
+- ✅ **FIXED:** Unused imports (ArticleRow.tsx) - removed
+- ✅ **FIXED:** Variable declaration (ExploreScreen.tsx) - fixed/removed
+- ✅ **FIXED:** Unused file (src/navigation/index.ts) - deleted
+- ❌ **REMAINING:** expo-linking dependency still present
 
 **Impact:**
-- Bundle size increases from unused imports and dependencies
-- Code clarity reduced by unused variables
-- Maintenance burden for dead code
-- Install time increases with unused npm dependencies
+- Increases node_modules size unnecessarily (~1-2MB)
+- Increases npm install time
+- Minor bundle size impact (if tree-shaking doesn't eliminate it)
 
 **Implementation:**
 
-Fix unused imports:
-```typescript
-// Before
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
-
-// After (only import what's used)
-import { Colors, FontFamily } from '../../constants';
-```
-
-Fix variable declaration:
-```typescript
-// Before
-let shouldContinue = true;  // Never reassigned
-
-// After
-const shouldContinue = true;  // Or remove if unnecessary
-```
-
-Remove unused dependency:
+**Option 1: Remove if truly unused (recommended)**
 ```bash
 cd apps/mobile
-npm uninstall expo-linking  # Only if truly unused
+npm uninstall expo-linking
 ```
 
-Document or remove types:
-```typescript
-/**
- * Backend article response format.
- * @todo Used when backend integration is complete
- */
-export interface BackendArticle {
-  // ...
-}
-```
-
-Configure ESLint auto-fix in `.vscode/settings.json`:
+**Option 2: Document if reserved for future use**
+Add comment to package.json or create a file documenting planned features:
 ```json
 {
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
-  },
-  "eslint.validate": [
-    "typescript",
-    "typescriptreact"
-  ]
+  "dependencies": {
+    "expo-linking": "~8.0.10"  // Reserved for deep linking feature (planned)
+  }
 }
 ```
+
+**Note:** expo-linking is typically used for:
+- Deep linking (opening app from URLs)
+- Universal links (iOS/Android app links)
+- URL parsing and validation
+
+If these features are planned, keep the dependency and document it. Otherwise, remove to reduce bundle size.
 
 **Verification:**
 ```bash
 cd apps/mobile
-npm run type-check
-npm run lint
-npm start
+npm run type-check  # Should pass
+npm run lint        # Should pass
+npm start           # App should work normally
+npm run ios         # Test deep linking if keeping dependency
 ```
 
-**Effort:** 1 hour
+**Effort:** 15 minutes
 
 ---
 
