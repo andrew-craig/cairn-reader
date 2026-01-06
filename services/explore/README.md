@@ -75,18 +75,84 @@ go run cmd/recommender/main.go
 
 ## API Endpoints
 
-### Explore Fetcher (explore_fetcher)
-- `GET /health` - Health check
-- `POST /fetch` - Trigger manual fetch
+### Explore Fetcher (explore_fetcher, port 8080)
 
-### Explore Recommender (explore_recommender)
-- `GET /health` - Health check
-- `POST /explore/articles` - Submit new articles (called by fetcher)
-- `GET /explore/recommendations/:userID` - Get 5 recommended articles for a user
-- `POST /explore/articles/read` - Mark an article as read (requires authentication)
-- `POST /explore/articles/:articleID/vote` - Vote on an article (requires authentication)
-- `DELETE /explore/articles/:articleID/vote` - Remove vote from an article (requires authentication)
-- `GET /explore/articles/:articleID/votes` - Get vote counts for an article (requires authentication)
+#### Health Checks
+- `GET /health/live` - Liveness check
+- `GET /health/ready` - Readiness check (includes database connectivity)
+
+#### Feed Management
+- `POST /api/v1/explore/feed/fetch` - Manually trigger feed fetch
+- `POST /api/v1/explore/feed/sync` - Sync feeds from Kagi Small Web
+- `GET /api/v1/explore/feed/stats` - Get feed statistics
+
+**Example API Calls:**
+
+```bash
+# Health checks
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
+
+# Manual feed fetch
+curl -X POST http://localhost:8080/api/v1/explore/feed/fetch
+
+# Feed statistics
+curl http://localhost:8080/api/v1/explore/feed/stats
+
+# Sync feeds
+curl -X POST http://localhost:8080/api/v1/explore/feed/sync
+```
+
+### Explore Recommender (explore_recommender, port 8081)
+
+#### Health Checks
+- `GET /health/live` - Liveness check
+- `GET /health/ready` - Readiness check (includes database connectivity)
+
+#### Article Management
+- `POST /api/v1/explore/article` - Submit article (from fetcher)
+
+#### Recommendations
+- `GET /api/v1/explore/recommendation/{user_id}` - Get 5 recommendations (requires auth)
+
+#### User Interactions
+- `POST /api/v1/explore/article/{article_id}/read` - Mark article as read (requires auth)
+- `POST /api/v1/explore/article/{article_id}/vote` - Vote on article (requires auth)
+- `DELETE /api/v1/explore/article/{article_id}/vote` - Remove vote (requires auth)
+- `GET /api/v1/explore/article/{article_id}/vote` - Get vote counts (requires auth)
+
+**Example API Calls:**
+
+```bash
+# Health checks
+curl http://localhost:8081/health/live
+curl http://localhost:8081/health/ready
+
+# Get recommendations (requires auth)
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/user123
+
+# Mark article as read (requires auth)
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/article/{article_id}/read
+
+# Vote on article (requires auth)
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"vote_type":"upvote"}' \
+  http://localhost:8081/api/v1/explore/article/{article_id}/vote
+
+# Remove vote (requires auth)
+curl -X DELETE \
+  -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/article/{article_id}/vote
+
+# Get vote counts (requires auth)
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/article/{article_id}/vote
+```
 
 ## Future Improvements
 
