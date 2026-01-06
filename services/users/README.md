@@ -104,27 +104,69 @@ The service will start on port 8080 (or the port specified in your .env file).
 
 ## API Endpoints
 
+### Health & Status
+
+- `GET /health/live` - Liveness check
+- `GET /health/ready` - Readiness check (includes database and Vault connectivity)
+
 ### Authentication
 
-- `POST /auth/register` - Create new user account with email/password
-- `POST /auth/register/mobile` - Create new mobile-only account using Expo device ID
-- `POST /auth/login` - Validate credentials and return tokens
-- `POST /auth/login/mobile` - Authenticate using Expo device ID
-- `POST /auth/refresh` - Exchange refresh token for new access token
-- `POST /auth/logout` - Revoke specific refresh token
-- `POST /auth/logout-all` - Revoke all refresh tokens for a user
+- `POST /api/v1/auth/register` - Create new user account with email/password
+- `POST /api/v1/auth/register/mobile` - Create new mobile-only account using Expo device ID
+- `POST /api/v1/auth/login` - Validate credentials and return tokens
+- `POST /api/v1/auth/login/mobile` - Authenticate using Expo device ID
+- `POST /api/v1/auth/refresh` - Exchange refresh token for new access token
+- `POST /api/v1/auth/logout` - Revoke specific refresh token
+- `POST /api/v1/auth/logout-all` - Revoke all refresh tokens for a user
 
 ### User Management
 
-- `GET /users/{id}` - Retrieve user profile (authenticated)
-- `PATCH /users/{id}` - Update user profile (authenticated)
-- `POST /users/{id}/upgrade` - Add email and password to mobile-only account
-- `DELETE /users/{id}` - Delete user account (authenticated)
+- `GET /api/v1/user/{user_id}` - Retrieve user profile (authenticated)
+- `PATCH /api/v1/user/{user_id}` - Update user profile (authenticated)
+- `POST /api/v1/user/{user_id}/upgrade` - Add email and password to mobile-only account
+- `DELETE /api/v1/user/{user_id}` - Delete user account (authenticated)
 
-### Health & Status
+**Example API Calls:**
 
-- `GET /health` - Basic health check
-- `GET /ready` - Readiness check (includes database and Vault connectivity)
+```bash
+# Health checks
+curl http://localhost:8082/health/live
+curl http://localhost:8082/health/ready
+
+# Register user
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"securepass123"}' \
+  http://localhost:8082/api/v1/auth/register
+
+# Login
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"securepass123"}' \
+  http://localhost:8082/api/v1/auth/login
+
+# Refresh token
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<refresh_token>"}' \
+  http://localhost:8082/api/v1/auth/refresh
+
+# Get user profile (requires auth)
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8082/api/v1/user/{user_id}
+
+# Update user profile (requires auth)
+curl -X PATCH \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"newemail@example.com"}' \
+  http://localhost:8082/api/v1/user/{user_id}
+
+# Delete user account (requires auth)
+curl -X DELETE \
+  -H "Authorization: Bearer <JWT>" \
+  http://localhost:8082/api/v1/user/{user_id}
+```
 
 ## Configuration
 
