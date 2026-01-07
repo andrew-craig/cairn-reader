@@ -115,51 +115,28 @@ router.POST("/auth/register", middleware.RequireJSON(), register)
 
 ### Logging
 
-#### `RequestLogger()`
-Logs HTTP requests with timing, status, and user information.
+**Note:** Logging middleware has been moved to the shared `pkg/logging` package.
+
+#### `logging.RequestLogger(logger *slog.Logger)`
+Logs HTTP requests with structured logging using `log/slog`.
 
 **Usage:**
 ```go
-router.Use(middleware.RequestLogger())
+import "github.com/andrew-craig/cairn/pkg/logging"
+
+logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+router.Use(logging.RequestLogger(logger))
 ```
 
-**Log Format:**
-```
-[request-id] METHOD path status duration client-ip user=user-id
-```
+**Features:**
+- Structured logging with slog
+- Request ID generation and propagation
+- Duration, status, method, path logging
+- User ID extraction from context
+- Client IP tracking
+- JSON output for production, text for development
 
-#### `RequestID()`
-Generates or retrieves request ID for tracking.
-
-**Usage:**
-```go
-router.Use(middleware.RequestID())
-```
-
-#### `AuthenticationLogger()`
-Specifically logs authentication attempts (success/failure).
-
-**Usage:**
-```go
-auth := router.Group("/auth")
-auth.Use(middleware.AuthenticationLogger())
-{
-    auth.POST("/login", login)
-}
-```
-
-#### `SensitiveEndpointLogger(operation string)`
-Logs access to sensitive endpoints (e.g., account deletion, password changes).
-
-**Usage:**
-```go
-router.DELETE("/users/:id",
-    middleware.JWTAuth(jwtManager),
-    middleware.RequireSameUser(),
-    middleware.SensitiveEndpointLogger("delete_account"),
-    deleteUser,
-)
-```
+For detailed documentation, see `pkg/logging/README.md` and `docs/LOGGING_STRATEGY.md`.
 
 ### CORS
 
@@ -255,7 +232,6 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager) *gin.Engine {
     auth := router.Group("/auth")
     auth.Use(middleware.RateLimitAuth(5, time.Minute))  // 5 attempts per minute
     auth.Use(middleware.RequireJSON())                   // Require JSON
-    auth.Use(middleware.AuthenticationLogger())          // Log auth attempts
     {
         auth.POST("/register", register)
         auth.POST("/register/mobile", registerMobile)
@@ -276,10 +252,7 @@ func setupRouter(cfg *config.Config, jwtManager *auth.JWTManager) *gin.Engine {
         users.GET("/:id", getUser)
         users.PATCH("/:id", middleware.RequireJSON(), updateUser)
         users.POST("/:id/upgrade", middleware.RequireJSON(), upgradeAccount)
-        users.DELETE("/:id",
-            middleware.SensitiveEndpointLogger("delete_account"),
-            deleteUser,
-        )
+        users.DELETE("/:id", deleteUser)
     }
 
     return router

@@ -70,3 +70,14 @@ func GetLogger(c *gin.Context) *slog.Logger {
 	}
 	return slog.Default()
 }
+
+// GetRequestID retrieves the request ID from the Gin context
+// Returns the request ID string, or an empty string if not found
+func GetRequestID(c *gin.Context) string {
+	if requestID, exists := c.Get("request_id"); exists {
+		if id, ok := requestID.(string); ok {
+			return id
+		}
+	}
+	return ""
+}

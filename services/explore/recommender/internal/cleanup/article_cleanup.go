@@ -5,7 +5,7 @@ package cleanup
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
@@ -17,22 +17,30 @@ type ArticleCleanup struct {
 	retentionDays   int
 	cleanupInterval time.Duration
 	stopChan        chan struct{}
+	logger          *slog.Logger
 }
 
 // NewArticleCleanup creates a new article cleanup job
-func NewArticleCleanup(articleRepo db.ArticleRepositoryInterface, retentionDays int, cleanupInterval time.Duration) *ArticleCleanup {
+func NewArticleCleanup(articleRepo db.ArticleRepositoryInterface, retentionDays int, cleanupInterval time.Duration, logger *slog.Logger) *ArticleCleanup {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &ArticleCleanup{
 		articleRepo:     articleRepo,
 		retentionDays:   retentionDays,
 		cleanupInterval: cleanupInterval,
 		stopChan:        make(chan struct{}),
+		logger:          logger,
 	}
 }
 
 // Start begins the periodic cleanup job
 // Runs cleanup immediately on start, then periodically based on cleanupInterval
 func (c *ArticleCleanup) Start() {
-	log.Printf("Starting article cleanup job (retention: %d days, interval: %s)", c.retentionDays, c.cleanupInterval)
+	c.logger.Info("starting article cleanup job",
+		slog.Int("retention_days", c.retentionDays),
+		slog.Duration("interval", c.cleanupInterval),
+	)
 
 	// Run cleanup immediately on start
 	c.runCleanup()
@@ -46,7 +54,7 @@ func (c *ArticleCleanup) Start() {
 				c.runCleanup()
 			case <-c.stopChan:
 				ticker.Stop()
-				log.Println("Article cleanup job stopped")
+				c.logger.Info("article cleanup job stopped")
 				return
 			}
 		}
@@ -63,19 +71,23 @@ func (c *ArticleCleanup) runCleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.Printf("Running article cleanup (marking articles older than %d days as deleted)...", c.retentionDays)
+	c.logger.Info("running article cleanup",
+		slog.Int("retention_days", c.retentionDays),
+	)
 
 	// Mark old articles as deleted (soft delete)
 	count, err := c.articleRepo.MarkOldArticlesAsDeleted(ctx, c.retentionDays)
 	if err != nil {
-		log.Printf("Error marking old articles as deleted: %v", err)
+		c.logger.Error("failed to mark old articles as deleted",
+			slog.Any("error", err),
+		)
 		return
 	}
 
 	if count > 0 {
-		log.Printf("Marked %d articles as deleted", count)
+		c.logger.Info("marked articles as deleted", slog.Int("count", count))
 	} else {
-		log.Println("No articles to mark as deleted")
+		c.logger.Info("no articles to mark as deleted")
 	}
 
 	// Optional: Hard delete articles that have been soft-deleted for a while
@@ -83,15 +95,20 @@ func (c *ArticleCleanup) runCleanup() {
 	hardDeleteDays := c.retentionDays + 30 // Delete articles that have been soft-deleted for 30+ days
 	hardDeleteCount, err := c.articleRepo.HardDeleteOldArticles(ctx, hardDeleteDays)
 	if err != nil {
-		log.Printf("Error hard deleting old articles: %v", err)
+		c.logger.Error("failed to hard delete old articles",
+			slog.Any("error", err),
+		)
 		return
 	}
 
 	if hardDeleteCount > 0 {
-		log.Printf("Hard deleted %d articles (older than %d days and already marked as deleted)", hardDeleteCount, hardDeleteDays)
+		c.logger.Info("hard deleted articles",
+			slog.Int("count", hardDeleteCount),
+			slog.Int("days", hardDeleteDays),
+		)
 	}
 
-	log.Println("Article cleanup completed")
+	c.logger.Info("article cleanup completed")
 }
 
 // RunOnce runs the cleanup job once and returns
@@ -105,7 +122,7 @@ func (c *ArticleCleanup) RunOnce() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Marked %d articles as deleted", count)
+	c.logger.Info("marked articles as deleted", slog.Int("count", count))
 
 	// Hard delete old soft-deleted articles
 	hardDeleteDays := c.retentionDays + 30
@@ -113,7 +130,7 @@ func (c *ArticleCleanup) RunOnce() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Hard deleted %d articles", hardDeleteCount)
+	c.logger.Info("hard deleted articles", slog.Int("count", hardDeleteCount))
 
 	return nil
 }

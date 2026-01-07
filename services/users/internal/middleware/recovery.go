@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andrew-craig/cairn/pkg/auth"
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +18,7 @@ func Recovery() gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				// Get request ID if available
-				requestID := GetRequestID(c)
+				requestID := logging.GetRequestID(c)
 				if requestID == "" {
 					requestID = "unknown"
 				}
@@ -59,7 +60,7 @@ func RecoveryWithDetails() gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				// Get request ID if available
-				requestID := GetRequestID(c)
+				requestID := logging.GetRequestID(c)
 				if requestID == "" {
 					requestID = "unknown"
 				}
@@ -125,7 +126,7 @@ func RecoveryWithHandler(handler PanicHandler) gin.HandlerFunc {
 
 // DefaultPanicHandler is a default panic handler implementation
 func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
-	requestID := GetRequestID(c)
+	requestID := logging.GetRequestID(c)
 	if requestID == "" {
 		requestID = "unknown"
 	}
@@ -184,7 +185,7 @@ func SafeRecovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				requestID := GetRequestID(c)
+				requestID := logging.GetRequestID(c)
 				if requestID == "" {
 					requestID = "unknown"
 				}
