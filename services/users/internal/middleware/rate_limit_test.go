@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -270,7 +271,7 @@ func TestRateLimitByUser(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Set(UserIDKey, userID)
+			c.Set(string(auth.UserIDContextKey), userID)
 			middleware(c)
 			assert.False(t, c.IsAborted())
 		}
@@ -279,7 +280,7 @@ func TestRateLimitByUser(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		middleware(c)
 
 		assert.True(t, c.IsAborted())
@@ -319,7 +320,7 @@ func TestRateLimitByUser(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Set(UserIDKey, user1)
+			c.Set(string(auth.UserIDContextKey), user1)
 			middleware(c)
 		}
 
@@ -327,7 +328,7 @@ func TestRateLimitByUser(t *testing.T) {
 		w1 := httptest.NewRecorder()
 		c1, _ := gin.CreateTestContext(w1)
 		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c1.Set(UserIDKey, user1)
+		c1.Set(string(auth.UserIDContextKey), user1)
 		middleware(c1)
 		assert.True(t, c1.IsAborted())
 
@@ -335,7 +336,7 @@ func TestRateLimitByUser(t *testing.T) {
 		w2 := httptest.NewRecorder()
 		c2, _ := gin.CreateTestContext(w2)
 		c2.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c2.Set(UserIDKey, user2)
+		c2.Set(string(auth.UserIDContextKey), user2)
 		middleware(c2)
 		assert.False(t, c2.IsAborted())
 	})
@@ -348,14 +349,14 @@ func TestRateLimitByUser(t *testing.T) {
 		w1 := httptest.NewRecorder()
 		c1, _ := gin.CreateTestContext(w1)
 		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c1.Set(UserIDKey, userID)
+		c1.Set(string(auth.UserIDContextKey), userID)
 		middleware(c1)
 
 		// Second request
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		middleware(c)
 
 		assert.Equal(t, "1m0s", w.Header().Get("X-RateLimit-Window"))

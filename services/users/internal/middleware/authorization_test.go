@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestRequireSameUser(t *testing.T) {
 		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
 
 		// Set user ID in context (from JWTAuth middleware)
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
 		handlerCalled := false
@@ -48,7 +49,7 @@ func TestRequireSameUser(t *testing.T) {
 		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
 
 		// Set different user ID in context
-		c.Set(UserIDKey, authenticatedUserID)
+		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
 		c.Params = gin.Params{{Key: "id", Value: requestedUserID.String()}}
 
 		middleware := RequireSameUser()
@@ -84,7 +85,7 @@ func TestRequireSameUser(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/users", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		// No :id parameter
 
 		middleware := RequireSameUser()
@@ -102,7 +103,7 @@ func TestRequireSameUser(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "id", Value: "invalid-uuid"}}
 
 		middleware := RequireSameUser()
@@ -121,7 +122,7 @@ func TestRequireSameUser(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
 		middleware := RequireSameUser()
@@ -147,7 +148,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "user_id", Value: userID.String()}}
 
 		handlerCalled := false
@@ -173,7 +174,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+requestedUserID.String(), nil)
 
-		c.Set(UserIDKey, authenticatedUserID)
+		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
 		c.Params = gin.Params{{Key: "user_id", Value: requestedUserID.String()}}
 
 		middleware := RequireSameUserWithCustomParam("user_id")
@@ -190,7 +191,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 
 		middleware := RequireSameUserWithCustomParam("user_id")
 		middleware(c)
@@ -206,7 +207,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/not-a-uuid", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "user_id", Value: "not-a-uuid"}}
 
 		middleware := RequireSameUserWithCustomParam("user_id")
@@ -251,7 +252,7 @@ func TestRequireOwnership(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
 
 		handlerCalled := false
@@ -281,7 +282,7 @@ func TestRequireOwnership(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
 
-		c.Set(UserIDKey, authenticatedUserID)
+		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
 		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
 
 		middleware := RequireOwnership(ownerCheckFunc)
@@ -302,7 +303,7 @@ func TestRequireOwnership(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
 
 		middleware := RequireOwnership(ownerCheckFunc)
@@ -345,7 +346,7 @@ func TestRequireOwnership(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
 
-		c.Set(UserIDKey, userID)
+		c.Set(string(auth.UserIDContextKey), userID)
 		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
 
 		middleware := RequireOwnership(ownerCheckFunc)

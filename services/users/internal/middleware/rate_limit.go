@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -136,7 +137,7 @@ func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// Get user ID from context (set by JWTAuth middleware)
-		userID, err := GetUserIDFromContext(c)
+		userID, err := auth.GetUserIDFromGinContext(c)
 		if err != nil {
 			// If user is not authenticated, fall back to IP-based rate limiting
 			key := c.ClientIP()

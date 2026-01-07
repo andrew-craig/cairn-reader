@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -39,7 +40,7 @@ func RequestLogger() gin.HandlerFunc {
 
 		// Get user ID if authenticated
 		userID := ""
-		if id, err := GetUserIDFromContext(c); err == nil {
+		if id, err := auth.GetUserIDFromGinContext(c); err == nil {
 			userID = id.String()
 		}
 
@@ -103,7 +104,7 @@ func RequestLoggerDetailed() gin.HandlerFunc {
 
 		// Get user ID if authenticated
 		userID := ""
-		if id, err := GetUserIDFromContext(c); err == nil {
+		if id, err := auth.GetUserIDFromGinContext(c); err == nil {
 			userID = id.String()
 		}
 
@@ -181,7 +182,7 @@ func AuthenticationLogger() gin.HandlerFunc {
 
 		// Get user ID if available (might be in response or context)
 		userID := ""
-		if id, err := GetUserIDFromContext(c); err == nil {
+		if id, err := auth.GetUserIDFromGinContext(c); err == nil {
 			userID = id.String()
 		}
 
@@ -216,7 +217,7 @@ func SensitiveEndpointLogger(operation string) gin.HandlerFunc {
 
 		// Get user ID
 		userID := ""
-		if id, err := GetUserIDFromContext(c); err == nil {
+		if id, err := auth.GetUserIDFromGinContext(c); err == nil {
 			userID = id.String()
 		}
 

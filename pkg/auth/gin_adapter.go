@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/rsa"
 	"errors"
 	"net/http"
 
@@ -8,18 +9,23 @@ import (
 	"github.com/google/uuid"
 )
 
+// PublicKeyProvider is an interface for types that can provide an RSA public key
+// This allows the middleware to work with any JWT manager implementation
+type PublicKeyProvider interface {
+	GetPublicKey() *rsa.PublicKey
+}
+
 // GinMiddleware provides Gin-compatible wrappers around the stdlib auth middleware
 type GinMiddleware struct {
-	jwtManager *JWTManager
-	validator  *Validator
+	validator *Validator
 }
 
 // NewGinMiddleware creates a new Gin middleware adapter
 // This wraps the stdlib authentication middleware for use with Gin framework
-func NewGinMiddleware(jwtManager *JWTManager) *GinMiddleware {
+// Accepts any type that can provide a public key (e.g., JWTManager from services/users/internal/auth)
+func NewGinMiddleware(keyProvider PublicKeyProvider) *GinMiddleware {
 	return &GinMiddleware{
-		jwtManager: jwtManager,
-		validator:  NewValidator(jwtManager.publicKey),
+		validator: NewValidator(keyProvider.GetPublicKey()),
 	}
 }
 

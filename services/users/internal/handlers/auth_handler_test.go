@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	pkgAuth "github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/middleware"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -818,7 +818,7 @@ func TestLogoutAll(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
 		// Apply JWT middleware to set user ID in context
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.LogoutAll(c)
 		}
@@ -846,7 +846,7 @@ func TestLogoutAll(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
 		// Apply JWT middleware
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.LogoutAll(c)
 		}

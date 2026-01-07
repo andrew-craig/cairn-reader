@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -13,7 +14,7 @@ import (
 func RequireSameUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the user ID from the JWT token (set by JWTAuth middleware)
-		authenticatedUserID, err := GetUserIDFromContext(c)
+		authenticatedUserID, err := auth.GetUserIDFromGinContext(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "authentication required",
@@ -61,7 +62,7 @@ func RequireSameUser() gin.HandlerFunc {
 func RequireSameUserWithCustomParam(paramName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the user ID from the JWT token (set by JWTAuth middleware)
-		authenticatedUserID, err := GetUserIDFromContext(c)
+		authenticatedUserID, err := auth.GetUserIDFromGinContext(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "authentication required",
@@ -112,7 +113,7 @@ type OwnerCheckFunc func(c *gin.Context) (uuid.UUID, error)
 func RequireOwnership(ownerCheckFunc OwnerCheckFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the user ID from the JWT token (set by JWTAuth middleware)
-		authenticatedUserID, err := GetUserIDFromContext(c)
+		authenticatedUserID, err := auth.GetUserIDFromGinContext(c)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "authentication required",

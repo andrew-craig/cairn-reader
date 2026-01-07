@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	pkgAuth "github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/middleware"
 	"github.com/andrew-craig/cairn/services/users/internal/models"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
@@ -107,7 +107,7 @@ func TestGetUser(t *testing.T) {
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
 		// Apply JWT middleware
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.GetUser(c)
 		}
@@ -147,7 +147,7 @@ func TestGetUser(t *testing.T) {
 		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
 
 		// Apply JWT middleware (authenticates as userID)
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.GetUser(c)
 		}
@@ -166,7 +166,7 @@ func TestGetUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
 		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.GetUser(c)
 		}
@@ -182,7 +182,7 @@ func TestGetUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: "invalid-uuid"}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.GetUser(c)
 		}
@@ -198,7 +198,7 @@ func TestGetUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.GetUser(c)
 		}
@@ -242,7 +242,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -264,7 +264,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -286,7 +286,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -332,7 +332,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -359,7 +359,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -385,7 +385,7 @@ func TestUpdateUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
 		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpdateUser(c)
 		}
@@ -422,7 +422,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -445,7 +445,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -491,7 +491,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -520,7 +520,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+newAccessToken)
 		c.Params = gin.Params{{Key: "id", Value: newUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -549,7 +549,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+emailAccessToken)
 		c.Params = gin.Params{{Key: "id", Value: emailUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -583,7 +583,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+newAccessToken)
 		c.Params = gin.Params{{Key: "id", Value: newUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -612,7 +612,7 @@ func TestUpgradeAccount(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+verifyAccessToken)
 		c.Params = gin.Params{{Key: "id", Value: verifyUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.UpgradeAccount(c)
 		}
@@ -648,7 +648,7 @@ func TestDeleteUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.DeleteUser(c)
 		}
@@ -687,7 +687,7 @@ func TestDeleteUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
 		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.DeleteUser(c)
 		}
@@ -705,7 +705,7 @@ func TestDeleteUser(t *testing.T) {
 		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
 		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
 
-		middleware.JWTAuth(jwtManager)(c)
+		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
 		if !c.IsAborted() {
 			handler.DeleteUser(c)
 		}
