@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,7 +24,7 @@ func Recovery() gin.HandlerFunc {
 
 				// Get user ID if available
 				userID := ""
-				if id, e := GetUserIDFromContext(c); e == nil {
+				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
 					userID = id.String()
 				}
 
@@ -65,7 +66,7 @@ func RecoveryWithDetails() gin.HandlerFunc {
 
 				// Get user ID if available
 				userID := ""
-				if id, e := GetUserIDFromContext(c); e == nil {
+				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
 					userID = id.String()
 				}
 
@@ -130,7 +131,7 @@ func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
 	}
 
 	userID := ""
-	if id, e := GetUserIDFromContext(c); e == nil {
+	if id, e := auth.GetUserIDFromGinContext(c); e == nil {
 		userID = id.String()
 	}
 
@@ -189,7 +190,7 @@ func SafeRecovery() gin.HandlerFunc {
 				}
 
 				userID := ""
-				if id, e := GetUserIDFromContext(c); e == nil {
+				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
 					userID = id.String()
 				}
 
