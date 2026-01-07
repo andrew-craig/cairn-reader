@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/andrew-craig/cairn/pkg/api"
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/middleware"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -39,7 +39,7 @@ type UpgradeAccountRequest struct {
 // Retrieves user profile information for the authenticated user
 func (h *UserHandler) GetUser(c *gin.Context) {
 	// Get authenticated user ID from context
-	requestingUserID, err := middleware.GetUserIDFromContext(c)
+	requestingUserID, err := auth.GetUserIDFromGinContext(c)
 	if err != nil {
 		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
@@ -75,7 +75,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 // Updates user profile information
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	// Get authenticated user ID from context
-	requestingUserID, err := middleware.GetUserIDFromContext(c)
+	requestingUserID, err := auth.GetUserIDFromGinContext(c)
 	if err != nil {
 		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
@@ -132,7 +132,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 // Upgrades a mobile-only account to a hybrid account with email/password
 func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 	// Get authenticated user ID from context
-	requestingUserID, err := middleware.GetUserIDFromContext(c)
+	requestingUserID, err := auth.GetUserIDFromGinContext(c)
 	if err != nil {
 		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
@@ -197,7 +197,7 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 // Deletes a user account and all associated data
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// Get authenticated user ID from context
-	requestingUserID, err := middleware.GetUserIDFromContext(c)
+	requestingUserID, err := auth.GetUserIDFromGinContext(c)
 	if err != nil {
 		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return

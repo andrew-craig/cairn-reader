@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/andrew-craig/cairn/pkg/api"
-	"github.com/andrew-craig/cairn/services/users/internal/middleware"
+	"github.com/andrew-craig/cairn/pkg/auth"
 	"github.com/andrew-craig/cairn/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -277,7 +277,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // Revokes all refresh tokens for the authenticated user
 func (h *AuthHandler) LogoutAll(c *gin.Context) {
 	// Get user ID from context (set by JWT middleware)
-	userID, err := middleware.GetUserIDFromContext(c)
+	userID, err := auth.GetUserIDFromGinContext(c)
 	if err != nil {
 		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
