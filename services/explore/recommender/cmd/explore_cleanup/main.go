@@ -3,18 +3,27 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
-	log.Println("Article Cleanup Utility")
-	log.Println("=======================")
+	// Initialize logger
+	logger := logging.NewLogger(logging.Config{
+		Level:       "info",
+		Format:      "text",
+		ServiceName: "article-cleanup",
+	})
+	slog.SetDefault(logger)
+
+	slog.Info("Article Cleanup Utility")
+	slog.Info("=======================")
 
 	// Database configuration
 	dbConfig := db.Config{
@@ -32,16 +41,19 @@ func main() {
 		if err == nil {
 			retentionDays = days
 		} else {
-			log.Printf("Invalid retention days argument, using default: %d", retentionDays)
+			slog.Warn("invalid retention days argument, using default",
+				slog.Int("default", retentionDays),
+			)
 		}
 	}
 
-	log.Printf("Retention period: %d days", retentionDays)
+	slog.Info("retention period configured", slog.Int("days", retentionDays))
 
 	// Connect to database
 	database, err := connectDB(dbConfig)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
 	}
 	defer database.Close()
 
@@ -52,23 +64,25 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.Printf("Marking articles older than %d days as deleted...", retentionDays)
+	slog.Info("marking old articles as deleted", slog.Int("days", retentionDays))
 	softDeleteCount, err := articleRepo.MarkOldArticlesAsDeleted(ctx, retentionDays)
 	if err != nil {
-		log.Fatalf("Failed to mark articles as deleted: %v", err)
+		slog.Error("failed to mark articles as deleted", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Printf("Marked %d articles as deleted", softDeleteCount)
+	slog.Info("marked articles as deleted", slog.Int("count", softDeleteCount))
 
 	// Hard delete old soft-deleted articles
 	hardDeleteDays := retentionDays + 30 // Delete articles that have been soft-deleted for 30+ days
-	log.Printf("Hard deleting articles older than %d days (and already marked as deleted)...", hardDeleteDays)
+	slog.Info("hard deleting old articles", slog.Int("days", hardDeleteDays))
 	hardDeleteCount, err := articleRepo.HardDeleteOldArticles(ctx, hardDeleteDays)
 	if err != nil {
-		log.Fatalf("Failed to hard delete articles: %v", err)
+		slog.Error("failed to hard delete articles", slog.Any("error", err))
+		os.Exit(1)
 	}
-	log.Printf("Hard deleted %d articles", hardDeleteCount)
+	slog.Info("hard deleted articles", slog.Int("count", hardDeleteCount))
 
-	log.Println("Cleanup completed successfully")
+	slog.Info("cleanup completed successfully")
 }
 
 func connectDB(config db.Config) (*pgxpool.Pool, error) {
@@ -86,7 +100,7 @@ func connectDB(config db.Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("Successfully connected to database")
+	slog.Info("successfully connected to database")
 	return database, nil
 }
 
@@ -104,7 +118,11 @@ func getEnvAsInt(key string, defaultValue int) int {
 	}
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		log.Printf("Invalid value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		slog.Warn("invalid environment variable value, using default",
+			slog.String("key", key),
+			slog.String("value", valueStr),
+			slog.Int("default", defaultValue),
+		)
 		return defaultValue
 	}
 	return value

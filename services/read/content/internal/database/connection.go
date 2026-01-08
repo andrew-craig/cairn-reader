@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -78,14 +78,17 @@ func NewConnection(cfg Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Printf("Database connection established to %s:%d", cfg.Host, cfg.Port)
+	slog.Info("database connection established",
+		slog.String("host", cfg.Host),
+		slog.Int("port", cfg.Port),
+	)
 
 	return &DB{DB: db}, nil
 }
 
 // Close closes the database connection
 func (db *DB) Close() error {
-	log.Println("Closing database connection")
+	slog.Info("closing database connection")
 	return db.DB.Close()
 }
 

@@ -3,16 +3,25 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
+	"github.com/andrew-craig/cairn/pkg/logging"
 	"github.com/andrew-craig/cairn/services/users/internal/config"
 	"github.com/andrew-craig/cairn/services/users/internal/database"
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Initialize logger for CLI tool (use text handler for readability)
+	logger := logging.NewLogger(logging.Config{
+		Level:       "info",
+		Format:      "text",
+		ServiceName: "migrate",
+	})
+	slog.SetDefault(logger)
+
 	// Define command flags
 	var (
 		command        string
@@ -27,19 +36,27 @@ func main() {
 
 	// Load environment variables
 	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("Warning: Could not load %s file: %v", envFile, err)
+		slog.Warn("could not load env file",
+			slog.String("file", envFile),
+			slog.Any("error", err),
+		)
 	}
 
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		slog.Error("failed to load configuration", slog.Any("error", err))
+		os.Exit(1)
 	}
 
 	// Convert relative path to absolute path
 	absPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
-		log.Fatalf("Failed to resolve migrations path: %v", err)
+		slog.Error("failed to resolve migrations path",
+			slog.String("path", migrationsPath),
+			slog.Any("error", err),
+		)
+		os.Exit(1)
 	}
 
 	// Create database config
@@ -60,21 +77,24 @@ func main() {
 	case "up":
 		fmt.Println("Running migrations...")
 		if err := database.RunMigrations(dbCfg, absPath); err != nil {
-			log.Fatalf("Migration failed: %v", err)
+			slog.Error("migration failed", slog.Any("error", err))
+			os.Exit(1)
 		}
 		fmt.Println("Migrations completed successfully")
 
 	case "down":
 		fmt.Println("Rolling back last migration...")
 		if err := database.RollbackMigration(dbCfg, absPath); err != nil {
-			log.Fatalf("Rollback failed: %v", err)
+			slog.Error("rollback failed", slog.Any("error", err))
+			os.Exit(1)
 		}
 		fmt.Println("Rollback completed successfully")
 
 	case "version":
 		version, dirty, err := database.GetMigrationVersion(dbCfg, absPath)
 		if err != nil {
-			log.Fatalf("Failed to get migration version: %v", err)
+			slog.Error("failed to get migration version", slog.Any("error", err))
+			os.Exit(1)
 		}
 		fmt.Printf("Current migration version: %d\n", version)
 		if dirty {
