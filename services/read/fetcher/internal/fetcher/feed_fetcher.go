@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -96,7 +96,10 @@ type FetchResult struct {
 
 // ProcessFeed fetches and processes a feed (implements worker.FeedProcessor)
 func (f *FeedFetcher) ProcessFeed(ctx context.Context, feed *models.Feed) error {
-	log.Printf("Fetching feed %s (%s)", feed.ID, feed.FeedURL)
+	slog.Info("fetching feed",
+		slog.String("feed_id", feed.ID.String()),
+		slog.String("feed_url", feed.FeedURL),
+	)
 
 	// Fetch and parse the feed
 	parsedFeed, err := f.parser.ParseFromURL(ctx, feed.FeedURL, f.httpClient)
@@ -120,7 +123,10 @@ func (f *FeedFetcher) ProcessFeed(ctx context.Context, feed *models.Feed) error 
 	for _, item := range parsedFeed.Items {
 		isNew, err := f.processFeedItem(ctx, feed.ID, item)
 		if err != nil {
-			log.Printf("Error processing feed item %s: %v", item.GUID, err)
+			slog.Error("failed to process feed item",
+				slog.String("item_guid", item.GUID),
+				slog.Any("error", err),
+			)
 			continue
 		}
 		if isNew {
@@ -138,11 +144,17 @@ func (f *FeedFetcher) ProcessFeed(ctx context.Context, feed *models.Feed) error 
 		foundNewItems,
 	)
 	if err != nil {
-		log.Printf("Error updating feed polling info: %v", err)
+		slog.Warn("failed to update feed polling info",
+			slog.String("feed_id", feed.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
-	log.Printf("Successfully processed feed %s: %d new items out of %d total items",
-		feed.ID, newItemsCount, len(parsedFeed.Items))
+	slog.Info("successfully processed feed",
+		slog.String("feed_id", feed.ID.String()),
+		slog.Int("new_items", newItemsCount),
+		slog.Int("total_items", len(parsedFeed.Items)),
+	)
 
 	return nil
 }
@@ -180,13 +192,19 @@ func (f *FeedFetcher) processFeedItem(ctx context.Context, feedID uuid.UUID, ite
 		return false, fmt.Errorf("failed to create feed item: %w", err)
 	}
 
-	log.Printf("Created new feed item %s from feed %s", feedItem.ID, feedID)
+	slog.Debug("created new feed item",
+		slog.String("feed_item_id", feedItem.ID.String()),
+		slog.String("feed_id", feedID.String()),
+	)
 	return true, nil
 }
 
 // handleFetchError handles errors during feed fetching
 func (f *FeedFetcher) handleFetchError(ctx context.Context, feed *models.Feed, fetchErr error) error {
-	log.Printf("Error fetching feed %s: %v", feed.ID, fetchErr)
+	slog.Error("failed to fetch feed",
+		slog.String("feed_id", feed.ID.String()),
+		slog.Any("error", fetchErr),
+	)
 
 	// Increment consecutive error days
 	newConsecutiveErrorDays := feed.ConsecutiveErrorDays + 1
@@ -202,7 +220,10 @@ func (f *FeedFetcher) handleFetchError(ctx context.Context, feed *models.Feed, f
 		errorMessage,
 	)
 	if err != nil {
-		log.Printf("Error updating feed error info: %v", err)
+		slog.Warn("failed to update feed error info",
+			slog.String("feed_id", feed.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Calculate next poll time (still use current tier for retry)
@@ -210,7 +231,10 @@ func (f *FeedFetcher) handleFetchError(ctx context.Context, feed *models.Feed, f
 	now := time.Now()
 	err = f.feedRepo.UpdatePollingInfo(ctx, feed.ID, &now, nil, nextPollAt, feed.PollingTier)
 	if err != nil {
-		log.Printf("Error updating feed next poll time: %v", err)
+		slog.Warn("failed to update feed next poll time",
+			slog.String("feed_id", feed.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	return fetchErr
