@@ -14,7 +14,7 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Medium Priority
 
-### 12. Add Input Validation Library
+### 1. Add Input Validation Library
 **Files:** All API handlers
 
 **Issue:** Manual validation in each handler is error-prone and inconsistent.
@@ -83,7 +83,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 ---
 
-### 13. Setup Testcontainers for Integration Tests
+### 2. Setup Testcontainers for Integration Tests
 **Files:** All `*_integration_test.go` files
 
 **Issue:** Integration tests require manually running PostgreSQL, causing test failures in CI/CD.
@@ -188,7 +188,7 @@ go test ./... -v -short       # Skip integration tests
 
 ## Low Priority
 
-### 7. Clean Up Unused Dependency in Mobile App
+### 3. Clean Up Unused Dependency in Mobile App
 **File:**
 - `apps/mobile/package.json:27` - Unused dependency `expo-linking`
 
@@ -262,7 +262,7 @@ if err == sql.ErrNoRows {
 
 ---
 
-### 13. Add Standardized Error Variables
+### 4. Add Standardized Error Variables
 **Files:** All repository files in explore and user services
 
 **Issue:** String errors are used inline instead of defined error variables, preventing programmatic error checking.
@@ -323,7 +323,7 @@ if errors.Is(err, apperrors.ErrArticleNotFound) {
 
 ---
 
-### 19. Improve Router for Path Parameter Handling
+### 5. Improve Router for Path Parameter Handling
 **File:** `services/explore/recommender/internal/api/handlers.go`
 
 **Issue:** Manual string manipulation for extracting path parameters is fragile and error-prone.
@@ -389,7 +389,7 @@ func (s *Server) handleVoteWithParams(w http.ResponseWriter, r *http.Request, ps
 
 ---
 
-### 20. Consolidate getEnv Helper Functions
+### 6. Consolidate getEnv Helper Functions
 **Files:**
 - `services/explore/fetcher/cmd/fetcher/main.go:173-179`
 - `services/explore/recommender/cmd/recommender/main.go:182-187`
@@ -468,7 +468,7 @@ maxRetries := env.GetInt("MAX_RETRIES", 3)
 
 ---
 
-### 21. Add Package-Level Documentation
+### 7. Add Package-Level Documentation
 **Files:** Various package files across services
 
 **Issue:** User service has excellent package documentation, while explore services have minimal package comments.
@@ -593,7 +593,7 @@ If explore services grow significantly (>10 endpoints), consider:
 
 ---
 
-### 23. Add Mobile App Test Infrastructure
+### 8. Add Mobile App Test Infrastructure
 **Files:** `apps/mobile/src/`
 
 **Issue:** Mobile app has no test files (0 test coverage).
@@ -672,7 +672,7 @@ npm test
 
 ---
 
-### 24. Optimize N+1 Query in Recommendation Flow
+### 9. Optimize N+1 Query in Recommendation Flow
 **File:** `services/explore/recommender/internal/db/article_repository.go:327`
 
 **Issue:** Recording recommendations happens in a loop, creating N database calls instead of 1 batch operation.
@@ -756,8 +756,6 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 - Run `make test` and `make lint` after each fix
 - Update docker-compose.yml to set `DB_SSLMODE=disable` when SSL mode default changes
 
-
-
 ---
 
 ## Completed
@@ -768,37 +766,36 @@ The following items have been successfully implemented and verified:
 - **Standardize PostgreSQL Driver to pgx/v5** - Migrated explore services (fetcher and recommender) from `database/sql` + `lib/pq` to modern `pgx/v5/pgxpool`. Updated all repository methods, connection pooling, and transaction handling. Benefits include 2-3x faster query performance, better connection pooling with health checks, and native PostgreSQL protocol support. Both services build and compile successfully.
 
 ### Documentation & API
-- **Add API Versioning** (Task #11) - Verified that API versioning with `/api/v1/` prefix is fully implemented across all services. All services use consistent versioning: Explore Fetcher (`/api/v1/explore/feed/...`), Explore Recommender (`/api/v1/explore/...`), User Service (`/api/v1/auth/...`, `/api/v1/user/...`), Read Content Service (`/api/v1/content/...`), and Read Ingest RSS Service (`/api/v1/source/rss/...`). All services also use Kubernetes-compatible health endpoints (`/health/live` for liveness, `/health/ready` for readiness with dependency checks). Implementation includes proper route grouping in Gin (User Service) and Chi (Read Services), route registration with path prefixes in stdlib handlers (Explore Services). Benefits include API evolution capability, backward compatibility support, clear API contracts, and consistent API design across all microservices.
-- **Add OpenAPI/Swagger Specifications** - Created comprehensive OpenAPI 3.0 specifications for both Explore and User services (`services/explore/api/openapi.yaml` and `services/users/api/openapi.yaml`). Documented all endpoints with request/response schemas, authentication requirements, and examples. Added documentation section to CLAUDE.md with instructions for viewing specs with Swagger UI and validation commands. Both specs validated successfully with @apidevtools/swagger-cli.
-- **Complete API v1 Migration - Update OpenAPI Specifications** - Updated OpenAPI specifications to reflect the new API v1 structure that was implemented in the code. Migrated Explore Service spec from old paths (`/health`, `/fetch`, `/feeds/stats`, `/explore/articles`, `{userID}`, `{articleID}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/explore/feed/fetch`, `/api/v1/explore/feed/stats`, `/api/v1/explore/article`, `{user_id}`, `{article_id}`). Migrated User Service spec from old paths (`/health`, `/ready`, `/auth/*`, `/users/{id}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/auth/*`, `/api/v1/user/{user_id}`). Added health/ready endpoint documentation for fetcher service. Both specs validated successfully with @apidevtools/swagger-cli. API documentation now accurately reflects actual endpoint implementation, making it easier for API consumers and improving developer onboarding.
-- **Complete API v1 Migration - Update Integration Tests** - Task #3 was already completed prior to this session. All integration tests in `services/explore/recommender/integration_test.go` use the correct API v1 paths (`/api/v1/explore/article`, `/api/v1/explore/recommendation/{user_id}`, `/api/v1/explore/article/{article_id}/vote`). JWT authentication is properly implemented using `testJWTHelper` and `makeAuthenticatedRequest` function.
-- **Complete API v1 Migration - Update Service README Files** - Updated both `services/explore/README.md` and `services/users/README.md` with correct API v1 endpoints. Migrated Explore service endpoints from old paths (`/health`, `/fetch`, `/explore/articles`, `/explore/recommendations/:userID`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/explore/feed/fetch`, `/api/v1/explore/article`, `/api/v1/explore/recommendation/{user_id}`). Migrated User service endpoints from old paths (`/health`, `/ready`, `/auth/*`, `/users/{id}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/auth/*`, `/api/v1/user/{user_id}`). Added comprehensive example curl commands for all endpoints in both READMEs. Service-specific documentation now matches CLAUDE.md and actual implementation, improving developer experience and reducing onboarding confusion.
+- **Add OpenAPI/Swagger Specifications** - Created comprehensive OpenAPI 3.0 specifications for both Explore and User services 
+- **Add API Versioning** (Task #11) - Benefits include API evolution capability, backward compatibility support, clear API contracts, and consistent API design across all microservices.
+- **Complete API v1 Migration - Update OpenAPI Specifications** - Updated OpenAPI specifications to reflect the new API v1 structure 
+- **Complete API v1 Migration - Update Integration Tests** 
+- **Complete API v1 Migration - Update Service README Files** 
 
 ### Code Organization & Maintainability
 - **Consolidate Duplicate Logging Package** - Created shared logging package at repository root (`pkg/logging/`), updated imports in all services, eliminated duplicate code across explore and users services
-- **Standardize Logging Library to log/slog in Read Service** - Migrated Read service from `go.uber.org/zap` to stdlib `log/slog`. Updated test file `cleanup_job_test.go` to use slog instead of zap for logger instantiation. Removed zap dependency from go.mod using `go mod edit -dropreplace` and `go mod tidy`. All tests pass and both services (content and fetcher) build successfully. Aligns with Engineering Principles preference for stdlib over external dependencies.
-- **Move Shared Models to Root Package** - Created `pkg/models/` at repository root and migrated all domain models (Article, User, Vote, Feed, RecommendationEvent) from `services/explore/pkg/models/`. Updated imports across explore service. Created go.mod for the new shared package. All services (explore, users, read) build successfully.
-- **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. This eliminates the coupling where explore service depended on users service code. Removed the `replace github.com/andrew-craig/cairn/services/users => ../users` directive from explore/go.mod. Updated imports in explore service (recommender) to use `pkg/auth` instead of `services/users/pkg/auth`. Added proper replace directives for pkg/auth, pkg/models, and pkg/logging in all service go.mod files. All services build successfully, eliminating the need for complex Dockerfile workarounds.
-- **Consolidate Auth Middleware Implementations** - Created Gin-compatible wrappers in `pkg/auth/gin_adapter.go` with `NewGinMiddleware()` factory function, `JWTAuth()` and `OptionalAuth()` middleware methods, and context helpers (`GetUserIDFromGinContext()`, `MustGetUserIDFromGin()`, `IsAuthenticatedInGin()`). Updated User Service to use shared `pkg/auth` package instead of internal middleware implementation. Deleted obsolete `services/users/internal/middleware/auth.go` and `auth_test.go` files. Updated all handler files (`user_handler.go`, `auth_handler.go`) and other middleware files (`authorization.go`, `logging.go`, `rate_limit.go`, `recovery.go`) to use `pkg/auth` context functions. All tests pass. Benefits include code reusability across services, consistent auth middleware foundation, easier unit testing with mocks, and elimination of duplicate auth implementations.
-- **Rename testhelpers to testutil for Consistency** - Renamed `internal/testhelpers/` to `internal/testutil/` in both Read Service components (content and fetcher). Updated package declarations and all import statements in integration test files. This aligns Read Service with documented standards and patterns used in User Service and Explore Service. All tests pass (content service tests pass completely; fetcher service has a pre-existing test failure in worker package unrelated to this change). Benefits include consistency across services, easier test utility discovery, and alignment with Go community conventions.
-- **Add Repository Interfaces to Explore Services** - Implemented repository interface pattern for all Explore service repositories, matching the pattern already used in User and Read services. Created `internal/db/interfaces.go` files defining `FeedRepositoryInterface` (fetcher), `ArticleRepositoryInterface`, `VoteRepositoryInterface`, and `UserRepositoryInterface` (recommender). Renamed concrete struct types to unexported names (e.g., `FeedRepository` → `feedRepository`) while keeping exported constructor functions that return interfaces. Updated all callers including handlers, recommendation engine, cleanup jobs, and sync components to use interface types instead of concrete types. Updated recommender cleanup command and integration test to use pgxpool.Pool for consistency with interface requirements. All services build successfully. Benefits include easier unit testing with mocks, better dependency injection, cleaner API surface, and consistency with established patterns across the codebase. Note: Read Service already follows this pattern correctly.
-- **Standardize Configuration Management** - Created shared `pkg/config/config.go` package with common configuration patterns including `DatabaseConfig`, `ServerConfig`, and `LoggingConfig` structs with validation methods. Implemented helper functions (`GetString`, `GetInt`, `GetBool`, `GetDuration`) for environment variable parsing. Created service-specific config packages for all services: `services/explore/fetcher/internal/config`, `services/explore/recommender/internal/config`, `services/read/content/internal/config`, and `services/read/fetcher/internal/config`. Each service config package uses the shared `pkg/config` package and adds service-specific configuration options. Updated all main.go files to use centralized configuration with validation at startup. Removed duplicate `getEnv` helper functions from all services. Added replace directives in service go.mod files to reference the shared config package. All services (explore/fetcher, explore/recommender, read/content, read/fetcher) build successfully. Benefits include centralized configuration management, validation at startup to prevent runtime errors, consistent patterns across all services, easier testing of configuration logic, and elimination of code duplication. This implementation combines tasks #12 (Standardize Configuration Management for Explore services) and #25 (Centralize Configuration Management in Read Service).
-- **Standardize Error Response Format** - Task #10 was already completed prior to this session. Verified that all services (Explore Fetcher, Explore Recommender, User Service) use standardized JSON error responses via `pkg/api/response.go`. The shared package provides `WriteError()` for stdlib handlers, `GinWriteError()` for Gin handlers, and common error codes (`ErrCodeBadRequest`, `ErrCodeInternal`, `ErrCodeValidation`, etc.). All services compiled successfully. Benefits include consistent API responses across all services, easier client integration, standardized error codes for programmatic error handling, and improved API documentation clarity.
+- **Standardize Logging Library to log/slog in Read Service** 
+- **Move Shared Models to Root Package** - Created `pkg/models/` at repository root and migrated all domain models (Article, User, Vote, Feed, RecommendationEvent) from `services/explore/pkg/models/`.
+- **Fix Module Dependency Architecture** - Extracted auth middleware from `services/users/pkg/auth/` to shared `pkg/auth/` package at repository root. 
+- **Consolidate Auth Middleware Implementations** - Created Gin-compatible wrappers in `pkg/auth/gin_adapter.go` with `NewGinMiddleware()` factory function, `JWTAuth()` and `OptionalAuth()` middleware methods, and context helpers (`GetUserIDFromGinContext()`, `MustGetUserIDFromGin()`, `IsAuthenticatedInGin()`). 
+- **Rename testhelpers to testutil for Consistency** - 
+- **Add Repository Interfaces to Explore Services** - Implemented repository interface pattern for all Explore service repositories, matching the pattern already used in User and Read services. 
+- **Standardize Configuration Management** - Created shared `pkg/config/config.go` package with common configuration patterns including `DatabaseConfig`, `ServerConfig`, and `LoggingConfig` structs with validation methods. Implemented helper functions (`GetString`, `GetInt`, `GetBool`, `GetDuration`) for environment variable parsing. Created service-specific config packages for all services: 
+- **Standardize Error Response Format** 
 
 ### Security & Reliability
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
 - **Validate Article Exists Before Recording Vote** - Added rowsAffected check and error handling
 - **Make SSL Mode Configurable (Default: Require)** - DB_SSLMODE environment variable with "require" default
-- **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables. Created `.env.example` files in three locations: `infrastructure/docker/.env.example`, `services/explore/.env.example`, and `services/read/.env.example`. Updated all docker-compose.yml files (`infrastructure/docker/docker-compose.yml`, `services/explore/docker-compose.yml`, `services/read/docker-compose.yml`) to use environment variable substitution for sensitive values (PostgreSQL passwords, Vault tokens, database credentials). Added comprehensive documentation in README.md with setup instructions and security best practices. All `.env` files are already in `.gitignore` to prevent accidental commits.
+- **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables. 
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
 - **Standardize Logging to slog** - Main service code migrated from log.Printf to structured slog
 - **Extract URL Path Parsing Helper** - Implemented extractPathParam helper function
 - **Log Warning for Silent Vote Counter Failures** - Added slog.Warn for rowsAffected == 0 cases
-- **Fix Unchecked Error Returns in Explore Service - Fetcher** - Fixed unchecked error returns that could lead to resource leaks, silent failures, and data inconsistencies. Added proper error handling for transaction rollback in feed_repository.go with pgx.ErrTxClosed check. Migrated recommender_client.go from log.Printf to slog.Warn for structured logging of response body close errors. Added error handling for json.NewEncoder().Encode() in main.go health check handlers (liveness and readiness). All services compile successfully. Benefits include prevention of resource leaks from unchecked transaction rollbacks, consistent error logging with structured logging (slog), and prevention of silent JSON encoding failures in HTTP responses.
-- **Fix Unchecked Error Returns in Explore Service - Recommender** - Fixed unchecked error returns and compilation issues in the recommender service. Key changes include: (1) Migrated article_repository_test.go from database/sql to pgxpool.Pool for consistency with the repository interface after pgx migration; (2) Fixed 6 unchecked resp.Body.Close() errors in integration_test.go by adding proper error handling with defer functions; (3) Fixed unchecked db.Close() error in migrate.go by adding error logging; (4) Fixed context key type safety issue in middleware.go by creating a custom contextKey type to avoid collisions; (5) Removed unused articleScanner interface and pgx import from interfaces.go. All golangci-lint issues resolved (0 issues), and all unit tests pass. Benefits include prevention of resource leaks from unchecked Close() calls, better type safety for context values, and cleaner codebase without unused code.
-- **Fix Type Safety Violations in Mobile App** - Task #5 was already completed prior to this session. All explicit `any` types in ArticleListScreen.tsx and ExploreScreen.tsx have been replaced with proper TypeScript types. The `onArticlePress` parameter now uses `Article` type, and `onViewableItemsChanged` parameters use proper type definitions with `ViewToken[]`. ViewToken is imported from 'react-native' in both files. TypeScript compilation passes without errors (`npm run type-check` succeeds). Benefits include improved type safety, better IDE support with autocomplete and refactoring, and compile-time error detection instead of runtime errors.
+- **Fix Unchecked Error Returns in Explore Service - Fetcher and Recommender** 
+- **Fix Type Safety Violations in Mobile App**
 - **Fix Context Key Type Safety in User Service**
 
 ### Infrastructure & Architecture
@@ -806,29 +803,11 @@ The following items have been successfully implemented and verified:
 - **Implement Kubernetes-Style Health Endpoints** - Separate /health (liveness) and /ready (readiness) endpoints
 - **Add Request ID Propagation** - X-Request-ID header generation and context propagation for distributed tracing
 - **Validate User IDs as UUIDs** - UUID format validation in EnsureUserExists
-- **Standardize Database Architecture Pattern** - Migrated infrastructure docker-compose.yml from single PostgreSQL instance with multiple databases to separate PostgreSQL instances per service (users-db:5432, recommender-db:5433, fetcher-db:5434). This aligns with the microservices isolation pattern used in explore and read services. Benefits include independent scaling, better resource isolation, simplified deployment, and proper microservices boundaries. Updated .env.example with separate credentials for each database. Created MIGRATION.md guide for users upgrading from the old pattern. All services correctly depend on their specific database instances with proper health checks.
+- **Standardize Database Architecture Pattern** - Migrated infrastructure docker-compose.yml from single PostgreSQL instance with multiple databases to separate PostgreSQL instances per service (users-db:5432, recommender-db:5433, fetcher-db:5434). 
 
 ### Refactoring
 - **Delete Unused Gin Middleware** - Removed from explore service (user service middleware is actively used)
 - **Cache Internal User ID in Recommendation Flow** - Addressed by using external user ID from JWT token directly throughout the flow
 
 ### Testing & Quality Assurance
-- **Add Tests for Recommendation Engine** - Created comprehensive test suite for `services/explore/recommender/internal/recommend/engine.go` including:
-  - Unit tests for quality score calculation (8 test cases covering edge cases)
-  - Unit tests for high-quality article selection (4 test cases)
-  - Integration tests for GetRecommendations (5 test scenarios):
-    - Returns correct number of recommendations when fewer than 5 articles available
-    - Includes exploration article (low exposure) along with 4 high-quality articles
-    - Filters out deleted articles from recommendations
-    - Prevents duplicate recommendations to the same user
-    - Properly increments recommends counter for each recommendation
-  - All unit tests pass in CI/CD without database dependency (use `-short` flag)
-  - Integration tests validate end-to-end recommendation algorithm with real database
-
-### Documentation & Knowledge Sharing
-- **Document Read Service Technology Stack in Engineering Principles** - Added comprehensive documentation for Read Service specific libraries to `docs/ENGINEERING_PRINCIPLES.md`. Documented chi/v5 HTTP router, go-readability content extraction, bluemonday HTML sanitization, gobreaker circuit breaker, and robfig/cron job scheduling libraries. Updated HTTP Framework section to include all three frameworks (stdlib net/http, Gin, chi/v5) with rationale for each choice. Added "Why chi/v5?" section explaining architectural decision for lightweight router vs full framework.
-
-### Code Quality Fixes
-- **Fix React Hook Dependency Warning in ExploreScreen** - Verified that `apps/mobile/src/screens/ExploreScreen.tsx` already has proper `useCallback` implementation. The `loadExploreArticles` function (lines 103-122) is correctly wrapped in `useCallback` with proper dependency `[loadMoreUntilBuffer]`, and the `useEffect` (lines 133-135) correctly includes `loadExploreArticles` in its dependency array. The `loadMoreUntilBuffer` function (lines 35-101) is also properly wrapped in `useCallback` with dependency `[lastVisibleIndex]`. No React hooks warnings present in the codebase. Task was already completed prior to this verification.
-- **Remove Unused Functions in User Service** - Verified that all unused functions mentioned in the original task have already been removed from the codebase. Searched for `pathUserID` variable, `cleanupTestUserByEmail`, and `cleanupTestUserByDeviceID` functions - none exist in the current codebase. The `user_repository_test.go` file only contains the actively used `cleanupTestUser` function (lines 47-53) which is called throughout the test suite. Task was already completed prior to this verification.
-- **Apply Code Optimizations in Explore Service** (Task #8) - Verified that all three code optimizations have already been implemented: (1) Loop simplification in `fetcher/internal/fetcher/fetcher.go:207` - uses `append([]string(nil), item.Categories...)` instead of loop; (2) Nil safety in `fetcher/internal/fetcher/fetcher_test.go:485` - uses `t.Fatal()` to prevent nil pointer dereference on line 487; (3) Switch statement in `recommender/internal/api/server.go:63` - uses `switch r.Method` for HTTP method routing in voting endpoint. All unit tests pass. Benefits include clearer, more idiomatic Go code, minor performance improvements from loop optimization, and bug prevention from proper nil handling in tests.
+- **Add Tests for Recommendation Engine** 
