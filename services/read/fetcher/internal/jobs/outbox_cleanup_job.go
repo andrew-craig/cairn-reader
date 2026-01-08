@@ -3,7 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
@@ -51,7 +51,7 @@ func NewOutboxCleanupJob(config *OutboxCleanupJobConfig, outboxRepo repository.O
 func (j *OutboxCleanupJob) Run() {
 	ctx := context.Background()
 
-	log.Println("Starting outbox cleanup job")
+	slog.Info("Starting outbox cleanup job")
 
 	// Get and log metrics before cleanup
 	j.logMetrics("before_cleanup")
@@ -65,7 +65,7 @@ func (j *OutboxCleanupJob) Run() {
 	// Get and log metrics after cleanup
 	j.logMetrics("after_cleanup")
 
-	log.Println("Outbox cleanup job completed")
+	slog.Info("Outbox cleanup job completed")
 }
 
 // cleanupDeliveredEntries removes old delivered outbox entries in batches
@@ -73,15 +73,13 @@ func (j *OutboxCleanupJob) cleanupDeliveredEntries(ctx context.Context) {
 	olderThan := time.Now().Add(-time.Duration(j.config.RetentionDays) * 24 * time.Hour)
 	totalDeleted := 0
 
-	log.Printf("Cleaning up delivered outbox entries older than %d days (before %s)",
-		j.config.RetentionDays, olderThan.Format(time.RFC3339))
+	slog.Info("Cleaning up delivered outbox entries", "retention_days", j.config.RetentionDays, "older_than", olderThan.Format(time.RFC3339))
 
 	// Continue deleting in batches until no more rows are affected
 	for {
 		deletedCount, err := j.outboxRepo.DeleteOldDeliveredEntries(ctx, olderThan, j.config.BatchSize)
 		if err != nil {
-			log.Printf("Error deleting old delivered entries: %v (total_deleted_so_far=%d)",
-				err, totalDeleted)
+			slog.Error("Error deleting old delivered entries", "error", err, "total_deleted_so_far", totalDeleted)
 			return
 		}
 
@@ -92,17 +90,16 @@ func (j *OutboxCleanupJob) cleanupDeliveredEntries(ctx context.Context) {
 			break
 		}
 
-		log.Printf("Deleted batch of %d delivered entries (total_deleted=%d)",
-			deletedCount, totalDeleted)
+		slog.Info("Deleted batch of delivered entries", "deleted_count", deletedCount, "total_deleted", totalDeleted)
 
 		// Small delay between batches to avoid overwhelming the database
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if totalDeleted > 0 {
-		log.Printf("Successfully deleted %d old delivered outbox entries", totalDeleted)
+		slog.Info("Successfully deleted old delivered outbox entries", "count", totalDeleted)
 	} else {
-		log.Println("No old delivered entries to cleanup")
+		slog.Info("No old delivered entries to cleanup")
 	}
 }
 
@@ -110,16 +107,16 @@ func (j *OutboxCleanupJob) cleanupDeliveredEntries(ctx context.Context) {
 func (j *OutboxCleanupJob) logFailedEntries(ctx context.Context) {
 	failedEntries, err := j.outboxRepo.GetFailedEntries(ctx, j.config.FailedEntryLogLimit)
 	if err != nil {
-		log.Printf("Error retrieving failed outbox entries: %v", err)
+		slog.Error("Error retrieving failed outbox entries", "error", err)
 		return
 	}
 
 	if len(failedEntries) == 0 {
-		log.Println("No failed outbox entries found")
+		slog.Info("No failed outbox entries found")
 		return
 	}
 
-	log.Printf("Found %d failed outbox entries for investigation:", len(failedEntries))
+	slog.Info("Found failed outbox entries for investigation", "count", len(failedEntries))
 
 	for i, entry := range failedEntries {
 		lastError := "no error message"
@@ -127,18 +124,17 @@ func (j *OutboxCleanupJob) logFailedEntries(ctx context.Context) {
 			lastError = *entry.LastError
 		}
 
-		log.Printf("  [%d] ID: %s, FeedItemID: %s, RetryCount: %d, UserCount: %d, Created: %s, LastError: %s",
-			i+1,
-			entry.ID,
-			entry.FeedItemID,
-			entry.RetryCount,
-			len(entry.UserIDs),
-			entry.CreatedAt.Format(time.RFC3339),
-			lastError,
-		)
+		slog.Info("Failed outbox entry",
+			"index", i+1,
+			"id", entry.ID,
+			"feed_item_id", entry.FeedItemID,
+			"retry_count", entry.RetryCount,
+			"user_count", len(entry.UserIDs),
+			"created_at", entry.CreatedAt.Format(time.RFC3339),
+			"last_error", lastError)
 	}
 
-	log.Printf("Failed entries investigation complete. Consider manual intervention for persistent failures.")
+	slog.Info("Failed entries investigation complete - consider manual intervention for persistent failures")
 }
 
 // logMetrics retrieves and logs current outbox metrics
@@ -147,26 +143,26 @@ func (j *OutboxCleanupJob) logMetrics(stage string) {
 
 	metrics, err := j.outboxRepo.GetMetrics(ctx)
 	if err != nil {
-		log.Printf("Error retrieving outbox metrics (%s): %v", stage, err)
+		slog.Error("Error retrieving outbox metrics", "stage", stage, "error", err)
 		return
 	}
 
-	log.Printf("Outbox metrics (%s):", stage)
-	log.Printf("  - Pending: %d", metrics.PendingCount)
-	log.Printf("  - Sending: %d", metrics.SendingCount)
-	log.Printf("  - Delivered: %d", metrics.DeliveredCount)
-	log.Printf("  - Failed: %d", metrics.FailedCount)
-	log.Printf("  - Total: %d", metrics.TotalCount)
-	log.Printf("  - Queue depth (pending + sending): %d", metrics.PendingCount+metrics.SendingCount)
+	slog.Info("Outbox metrics", "stage", stage,
+		"pending", metrics.PendingCount,
+		"sending", metrics.SendingCount,
+		"delivered", metrics.DeliveredCount,
+		"failed", metrics.FailedCount,
+		"total", metrics.TotalCount,
+		"queue_depth", metrics.PendingCount+metrics.SendingCount)
 
 	// Log warnings for concerning metrics
 	if metrics.FailedCount > 0 {
-		log.Printf("  ⚠ WARNING: %d failed deliveries detected - investigation recommended", metrics.FailedCount)
+		slog.Warn("Failed deliveries detected - investigation recommended", "failed_count", metrics.FailedCount)
 	}
 
 	queueDepth := metrics.PendingCount + metrics.SendingCount
 	if queueDepth > 1000 {
-		log.Printf("  ⚠ WARNING: High queue depth (%d) - outbox may be backing up", queueDepth)
+		slog.Warn("High queue depth - outbox may be backing up", "queue_depth", queueDepth)
 	}
 }
 
@@ -183,7 +179,7 @@ func (j *OutboxCleanupJob) RunWithCustomRetention(retentionDays int) {
 	originalRetention := j.config.RetentionDays
 	j.config.RetentionDays = retentionDays
 
-	log.Printf("Running outbox cleanup with custom retention: %d days", retentionDays)
+	slog.Info("Running outbox cleanup with custom retention", "retention_days", retentionDays)
 	j.Run()
 
 	// Restore original config

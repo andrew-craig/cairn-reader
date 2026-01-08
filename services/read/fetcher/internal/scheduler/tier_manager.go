@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -51,14 +51,14 @@ func NewTierManager(
 func (tm *TierManager) Start() {
 	tm.wg.Add(1)
 	go tm.run()
-	log.Printf("Tier manager started (update_interval=%v)", tm.config.UpdateInterval)
+	slog.Info("Tier manager started", "update_interval", tm.config.UpdateInterval)
 }
 
 // Stop gracefully stops the tier manager
 func (tm *TierManager) Stop() {
 	close(tm.stopCh)
 	tm.wg.Wait()
-	log.Println("Tier manager stopped")
+	slog.Info("Tier manager stopped")
 }
 
 // run is the main tier management loop
@@ -85,22 +85,22 @@ func (tm *TierManager) run() {
 func (tm *TierManager) updateTiers() {
 	ctx := context.Background()
 
-	log.Println("Starting tier update job")
+	slog.Info("Starting tier update job")
 	startTime := time.Now()
 
 	// Get all active feeds
 	feeds, err := tm.feedRepo.GetFeedsForTierUpdate(ctx)
 	if err != nil {
-		log.Printf("Error fetching feeds for tier update: %v", err)
+		slog.Error("Error fetching feeds for tier update", "error", err)
 		return
 	}
 
 	if len(feeds) == 0 {
-		log.Println("No active feeds to update")
+		slog.Info("No active feeds to update")
 		return
 	}
 
-	log.Printf("Evaluating tiers for %d active feeds", len(feeds))
+	slog.Info("Evaluating tiers for active feeds", "count", len(feeds))
 
 	// Track statistics
 	stats := &TierUpdateStats{
@@ -114,7 +114,7 @@ func (tm *TierManager) updateTiers() {
 	// Update each feed's tier
 	for _, feed := range feeds {
 		if err := tm.updateFeedTier(ctx, feed, stats); err != nil {
-			log.Printf("Error updating tier for feed %s: %v", feed.ID, err)
+			slog.Error("Error updating tier for feed", "feed_id", feed.ID, "error", err)
 			stats.Errors++
 		}
 	}
@@ -157,8 +157,11 @@ func (tm *TierManager) updateFeedTier(
 		change := string(oldTier) + "->" + string(newTier)
 		stats.ByChange[change]++
 
-		log.Printf("Feed %s tier changed: %s -> %s (last_published: %v)",
-			feed.ID, oldTier, newTier, formatTimePtr(feed.LastPublishedAt))
+		slog.Info("Feed tier changed",
+			"feed_id", feed.ID,
+			"old_tier", oldTier,
+			"new_tier", newTier,
+			"last_published", formatTimePtr(feed.LastPublishedAt))
 	}
 
 	return nil
@@ -175,19 +178,18 @@ type TierUpdateStats struct {
 
 // logTierUpdateStats logs summary statistics
 func (tm *TierManager) logTierUpdateStats(stats *TierUpdateStats, duration time.Duration) {
-	log.Printf("Tier update completed in %v", duration)
-	log.Printf("  Total feeds: %d", stats.Total)
-	log.Printf("  Updated: %d", stats.Updated)
-	log.Printf("  Errors: %d", stats.Errors)
-	log.Printf("  Tier distribution:")
-	log.Printf("    Active: %d", stats.ByTier[models.PollingTierActive])
-	log.Printf("    Moderate: %d", stats.ByTier[models.PollingTierModerate])
-	log.Printf("    Quiet: %d", stats.ByTier[models.PollingTierQuiet])
+	slog.Info("Tier update completed",
+		"duration", duration,
+		"total_feeds", stats.Total,
+		"updated", stats.Updated,
+		"errors", stats.Errors,
+		"tier_active", stats.ByTier[models.PollingTierActive],
+		"tier_moderate", stats.ByTier[models.PollingTierModerate],
+		"tier_quiet", stats.ByTier[models.PollingTierQuiet])
 
 	if len(stats.ByChange) > 0 {
-		log.Println("  Tier changes:")
 		for change, count := range stats.ByChange {
-			log.Printf("    %s: %d", change, count)
+			slog.Info("Tier change", "change", change, "count", count)
 		}
 	}
 }

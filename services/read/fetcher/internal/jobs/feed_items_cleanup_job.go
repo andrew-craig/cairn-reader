@@ -3,7 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
@@ -51,7 +51,7 @@ func NewFeedItemsCleanupJob(config *FeedItemsCleanupJobConfig, feedItemRepo repo
 func (j *FeedItemsCleanupJob) Run() {
 	ctx := context.Background()
 
-	log.Println("Starting feed items cleanup job")
+	slog.Info("Starting feed items cleanup job")
 
 	// Get and log metrics before cleanup
 	j.logMetrics("before_cleanup")
@@ -65,7 +65,7 @@ func (j *FeedItemsCleanupJob) Run() {
 	// Get and log metrics after cleanup
 	j.logMetrics("after_cleanup")
 
-	log.Println("Feed items cleanup job completed")
+	slog.Info("Feed items cleanup job completed")
 }
 
 // cleanupCompletedItems removes old completed feed items in batches
@@ -73,15 +73,13 @@ func (j *FeedItemsCleanupJob) cleanupCompletedItems(ctx context.Context) {
 	olderThan := time.Now().Add(-time.Duration(j.config.CompletedRetentionDays) * 24 * time.Hour)
 	totalDeleted := 0
 
-	log.Printf("Cleaning up completed feed items older than %d days (before %s)",
-		j.config.CompletedRetentionDays, olderThan.Format(time.RFC3339))
+	slog.Info("Cleaning up completed feed items", "retention_days", j.config.CompletedRetentionDays, "older_than", olderThan.Format(time.RFC3339))
 
 	// Continue deleting in batches until no more rows are affected
 	for {
 		deletedCount, err := j.feedItemRepo.DeleteOldCompletedItems(ctx, olderThan, j.config.BatchSize)
 		if err != nil {
-			log.Printf("Error deleting old completed items: %v (total_deleted_so_far=%d)",
-				err, totalDeleted)
+			slog.Error("Error deleting old completed items", "error", err, "total_deleted_so_far", totalDeleted)
 			return
 		}
 
@@ -92,17 +90,16 @@ func (j *FeedItemsCleanupJob) cleanupCompletedItems(ctx context.Context) {
 			break
 		}
 
-		log.Printf("Deleted batch of %d completed items (total_deleted=%d)",
-			deletedCount, totalDeleted)
+		slog.Info("Deleted batch of completed items", "deleted_count", deletedCount, "total_deleted", totalDeleted)
 
 		// Small delay between batches to avoid overwhelming the database
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if totalDeleted > 0 {
-		log.Printf("Successfully deleted %d old completed feed items", totalDeleted)
+		slog.Info("Successfully deleted old completed feed items", "count", totalDeleted)
 	} else {
-		log.Println("No old completed items to cleanup")
+		slog.Info("No old completed items to cleanup")
 	}
 }
 
@@ -111,15 +108,13 @@ func (j *FeedItemsCleanupJob) cleanupFailedItems(ctx context.Context) {
 	olderThan := time.Now().Add(-time.Duration(j.config.FailedRetentionDays) * 24 * time.Hour)
 	totalDeleted := 0
 
-	log.Printf("Cleaning up failed feed items older than %d days (before %s)",
-		j.config.FailedRetentionDays, olderThan.Format(time.RFC3339))
+	slog.Info("Cleaning up failed feed items", "retention_days", j.config.FailedRetentionDays, "older_than", olderThan.Format(time.RFC3339))
 
 	// Continue deleting in batches until no more rows are affected
 	for {
 		deletedCount, err := j.feedItemRepo.DeleteOldFailedItems(ctx, olderThan, j.config.BatchSize)
 		if err != nil {
-			log.Printf("Error deleting old failed items: %v (total_deleted_so_far=%d)",
-				err, totalDeleted)
+			slog.Error("Error deleting old failed items", "error", err, "total_deleted_so_far", totalDeleted)
 			return
 		}
 
@@ -130,17 +125,16 @@ func (j *FeedItemsCleanupJob) cleanupFailedItems(ctx context.Context) {
 			break
 		}
 
-		log.Printf("Deleted batch of %d failed items (total_deleted=%d)",
-			deletedCount, totalDeleted)
+		slog.Info("Deleted batch of failed items", "deleted_count", deletedCount, "total_deleted", totalDeleted)
 
 		// Small delay between batches to avoid overwhelming the database
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if totalDeleted > 0 {
-		log.Printf("Successfully deleted %d old failed feed items", totalDeleted)
+		slog.Info("Successfully deleted old failed feed items", "count", totalDeleted)
 	} else {
-		log.Println("No old failed items to cleanup")
+		slog.Info("No old failed items to cleanup")
 	}
 }
 
@@ -150,29 +144,28 @@ func (j *FeedItemsCleanupJob) logMetrics(stage string) {
 
 	metrics, err := j.feedItemRepo.GetMetrics(ctx)
 	if err != nil {
-		log.Printf("Error retrieving feed items metrics (%s): %v", stage, err)
+		slog.Error("Error retrieving feed items metrics", "stage", stage, "error", err)
 		return
 	}
 
-	log.Printf("Feed items metrics (%s):", stage)
-	log.Printf("  - Pending: %d", metrics.PendingCount)
-	log.Printf("  - Processing: %d", metrics.ProcessingCount)
-	log.Printf("  - Completed: %d", metrics.CompletedCount)
-	log.Printf("  - Failed: %d", metrics.FailedCount)
-	log.Printf("  - Total: %d", metrics.TotalCount)
+	slog.Info("Feed items metrics", "stage", stage,
+		"pending", metrics.PendingCount,
+		"processing", metrics.ProcessingCount,
+		"completed", metrics.CompletedCount,
+		"failed", metrics.FailedCount,
+		"total", metrics.TotalCount)
 
 	// Log warnings for concerning metrics
 	if metrics.FailedCount > 100 {
-		log.Printf("  ⚠ WARNING: High number of failed items (%d) - investigation recommended", metrics.FailedCount)
+		slog.Warn("High number of failed items - investigation recommended", "failed_count", metrics.FailedCount)
 	}
 
 	if metrics.PendingCount > 1000 {
-		log.Printf("  ⚠ WARNING: High number of pending items (%d) - processing may be backing up", metrics.PendingCount)
+		slog.Warn("High number of pending items - processing may be backing up", "pending_count", metrics.PendingCount)
 	}
 
 	// Calculate table size estimate (for monitoring)
-	log.Printf("  - Table health: pending=%d, processing=%d (items in flight)",
-		metrics.PendingCount, metrics.ProcessingCount)
+	slog.Info("Table health", "pending", metrics.PendingCount, "processing", metrics.ProcessingCount)
 }
 
 // GetMetrics retrieves current feed items metrics for external monitoring
@@ -191,8 +184,7 @@ func (j *FeedItemsCleanupJob) RunWithCustomRetention(completedDays, failedDays i
 	j.config.CompletedRetentionDays = completedDays
 	j.config.FailedRetentionDays = failedDays
 
-	log.Printf("Running feed items cleanup with custom retention: completed=%d days, failed=%d days",
-		completedDays, failedDays)
+	slog.Info("Running feed items cleanup with custom retention", "completed_days", completedDays, "failed_days", failedDays)
 	j.Run()
 
 	// Restore original config

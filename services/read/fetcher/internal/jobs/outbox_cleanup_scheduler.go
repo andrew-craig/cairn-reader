@@ -1,7 +1,7 @@
 package jobs
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -50,15 +50,16 @@ func NewOutboxCleanupScheduler(
 func (s *OutboxCleanupScheduler) Start() {
 	s.wg.Add(1)
 	go s.run()
-	log.Printf("Outbox cleanup scheduler started (interval=%v, run_at_startup=%v)",
-		s.config.CleanupInterval, s.config.RunAtStartup)
+	slog.Info("Outbox cleanup scheduler started",
+		"interval", s.config.CleanupInterval,
+		"run_at_startup", s.config.RunAtStartup)
 }
 
 // Stop gracefully stops the outbox cleanup scheduler
 func (s *OutboxCleanupScheduler) Stop() {
 	close(s.stopCh)
 	s.wg.Wait()
-	log.Println("Outbox cleanup scheduler stopped")
+	slog.Info("Outbox cleanup scheduler stopped")
 }
 
 // run is the main scheduling loop
@@ -87,7 +88,7 @@ func (s *OutboxCleanupScheduler) run() {
 func (s *OutboxCleanupScheduler) runCleanup() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Outbox cleanup job panicked: %v", r)
+			slog.Error("Outbox cleanup job panicked", "panic", r)
 		}
 	}()
 

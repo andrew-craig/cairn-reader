@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -86,11 +86,11 @@ func (ud *UpdateDetector) CheckForUpdates(ctx context.Context, batchSize int) er
 		return nil
 	}
 
-	log.Printf("Checking %d items for content updates", len(items))
+	slog.Info("Checking items for content updates", "count", len(items))
 
 	for _, item := range items {
 		if err := ud.checkItem(ctx, item); err != nil {
-			log.Printf("Error checking item %s for updates: %v", item.ID, err)
+			slog.Error("Error checking item for updates", "item_id", item.ID, "error", err)
 		}
 	}
 
@@ -102,7 +102,7 @@ func (ud *UpdateDetector) checkItem(ctx context.Context, item *models.FeedItem) 
 	// Perform conditional fetch
 	result, err := ud.conditionalFetcher.FetchForItem(ctx, item)
 	if err != nil {
-		log.Printf("Conditional fetch failed for item %s: %v", item.ID, err)
+		slog.Error("Conditional fetch failed for item", "item_id", item.ID, "error", err)
 		// Update last_checked_at even on error
 		now := time.Now()
 		_ = ud.feedItemRepo.UpdateContentUpdateInfo(ctx, item.ID, item.HTTPLastModified, item.HTTPETag, &now)
@@ -114,22 +114,22 @@ func (ud *UpdateDetector) checkItem(ctx context.Context, item *models.FeedItem) 
 	if err := ud.feedItemRepo.UpdateContentUpdateInfo(
 		ctx, item.ID, result.LastModified, result.ETag, &now,
 	); err != nil {
-		log.Printf("Failed to update caching headers for item %s: %v", item.ID, err)
+		slog.Error("Failed to update caching headers for item", "item_id", item.ID, "error", err)
 	}
 
 	// If not modified, nothing to do
 	if result.NotModified {
-		log.Printf("Item %s not modified (HTTP 304)", item.ID)
+		slog.Debug("Item not modified (HTTP 304)", "item_id", item.ID)
 		return nil
 	}
 
 	// Content was modified, process the update
-	log.Printf("Item %s has been modified, processing update", item.ID)
+	slog.Info("Item has been modified, processing update", "item_id", item.ID)
 
 	// Apply readability parsing
 	cleanedHTML, err := ud.applyReadability(item.ItemURL, string(result.Content))
 	if err != nil {
-		log.Printf("Readability parsing failed for update, using sanitized raw content: %v", err)
+		slog.Warn("Readability parsing failed for update, using sanitized raw content", "error", err)
 		cleanedHTML = string(result.Content)
 	}
 
@@ -141,13 +141,13 @@ func (ud *UpdateDetector) checkItem(ctx context.Context, item *models.FeedItem) 
 
 	// Compare with stored hash to confirm actual change
 	if item.ContentHash != nil && *item.ContentHash == newContentHash {
-		log.Printf("Item %s: Headers changed but content hash unchanged, skipping update", item.ID)
+		slog.Debug("Headers changed but content hash unchanged, skipping update", "item_id", item.ID)
 		return nil
 	}
 
 	// Content has actually changed, update via Content Service
 	if item.ContentServiceID == nil {
-		log.Printf("Item %s: No content_service_id, skipping update", item.ID)
+		slog.Debug("No content_service_id, skipping update", "item_id", item.ID)
 		return nil
 	}
 
@@ -167,10 +167,10 @@ func (ud *UpdateDetector) checkItem(ctx context.Context, item *models.FeedItem) 
 	if err := ud.feedItemRepo.UpdateProcessingStatus(
 		ctx, item.ID, models.ProcessingStatusCompleted, &newContentHash, item.ContentServiceID, nil,
 	); err != nil {
-		log.Printf("Failed to update content hash for item %s: %v", item.ID, err)
+		slog.Error("Failed to update content hash for item", "item_id", item.ID, "error", err)
 	}
 
-	log.Printf("Successfully updated content for item %s (content_service_id: %s)", item.ID, item.ContentServiceID)
+	slog.Info("Successfully updated content for item", "item_id", item.ID, "content_service_id", item.ContentServiceID)
 	return nil
 }
 

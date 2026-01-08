@@ -1,7 +1,7 @@
 package jobs
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -50,15 +50,16 @@ func NewFeedItemsCleanupScheduler(
 func (s *FeedItemsCleanupScheduler) Start() {
 	s.wg.Add(1)
 	go s.run()
-	log.Printf("Feed items cleanup scheduler started (interval=%v, run_at_startup=%v)",
-		s.config.CleanupInterval, s.config.RunAtStartup)
+	slog.Info("Feed items cleanup scheduler started",
+		"interval", s.config.CleanupInterval,
+		"run_at_startup", s.config.RunAtStartup)
 }
 
 // Stop gracefully stops the feed items cleanup scheduler
 func (s *FeedItemsCleanupScheduler) Stop() {
 	close(s.stopCh)
 	s.wg.Wait()
-	log.Println("Feed items cleanup scheduler stopped")
+	slog.Info("Feed items cleanup scheduler stopped")
 }
 
 // run is the main scheduling loop
@@ -87,7 +88,7 @@ func (s *FeedItemsCleanupScheduler) run() {
 func (s *FeedItemsCleanupScheduler) runCleanup() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Feed items cleanup job panicked: %v", r)
+			slog.Error("Feed items cleanup job panicked", "panic", r)
 		}
 	}()
 

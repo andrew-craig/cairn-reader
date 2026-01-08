@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -87,25 +87,25 @@ func (p *ItemProcessor) ProcessPendingItems(ctx context.Context, batchSize int) 
 		return nil
 	}
 
-	log.Printf("Processing %d pending feed items", len(items))
+	slog.Info("Processing pending feed items", "count", len(items))
 
 	for _, item := range items {
 		if err := p.processItem(ctx, item); err != nil {
-			log.Printf("Error processing item %s: %v", item.ID, err)
+			slog.Error("Error processing item", "item_id", item.ID, "error", err)
 
 			// Increment retry count
 			if item.RetryCount < p.config.MaxRetries {
 				if err := p.feedItemRepo.IncrementRetryCount(ctx, item.ID, err.Error()); err != nil {
-					log.Printf("Error incrementing retry count for item %s: %v", item.ID, err)
+					slog.Error("Error incrementing retry count", "item_id", item.ID, "error", err)
 				}
 			} else {
 				// Max retries exceeded, mark as failed
 				now := time.Now()
-				log.Printf("Max retries exceeded for item %s: %v", item.ID, err)
+				slog.Warn("Max retries exceeded for item", "item_id", item.ID, "error", err)
 				if err := p.feedItemRepo.UpdateProcessingStatus(
 					ctx, item.ID, models.ProcessingStatusFailed, nil, nil, &now,
 				); err != nil {
-					log.Printf("Error marking item %s as failed: %v", item.ID, err)
+					slog.Error("Error marking item as failed", "item_id", item.ID, "error", err)
 				}
 			}
 		}
@@ -116,7 +116,7 @@ func (p *ItemProcessor) ProcessPendingItems(ctx context.Context, batchSize int) 
 
 // processItem processes a single feed item
 func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) error {
-	log.Printf("Processing feed item %s (%s)", item.ID, item.ItemURL)
+	slog.Info("Processing feed item", "item_id", item.ID, "url", item.ItemURL)
 
 	// Update status to 'processing'
 	if err := p.feedItemRepo.UpdateProcessingStatus(
@@ -129,7 +129,7 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	content, err := p.fetchArticleContent(ctx, item.ItemURL)
 	if err != nil {
 		// Fallback to RSS description if content fetch fails
-		log.Printf("Failed to fetch article content, using RSS description: %v", err)
+		slog.Warn("Failed to fetch article content, using RSS description", "error", err)
 		if item.Description != nil && *item.Description != "" {
 			content = *item.Description
 		} else {
@@ -140,7 +140,7 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	// Apply readability parsing
 	cleanedHTML, err := p.applyReadability(item.ItemURL, content)
 	if err != nil {
-		log.Printf("Readability parsing failed, using sanitized raw content: %v", err)
+		slog.Warn("Readability parsing failed, using sanitized raw content", "error", err)
 		cleanedHTML = content
 	}
 
@@ -169,7 +169,7 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	}
 
 	if len(subscriptions) == 0 {
-		log.Printf("No subscriptions found for feed %s, marking item as completed", item.FeedID)
+		slog.Info("No subscriptions found for feed, marking item as completed", "feed_id", item.FeedID)
 		now := time.Now()
 		return p.feedItemRepo.UpdateProcessingStatus(
 			ctx, item.ID, models.ProcessingStatusCompleted, &contentHash, nil, &now,
@@ -207,7 +207,7 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		return fmt.Errorf("failed to update item status to completed: %w", err)
 	}
 
-	log.Printf("Successfully processed item %s, created outbox entry for %d users", item.ID, len(userIDs))
+	slog.Info("Successfully processed item", "item_id", item.ID, "user_count", len(userIDs))
 	return nil
 }
 

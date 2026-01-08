@@ -3,7 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -77,8 +77,10 @@ func (ow *OutboxWorker) Start() {
 	// Start polling goroutine
 	go ow.pollPendingEntries()
 
-	log.Printf("Outbox worker pool started with %d workers (batch_size=%d, poll_interval=%s)",
-		ow.config.WorkerCount, ow.config.BatchSize, ow.config.PollInterval)
+	slog.Info("Outbox worker pool started",
+		"workers", ow.config.WorkerCount,
+		"batch_size", ow.config.BatchSize,
+		"poll_interval", ow.config.PollInterval)
 }
 
 // Stop gracefully stops the worker pool
@@ -87,7 +89,7 @@ func (ow *OutboxWorker) Stop() {
 	<-ow.pollTickerDone // Wait for poller to stop
 	close(ow.outboxQueue)
 	ow.wg.Wait()
-	log.Println("Outbox worker pool stopped")
+	slog.Info("Outbox worker pool stopped")
 }
 
 // pollPendingEntries continuously polls for pending outbox entries
@@ -105,7 +107,7 @@ func (ow *OutboxWorker) pollPendingEntries() {
 		case <-ticker.C:
 			ow.fetchAndQueuePendingEntries()
 		case <-ow.stopCh:
-			log.Println("Outbox poller received stop signal")
+			slog.Info("Outbox poller received stop signal")
 			return
 		}
 	}
@@ -117,12 +119,12 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 
 	entries, err := ow.outboxRepo.GetPendingEntries(ctx, ow.config.BatchSize)
 	if err != nil {
-		log.Printf("Error fetching pending outbox entries: %v", err)
+		slog.Error("Error fetching pending outbox entries", "error", err)
 		return
 	}
 
 	if len(entries) > 0 {
-		log.Printf("Fetched %d pending outbox entries for delivery", len(entries))
+		slog.Info("Fetched pending outbox entries for delivery", "count", len(entries))
 	}
 
 	for _, entry := range entries {
@@ -134,7 +136,7 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 			return
 		default:
 			// Queue is full, log warning
-			log.Printf("Outbox queue is full, will retry entry %s on next poll", entry.ID)
+			slog.Warn("Outbox queue is full, will retry entry on next poll", "entry_id", entry.ID)
 		}
 	}
 }
@@ -143,20 +145,20 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 func (ow *OutboxWorker) worker(id int) {
 	defer ow.wg.Done()
 
-	log.Printf("Outbox worker %d started", id)
+	slog.Info("Outbox worker started", "worker_id", id)
 
 	for {
 		select {
 		case entry, ok := <-ow.outboxQueue:
 			if !ok {
 				// Channel closed, worker should exit
-				log.Printf("Outbox worker %d stopped", id)
+				slog.Info("Outbox worker stopped", "worker_id", id)
 				return
 			}
 			ow.processOutboxEntry(id, entry)
 
 		case <-ow.stopCh:
-			log.Printf("Outbox worker %d received stop signal", id)
+			slog.Info("Outbox worker received stop signal", "worker_id", id)
 			return
 		}
 	}
@@ -166,13 +168,18 @@ func (ow *OutboxWorker) worker(id int) {
 func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOutbox) {
 	ctx := context.Background()
 
-	log.Printf("Worker %d processing outbox entry %s (retry_count=%d, users=%d)",
-		workerID, entry.ID, entry.RetryCount, len(entry.UserIDs))
+	slog.Info("Processing outbox entry",
+		"worker_id", workerID,
+		"entry_id", entry.ID,
+		"retry_count", entry.RetryCount,
+		"user_count", len(entry.UserIDs))
 
 	// Set status to 'sending'
 	if err := ow.updateStatus(ctx, entry.ID, models.DeliveryStatusSending, nil, nil, nil); err != nil {
-		log.Printf("Worker %d failed to update status to sending for entry %s: %v",
-			workerID, entry.ID, err)
+		slog.Error("Failed to update status to sending",
+			"worker_id", workerID,
+			"entry_id", entry.ID,
+			"error", err)
 		return
 	}
 
@@ -180,7 +187,7 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 	contentItem, err := ow.buildContentItem(entry)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to build content item: %v", err)
-		log.Printf("Worker %d: %s", workerID, errorMsg)
+		slog.Error("Failed to build content item", "worker_id", workerID, "error", err)
 		ow.handleDeliveryFailure(ctx, entry, errorMsg)
 		return
 	}
@@ -189,7 +196,7 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 	bulkResp, err := ow.contentClient.BulkCreateContent(ctx, []client.BulkContentItem{contentItem})
 	if err != nil {
 		errorMsg := fmt.Sprintf("Content Service API error: %v", err)
-		log.Printf("Worker %d: %s", workerID, errorMsg)
+		slog.Error("Content Service API error", "worker_id", workerID, "error", err)
 		ow.handleDeliveryFailure(ctx, entry, errorMsg)
 		return
 	}
@@ -198,19 +205,19 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 	var contentID uuid.UUID
 	if len(bulkResp.Created) > 0 {
 		contentID = bulkResp.Created[0].ID
-		log.Printf("Worker %d: Created new content with ID %s", workerID, contentID)
+		slog.Info("Created new content", "worker_id", workerID, "content_id", contentID)
 	} else if len(bulkResp.Existing) > 0 {
 		contentID = bulkResp.Existing[0].ID
-		log.Printf("Worker %d: Using existing content with ID %s", workerID, contentID)
+		slog.Info("Using existing content", "worker_id", workerID, "content_id", contentID)
 	} else if len(bulkResp.Failed) > 0 {
 		errorMsg := fmt.Sprintf("Content creation failed: %s - %s",
 			bulkResp.Failed[0].Error, bulkResp.Failed[0].Message)
-		log.Printf("Worker %d: %s", workerID, errorMsg)
+		slog.Error("Content creation failed", "worker_id", workerID, "error", errorMsg)
 		ow.handleDeliveryFailure(ctx, entry, errorMsg)
 		return
 	} else {
 		errorMsg := "No content created, existing, or failed - unexpected response"
-		log.Printf("Worker %d: %s", workerID, errorMsg)
+		slog.Error("Unexpected response from Content Service", "worker_id", workerID)
 		ow.handleDeliveryFailure(ctx, entry, errorMsg)
 		return
 	}
@@ -228,15 +235,17 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 	addResp, err := ow.contentClient.AddContentToUsers(ctx, items)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to add content to users: %v", err)
-		log.Printf("Worker %d: %s", workerID, errorMsg)
+		slog.Error("Failed to add content to users", "worker_id", workerID, "error", err)
 		ow.handleDeliveryFailure(ctx, entry, errorMsg)
 		return
 	}
 
 	// Check if any additions failed
 	if len(addResp.Failed) > 0 {
-		log.Printf("Worker %d: %d/%d users failed to receive content",
-			workerID, len(addResp.Failed), len(entry.UserIDs))
+		slog.Warn("Some users failed to receive content",
+			"worker_id", workerID,
+			"failed_count", len(addResp.Failed),
+			"total_count", len(entry.UserIDs))
 		// Still mark as delivered if at least some succeeded
 	}
 
@@ -244,13 +253,18 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 	deliveredAt := time.Now()
 	if err := ow.updateStatus(ctx, entry.ID, models.DeliveryStatusDelivered,
 		&contentID, &deliveredAt, nil); err != nil {
-		log.Printf("Worker %d: Failed to update status to delivered for entry %s: %v",
-			workerID, entry.ID, err)
+		slog.Error("Failed to update status to delivered",
+			"worker_id", workerID,
+			"entry_id", entry.ID,
+			"error", err)
 		return
 	}
 
-	log.Printf("Worker %d: Successfully delivered outbox entry %s to %d users (content_id=%s)",
-		workerID, entry.ID, len(addResp.Succeeded), contentID)
+	slog.Info("Successfully delivered outbox entry",
+		"worker_id", workerID,
+		"entry_id", entry.ID,
+		"user_count", len(addResp.Succeeded),
+		"content_id", contentID)
 }
 
 // buildContentItem builds a BulkContentItem from the outbox entry's payload
@@ -299,16 +313,21 @@ func (ow *OutboxWorker) handleDeliveryFailure(ctx context.Context, entry *models
 	nextRetryAt := ow.calculateNextRetry(entry.RetryCount + 1)
 
 	if err := ow.outboxRepo.IncrementRetryCount(ctx, entry.ID, nextRetryAt, errorMsg); err != nil {
-		log.Printf("Failed to increment retry count for entry %s: %v", entry.ID, err)
+		slog.Error("Failed to increment retry count", "entry_id", entry.ID, "error", err)
 		return
 	}
 
 	// Check if max retries exceeded (IncrementRetryCount will set status to 'failed' if so)
 	if entry.RetryCount+1 >= ow.config.MaxRetries {
-		log.Printf("Outbox entry %s marked as failed after %d retries", entry.ID, entry.RetryCount+1)
+		slog.Warn("Outbox entry marked as failed after max retries",
+			"entry_id", entry.ID,
+			"retry_count", entry.RetryCount+1)
 	} else {
-		log.Printf("Outbox entry %s will retry in %s (retry %d/%d)",
-			entry.ID, time.Until(nextRetryAt).Round(time.Second), entry.RetryCount+1, ow.config.MaxRetries)
+		slog.Info("Outbox entry will retry",
+			"entry_id", entry.ID,
+			"retry_in", time.Until(nextRetryAt).Round(time.Second),
+			"retry_number", entry.RetryCount+1,
+			"max_retries", ow.config.MaxRetries)
 	}
 }
 
