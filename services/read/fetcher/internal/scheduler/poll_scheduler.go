@@ -3,7 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -63,15 +63,17 @@ func NewPollScheduler(
 func (s *PollScheduler) Start() {
 	s.wg.Add(1)
 	go s.run()
-	log.Printf("Poll scheduler started (batch_size=%d, poll_interval=%v, workers=%d)",
-		s.config.BatchSize, s.config.PollInterval, s.config.WorkerPoolSize)
+	slog.Info("Poll scheduler started",
+		"batch_size", s.config.BatchSize,
+		"poll_interval", s.config.PollInterval,
+		"workers", s.config.WorkerPoolSize)
 }
 
 // Stop gracefully stops the polling scheduler
 func (s *PollScheduler) Stop() {
 	close(s.stopCh)
 	s.wg.Wait()
-	log.Println("Poll scheduler stopped")
+	slog.Info("Poll scheduler stopped")
 }
 
 // run is the main polling loop
@@ -101,7 +103,7 @@ func (s *PollScheduler) pollFeeds() {
 	// Get feeds due for polling
 	feeds, err := s.feedRepo.GetFeedsDueForPolling(ctx, s.config.BatchSize)
 	if err != nil {
-		log.Printf("Error fetching feeds due for polling: %v", err)
+		slog.Error("Error fetching feeds due for polling", "error", err)
 		return
 	}
 
@@ -109,7 +111,7 @@ func (s *PollScheduler) pollFeeds() {
 		return
 	}
 
-	log.Printf("Found %d feeds due for polling", len(feeds))
+	slog.Info("Found feeds due for polling", "count", len(feeds))
 
 	// Process each feed using the worker pool
 	for _, feed := range feeds {
@@ -221,7 +223,7 @@ func UpdateFeedPollingAfterError(
 		if err := feedRepo.UpdateStatus(ctx, feedID, models.FeedStatusDisabled); err != nil {
 			return fmt.Errorf("failed to disable feed: %w", err)
 		}
-		log.Printf("Feed %s disabled after %d consecutive error days", feedID, consecutiveErrorDays)
+		slog.Warn("Feed disabled after consecutive error days", "feed_id", feedID, "error_days", consecutiveErrorDays)
 	}
 
 	return nil

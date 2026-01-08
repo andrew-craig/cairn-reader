@@ -52,14 +52,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := database.RunMigrations(&cfg.DB, migrationsPath); err != nil {
-		slog.Error("failed to run migrations", slog.Any("error", err))
-		os.Exit(1)
-	}
-	slog.Info("database migrations completed")
-
-	// Initialize database connection
-	slog.Info("component initializing", slog.String("component", "database"))
+	// Convert database config for migrations
 	port, _ := strconv.Atoi(cfg.Database.Port)
 	dbConfig := &database.Config{
 		Host:     cfg.Database.Host,
@@ -69,6 +62,15 @@ func main() {
 		DBName:   cfg.Database.DBName,
 		SSLMode:  cfg.Database.SSLMode,
 	}
+
+	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil{
+		slog.Error("failed to run migrations", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slog.Info("database migrations completed")
+
+	// Initialize database connection
+	slog.Info("component initializing", slog.String("component", "database"))
 	db, err := database.NewConnection(dbConfig)
 	if err != nil {
 		slog.Error("failed to connect to database", slog.Any("error", err))

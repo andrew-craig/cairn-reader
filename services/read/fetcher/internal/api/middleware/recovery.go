@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 )
@@ -13,7 +13,7 @@ func Recovery(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				// Log the panic and stack trace
-				log.Printf("PANIC: %v\n%s", err, debug.Stack())
+				slog.Error("PANIC recovered", "panic", err, "stack", string(debug.Stack()))
 
 				// Return 500 Internal Server Error
 				w.Header().Set("Content-Type", "application/json")

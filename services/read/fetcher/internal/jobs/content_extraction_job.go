@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -53,15 +53,16 @@ func NewContentExtractionJob(
 func (j *ContentExtractionJob) Start() {
 	j.wg.Add(1)
 	go j.run()
-	log.Printf("Content extraction job started (batch_size=%d, interval=%v)",
-		j.config.BatchSize, j.config.ProcessInterval)
+	slog.Info("Content extraction job started",
+		"batch_size", j.config.BatchSize,
+		"interval", j.config.ProcessInterval)
 }
 
 // Stop gracefully stops the content extraction job
 func (j *ContentExtractionJob) Stop() {
 	close(j.stopCh)
 	j.wg.Wait()
-	log.Println("Content extraction job stopped")
+	slog.Info("Content extraction job stopped")
 }
 
 // run is the main processing loop
@@ -89,6 +90,6 @@ func (j *ContentExtractionJob) processPendingItems() {
 	ctx := context.Background()
 
 	if err := j.itemProcessor.ProcessPendingItems(ctx, j.config.BatchSize); err != nil {
-		log.Printf("Error processing pending items: %v", err)
+		slog.Error("Error processing pending items", "error", err)
 	}
 }

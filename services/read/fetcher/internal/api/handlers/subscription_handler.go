@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -67,7 +67,7 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		log.Printf("Error subscribing to feed: %v", err)
+		slog.Error("Error subscribing to feed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed", nil, "v1")
 		return
 	}
@@ -106,7 +106,7 @@ func (h *SubscriptionHandler) Unsubscribe(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		log.Printf("Error unsubscribing from feed: %v", err)
+		slog.Error("Error unsubscribing from feed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to unsubscribe from feed", nil, "v1")
 		return
 	}
@@ -133,7 +133,7 @@ func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	// Get user subscriptions
 	subscriptions, err := h.feedService.ListUserSubscriptions(ctx, userID)
 	if err != nil {
-		log.Printf("Error listing subscriptions: %v", err)
+		slog.Error("Error listing subscriptions", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to list subscriptions", nil, "v1")
 		return
 	}
@@ -168,7 +168,7 @@ func (h *SubscriptionHandler) EnableFeed(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		log.Printf("Error enabling feed: %v", err)
+		slog.Error("Error enabling feed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to enable feed", nil, "v1")
 		return
 	}
@@ -216,7 +216,7 @@ func (h *SubscriptionHandler) UpdateFeed(w http.ResponseWriter, r *http.Request)
 					return
 				}
 
-				log.Printf("Error enabling feed: %v", err)
+				slog.Error("Error enabling feed", "error", err)
 				api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to enable feed", nil, "v1")
 				return
 			}

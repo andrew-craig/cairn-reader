@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
@@ -65,8 +65,9 @@ func (fw *FeedWorker) Start() {
 		fw.wg.Add(1)
 		go fw.worker(i)
 	}
-	log.Printf("Feed worker pool started with %d workers (queue_size=%d)",
-		fw.config.WorkerCount, fw.config.QueueSize)
+	slog.Info("Feed worker pool started",
+		"workers", fw.config.WorkerCount,
+		"queue_size", fw.config.QueueSize)
 }
 
 // Stop gracefully stops the worker pool
@@ -75,7 +76,7 @@ func (fw *FeedWorker) Stop() {
 	// Close the feed queue to signal workers to finish
 	close(fw.feedQueue)
 	fw.wg.Wait()
-	log.Println("Feed worker pool stopped")
+	slog.Info("Feed worker pool stopped")
 }
 
 // Submit submits a feed for processing
@@ -85,10 +86,10 @@ func (fw *FeedWorker) Submit(feed *models.Feed) {
 		// Feed submitted successfully
 	case <-fw.stopCh:
 		// Worker is stopping, don't block
-		log.Printf("Worker pool is stopping, skipping feed %s", feed.ID)
+		slog.Warn("Worker pool is stopping, skipping feed", "feed_id", feed.ID)
 	default:
 		// Queue is full, log warning
-		log.Printf("Feed queue is full, skipping feed %s", feed.ID)
+		slog.Warn("Feed queue is full, skipping feed", "feed_id", feed.ID)
 	}
 }
 
@@ -96,20 +97,20 @@ func (fw *FeedWorker) Submit(feed *models.Feed) {
 func (fw *FeedWorker) worker(id int) {
 	defer fw.wg.Done()
 
-	log.Printf("Worker %d started", id)
+	slog.Info("Feed worker started", "worker_id", id)
 
 	for {
 		select {
 		case feed, ok := <-fw.feedQueue:
 			if !ok {
 				// Channel closed, worker should exit
-				log.Printf("Worker %d stopped", id)
+				slog.Info("Feed worker stopped", "worker_id", id)
 				return
 			}
 			fw.processFeed(id, feed)
 
 		case <-fw.stopCh:
-			log.Printf("Worker %d received stop signal", id)
+			slog.Info("Feed worker received stop signal", "worker_id", id)
 			return
 		}
 	}
@@ -117,20 +118,20 @@ func (fw *FeedWorker) worker(id int) {
 
 // processFeed processes a single feed
 func (fw *FeedWorker) processFeed(workerID int, feed *models.Feed) {
-	log.Printf("Worker %d processing feed %s (%s)", workerID, feed.ID, feed.FeedURL)
+	slog.Info("Processing feed", "worker_id", workerID, "feed_id", feed.ID, "feed_url", feed.FeedURL)
 
 	ctx := context.Background()
 
 	// Use the processor if provided, otherwise just log
 	if fw.processor != nil {
 		if err := fw.processor.ProcessFeed(ctx, feed); err != nil {
-			log.Printf("Worker %d error processing feed %s: %v", workerID, feed.ID, err)
+			slog.Error("Error processing feed", "worker_id", workerID, "feed_id", feed.ID, "error", err)
 		} else {
-			log.Printf("Worker %d successfully processed feed %s", workerID, feed.ID)
+			slog.Info("Successfully processed feed", "worker_id", workerID, "feed_id", feed.ID)
 		}
 	} else {
 		// Placeholder: In Phase 3.2, this will fetch and parse the feed
-		log.Printf("Worker %d: Feed processor not implemented yet (Phase 3.2)", workerID)
+		slog.Debug("Feed processor not implemented yet (Phase 3.2)", "worker_id", workerID)
 		// For now, we'll just log that we received the feed
 		// The actual RSS fetching and parsing will be implemented in Phase 3.2
 	}
@@ -146,6 +147,6 @@ type NoOpFeedProcessor struct{}
 
 // ProcessFeed does nothing (placeholder implementation)
 func (n *NoOpFeedProcessor) ProcessFeed(ctx context.Context, feed *models.Feed) error {
-	log.Printf("NoOpFeedProcessor: Would process feed %s (%s)", feed.ID, feed.FeedURL)
+	slog.Debug("NoOpFeedProcessor would process feed", "feed_id", feed.ID, "feed_url", feed.FeedURL)
 	return nil
 }
