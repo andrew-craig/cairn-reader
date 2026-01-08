@@ -82,53 +82,6 @@ make test
 
 ---
 
-### 11. Add API Versioning
-**Files:** All API handlers in explore and user services
-
-**Issue:** No API versioning strategy exists. Current endpoints have no version prefix.
-
-**Current:**
-```
-/auth/login
-/explore/recommendations/{userID}
-```
-
-**Implementation:**
-
-1. Add `/v1/` prefix to all endpoints:
-```
-/v1/auth/login
-/v1/explore/recommendations/{userID}
-```
-
-2. Update route registration:
-```go
-// Before
-mux.HandleFunc("/explore/recommendations/", s.handleRecommendations)
-
-// After
-v1 := http.NewServeMux()
-v1.HandleFunc("/explore/recommendations/", s.handleRecommendations)
-mux.Handle("/v1/", http.StripPrefix("/v1", v1))
-```
-
-3. For Gin (user service):
-```go
-v1 := router.Group("/v1")
-{
-    auth := v1.Group("/auth")
-    {
-        auth.POST("/login", authHandler.Login)
-        auth.POST("/register", authHandler.Register)
-    }
-}
-```
-
-4. Keep current routes as aliases temporarily for backward compatibility
-5. Update all documentation and mobile app to use versioned endpoints
-
----
-
 ### 12. Add Input Validation Library
 **Files:** All API handlers
 
@@ -1029,6 +982,7 @@ The following items have been successfully implemented and verified:
 - **Standardize PostgreSQL Driver to pgx/v5** - Migrated explore services (fetcher and recommender) from `database/sql` + `lib/pq` to modern `pgx/v5/pgxpool`. Updated all repository methods, connection pooling, and transaction handling. Benefits include 2-3x faster query performance, better connection pooling with health checks, and native PostgreSQL protocol support. Both services build and compile successfully.
 
 ### Documentation & API
+- **Add API Versioning** (Task #11) - Verified that API versioning with `/api/v1/` prefix is fully implemented across all services. All services use consistent versioning: Explore Fetcher (`/api/v1/explore/feed/...`), Explore Recommender (`/api/v1/explore/...`), User Service (`/api/v1/auth/...`, `/api/v1/user/...`), Read Content Service (`/api/v1/content/...`), and Read Ingest RSS Service (`/api/v1/source/rss/...`). All services also use Kubernetes-compatible health endpoints (`/health/live` for liveness, `/health/ready` for readiness with dependency checks). Implementation includes proper route grouping in Gin (User Service) and Chi (Read Services), route registration with path prefixes in stdlib handlers (Explore Services). Benefits include API evolution capability, backward compatibility support, clear API contracts, and consistent API design across all microservices.
 - **Add OpenAPI/Swagger Specifications** - Created comprehensive OpenAPI 3.0 specifications for both Explore and User services (`services/explore/api/openapi.yaml` and `services/users/api/openapi.yaml`). Documented all endpoints with request/response schemas, authentication requirements, and examples. Added documentation section to CLAUDE.md with instructions for viewing specs with Swagger UI and validation commands. Both specs validated successfully with @apidevtools/swagger-cli.
 - **Complete API v1 Migration - Update OpenAPI Specifications** - Updated OpenAPI specifications to reflect the new API v1 structure that was implemented in the code. Migrated Explore Service spec from old paths (`/health`, `/fetch`, `/feeds/stats`, `/explore/articles`, `{userID}`, `{articleID}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/explore/feed/fetch`, `/api/v1/explore/feed/stats`, `/api/v1/explore/article`, `{user_id}`, `{article_id}`). Migrated User Service spec from old paths (`/health`, `/ready`, `/auth/*`, `/users/{id}`) to API v1 paths (`/health/live`, `/health/ready`, `/api/v1/auth/*`, `/api/v1/user/{user_id}`). Added health/ready endpoint documentation for fetcher service. Both specs validated successfully with @apidevtools/swagger-cli. API documentation now accurately reflects actual endpoint implementation, making it easier for API consumers and improving developer onboarding.
 - **Complete API v1 Migration - Update Integration Tests** - Task #3 was already completed prior to this session. All integration tests in `services/explore/recommender/integration_test.go` use the correct API v1 paths (`/api/v1/explore/article`, `/api/v1/explore/recommendation/{user_id}`, `/api/v1/explore/article/{article_id}/vote`). JWT authentication is properly implemented using `testJWTHelper` and `makeAuthenticatedRequest` function.
