@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -83,8 +82,8 @@ func main() {
 	outboxCleanupJob := jobs.NewOutboxCleanupJob(cfg.OutboxCleanup, outboxRepo)
 	feedItemsCleanupJob := jobs.NewFeedItemsCleanupJob(cfg.FeedItemsCleanup, feedItemRepo)
 
-	// Create cron scheduler for cleanup jobs
-	cronScheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
+	// Create cron scheduler for cleanup jobs (with default logger)
+	cronScheduler := cron.New()
 
 	// Schedule outbox cleanup job to run daily at 3 AM
 	outboxCleanupCron := getEnv("OUTBOX_CLEANUP_CRON", "0 3 * * *")
@@ -269,7 +268,11 @@ func getEnvAsInt(key string, defaultValue int) int {
 	}
 	value, err := strconv.Atoi(valueStr)
 	if err != nil {
-		log.Printf("Warning: invalid integer value for %s, using default %d", key, defaultValue)
+		slog.Warn("invalid integer value for environment variable, using default",
+			slog.String("key", key),
+			slog.String("value", valueStr),
+			slog.Int("default", defaultValue),
+		)
 		return defaultValue
 	}
 	return value
@@ -283,7 +286,11 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	}
 	value, err := time.ParseDuration(valueStr)
 	if err != nil {
-		log.Printf("Warning: invalid duration value for %s, using default %v", key, defaultValue)
+		slog.Warn("invalid duration value for environment variable, using default",
+			slog.String("key", key),
+			slog.String("value", valueStr),
+			slog.Duration("default", defaultValue),
+		)
 		return defaultValue
 	}
 	return value
