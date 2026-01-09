@@ -31,9 +31,9 @@ func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate URL
-	if req.URL == "" {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL is required", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 

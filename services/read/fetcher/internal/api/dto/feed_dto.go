@@ -1,7 +1,11 @@
 package dto
 
 import (
+	"strings"
 	"time"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
 	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
@@ -11,6 +15,26 @@ import (
 // SubscribeFeedRequest represents a request to subscribe to a feed
 type SubscribeFeedRequest struct {
 	FeedURL string `json:"feed_url"`
+}
+
+// Validate validates the SubscribeFeedRequest
+func (s SubscribeFeedRequest) Validate() error {
+	return validation.ValidateStruct(&s,
+		validation.Field(&s.FeedURL,
+			validation.Required.Error("Feed URL is required"),
+			validation.By(func(value interface{}) error {
+				str, ok := value.(string)
+				if !ok {
+					return validation.NewError("validation_type_error", "value must be a string")
+				}
+				if strings.TrimSpace(str) == "" {
+					return validation.NewError("validation_required", "Feed URL cannot be empty or whitespace")
+				}
+				return nil
+			}),
+			is.URL.Error("Feed URL must be a valid URL"),
+		),
+	)
 }
 
 // SubscribeFeedResponse represents the response after subscribing to a feed

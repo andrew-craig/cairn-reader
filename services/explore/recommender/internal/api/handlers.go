@@ -11,7 +11,7 @@ import (
 
 	pkgapi "github.com/andrew-craig/cairn/pkg/api"
 	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api/dto"
 )
 
 const (
@@ -85,9 +85,7 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 	// Limit request body size to prevent DoS attacks
 	r.Body = http.MaxBytesReader(w, r.Body, maxArticlesBatchSize)
 
-	var payload struct {
-		Articles []models.Article `json:"articles"`
-	}
+	var payload dto.ArticlesRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		var maxBytesErr *http.MaxBytesError
@@ -100,8 +98,9 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(payload.Articles) == 0 {
-		pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{"status": "no articles to process"}, "v1")
+	// Validate the request
+	if err := payload.Validate(); err != nil {
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 
@@ -202,9 +201,7 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	// Limit request body size to prevent DoS attacks
 	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
 
-	var payload struct {
-		VoteType string `json:"vote_type"`
-	}
+	var payload dto.VoteRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		var maxBytesErr *http.MaxBytesError
@@ -217,8 +214,9 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if payload.VoteType != "upvote" && payload.VoteType != "downvote" {
-		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, "vote_type must be 'upvote' or 'downvote'", nil, "v1")
+	// Validate the request
+	if err := payload.Validate(); err != nil {
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 

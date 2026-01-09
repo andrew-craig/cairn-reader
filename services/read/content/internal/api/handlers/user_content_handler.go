@@ -166,6 +166,12 @@ func (h *UserContentHandler) AddContentToUser(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+		return
+	}
+
 	// Determine which mode: URL-based or ContentID-based
 	if req.URL != nil && *req.URL != "" {
 		// NEW FLOW: URL-based submission
@@ -399,9 +405,9 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Validate status if provided
-	if req.Status != nil && !middleware.ValidateStatus(*req.Status) {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 

@@ -44,9 +44,9 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Validate feed URL
-	if strings.TrimSpace(req.FeedURL) == "" {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Feed URL is required", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 

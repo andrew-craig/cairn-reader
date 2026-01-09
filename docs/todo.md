@@ -14,75 +14,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Medium Priority
 
-### 1. Add Input Validation Library
-**Files:** All API handlers
-
-**Issue:** Manual validation in each handler is error-prone and inconsistent.
-
-**Current pattern:**
-```go
-if payload.ArticleID == "" {
-    http.Error(w, "article_id is required", http.StatusBadRequest)
-    return
-}
-if payload.VoteType != "upvote" && payload.VoteType != "downvote" {
-    http.Error(w, "invalid vote_type", http.StatusBadRequest)
-    return
-}
-```
-
-**Implementation:**
-
-**For stdlib services (explore):**
-Add `github.com/go-ozzo/ozzo-validation`:
-```go
-import (
-    validation "github.com/go-ozzo/ozzo-validation/v4"
-    "github.com/go-ozzo/ozzo-validation/v4/is"
-)
-
-type VotePayload struct {
-    VoteType string `json:"vote_type"`
-}
-
-func (p VotePayload) Validate() error {
-    return validation.ValidateStruct(&p,
-        validation.Field(&p.VoteType, validation.Required, validation.In("upvote", "downvote")),
-    )
-}
-
-// In handler:
-var payload VotePayload
-if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-    api.WriteError(w, http.StatusBadRequest, "invalid request body", "INVALID_JSON")
-    return
-}
-if err := payload.Validate(); err != nil {
-    api.WriteError(w, http.StatusBadRequest, err.Error(), "VALIDATION_ERROR")
-    return
-}
-```
-
-**For Gin service (users):**
-Use built-in validation:
-```go
-type RegisterRequest struct {
-    Email    string `json:"email" binding:"required,email"`
-    Password string `json:"password" binding:"required,min=8"`
-}
-
-func (h *AuthHandler) Register(c *gin.Context) {
-    var req RegisterRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
-    // ... process request
-}
-```
-
----
-
 ### 2. Setup Testcontainers for Integration Tests
 **Files:** All `*_integration_test.go` files
 
@@ -787,7 +718,8 @@ The following items have been successfully implemented and verified:
 - **Add Request Body Size Limits** - Implemented MaxBytesReader with appropriate limits (10MB for batch, 1KB for simple requests)
 - **Validate Article Exists Before Recording Vote** - Added rowsAffected check and error handling
 - **Make SSL Mode Configurable (Default: Require)** - DB_SSLMODE environment variable with "require" default
-- **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables. 
+- **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables.
+- **Add Input Validation Library** (Task #1) - Implemented comprehensive request validation across all services using appropriate validation libraries. Stdlib services (Explore Recommender, Read Content, Read Ingest RSS) now use `github.com/go-ozzo/ozzo-validation/v4` with declarative validation methods on all DTOs. Gin service (User Service) already uses built-in Gin validation tags (`binding:"required,email"`). All handlers updated to call validation methods before processing requests. Benefits include consistent validation, better error messages, reduced boilerplate code, and improved maintainability. 
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance

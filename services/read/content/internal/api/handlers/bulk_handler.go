@@ -36,33 +36,18 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Validate max 100 items
-	if len(req.Contents) == 0 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Contents array cannot be empty", nil, "v1")
-		return
-	}
-	if len(req.Contents) > 100 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per bulk request", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 
 	// Convert DTOs to service types
 	serviceItems := make([]service.BulkContentItem, len(req.Contents))
 	for i, item := range req.Contents {
-		// Validate required fields
-		if item.URL == "" || item.HTML == "" {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "URL and HTML are required for all items", nil, "v1")
-			return
-		}
-
 		// Default source type to RSS if not specified
 		if item.SourceType == "" {
 			item.SourceType = models.SourceTypeRSS
-		}
-
-		if !middleware.ValidateSourceType(item.SourceType) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid source_type. Must be 'rss' or 'web'", nil, "v1")
-			return
 		}
 
 		serviceItems[i] = service.BulkContentItem{
@@ -117,13 +102,9 @@ func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate max 100 items
-	if len(req.Items) == 0 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Items array cannot be empty", nil, "v1")
-		return
-	}
-	if len(req.Items) > 100 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per request", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 
@@ -174,27 +155,19 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate max 100 items
-	if len(req.Items) == 0 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Items array cannot be empty", nil, "v1")
-		return
-	}
-	if len(req.Items) > 100 {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Maximum 100 items allowed per request", nil, "v1")
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 		return
 	}
 
-	// Validate and prepare user-content records
+	// Prepare user-content records
 	userContents := make([]*models.UserContent, len(req.Items))
 	for i, item := range req.Items {
-		// Validate status if provided
+		// Default status to unread if not provided
 		status := item.Status
 		if status == "" {
-			status = models.StatusUnread // Default to unread
-		}
-		if !models.ValidateStatus(status) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
-			return
+			status = models.StatusUnread
 		}
 
 		userContents[i] = &models.UserContent{

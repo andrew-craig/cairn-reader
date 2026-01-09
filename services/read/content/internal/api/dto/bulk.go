@@ -4,6 +4,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
+
+	"github.com/andrew-craig/cairn/services/read/content/internal/models"
 )
 
 // BulkContentItem represents a single content item in a bulk request
@@ -15,9 +19,44 @@ type BulkContentItem struct {
 	PublishedAt  *time.Time `json:"published_at,omitempty"`
 }
 
+// Validate validates the BulkContentItem
+func (b BulkContentItem) Validate() error {
+	return validation.ValidateStruct(&b,
+		validation.Field(&b.URL,
+			validation.Required.Error("URL is required"),
+			is.URL.Error("URL must be a valid URL"),
+		),
+		validation.Field(&b.HTML,
+			validation.Required.Error("HTML is required"),
+		),
+		validation.Field(&b.SourceType,
+			validation.Required.Error("source_type is required"),
+			validation.In(models.SourceTypeRSS, models.SourceTypeWeb).
+				Error("Invalid source_type. Must be 'rss' or 'web'"),
+		),
+	)
+}
+
 // BulkCreateContentRequest represents the request body for batch creating contents
 type BulkCreateContentRequest struct {
 	Contents []BulkContentItem `json:"contents"`
+}
+
+// Validate validates the BulkCreateContentRequest
+func (b BulkCreateContentRequest) Validate() error {
+	return validation.ValidateStruct(&b,
+		validation.Field(&b.Contents,
+			validation.Required.Error("contents is required"),
+			validation.Length(1, 100).Error("contents array must have 1-100 items"),
+			validation.Each(validation.By(func(value interface{}) error {
+				item, ok := value.(BulkContentItem)
+				if !ok {
+					return validation.NewError("validation_type_error", "invalid item type")
+				}
+				return item.Validate()
+			})),
+		),
+	)
 }
 
 // BulkCreateContentResponse represents the response for batch creating contents
@@ -46,6 +85,16 @@ type CheckDuplicatesRequest struct {
 	Items []CheckDuplicatesItem `json:"items"`
 }
 
+// Validate validates the CheckDuplicatesRequest
+func (c CheckDuplicatesRequest) Validate() error {
+	return validation.ValidateStruct(&c,
+		validation.Field(&c.Items,
+			validation.Required.Error("items is required"),
+			validation.Length(1, 100).Error("items array must have 1-100 items"),
+		),
+	)
+}
+
 // DuplicateCheckResult represents the result of a duplicate check
 type DuplicateCheckResult struct {
 	ContentHash  string         `json:"content_hash"`
@@ -66,9 +115,38 @@ type BulkAddToUsersItem struct {
 	Status    string    `json:"status,omitempty"` // defaults to "unread"
 }
 
+// Validate validates the BulkAddToUsersItem
+func (b BulkAddToUsersItem) Validate() error {
+	return validation.ValidateStruct(&b,
+		validation.Field(&b.Status,
+			validation.When(b.Status != "",
+				validation.In(models.StatusUnread, models.StatusRead, models.StatusArchived).
+					Error("Invalid status. Must be 'unread', 'read', or 'archived'"),
+			),
+		),
+	)
+}
+
 // BulkAddToUsersRequest represents the request body for batch adding contents to users
 type BulkAddToUsersRequest struct {
 	Items []BulkAddToUsersItem `json:"items"`
+}
+
+// Validate validates the BulkAddToUsersRequest
+func (b BulkAddToUsersRequest) Validate() error {
+	return validation.ValidateStruct(&b,
+		validation.Field(&b.Items,
+			validation.Required.Error("items is required"),
+			validation.Length(1, 100).Error("items array must have 1-100 items"),
+			validation.Each(validation.By(func(value interface{}) error {
+				item, ok := value.(BulkAddToUsersItem)
+				if !ok {
+					return validation.NewError("validation_type_error", "invalid item type")
+				}
+				return item.Validate()
+			})),
+		),
+	)
 }
 
 // BulkAddToUsersResponse represents the response for batch adding contents to users
