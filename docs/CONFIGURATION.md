@@ -31,17 +31,292 @@ Configuration values are read in this order (highest to lowest priority):
 
 ## User Service Configuration
 
-> **TODO**: Document User Service configuration
->
-> Topics to cover:
-> - Required environment variables (DATABASE_URL, VAULT_ADDR, etc.)
-> - Optional configuration (JWT lifetimes, port, log level)
-> - Vault integration settings
-> - JWT configuration
-> - Database connection pool settings
-> - Example .env file
+The User Service handles authentication and account management, requiring HashiCorp Vault for JWT key management and PostgreSQL for user data storage.
 
-**Status**: Service is operational. See [services/users/README.md](../services/users/README.md) for current configuration details.
+### Required Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `VAULT_ADDR` | string | Yes | `http://localhost:8200` | HashiCorp Vault server address |
+| `VAULT_TOKEN` | string | Yes* | - | Vault access token (dev mode) |
+| `VAULT_ROLE_ID` | string | Yes* | - | Vault AppRole role ID (production) |
+| `VAULT_SECRET_ID` | string | Yes* | - | Vault AppRole secret ID (production) |
+| `DB_HOST` | string | Yes | `localhost` | PostgreSQL host |
+| `DB_PORT` | string | Yes | `5432` | PostgreSQL port |
+| `DB_USER` | string | Yes** | - | Database username |
+| `DB_PASSWORD` | string | Yes** | - | Database password |
+| `DB_NAME` | string | Yes | `cairn_users` | Database name |
+
+**\* Authentication**: Use `VAULT_TOKEN` for dev mode OR `VAULT_ROLE_ID` + `VAULT_SECRET_ID` for production AppRole auth.
+
+**\*\* Database Credentials**: Can be provided directly OR retrieved from Vault using `VAULT_DB_CREDS_PATH`.
+
+### Server Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PORT` | string | No | `8080` | HTTP server port |
+| `ENVIRONMENT` | string | No | `development` | Environment: `development`, `staging`, `production` |
+| `SHUTDOWN_TIMEOUT` | duration | No | `30s` | Graceful shutdown timeout |
+
+### Database Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DB_SSLMODE` | string | No | `disable` | SSL mode: `disable`, `require`, `verify-ca`, `verify-full` |
+| `DB_MAX_OPEN_CONNS` | int | No | `25` | Maximum open database connections |
+| `DB_MAX_IDLE_CONNS` | int | No | `5` | Maximum idle database connections |
+| `DB_CONN_MAX_LIFETIME` | duration | No | `5m` | Maximum connection lifetime |
+
+### Vault Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `VAULT_NAMESPACE` | string | No | - | Vault namespace (Enterprise only) |
+| `VAULT_AUTH_PATH` | string | No | `approle` | Vault AppRole auth mount path |
+| `VAULT_DB_CREDS_PATH` | string | No | `secret/data/database/credentials` | Path to database credentials in Vault |
+| `VAULT_TOKEN_RENEWAL_INTERVAL` | duration | No | `1h` | Token renewal check interval |
+
+### JWT Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `JWT_PRIVATE_KEY_PATH` | string | No | `secret/data/jwt/private-key` | Vault path to RSA private key |
+| `JWT_PUBLIC_KEY_PATH` | string | No | `secret/data/jwt/public-key` | Vault path to RSA public key |
+| `JWT_ACCESS_TOKEN_EXPIRY` | duration | No | `60m` | Access token lifetime (recommended: 15m-60m) |
+| `JWT_REFRESH_TOKEN_EXPIRY` | duration | No | `720h` (30 days) | Refresh token lifetime |
+| `JWT_KEY_ROTATION_INTERVAL` | duration | No | `24h` | How often to check Vault for new keys |
+
+**JWT Key Format**: RSA 2048-bit keys stored in Vault as PEM-encoded strings in the `value` field.
+
+### Security Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `BCRYPT_COST` | int | No | `12` | Bcrypt cost factor (10-14, higher = slower) |
+| `MIN_PASSWORD_LENGTH` | int | No | `8` | Minimum password length |
+| `REQUIRE_PASSWORD_COMPLEXITY` | bool | No | `true` | Require uppercase, lowercase, digit, special char |
+| `RATE_LIMIT_REQUESTS` | int | No | `100` | Max requests per window |
+| `RATE_LIMIT_WINDOW` | duration | No | `1m` | Rate limit time window |
+
+**Rate Limiting**: Applied to authentication endpoints (`/auth/*`) to prevent brute force attacks.
+
+### Logging Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `LOG_LEVEL` | string | No | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `LOG_FORMAT` | string | No | `text` | Log format: `text`, `json` |
+
+### Example `.env` File
+
+#### Development
+
+```bash
+# User Service Configuration - Development
+
+# Server
+PORT=8082
+ENVIRONMENT=development
+SHUTDOWN_TIMEOUT=30s
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=cairn
+DB_PASSWORD=cairn_password
+DB_NAME=cairn_users
+DB_SSLMODE=disable
+DB_MAX_OPEN_CONNS=25
+DB_MAX_IDLE_CONNS=5
+DB_CONN_MAX_LIFETIME=5m
+
+# Vault (Dev Mode)
+VAULT_ADDR=http://localhost:8200
+VAULT_TOKEN=dev-token
+VAULT_NAMESPACE=
+
+# JWT Configuration
+JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+JWT_ACCESS_TOKEN_EXPIRY=60m
+JWT_REFRESH_TOKEN_EXPIRY=720h  # 30 days
+JWT_KEY_ROTATION_INTERVAL=24h
+
+# Security
+BCRYPT_COST=12
+MIN_PASSWORD_LENGTH=8
+REQUIRE_PASSWORD_COMPLEXITY=true
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_WINDOW=1m
+
+# Logging
+LOG_LEVEL=debug
+LOG_FORMAT=text
+```
+
+#### Production
+
+```bash
+# User Service Configuration - Production
+
+# Server
+PORT=8082
+ENVIRONMENT=production
+SHUTDOWN_TIMEOUT=30s
+
+# Database (credentials from Vault)
+DB_HOST=postgres.production.internal
+DB_PORT=5432
+DB_NAME=cairn_users
+DB_SSLMODE=require
+DB_MAX_OPEN_CONNS=50
+DB_MAX_IDLE_CONNS=10
+DB_CONN_MAX_LIFETIME=5m
+
+# Vault (AppRole Authentication)
+VAULT_ADDR=https://vault.production.internal:8200
+VAULT_ROLE_ID=<your-role-id>
+VAULT_SECRET_ID=<your-secret-id>
+VAULT_NAMESPACE=cairn
+VAULT_AUTH_PATH=approle
+VAULT_DB_CREDS_PATH=secret/data/database/cairn_users
+VAULT_TOKEN_RENEWAL_INTERVAL=1h
+
+# JWT Configuration
+JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+JWT_ACCESS_TOKEN_EXPIRY=15m  # Shorter in production
+JWT_REFRESH_TOKEN_EXPIRY=168h  # 7 days in production
+JWT_KEY_ROTATION_INTERVAL=24h
+
+# Security
+BCRYPT_COST=12
+MIN_PASSWORD_LENGTH=12  # Stricter in production
+REQUIRE_PASSWORD_COMPLEXITY=true
+RATE_LIMIT_REQUESTS=10  # Stricter rate limiting
+RATE_LIMIT_WINDOW=1m
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=json
+```
+
+### Vault Setup
+
+#### 1. Generate JWT Key Pair
+
+```bash
+# Generate RSA 2048-bit key pair
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -out public.pem
+```
+
+#### 2. Store Keys in Vault
+
+**Development (Token Auth)**:
+```bash
+export VAULT_ADDR=http://localhost:8200
+export VAULT_TOKEN=dev-token
+
+# Store private key
+vault kv put secret/jwt/private-key value=@private.pem
+
+# Store public key
+vault kv put secret/jwt/public-key value=@public.pem
+```
+
+**Production (AppRole Auth)**:
+```bash
+export VAULT_ADDR=https://vault.production.internal:8200
+
+# Login with AppRole
+vault write auth/approle/login \
+  role_id="$VAULT_ROLE_ID" \
+  secret_id="$VAULT_SECRET_ID"
+
+# Store keys (same commands as dev)
+vault kv put secret/jwt/private-key value=@private.pem
+vault kv put secret/jwt/public-key value=@public.pem
+```
+
+#### 3. Store Database Credentials in Vault (Optional)
+
+```bash
+vault kv put secret/database/cairn_users \
+  username=cairn \
+  password=<secure-password>
+```
+
+**Service Configuration**: If using Vault for database credentials, omit `DB_USER` and `DB_PASSWORD` environment variables and ensure `VAULT_DB_CREDS_PATH` points to the correct Vault path.
+
+### Security Best Practices
+
+**Production Checklist**:
+- ✅ Use `ENVIRONMENT=production`
+- ✅ Enable SSL for database (`DB_SSLMODE=require`)
+- ✅ Use AppRole authentication for Vault (not token)
+- ✅ Store database credentials in Vault
+- ✅ Shorter access token expiry (15 minutes recommended)
+- ✅ Stricter rate limiting (10 requests/minute on auth endpoints)
+- ✅ Use `LOG_FORMAT=json` for structured logging
+- ✅ Rotate JWT keys periodically (manual or automated)
+- ✅ Use strong passwords for database (min 32 characters)
+
+**JWT Key Rotation**:
+1. Generate new key pair
+2. Store in Vault at the same paths
+3. Service automatically detects and loads new keys within `JWT_KEY_ROTATION_INTERVAL`
+4. Old tokens remain valid until expiration
+
+### Troubleshooting
+
+**Vault Connection Failed**:
+```bash
+# Check Vault status
+curl $VAULT_ADDR/v1/sys/health
+
+# Verify Vault token (dev)
+vault token lookup
+
+# Verify AppRole (production)
+vault read auth/approle/role/<role-name>
+```
+
+**Database Connection Failed**:
+```bash
+# Test database connection
+psql "host=$DB_HOST port=$DB_PORT dbname=$DB_NAME user=$DB_USER password=$DB_PASSWORD sslmode=$DB_SSLMODE"
+```
+
+**Cannot Read JWT Keys from Vault**:
+```bash
+# Verify keys exist
+vault kv get secret/jwt/private-key
+vault kv get secret/jwt/public-key
+
+# Check key format (should be PEM)
+vault kv get -field=value secret/jwt/private-key | head -1
+# Expected: -----BEGIN RSA PRIVATE KEY-----
+```
+
+**Rate Limiting Too Aggressive**:
+- Increase `RATE_LIMIT_REQUESTS` or `RATE_LIMIT_WINDOW`
+- Default: 100 requests per minute (production: 10 requests per minute on auth endpoints)
+
+### Service-Specific Notes
+
+**Account Types**: The service supports three account types:
+- **Mobile-only**: Authenticates with Expo device ID only
+- **Email-only**: Authenticates with email/password only
+- **Hybrid**: Upgraded mobile account, authenticates with email/password (device login disabled)
+
+**Token Management**:
+- Refresh tokens are automatically rotated on each use
+- Token reuse detection triggers automatic revocation of all user tokens
+- Token family tracking prevents replay attacks
+
+**Authorization**: All user-specific endpoints enforce authorization (users can only access their own data).
 
 ---
 

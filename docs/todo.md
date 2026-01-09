@@ -170,7 +170,7 @@ npm start           # App should work normally
 npm run ios         # Test deep linking if keeping dependency
 ```
 
-**Effort:** 15 minutes
+
 
 ---
 
@@ -678,6 +678,12 @@ if err := r.articleRepo.RecordRecommendationsBatch(ctx, userID, articleIDs); err
 - Before: N queries (5 INSERTs + 5 UPDATEs = 10 queries)
 - After: 2 queries (1 batch INSERT + 1 batch UPDATE)
 - 5x reduction in database round trips
+
+## Pre-Go Live
+
+* Load testing
+* Alerting
+* Metrics
 
 ---
 

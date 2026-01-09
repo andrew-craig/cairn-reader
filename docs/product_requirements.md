@@ -164,6 +164,8 @@ Secondary requirements
 
 The following features are **not** included in the initial release:
 
+- OBSERVABILITY METRICS
+- ALERTING INFRASTRUCTURE
 - Social features (sharing, comments, collaborative reading)
 - Image downloading/hosting (images loaded from source)
 - Advanced search (full content search, filters)
