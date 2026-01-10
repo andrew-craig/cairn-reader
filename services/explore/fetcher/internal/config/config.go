@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	sharedconfig "github.com/andrew-craig/cairn/pkg/config"
+	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
 )
 
 // Config holds all configuration for the fetcher service

@@ -6,14 +6,14 @@ package config
 import (
 	"fmt"
 
-	sharedconfig "github.com/andrew-craig/cairn/pkg/config"
+	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
 )
 
 // VaultConfig contains HashiCorp Vault configuration
 type VaultConfig struct {
-	Address        string
-	Token          string
-	PublicKeyPath  string
+	Address       string
+	Token         string
+	PublicKeyPath string
 }
 
 // Validate checks if the vault configuration is valid
@@ -25,10 +25,10 @@ func (c *VaultConfig) Validate() error {
 
 // Config holds all configuration for the recommender service
 type Config struct {
-	Server             sharedconfig.ServerConfig
-	Database           sharedconfig.DatabaseConfig
-	Logging            sharedconfig.LoggingConfig
-	Vault              VaultConfig
+	Server               sharedconfig.ServerConfig
+	Database             sharedconfig.DatabaseConfig
+	Logging              sharedconfig.LoggingConfig
+	Vault                VaultConfig
 	ArticleRetentionDays int
 }
 

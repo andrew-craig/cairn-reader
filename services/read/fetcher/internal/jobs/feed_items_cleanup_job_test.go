@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

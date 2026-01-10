@@ -7,8 +7,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/pkg/logging"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/gin-gonic/gin"
 )
 

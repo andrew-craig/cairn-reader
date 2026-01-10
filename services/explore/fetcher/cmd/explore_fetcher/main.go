@@ -17,13 +17,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/api"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/client"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/config"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/db"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/fetcher"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/sync"
-	"github.com/andrew-craig/cairn/pkg/logging"
+	"github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/config"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

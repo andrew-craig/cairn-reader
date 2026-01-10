@@ -85,7 +85,7 @@ Manages RSS feed subscriptions and content delivery:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/andrew-craig/cairn.git
+git clone https://github.com/cairn-app/cairn-reader.git
 cd cairn/services/read
 ```
 
@@ -482,7 +482,7 @@ Future enhancements planned:
 
 For issues, questions, or contributions:
 
-- **Issues**: [GitHub Issues](https://github.com/andrew-craig/cairn/services/read/issues)
+- **Issues**: [GitHub Issues](https://github.com/cairn-app/cairn-reader/services/read/issues)
 - **Documentation**: See `/docs` directory
 - **Architecture**: [../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
 

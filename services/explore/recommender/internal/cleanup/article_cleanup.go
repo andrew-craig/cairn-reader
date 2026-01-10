@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 )
 
 // ArticleCleanup handles periodic cleanup of old articles

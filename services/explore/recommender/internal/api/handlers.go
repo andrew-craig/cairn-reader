@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	pkgapi "github.com/andrew-craig/cairn/pkg/api"
-	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api/dto"
+	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api/dto"
 )
 
 const (

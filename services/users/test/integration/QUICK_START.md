@@ -139,7 +139,7 @@ Expected output:
 === RUN   TestAuthService_Registration_Integration/Register_with_duplicate_email
 ...
 PASS
-ok      github.com/andrew-craig/cairn/services/users/test/integration    12.345s
+ok      github.com/cairn-app/cairn-reader/services/users/test/integration    12.345s
 ```
 
 All tests should PASS ✅

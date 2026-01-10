@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package db
@@ -9,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 	_ "github.com/lib/pq"
 )
 
@@ -296,7 +297,7 @@ func TestIntegration_CreateBatch_WithDuplicates(t *testing.T) {
 
 	// Create batch with one duplicate link and two new articles
 	articles := []models.Article{
-		createIntegrationTestArticle("test-batch-2", "https://example.com/test/batch1", "Updated Title"),  // Duplicate link
+		createIntegrationTestArticle("test-batch-2", "https://example.com/test/batch1", "Updated Title"), // Duplicate link
 		createIntegrationTestArticle("test-batch-3", "https://example.com/test/batch2", "New Article 1"), // New article
 		createIntegrationTestArticle("test-batch-4", "https://example.com/test/batch3", "New Article 2"), // New article
 	}

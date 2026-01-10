@@ -31,7 +31,7 @@ info:
     - Authorization checks ensure users can only access their own data
   contact:
     name: Cairn API Support
-    url: https://github.com/andrew-craig/cairn
+    url: https://github.com/cairn-app/cairn-reader
   license:
     name: MIT
 

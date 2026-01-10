@@ -1,9 +1,9 @@
+//go:build integration
 // +build integration
 
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/handlers"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/middleware"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/testutil"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/middleware"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/testutil"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -222,10 +222,10 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		userIDs := []uuid.UUID{uuid.New(), uuid.New()}
 
 		contentPayload := map[string]interface{}{
-			"url":         "https://example.com/article",
-			"title":       "Test Article",
+			"url":          "https://example.com/article",
+			"title":        "Test Article",
 			"cleaned_html": "<p>Test</p>",
-			"source_type": "rss",
+			"source_type":  "rss",
 		}
 
 		outboxEntry := &models.ContentOutbox{

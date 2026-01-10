@@ -18,10 +18,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/config"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/config"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
 )
 
 func main() {
@@ -63,7 +63,7 @@ func main() {
 		SSLMode:  cfg.Database.SSLMode,
 	}
 
-	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil{
+	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil {
 		slog.Error("failed to run migrations", slog.Any("error", err))
 		os.Exit(1)
 	}

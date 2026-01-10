@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 )
 
 // RecommenderClientInterface defines the interface for submitting articles.

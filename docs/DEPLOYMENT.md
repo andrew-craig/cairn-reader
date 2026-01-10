@@ -257,7 +257,7 @@ su - cairn
 
 ```bash
 # Clone repository
-git clone https://github.com/andrew-craig/cairn.git
+git clone https://github.com/cairn-app/cairn-reader.git
 cd cairn
 
 # Create production environment file
@@ -954,4 +954,4 @@ For detailed documentation:
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Troubleshooting guide
 
 For issues or questions:
-- GitHub Issues: https://github.com/andrew-craig/cairn/issues
+- GitHub Issues: https://github.com/cairn-app/cairn-reader/issues

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/internal/auth"
-	"github.com/andrew-craig/cairn/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

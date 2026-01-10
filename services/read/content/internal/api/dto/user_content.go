@@ -3,11 +3,11 @@ package dto
 import (
 	"time"
 
-	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/google/uuid"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 )
 
 // AddContentToUserRequest represents the request body for adding content to a user's list
@@ -92,14 +92,14 @@ func (u UpdateUserContentRequest) Validate() error {
 
 // UserContentResponse represents a user-content item in API responses
 type UserContentResponse struct {
-	ID             uuid.UUID       `json:"id"`
-	UserID         uuid.UUID       `json:"user_id"`
-	ContentID      uuid.UUID       `json:"content_id"`
-	Status         string          `json:"status"`
-	ScrollPosition int             `json:"scroll_position"`
-	IsFavorite     bool            `json:"is_favorite"`
-	AddedAt        time.Time       `json:"added_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID             uuid.UUID        `json:"id"`
+	UserID         uuid.UUID        `json:"user_id"`
+	ContentID      uuid.UUID        `json:"content_id"`
+	Status         string           `json:"status"`
+	ScrollPosition int              `json:"scroll_position"`
+	IsFavorite     bool             `json:"is_favorite"`
+	AddedAt        time.Time        `json:"added_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
 	Content        *ContentResponse `json:"content,omitempty"`
 }
 

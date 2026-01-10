@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
 )
 
 // CleanupJob handles the cleanup of orphaned content

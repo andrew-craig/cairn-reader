@@ -3,7 +3,7 @@ package db
 import (
 	"context"
 
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 )
 
 // ArticleRepositoryInterface defines the contract for article database operations

@@ -7,8 +7,8 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
 	"github.com/google/uuid"
 )
 
@@ -49,14 +49,14 @@ type SubscribeFeedResponse struct {
 
 // FeedSubscriptionResponse represents a single feed subscription
 type FeedSubscriptionResponse struct {
-	SubscriptionID uuid.UUID              `json:"subscription_id"`
-	FeedID         uuid.UUID              `json:"feed_id"`
-	FeedURL        string                 `json:"feed_url"`
-	FeedTitle      string                 `json:"feed_title"`
-	FeedStatus     models.FeedStatus      `json:"feed_status"`
-	PollingTier    models.PollingTier     `json:"polling_tier"`
-	LastFetchedAt  *time.Time             `json:"last_fetched_at,omitempty"`
-	SubscribedAt   time.Time              `json:"subscribed_at"`
+	SubscriptionID uuid.UUID          `json:"subscription_id"`
+	FeedID         uuid.UUID          `json:"feed_id"`
+	FeedURL        string             `json:"feed_url"`
+	FeedTitle      string             `json:"feed_title"`
+	FeedStatus     models.FeedStatus  `json:"feed_status"`
+	PollingTier    models.PollingTier `json:"polling_tier"`
+	LastFetchedAt  *time.Time         `json:"last_fetched_at,omitempty"`
+	SubscribedAt   time.Time          `json:"subscribed_at"`
 }
 
 // ListFeedSubscriptionsResponse represents the response for listing subscriptions

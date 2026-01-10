@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 )
 
 // ConditionalFetchResult represents the result of a conditional fetch
@@ -65,8 +65,8 @@ func (cf *ConditionalFetcher) FetchWithConditionals(
 	defer resp.Body.Close()
 
 	result := &ConditionalFetchResult{
-		StatusCode:   resp.StatusCode,
-		NotModified:  resp.StatusCode == http.StatusNotModified,
+		StatusCode:  resp.StatusCode,
+		NotModified: resp.StatusCode == http.StatusNotModified,
 	}
 
 	// Extract caching headers from response

@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/api"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
-	"github.com/andrew-craig/cairn/services/read/content/internal/service"
+	"github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
 )
 
 // DetectionHandler handles URL detection requests

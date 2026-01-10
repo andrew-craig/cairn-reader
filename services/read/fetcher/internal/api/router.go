@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/handlers"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/api/middleware"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/service"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/middleware"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )

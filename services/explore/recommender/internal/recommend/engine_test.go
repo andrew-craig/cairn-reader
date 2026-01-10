@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/models"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
+	"github.com/cairn-app/cairn-reader/pkg/models"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -183,20 +183,20 @@ func TestSelectHighQualityArticles(t *testing.T) {
 	engine := &Engine{}
 
 	tests := []struct {
-		name           string
-		articles       []models.Article
-		count          int
-		wantIDs        []string
-		description    string
+		name        string
+		articles    []models.Article
+		count       int
+		wantIDs     []string
+		description string
 	}{
 		{
 			name: "select top 4 from sorted articles",
 			articles: []models.Article{
-				createTestArticle("1", "Article 1", 10, 1, 20),  // Score: (10-3)/20 = 0.35
-				createTestArticle("2", "Article 2", 20, 0, 10),  // Score: 20/10 = 2.0
-				createTestArticle("3", "Article 3", 5, 5, 15),   // Score: (5-15)/15 = -0.67
-				createTestArticle("4", "Article 4", 15, 2, 30),  // Score: (15-6)/30 = 0.3
-				createTestArticle("5", "Article 5", 8, 0, 10),   // Score: 8/10 = 0.8
+				createTestArticle("1", "Article 1", 10, 1, 20), // Score: (10-3)/20 = 0.35
+				createTestArticle("2", "Article 2", 20, 0, 10), // Score: 20/10 = 2.0
+				createTestArticle("3", "Article 3", 5, 5, 15),  // Score: (5-15)/15 = -0.67
+				createTestArticle("4", "Article 4", 15, 2, 30), // Score: (15-6)/30 = 0.3
+				createTestArticle("5", "Article 5", 8, 0, 10),  // Score: 8/10 = 0.8
 			},
 			count:       4,
 			wantIDs:     []string{"2", "5", "1", "4"}, // Sorted by score descending
@@ -215,10 +215,10 @@ func TestSelectHighQualityArticles(t *testing.T) {
 		{
 			name: "new articles with no recommends get surfaced first",
 			articles: []models.Article{
-				createTestArticle("1", "Article 1", 10, 0, 50),  // Score: 10/50 = 0.2
-				createTestArticle("2", "Article 2", 5, 0, 0),    // Score: Inf (new with upvotes)
-				createTestArticle("3", "Article 3", 0, 0, 0),    // Score: 1000 (new no votes)
-				createTestArticle("4", "Article 4", 0, 0, 10),   // Score: 0
+				createTestArticle("1", "Article 1", 10, 0, 50), // Score: 10/50 = 0.2
+				createTestArticle("2", "Article 2", 5, 0, 0),   // Score: Inf (new with upvotes)
+				createTestArticle("3", "Article 3", 0, 0, 0),   // Score: 1000 (new no votes)
+				createTestArticle("4", "Article 4", 0, 0, 10),  // Score: 0
 			},
 			count:       3,
 			wantIDs:     []string{"2", "3", "1"},

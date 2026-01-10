@@ -10,13 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/cleanup"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/config"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/cleanup"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/config"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
 )
 
 func main() {

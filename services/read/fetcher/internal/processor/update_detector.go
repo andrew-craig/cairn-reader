@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/client"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/fetcher"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/fetcher"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/go-shiori/go-readability"
 	"github.com/microcosm-cc/bluemonday"
 )
@@ -39,11 +39,11 @@ func DefaultUpdateDetectorConfig() *UpdateDetectorConfig {
 
 // UpdateDetector checks for content updates using HTTP caching headers
 type UpdateDetector struct {
-	config              *UpdateDetectorConfig
-	httpClient          *http.Client
-	conditionalFetcher  *fetcher.ConditionalFetcher
-	sanitizer           *bluemonday.Policy
-	feedItemRepo        repository.FeedItemRepository
+	config               *UpdateDetectorConfig
+	httpClient           *http.Client
+	conditionalFetcher   *fetcher.ConditionalFetcher
+	sanitizer            *bluemonday.Policy
+	feedItemRepo         repository.FeedItemRepository
 	contentServiceClient *client.ContentServiceClient
 }
 
@@ -65,11 +65,11 @@ func NewUpdateDetector(
 	sanitizer := bluemonday.UGCPolicy()
 
 	return &UpdateDetector{
-		config:              config,
-		httpClient:          httpClient,
-		conditionalFetcher:  conditionalFetcher,
-		sanitizer:           sanitizer,
-		feedItemRepo:        feedItemRepo,
+		config:               config,
+		httpClient:           httpClient,
+		conditionalFetcher:   conditionalFetcher,
+		sanitizer:            sanitizer,
+		feedItemRepo:         feedItemRepo,
 		contentServiceClient: contentServiceClient,
 	}
 }

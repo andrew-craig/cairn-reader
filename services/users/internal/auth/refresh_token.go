@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/models"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
 )
 

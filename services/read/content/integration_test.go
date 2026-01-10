@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package main
@@ -10,12 +11,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/api"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn/services/read/content/internal/database"
-	"github.com/andrew-craig/cairn/services/read/content/internal/testutil"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
 )
 
 // Recovery middleware recovers from panics and returns a 500 error

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )

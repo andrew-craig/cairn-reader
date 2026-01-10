@@ -6,26 +6,26 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/pkg/logging"
-	localAuth "github.com/andrew-craig/cairn/services/users/internal/auth"
-	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/middleware"
-	"github.com/andrew-craig/cairn/services/users/internal/services"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	localAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/middleware"
+	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 // RouterConfig holds all dependencies needed to set up the HTTP router.
 // These dependencies are injected from the main application during startup.
 type RouterConfig struct {
-	DB                  *database.DB             // Database connection for health checks
-	VaultClient         *localAuth.VaultClient   // Vault client for health checks
-	AuthService         services.AuthService     // Service handling authentication operations
-	UserService         services.UserService     // Service handling user management operations
-	JWTManager          *localAuth.JWTManager    // JWT manager for token validation middleware
-	AuthRateLimit       int                      // Requests per window for auth endpoints (default: 10)
-	AuthRateLimitWindow time.Duration            // Time window for auth rate limiting (default: 1 minute)
-	Logger              *slog.Logger             // Structured logger for request logging
+	DB                  *database.DB           // Database connection for health checks
+	VaultClient         *localAuth.VaultClient // Vault client for health checks
+	AuthService         services.AuthService   // Service handling authentication operations
+	UserService         services.UserService   // Service handling user management operations
+	JWTManager          *localAuth.JWTManager  // JWT manager for token validation middleware
+	AuthRateLimit       int                    // Requests per window for auth endpoints (default: 10)
+	AuthRateLimitWindow time.Duration          // Time window for auth rate limiting (default: 1 minute)
+	Logger              *slog.Logger           // Structured logger for request logging
 }
 
 // Router sets up the HTTP routes and returns a configured gin.Engine.
@@ -76,12 +76,12 @@ func Router(config RouterConfig) *gin.Engine {
 		authGroup := v1.Group("/auth")
 		authGroup.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
 		{
-			authGroup.POST("/register", authHandler.Register)           // Create account with email/password
+			authGroup.POST("/register", authHandler.Register)              // Create account with email/password
 			authGroup.POST("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
-			authGroup.POST("/login", authHandler.Login)                 // Authenticate with email/password
-			authGroup.POST("/login/mobile", authHandler.LoginMobile)    // Authenticate with device ID
-			authGroup.POST("/refresh", authHandler.Refresh)             // Exchange refresh token for new access token
-			authGroup.POST("/logout", authHandler.Logout)               // Revoke a specific refresh token
+			authGroup.POST("/login", authHandler.Login)                    // Authenticate with email/password
+			authGroup.POST("/login/mobile", authHandler.LoginMobile)       // Authenticate with device ID
+			authGroup.POST("/refresh", authHandler.Refresh)                // Exchange refresh token for new access token
+			authGroup.POST("/logout", authHandler.Logout)                  // Revoke a specific refresh token
 			// logout-all requires authentication since it needs to know which user's tokens to revoke
 			authGroup.POST("/logout-all", authMiddleware.JWTAuth(), authHandler.LogoutAll)
 		}
@@ -92,10 +92,10 @@ func Router(config RouterConfig) *gin.Engine {
 		users := v1.Group("/user")
 		users.Use(authMiddleware.JWTAuth())
 		{
-			users.GET("/:user_id", userHandler.GetUser)           // Get user profile
-			users.PATCH("/:user_id", userHandler.UpdateUser)      // Update user email
+			users.GET("/:user_id", userHandler.GetUser)                 // Get user profile
+			users.PATCH("/:user_id", userHandler.UpdateUser)            // Update user email
 			users.POST("/:user_id/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
-			users.DELETE("/:user_id", userHandler.DeleteUser)     // Delete user account and all associated data
+			users.DELETE("/:user_id", userHandler.DeleteUser)           // Delete user account and all associated data
 		}
 	}
 

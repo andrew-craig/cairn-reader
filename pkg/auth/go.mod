@@ -1,4 +1,4 @@
-module github.com/andrew-craig/cairn/pkg/auth
+module github.com/cairn-app/cairn-reader/pkg/auth
 
 go 1.24.0
 

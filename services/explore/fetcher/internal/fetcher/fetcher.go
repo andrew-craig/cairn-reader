@@ -10,9 +10,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/client"
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/db"
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
 	"github.com/mmcdole/gofeed"
 )
 

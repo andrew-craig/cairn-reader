@@ -131,7 +131,7 @@ func (p *ContentProcessor) fetchURL(url string) (string, error) {
 	}
 
 	// Set a user agent to avoid being blocked by some sites
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CairnBot/1.0; +https://github.com/andrew-craig/cairn/services/read)")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CairnBot/1.0; +https://github.com/cairn-app/cairn-reader/services/read)")
 
 	// Execute the request
 	resp, err := p.httpClient.Do(req)

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/internal/services"
-	"github.com/andrew-craig/cairn/services/users/test/integration/testutil"
+	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	"github.com/cairn-app/cairn-reader/services/users/test/integration/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

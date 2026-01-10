@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/andrew-craig/cairn/services/users/internal/auth"
-	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/models"
+	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
 )
 
@@ -40,11 +40,11 @@ type UserService interface {
 
 // userService is the concrete implementation of UserService
 type userService struct {
-	userRepo           database.UserRepository
-	refreshTokenRepo   database.RefreshTokenRepository
-	passwordHasher     *auth.PasswordHasher
-	passwordMinLength  int
-	requireComplexity  bool
+	userRepo          database.UserRepository
+	refreshTokenRepo  database.RefreshTokenRepository
+	passwordHasher    *auth.PasswordHasher
+	passwordMinLength int
+	requireComplexity bool
 }
 
 // UserServiceConfig holds configuration for the user service

@@ -122,7 +122,7 @@ Logs HTTP requests with structured logging using `log/slog`.
 
 **Usage:**
 ```go
-import "github.com/andrew-craig/cairn/pkg/logging"
+import "github.com/cairn-app/cairn-reader/pkg/logging"
 
 logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 router.Use(logging.RequestLogger(logger))

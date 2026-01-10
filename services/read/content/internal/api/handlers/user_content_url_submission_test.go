@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
-	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
-	"github.com/andrew-craig/cairn/services/read/content/internal/service"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -82,9 +82,9 @@ func (m *mockIngestRSSClient) SubscribeUserToFeed(ctx interface{}, userID, feedU
 	}
 	return &service.FeedSubscriptionResponse{
 		Subscription: struct {
-			ID           string    `json:"id"`
-			UserID       string    `json:"user_id"`
-			FeedID       string    `json:"feed_id"`
+			ID           string      `json:"id"`
+			UserID       string      `json:"user_id"`
+			FeedID       string      `json:"feed_id"`
 			SubscribedAt interface{} `json:"subscribed_at"`
 		}{
 			ID:     uuid.NewString(),
@@ -92,13 +92,13 @@ func (m *mockIngestRSSClient) SubscribeUserToFeed(ctx interface{}, userID, feedU
 			FeedID: uuid.NewString(),
 		},
 		Feed: struct {
-			ID          string    `json:"id"`
-			FeedURL     string    `json:"feed_url"`
-			Title       string    `json:"title"`
-			Description string    `json:"description"`
-			SiteURL     string    `json:"site_url"`
-			PollingTier string    `json:"polling_tier"`
-			Status      string    `json:"status"`
+			ID          string      `json:"id"`
+			FeedURL     string      `json:"feed_url"`
+			Title       string      `json:"title"`
+			Description string      `json:"description"`
+			SiteURL     string      `json:"site_url"`
+			PollingTier string      `json:"polling_tier"`
+			Status      string      `json:"status"`
 			CreatedAt   interface{} `json:"created_at"`
 			UpdatedAt   interface{} `json:"updated_at"`
 		}{

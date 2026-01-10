@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/auth"
-	"github.com/andrew-craig/cairn/pkg/models"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/api"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/db"
-	"github.com/andrew-craig/cairn/services/explore/recommender/internal/recommend"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/models"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,13 +25,13 @@ import (
 
 // Integration test configuration
 type IntegrationTestSuite struct {
-	database   *pgxpool.Pool
-	server     *httptest.Server
+	database    *pgxpool.Pool
+	server      *httptest.Server
 	articleRepo db.ArticleRepositoryInterface
-	userRepo   db.UserRepositoryInterface
-	voteRepo   db.VoteRepositoryInterface
-	engine     *recommend.Engine
-	jwtHelper  *testJWTHelper
+	userRepo    db.UserRepositoryInterface
+	voteRepo    db.VoteRepositoryInterface
+	engine      *recommend.Engine
+	jwtHelper   *testJWTHelper
 }
 
 func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {

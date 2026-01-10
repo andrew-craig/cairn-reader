@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/andrew-craig/cairn/pkg/api"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/dto"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api/middleware"
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
-	"github.com/andrew-craig/cairn/services/read/content/internal/service"
+	"github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

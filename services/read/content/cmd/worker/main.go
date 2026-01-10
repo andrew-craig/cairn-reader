@@ -13,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/read/content/internal/database"
-	"github.com/andrew-craig/cairn/services/read/content/internal/jobs"
-	"github.com/andrew-craig/cairn/services/read/content/internal/repository"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/jobs"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
 	"github.com/robfig/cron/v3"
 )
 

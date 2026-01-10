@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -293,7 +293,7 @@ func TestCreateBatch_WithDuplicates(t *testing.T) {
 	// Create batch with one duplicate link and one new article
 	articles := []models.Article{
 		createTestArticle("test-id-2", "https://example.com/article1", "Updated Title"), // Duplicate link
-		createTestArticle("test-id-3", "https://example.com/article2", "New Article"),    // New article
+		createTestArticle("test-id-3", "https://example.com/article2", "New Article"),   // New article
 	}
 
 	err = repo.CreateBatch(ctx, articles)

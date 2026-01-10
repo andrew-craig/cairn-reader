@@ -3,11 +3,11 @@ package dto
 import (
 	"time"
 
-	"github.com/google/uuid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/google/uuid"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 )
 
 // BulkContentItem represents a single content item in a bulk request
@@ -97,10 +97,10 @@ func (c CheckDuplicatesRequest) Validate() error {
 
 // DuplicateCheckResult represents the result of a duplicate check
 type DuplicateCheckResult struct {
-	ContentHash  string         `json:"content_hash"`
-	Exists       bool           `json:"exists"`
-	ContentID    *uuid.UUID     `json:"content_id,omitempty"`
-	Content      *ContentResponse `json:"content,omitempty"`
+	ContentHash string           `json:"content_hash"`
+	Exists      bool             `json:"exists"`
+	ContentID   *uuid.UUID       `json:"content_id,omitempty"`
+	Content     *ContentResponse `json:"content,omitempty"`
 }
 
 // CheckDuplicatesResponse represents the response for checking duplicates

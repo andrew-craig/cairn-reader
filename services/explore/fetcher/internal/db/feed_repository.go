@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/models"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,7 +24,8 @@ func NewFeedRepository(db *pgxpool.Pool) FeedRepositoryInterface {
 
 // GetNextFeed returns the next feed to fetch
 // Prioritizes: 1) Never fetched (last_fetched_at IS NULL)
-//              2) Oldest fetched
+//  2. Oldest fetched
+//
 // Only returns enabled feeds
 func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) {
 	query := `

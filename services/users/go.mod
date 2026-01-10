@@ -1,11 +1,11 @@
-module github.com/andrew-craig/cairn/services/users
+module github.com/cairn-app/cairn-reader/services/users
 
 go 1.24.0
 
 require (
-	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/auth v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/api v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
@@ -78,10 +78,10 @@ require (
 )
 
 // Use local version of shared cairn packages
-replace github.com/andrew-craig/cairn => ../..
+replace github.com/cairn-app/cairn-reader => ../..
 
-replace github.com/andrew-craig/cairn/pkg/api => ../../pkg/api
+replace github.com/cairn-app/cairn-reader/pkg/api => ../../pkg/api
 
-replace github.com/andrew-craig/cairn/pkg/auth => ../../pkg/auth
+replace github.com/cairn-app/cairn-reader/pkg/auth => ../../pkg/auth
 
-replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
+replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging

@@ -1,13 +1,13 @@
-module github.com/andrew-craig/cairn/services/explore
+module github.com/cairn-app/cairn-reader/services/explore
 
 go 1.24.7
 
 require (
-	github.com/andrew-craig/cairn/pkg/api v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/auth v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/config v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/logging v0.0.0-00010101000000-000000000000
-	github.com/andrew-craig/cairn/pkg/models v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/api v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/models v0.0.0-00010101000000-000000000000
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
@@ -76,15 +76,15 @@ require (
 )
 
 // Use local version of shared cairn packages
-replace github.com/andrew-craig/cairn => ../..
+replace github.com/cairn-app/cairn-reader => ../..
 
 // Use local versions of pkg packages
-replace github.com/andrew-craig/cairn/pkg/api => ../../pkg/api
+replace github.com/cairn-app/cairn-reader/pkg/api => ../../pkg/api
 
-replace github.com/andrew-craig/cairn/pkg/auth => ../../pkg/auth
+replace github.com/cairn-app/cairn-reader/pkg/auth => ../../pkg/auth
 
-replace github.com/andrew-craig/cairn/pkg/logging => ../../pkg/logging
+replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging
 
-replace github.com/andrew-craig/cairn/pkg/models => ../../pkg/models
+replace github.com/cairn-app/cairn-reader/pkg/models => ../../pkg/models
 
-replace github.com/andrew-craig/cairn/pkg/config => ../../pkg/config
+replace github.com/cairn-app/cairn-reader/pkg/config => ../../pkg/config

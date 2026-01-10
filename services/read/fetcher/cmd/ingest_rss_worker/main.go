@@ -12,14 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/client"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/database"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/jobs"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/processor"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/scheduler"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/worker"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/jobs"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/processor"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/scheduler"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/worker"
 	"github.com/robfig/cron/v3"
 )
 

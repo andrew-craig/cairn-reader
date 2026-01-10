@@ -233,7 +233,7 @@ var (
 
 Use in repositories:
 ```go
-import apperrors "github.com/andrew-craig/cairn/pkg/errors"
+import apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 
 func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Article, error) {
     var article models.Article
@@ -390,7 +390,7 @@ func MustGetString(key string) string {
 
 Use in all services:
 ```go
-import "github.com/andrew-craig/cairn/pkg/env"
+import "github.com/cairn-app/cairn-reader/pkg/env"
 
 port := env.GetString("PORT", "8080")
 timeout := env.GetDuration("FETCH_TIMEOUT", 30*time.Second)

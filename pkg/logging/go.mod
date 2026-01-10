@@ -1,4 +1,4 @@
-module github.com/andrew-craig/cairn/pkg/logging
+module github.com/cairn-app/cairn-reader/pkg/logging
 
 go 1.24.0
 

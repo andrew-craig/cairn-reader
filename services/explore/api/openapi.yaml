@@ -18,7 +18,7 @@ info:
     The JWT must contain a valid `user_id` claim.
   contact:
     name: Cairn API Support
-    url: https://github.com/andrew-craig/cairn
+    url: https://github.com/cairn-app/cairn-reader
   license:
     name: MIT
 

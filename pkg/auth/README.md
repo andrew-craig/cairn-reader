@@ -14,7 +14,7 @@ This package provides JWT validation and HTTP middleware for protecting endpoint
 ## Installation
 
 ```bash
-go get github.com/andrew-craig/cairn/services/users/pkg/auth
+go get github.com/cairn-app/cairn-reader/services/users/pkg/auth
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ import (
     "log"
     "net/http"
 
-    "github.com/andrew-craig/cairn/services/users/pkg/auth"
+    "github.com/cairn-app/cairn-reader/services/users/pkg/auth"
 )
 
 func main() {
@@ -272,7 +272,7 @@ import (
     "log"
     "net/http"
 
-    "github.com/andrew-craig/cairn/services/users/pkg/auth"
+    "github.com/cairn-app/cairn-reader/services/users/pkg/auth"
 )
 
 type Server struct {

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/lib/pq"

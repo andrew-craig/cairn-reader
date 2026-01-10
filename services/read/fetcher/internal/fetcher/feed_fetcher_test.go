@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -152,7 +152,6 @@ func (m *MockFeedItemRepository) GetPendingItems(ctx context.Context, limit int)
 	}
 	return args.Get(0).([]*models.FeedItem), args.Error(1)
 }
-
 
 func (m *MockFeedItemRepository) DeleteOldCompletedItems(ctx context.Context, olderThan time.Time, batchSize int) (int, error) {
 	args := m.Called(ctx, olderThan, batchSize)
@@ -418,10 +417,10 @@ func TestProcessFeed_FetchError(t *testing.T) {
 
 	feedID := uuid.New()
 	feed := &models.Feed{
-		ID:                    feedID,
-		FeedURL:               server.URL,
-		PollingTier:           models.PollingTierActive,
-		ConsecutiveErrorDays:  0,
+		ID:                   feedID,
+		FeedURL:              server.URL,
+		PollingTier:          models.PollingTierActive,
+		ConsecutiveErrorDays: 0,
 	}
 
 	// Expect error info update
@@ -451,10 +450,10 @@ func TestProcessFeed_IncrementConsecutiveErrors(t *testing.T) {
 
 	feedID := uuid.New()
 	feed := &models.Feed{
-		ID:                    feedID,
-		FeedURL:               server.URL,
-		PollingTier:           models.PollingTierActive,
-		ConsecutiveErrorDays:  3, // Already had errors
+		ID:                   feedID,
+		FeedURL:              server.URL,
+		PollingTier:          models.PollingTierActive,
+		ConsecutiveErrorDays: 3, // Already had errors
 	}
 
 	// Expect consecutive errors to increment to 4
@@ -492,10 +491,10 @@ func TestProcessFeed_HTTPTimeout(t *testing.T) {
 
 	feedID := uuid.New()
 	feed := &models.Feed{
-		ID:                    feedID,
-		FeedURL:               server.URL,
-		PollingTier:           models.PollingTierActive,
-		ConsecutiveErrorDays:  0,
+		ID:                   feedID,
+		FeedURL:              server.URL,
+		PollingTier:          models.PollingTierActive,
+		ConsecutiveErrorDays: 0,
 	}
 
 	mockFeedRepo.On("UpdateErrorInfo", mock.Anything, feedID, 1, mock.AnythingOfType("*time.Time"), mock.AnythingOfType("*string")).
@@ -536,10 +535,10 @@ func TestProcessFeed_MaxRedirects(t *testing.T) {
 
 	feedID := uuid.New()
 	feed := &models.Feed{
-		ID:                    feedID,
-		FeedURL:               server.URL,
-		PollingTier:           models.PollingTierActive,
-		ConsecutiveErrorDays:  0,
+		ID:                   feedID,
+		FeedURL:              server.URL,
+		PollingTier:          models.PollingTierActive,
+		ConsecutiveErrorDays: 0,
 	}
 
 	mockFeedRepo.On("UpdateErrorInfo", mock.Anything, feedID, 1, mock.AnythingOfType("*time.Time"), mock.AnythingOfType("*string")).
@@ -749,10 +748,10 @@ func TestHandleFetchError(t *testing.T) {
 
 	feedID := uuid.New()
 	feed := &models.Feed{
-		ID:                    feedID,
-		FeedURL:               "https://example.com/feed",
-		PollingTier:           models.PollingTierModerate,
-		ConsecutiveErrorDays:  2,
+		ID:                   feedID,
+		FeedURL:              "https://example.com/feed",
+		PollingTier:          models.PollingTierModerate,
+		ConsecutiveErrorDays: 2,
 	}
 
 	testError := errors.New("network timeout")

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/andrew-craig/cairn/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -75,11 +75,11 @@ func TestContentRepository_Create_GeneratesUUID(t *testing.T) {
 	now := time.Now()
 
 	content := &models.Content{
-		ContentHash:  "hash123",
-		CleanedHTML:  "<p>Test content</p>",
-		OriginalURL:  "https://example.com/article",
-		Title:        "Test Article",
-		SourceType:   "web",
+		ContentHash: "hash123",
+		CleanedHTML: "<p>Test content</p>",
+		OriginalURL: "https://example.com/article",
+		Title:       "Test Article",
+		SourceType:  "web",
 	}
 
 	mock.ExpectQuery(`INSERT INTO contents`).

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/gin-gonic/gin"
 )
 

@@ -7,14 +7,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/andrew-craig/cairn/services/users/pkg/auth"
+	"github.com/cairn-app/cairn-reader/services/users/pkg/auth"
 )
 
 func main() {
 	// 1. Setup Vault client and fetch public key
 	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
 		Address: "http://localhost:8200", // Vault address
-		Token:   "dev-token",              // Development token (use AppRole in production)
+		Token:   "dev-token",             // Development token (use AppRole in production)
 	})
 	if err != nil {
 		log.Fatalf("Failed to create Vault client: %v", err)

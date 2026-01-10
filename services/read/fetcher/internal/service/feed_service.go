@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 )
@@ -127,7 +127,7 @@ func (s *feedService) Subscribe(ctx context.Context, userID uuid.UUID, feedURL s
 			Description:          &metadata.Description,
 			SiteURL:              &metadata.SiteURL,
 			PollingTier:          models.PollingTierActive, // Start with active tier
-			NextPollAt:           time.Now(),                // Poll immediately
+			NextPollAt:           time.Now(),               // Poll immediately
 			Status:               models.FeedStatusActive,
 			ConsecutiveErrorDays: 0,
 		}

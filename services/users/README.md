@@ -45,7 +45,7 @@ cairn/services/users/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/andrew-craig/cairn.git
+git clone https://github.com/cairn-app/cairn-reader.git
 cd cairn/services/users
 ```
 

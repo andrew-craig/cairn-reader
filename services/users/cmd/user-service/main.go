@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/internal/auth"
-	"github.com/andrew-craig/cairn/services/users/internal/config"
-	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/handlers"
-	"github.com/andrew-craig/cairn/services/users/internal/services"
-	"github.com/andrew-craig/cairn/pkg/logging"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/services/users/internal/config"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/handlers"
+	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )

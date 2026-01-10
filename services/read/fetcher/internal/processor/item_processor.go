@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/models"
-	"github.com/andrew-craig/cairn/services/read/fetcher/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/go-shiori/go-readability"
 	"github.com/google/uuid"
 	"github.com/microcosm-cc/bluemonday"

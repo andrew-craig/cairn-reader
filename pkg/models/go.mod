@@ -1,3 +1,3 @@
-module github.com/andrew-craig/cairn/pkg/models
+module github.com/cairn-app/cairn-reader/pkg/models
 
 go 1.24.0

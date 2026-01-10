@@ -586,8 +586,8 @@ import (
     "github.com/gin-gonic/gin"
 
     // 3. Internal packages
-    "github.com/andrew-craig/cairn/services/users/internal/database"
-    "github.com/andrew-craig/cairn/services/users/internal/services"
+    "github.com/cairn-app/cairn-reader/services/users/internal/database"
+    "github.com/cairn-app/cairn-reader/services/users/internal/services"
 )
 ```
 

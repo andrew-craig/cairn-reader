@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/explore/fetcher/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
 )
 
 // FeedSyncer fetches and updates the Kagi feed list daily.

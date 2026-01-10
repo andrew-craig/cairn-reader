@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrew-craig/cairn/services/users/internal/database"
-	"github.com/andrew-craig/cairn/services/users/internal/services"
-	"github.com/andrew-craig/cairn/services/users/test/integration/testutil"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	"github.com/cairn-app/cairn-reader/services/users/test/integration/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func TestAuthService_Registration_Integration(t *testing.T) {
 		env.JWTManager,
 		env.PasswordHash,
 		env.TokenService,
-		8, // min password length
+		8,    // min password length
 		true, // require complexity
 	)
 
