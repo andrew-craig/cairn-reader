@@ -34,7 +34,7 @@ ghcr.io/cairn-app/cairn-user-service:main-abc123
 # infrastructure/docker/docker-compose.yml
 services:
   user-service:
-    image: ghcr.io/cairn-app/cairn-reader-user-service:develop
+    image: ghcr.io/cairn-app/cairn-user-service:develop
     # ... rest of config
 ```
 
@@ -43,7 +43,7 @@ services:
 ```yaml
 services:
   user-service:
-    image: ghcr.io/cairn-app/cairn-reader-user-service:v1.0.0
+    image: ghcr.io/cairn-app/cairn-user-service:v1.0.0
     # ... rest of config
 ```
 
@@ -52,7 +52,7 @@ services:
 ```yaml
 services:
   user-service:
-    image: ghcr.io/cairn-app/cairn-reader-user-service:main-abc123
+    image: ghcr.io/cairn-app/cairn-user-service:main-abc123
     # ... rest of config
 ```
 
@@ -73,14 +73,14 @@ docker-compose up -d
 
 ```bash
 # Pull latest
-docker pull ghcr.io/cairn-app/cairn-reader-user-service:latest
+docker pull ghcr.io/cairn-app/cairn-user-service:latest
 
 # Run locally
 docker run -p 8082:8080 \
   -e DB_HOST=localhost \
   -e DB_PORT=5432 \
   # ... other env vars
-  ghcr.io/cairn-app/cairn-reader-user-service:latest
+  ghcr.io/cairn-app/cairn-user-service:latest
 ```
 
 ## Release Process
