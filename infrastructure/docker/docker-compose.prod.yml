@@ -142,7 +142,7 @@ services:
   # User Service - Authentication and account management
   # Using published image from GitHub Container Registry
   user-service:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-user-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-user-service:${IMAGE_TAG:-latest}
     ports:
       - "8082:8080"
     environment:
@@ -174,7 +174,7 @@ services:
   # Explore Recommender Service - Article storage and recommendations
   # Using published image from GitHub Container Registry
   explore-recommender:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-explore-recommender:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-recommender:${IMAGE_TAG:-latest}
     ports:
       - "8087:8081"
     environment:
@@ -206,7 +206,7 @@ services:
   # Explore Fetcher Service - RSS feed fetching for discovery
   # Using published image from GitHub Container Registry
   explore-fetcher:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-explore-fetcher:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-fetcher:${IMAGE_TAG:-latest}
     ports:
       - "8088:8080"
     environment:
@@ -239,7 +239,7 @@ services:
   # Content Service - Article content storage and management
   # Using published image from GitHub Container Registry
   content-service:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-content-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-service:${IMAGE_TAG:-latest}
     ports:
       - "8083:8080"
     environment:
@@ -265,7 +265,7 @@ services:
   # Content Service Worker - Background jobs for content cleanup
   # Using published image from GitHub Container Registry
   content-worker:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-content-worker:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-worker:${IMAGE_TAG:-latest}
     environment:
       - DB_HOST=content-db
       - DB_PORT=5432
@@ -293,7 +293,7 @@ services:
   # Ingest RSS Service - Feed subscription and polling
   # Using published image from GitHub Container Registry
   ingest-rss:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-ingest-rss:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss:${IMAGE_TAG:-latest}
     ports:
       - "8085:8081"
     environment:
@@ -319,7 +319,7 @@ services:
   # Ingest RSS Worker - Background jobs for feed polling and processing
   # Using published image from GitHub Container Registry
   ingest-rss-worker:
-    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-ingest-rss-worker:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss-worker:${IMAGE_TAG:-latest}
     environment:
       - DB_HOST=ingest-rss-db
       - DB_PORT=5432
