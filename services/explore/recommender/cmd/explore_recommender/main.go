@@ -113,7 +113,7 @@ func main() {
 
 	// Initialize article cleanup job
 	cleanupInterval := 24 * time.Hour // Run cleanup once per day
-	cleanupJob := cleanup.NewArticleCleanup(articleRepo, cfg.ArticleRetentionDays, cleanupInterval)
+	cleanupJob := cleanup.NewArticleCleanup(articleRepo, cfg.ArticleRetentionDays, cleanupInterval, logger)
 	cleanupJob.Start()
 	slog.Info("article cleanup job started",
 		slog.Int("retention_days", cfg.ArticleRetentionDays),

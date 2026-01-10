@@ -2,6 +2,20 @@
 
 This directory contains the complete Docker setup for all Cairn backend services.
 
+## Quick Start
+
+**For local development (build from source):**
+```bash
+docker-compose up --build -d
+```
+
+**For production/staging (use pre-built images):**
+```bash
+cp .env.prod.example .env.prod
+# Edit .env.prod with your settings
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
 ## Services
 
 The Docker Compose configuration includes:

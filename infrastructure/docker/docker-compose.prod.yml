@@ -1,0 +1,361 @@
+name: cairn-prod
+# Production docker-compose file using published images from GitHub Container Registry
+# This file demonstrates how to deploy using pre-built images instead of building locally
+
+services:
+  # HashiCorp Vault - Secrets management
+  vault:
+    image: hashicorp/vault:latest
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_DEV_ROOT_TOKEN_ID}
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+      - VAULT_ADDR=http://127.0.0.1:8200
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cairn-network
+
+  # Vault Initializer - Populates Vault with JWT keys on startup
+  vault-init:
+    image: hashicorp/vault:latest
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+    volumes:
+      - ./scripts/init-vault.sh:/init-vault.sh
+      - vault-keys:/vault-keys
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
+    networks:
+      - cairn-network
+
+  # User Service Database
+  users-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_USERS}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_USERS}
+      POSTGRES_DB: ${POSTGRES_DB_USERS}
+    ports:
+      - "5432:5432"
+    volumes:
+      - users_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_USERS} -d ${POSTGRES_DB_USERS}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cairn-network
+
+  # Explore Recommender Service Database
+  explore-recommender-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_RECOMMENDER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RECOMMENDER}
+      POSTGRES_DB: ${POSTGRES_DB_RECOMMENDER}
+    ports:
+      - "5433:5432"
+    volumes:
+      - explore_recommender_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RECOMMENDER} -d ${POSTGRES_DB_RECOMMENDER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cairn-network
+
+  # Explore Fetcher Service Database
+  explore-fetcher-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_FETCHER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_FETCHER}
+      POSTGRES_DB: ${POSTGRES_DB_FETCHER}
+    ports:
+      - "5434:5432"
+    volumes:
+      - explore_fetcher_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_FETCHER} -d ${POSTGRES_DB_FETCHER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cairn-network
+
+  # Content Service Database
+  content-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_CONTENT}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CONTENT}
+      POSTGRES_DB: ${POSTGRES_DB_CONTENT}
+    ports:
+      - "5435:5432"
+    volumes:
+      - content_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_CONTENT} -d ${POSTGRES_DB_CONTENT}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cairn-network
+
+  # Ingest RSS Database
+  ingest-rss-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER_RSS}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_RSS}
+      POSTGRES_DB: ${POSTGRES_DB_RSS}
+    ports:
+      - "5436:5432"
+    volumes:
+      - ingest_rss_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RSS} -d ${POSTGRES_DB_RSS}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - cairn-network
+
+  # User Service - Authentication and account management
+  # Using published image from GitHub Container Registry
+  user-service:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-user-service:${IMAGE_TAG:-latest}
+    ports:
+      - "8082:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=users-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_USERS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_USERS}
+      - DB_NAME=${POSTGRES_DB_USERS}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+      - JWT_ACCESS_LIFETIME=15m
+      - JWT_REFRESH_LIFETIME=7d
+      - SERVER_ENVIRONMENT=production
+    depends_on:
+      users-db:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Explore Recommender Service - Article storage and recommendations
+  # Using published image from GitHub Container Registry
+  explore-recommender:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-explore-recommender:${IMAGE_TAG:-latest}
+    ports:
+      - "8087:8081"
+    environment:
+      - PORT=8081
+      - DB_HOST=explore-recommender-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_RECOMMENDER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}
+      - DB_NAME=${POSTGRES_DB_RECOMMENDER}
+      - DB_SSLMODE=disable
+      - ARTICLE_RETENTION_DAYS=90
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+      - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+    depends_on:
+      explore-recommender-db:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Explore Fetcher Service - RSS feed fetching for discovery
+  # Using published image from GitHub Container Registry
+  explore-fetcher:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-explore-fetcher:${IMAGE_TAG:-latest}
+    ports:
+      - "8088:8080"
+    environment:
+      - PORT=8080
+      - RECOMMENDER_URL=http://explore-recommender:8081
+      - FETCH_INTERVAL=60
+      - FETCH_TIMEOUT=30
+      - MAX_FETCH_ERRORS=10
+      - DB_HOST=explore-fetcher-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_FETCHER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
+      - DB_NAME=${POSTGRES_DB_FETCHER}
+      - DB_SSLMODE=disable
+      - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
+    depends_on:
+      explore-fetcher-db:
+        condition: service_healthy
+      explore-recommender:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Content Service - Article content storage and management
+  # Using published image from GitHub Container Registry
+  content-service:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-content-service:${IMAGE_TAG:-latest}
+    ports:
+      - "8083:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=content-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_CONTENT}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
+      - DB_NAME=${POSTGRES_DB_CONTENT}
+      - DB_SSL_MODE=disable
+    depends_on:
+      content-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Content Service Worker - Background jobs for content cleanup
+  # Using published image from GitHub Container Registry
+  content-worker:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-content-worker:${IMAGE_TAG:-latest}
+    environment:
+      - DB_HOST=content-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_CONTENT}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
+      - DB_NAME=${POSTGRES_DB_CONTENT}
+      - DB_SSL_MODE=disable
+      - CLEANUP_CRON=0 2 * * *
+      - HEALTH_PORT=8084
+    ports:
+      - "8084:8084"
+    depends_on:
+      content-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Ingest RSS Service - Feed subscription and polling
+  # Using published image from GitHub Container Registry
+  ingest-rss:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-ingest-rss:${IMAGE_TAG:-latest}
+    ports:
+      - "8085:8081"
+    environment:
+      - PORT=8081
+      - DB_HOST=ingest-rss-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_RSS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
+      - DB_NAME=${POSTGRES_DB_RSS}
+      - DB_SSL_MODE=disable
+    depends_on:
+      ingest-rss-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Ingest RSS Worker - Background jobs for feed polling and processing
+  # Using published image from GitHub Container Registry
+  ingest-rss-worker:
+    image: ghcr.io/${GITHUB_ORG:-andrew-craig}/cairn-ingest-rss-worker:${IMAGE_TAG:-latest}
+    environment:
+      - DB_HOST=ingest-rss-db
+      - DB_PORT=5432
+      - DB_USER=${POSTGRES_USER_RSS}
+      - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
+      - DB_NAME=${POSTGRES_DB_RSS}
+      - DB_SSL_MODE=disable
+      - CONTENT_SERVICE_URL=http://content-service:8080
+      - HEALTH_PORT=8086
+      - OUTBOX_CLEANUP_CRON=0 3 * * *
+      - FEED_ITEMS_CLEANUP_CRON=0 4 * * *
+    ports:
+      - "8086:8086"
+    depends_on:
+      ingest-rss-db:
+        condition: service_healthy
+      content-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+volumes:
+  users_db_data:
+  explore_recommender_db_data:
+  explore_fetcher_db_data:
+  content_db_data:
+  ingest_rss_db_data:
+  vault-keys:
+
+networks:
+  cairn-network:
+    driver: bridge

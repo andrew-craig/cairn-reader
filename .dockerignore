@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+docs/
+!**/README.md
+
+# Mobile app (not needed for backend services)
+apps/mobile/node_modules
+apps/mobile/.expo
+apps/mobile/.expo-shared
+apps/mobile/dist
+
+# Development files
+**/.DS_Store
+**/.env
+**/.env.local
+**/.env.*.local
+**/node_modules
+**/.vscode
+**/.idea
+
+# Test files
+**/*_test.go
+**/testdata
+**/.coverage
+**/coverage
+
+# Build artifacts (exclude from context)
+**/bin/
+**/dist/
+**/build/
+**/*.log
+
+# Infrastructure configs (not needed in images)
+infrastructure/
+!infrastructure/docker/scripts
+
+# Temporary files
+**/tmp/
+**/.tmp/
+**/*.tmp
+**/*.swp
+**/*.swo
