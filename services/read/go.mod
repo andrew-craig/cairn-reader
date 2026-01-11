@@ -8,6 +8,7 @@ require (
 	github.com/cairn-app/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
 	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0
 	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
@@ -33,7 +34,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.11.0 // indirect
-	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.27.0 // indirect

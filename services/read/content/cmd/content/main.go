@@ -18,10 +18,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrew-craig/cairn/pkg/logging"
-	"github.com/andrew-craig/cairn/services/read/content/internal/api"
-	"github.com/andrew-craig/cairn/services/read/content/internal/config"
-	"github.com/andrew-craig/cairn/services/read/content/internal/database"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/api"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/config"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
 )
 
 func main() {
