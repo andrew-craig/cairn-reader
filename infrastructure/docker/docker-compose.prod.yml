@@ -3,27 +3,41 @@ name: cairn-prod
 # This file demonstrates how to deploy using pre-built images instead of building locally
 
 services:
-  # HashiCorp Vault - Secrets management
+  # HashiCorp Vault - Secrets Management
+  # NOTE: Port 8200 is NOT exposed to host in production for security
+  # Access Vault only through the Docker network
   vault:
     image: hashicorp/vault:latest
-    ports:
-      - "8200:8200"
+    # Port intentionally NOT exposed to host - access only via Docker network
+    # Uncomment below ONLY for debugging (not recommended in production)
+    # ports:
+    #   - "8200:8200"
     environment:
-      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_DEV_ROOT_TOKEN_ID}
-      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
-      - VAULT_ADDR=http://127.0.0.1:8200
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://vault:8200
+      - SKIP_SETCAP=true
     cap_add:
       - IPC_LOCK
-    command: server -dev
+    volumes:
+      - vault-data:/vault/data
+      - ./vault-config:/vault/config
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        chown -R vault:vault /vault/data
+        exec /usr/local/bin/docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8200/v1/sys/health?standbyok=true&uninitcode=200&sealedcode=200"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
     networks:
       - cairn-network
 
-  # Vault Initializer - Populates Vault with JWT keys on startup
+  # Vault Initializer - Sets up AppRoles and JWT keys on startup
+  # This runs once and creates scoped credentials for each service
   vault-init:
     image: hashicorp/vault:latest
     depends_on:
@@ -31,11 +45,13 @@ services:
         condition: service_healthy
     environment:
       - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+      - VAULT_SKIP_VERIFY=true
     volumes:
-      - ./scripts/init-vault.sh:/init-vault.sh
+      - ./scripts/init-vault-prod.sh:/init-vault-prod.sh:ro
+      - ./vault-config/policies:/vault/policies:ro
       - vault-keys:/vault-keys
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl grep && /bin/sh /init-vault-prod.sh"]
+    restart: "no"
     networks:
       - cairn-network
 
@@ -141,6 +157,7 @@ services:
 
   # User Service - Authentication and account management
   # Using published image from GitHub Container Registry
+  # Authenticates to Vault using AppRole (not root token)
   user-service:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-user-service:${IMAGE_TAG:-latest}
     ports:
@@ -152,11 +169,16 @@ services:
       - DB_USER=${POSTGRES_USER_USERS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_USERS}
       - DB_NAME=${POSTGRES_DB_USERS}
+      # Vault AppRole authentication (scoped to user-service policy)
       - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
-      - JWT_ACCESS_LIFETIME=15m
-      - JWT_REFRESH_LIFETIME=7d
-      - SERVER_ENVIRONMENT=production
+      - VAULT_ROLE_ID=${USER_SERVICE_ROLE_ID}
+      - VAULT_SECRET_ID=${USER_SERVICE_SECRET_ID}
+      - VAULT_AUTH_PATH=approle
+      - JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
+      - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+      - JWT_ACCESS_TOKEN_EXPIRY=15m
+      - JWT_REFRESH_TOKEN_EXPIRY=7d
+      - ENVIRONMENT=production
     depends_on:
       users-db:
         condition: service_healthy
@@ -173,6 +195,7 @@ services:
 
   # Explore Recommender Service - Article storage and recommendations
   # Using published image from GitHub Container Registry
+  # Authenticates to Vault using AppRole (read-only public key access)
   explore-recommender:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-recommender:${IMAGE_TAG:-latest}
     ports:
@@ -186,8 +209,11 @@ services:
       - DB_NAME=${POSTGRES_DB_RECOMMENDER}
       - DB_SSLMODE=disable
       - ARTICLE_RETENTION_DAYS=90
+      # Vault AppRole authentication (scoped to explore-recommender policy - public key only)
       - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+      - VAULT_ROLE_ID=${EXPLORE_RECOMMENDER_ROLE_ID}
+      - VAULT_SECRET_ID=${EXPLORE_RECOMMENDER_SECRET_ID}
+      - VAULT_AUTH_PATH=approle
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
       explore-recommender-db:
@@ -249,7 +275,7 @@ services:
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
     depends_on:
       content-db:
         condition: service_healthy
@@ -272,7 +298,7 @@ services:
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - CLEANUP_CRON=0 2 * * *
       - HEALTH_PORT=8084
     ports:
@@ -303,7 +329,7 @@ services:
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
     depends_on:
       ingest-rss-db:
         condition: service_healthy
@@ -326,7 +352,7 @@ services:
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
       - HEALTH_PORT=8086
       - OUTBOX_CLEANUP_CRON=0 3 * * *
@@ -355,6 +381,7 @@ volumes:
   content_db_data:
   ingest_rss_db_data:
   vault-keys:
+  vault-data:
 
 networks:
   cairn-network:

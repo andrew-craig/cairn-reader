@@ -12,7 +12,10 @@ import (
 // VaultConfig contains HashiCorp Vault configuration
 type VaultConfig struct {
 	Address       string
-	Token         string
+	Token         string // For token-based auth (development)
+	RoleID        string // For AppRole authentication (production)
+	SecretID      string // For AppRole authentication (production)
+	AuthPath      string // AppRole auth path (default: "approle")
 	PublicKeyPath string
 }
 
@@ -21,6 +24,16 @@ func (c *VaultConfig) Validate() error {
 	// Vault is optional for development, but required for production
 	// We'll check this based on the environment in the main config validation
 	return nil
+}
+
+// HasAppRoleAuth returns true if AppRole credentials are configured
+func (c *VaultConfig) HasAppRoleAuth() bool {
+	return c.RoleID != "" && c.SecretID != ""
+}
+
+// HasTokenAuth returns true if token-based auth is configured
+func (c *VaultConfig) HasTokenAuth() bool {
+	return c.Token != ""
 }
 
 // Config holds all configuration for the recommender service
@@ -41,7 +54,10 @@ func Load() (*Config, error) {
 		Vault: VaultConfig{
 			Address:       sharedconfig.GetString("VAULT_ADDR", "http://localhost:8200"),
 			Token:         sharedconfig.GetString("VAULT_TOKEN", ""),
-			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/jwt/public-key"),
+			RoleID:        sharedconfig.GetString("VAULT_ROLE_ID", ""),
+			SecretID:      sharedconfig.GetString("VAULT_SECRET_ID", ""),
+			AuthPath:      sharedconfig.GetString("VAULT_AUTH_PATH", "approle"),
+			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 		},
 		ArticleRetentionDays: sharedconfig.GetInt("ARTICLE_RETENTION_DAYS", 90),
 	}
@@ -72,8 +88,9 @@ func (c *Config) Validate() error {
 		if c.Vault.Address == "" {
 			return fmt.Errorf("VAULT_ADDR is required in production")
 		}
-		if c.Vault.Token == "" {
-			return fmt.Errorf("VAULT_TOKEN is required in production")
+		// Require either token auth or AppRole auth
+		if !c.Vault.HasTokenAuth() && !c.Vault.HasAppRoleAuth() {
+			return fmt.Errorf("VAULT_TOKEN or VAULT_ROLE_ID/VAULT_SECRET_ID is required in production")
 		}
 	}
 

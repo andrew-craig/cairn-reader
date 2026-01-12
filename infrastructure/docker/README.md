@@ -429,49 +429,142 @@ ports:
 
 ## Production Deployment
 
-⚠️ **This setup is for DEVELOPMENT only!**
+The production deployment uses `docker-compose.prod.yml` with significant security improvements over the development setup.
 
-For production deployment:
+### Key Security Features
 
-1. **Use production Vault** (not dev mode):
-   - Deploy Vault with proper storage backend
-   - Use real authentication (not dev token)
-   - Enable TLS/SSL
-   - Use unsealing keys
+| Feature | Development | Production |
+|---------|-------------|------------|
+| Vault Authentication | Root token | AppRole per service |
+| Vault Port | Exposed (8200) | Internal only |
+| Token Permissions | Unlimited | Scoped policies |
+| Unseal Keys | 1 key | 5 keys (3 threshold) |
 
-2. **Secure database passwords**:
-   - Use strong passwords
+### First-Time Production Setup
+
+```bash
+cd infrastructure/docker
+
+# 1. Copy and configure environment
+cp .env.prod.example .env.prod
+# Edit .env.prod with secure database passwords
+
+# 2. Start services (first run initializes Vault)
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# 3. Wait for vault-init to complete
+docker-compose -f docker-compose.prod.yml logs -f vault-init
+
+# 4. Retrieve AppRole credentials from the vault-keys volume
+docker-compose -f docker-compose.prod.yml exec vault cat /vault-keys/approle-credentials.env
+
+# 5. Update .env.prod with the AppRole credentials
+# USER_SERVICE_ROLE_ID=<from step 4>
+# USER_SERVICE_SECRET_ID=<from step 4>
+# EXPLORE_RECOMMENDER_ROLE_ID=<from step 4>
+# EXPLORE_RECOMMENDER_SECRET_ID=<from step 4>
+
+# 6. Restart services to use AppRole auth
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# 7. IMPORTANT: Secure the unseal keys
+docker-compose -f docker-compose.prod.yml exec vault cat /vault-keys/UNSEAL_KEYS.txt
+# Copy these keys to a secure location and delete the file:
+docker-compose -f docker-compose.prod.yml exec vault rm /vault-keys/UNSEAL_KEYS.txt
+```
+
+### Vault Security Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Vault (internal only)                    │
+│  ┌─────────────────┐    ┌─────────────────────────────────────┐ │
+│  │   AppRole Auth  │    │           Secrets (KV v2)           │ │
+│  │                 │    │  secret/data/jwt/private-key        │ │
+│  │  user-service   │───▶│  secret/data/jwt/public-key         │ │
+│  │  (read priv+pub)│    │                                     │ │
+│  │                 │    │                                     │ │
+│  │  explore-recomm │───▶│  (read public key only)             │ │
+│  │  (read pub only)│    │                                     │ │
+│  └─────────────────┘    └─────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Service Permissions:**
+- **user-service**: Can read both private and public JWT keys (signs tokens)
+- **explore-recommender**: Can only read the public JWT key (verifies tokens)
+
+### Vault Unseal After Restart
+
+If Vault restarts, it will be sealed. To unseal:
+
+```bash
+# Connect to the vault container
+docker-compose -f docker-compose.prod.yml exec vault sh
+
+# Unseal with 3 of the 5 keys (from your secure storage)
+vault operator unseal <key1>
+vault operator unseal <key2>
+vault operator unseal <key3>
+```
+
+### Additional Production Recommendations
+
+1. **Secure database passwords**:
+   - Use strong, unique passwords for each database
    - Store in environment variables or secrets manager
-   - Don't commit passwords to version control
+   - Never commit passwords to version control
 
-3. **Enable HTTPS**:
-   - Add reverse proxy (nginx/traefik)
+2. **Enable HTTPS** (external traffic):
+   - Add nginx or traefik reverse proxy
    - Use SSL certificates (Let's Encrypt)
+   - Internal Docker network traffic can remain HTTP
 
-4. **Use environment-specific configs**:
-   - Separate `.env` files for prod/staging/dev
-   - Use Docker secrets or Kubernetes secrets
-
-5. **Set up monitoring**:
+3. **Set up monitoring**:
    - Add Prometheus metrics
    - Configure log aggregation
    - Set up health check monitoring
 
-6. **Database backups**:
+4. **Database backups**:
    - Configure automated backups
    - Test restore procedures
-   - Use managed PostgreSQL if possible
+   - Consider managed PostgreSQL
+
+5. **Rotate AppRole Secret IDs periodically**:
+   ```bash
+   # Generate new secret ID for a service
+   docker-compose exec vault vault write -f auth/approle/role/user-service/secret-id
+   # Update .env.prod and restart the service
+   ```
 
 ## Scripts
 
-### init-vault.sh
+### init-vault.sh (Development)
 
-Automatically runs on first startup to:
+Automatically runs on first startup in development mode to:
 - Generate RSA key pair (2048-bit)
 - Store keys in Vault
 - Verify key storage
 
 Located at: `infrastructure/docker/scripts/init-vault.sh`
+
+### init-vault-prod.sh (Production)
+
+Runs on first production startup to securely initialize Vault:
+- Initialize Vault with 5 unseal keys (3 threshold)
+- Enable KV v2 secrets engine
+- Generate and store RSA JWT keys
+- Enable AppRole authentication
+- Create scoped policies for each service
+- Create AppRoles with limited permissions
+- Output AppRole credentials for service configuration
+
+**Security features:**
+- Root token is NOT stored or logged
+- Each service gets its own AppRole with minimal permissions
+- Unseal keys are written to a file that should be retrieved and deleted
+
+Located at: `infrastructure/docker/scripts/init-vault-prod.sh`
 
 ### init-postgres.sh
 

@@ -75,12 +75,17 @@ func main() {
 	defer database.Close()
 
 	// Initialize Vault client and fetch JWT public key for authentication
+	// Supports both token auth (development) and AppRole auth (production)
 	slog.Info("connecting to vault",
 		slog.String("address", cfg.Vault.Address),
+		slog.Bool("using_approle", cfg.Vault.HasAppRoleAuth()),
 	)
 	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
-		Address: cfg.Vault.Address,
-		Token:   cfg.Vault.Token,
+		Address:  cfg.Vault.Address,
+		Token:    cfg.Vault.Token,
+		RoleID:   cfg.Vault.RoleID,
+		SecretID: cfg.Vault.SecretID,
+		AuthPath: cfg.Vault.AuthPath,
 	})
 	if err != nil {
 		slog.Error("failed to create vault client", slog.Any("error", err))

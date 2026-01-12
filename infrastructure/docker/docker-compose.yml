@@ -33,6 +33,7 @@ services:
       - ./scripts/init-vault.sh:/init-vault.sh
       - vault-keys:/vault-keys
     entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
+    restart: "no"
     networks:
       - cairn-network
 
