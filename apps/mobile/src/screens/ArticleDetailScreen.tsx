@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import { RootStackParamList } from '../types';
-import { StorageService } from '../services';
+import { StorageService, ReadService } from '../services';
 import { formatDate, extractDomain } from '../utils';
 import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
 
@@ -31,10 +31,19 @@ export const ArticleDetailScreen: React.FC = () => {
     try {
       await WebBrowser.openBrowserAsync(article.url);
       if (!article.isRead) {
+        // Update both local storage and backend
         await StorageService.updateArticle(article.id, {
           isRead: true,
           readAt: Date.now(),
         });
+        try {
+          await ReadService.updateUserContent(article.id, {
+            status: 'completed',
+          });
+        } catch (backendError) {
+          console.error('Failed to sync read status to backend:', backendError);
+          // Continue anyway - local update was successful
+        }
         setArticle({ ...article, isRead: true, readAt: Date.now() });
       }
     } catch (error) {
@@ -44,10 +53,20 @@ export const ArticleDetailScreen: React.FC = () => {
 
   const handleToggleFavorite = async () => {
     try {
+      const newIsFavorite = !article.isFavorite;
+      // Update both local storage and backend
       await StorageService.updateArticle(article.id, {
-        isFavorite: !article.isFavorite,
+        isFavorite: newIsFavorite,
       });
-      setArticle({ ...article, isFavorite: !article.isFavorite });
+      try {
+        await ReadService.updateUserContent(article.id, {
+          is_favorite: newIsFavorite,
+        });
+      } catch (backendError) {
+        console.error('Failed to sync favorite status to backend:', backendError);
+        // Continue anyway - local update was successful
+      }
+      setArticle({ ...article, isFavorite: newIsFavorite });
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
     }
@@ -56,10 +75,19 @@ export const ArticleDetailScreen: React.FC = () => {
   const handleToggleRead = async () => {
     try {
       const newIsRead = !article.isRead;
+      // Update both local storage and backend
       await StorageService.updateArticle(article.id, {
         isRead: newIsRead,
         readAt: newIsRead ? Date.now() : undefined,
       });
+      try {
+        await ReadService.updateUserContent(article.id, {
+          status: newIsRead ? 'completed' : 'unread',
+        });
+      } catch (backendError) {
+        console.error('Failed to sync read status to backend:', backendError);
+        // Continue anyway - local update was successful
+      }
       setArticle({
         ...article,
         isRead: newIsRead,
@@ -92,7 +120,15 @@ export const ArticleDetailScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Delete from local storage
               await StorageService.deleteArticle(article.id);
+              // Also delete from backend
+              try {
+                await ReadService.deleteUserContent(article.id);
+              } catch (backendError) {
+                console.error('Failed to delete article from backend:', backendError);
+                // Continue anyway - local deletion was successful
+              }
               navigation.goBack();
             } catch (error) {
               console.error('Failed to delete article:', error);

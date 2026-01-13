@@ -14,8 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../types';
 import { Button } from '../components/common';
-import { StorageService } from '../services';
-import { generateId, isValidUrl } from '../utils';
+import { StorageService, ReadService, AuthService } from '../services';
+import { isValidUrl } from '../utils';
 import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
 
 export const AddArticleScreen: React.FC = () => {
@@ -48,24 +48,34 @@ export const AddArticleScreen: React.FC = () => {
       return;
     }
 
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title');
-      return;
-    }
-
     setLoading(true);
     try {
-      const newArticle: Article = {
-        id: generateId(),
+      // First, try to add via backend
+      const addResponse = await ReadService.addURL({
         url: url.trim(),
         title: title.trim(),
-        tags: [],
-        isRead: false,
-        isFavorite: false,
-        addedAt: Date.now(),
-      };
+      });
 
-      await StorageService.addArticle(newArticle);
+      // Transform the response to Article format
+      let article: Article;
+      if (addResponse.type === 'page' && addResponse.content) {
+        article = ReadService.transformToArticle(addResponse.content);
+      } else {
+        // For feed subscriptions, create a basic article entry
+        article = {
+          id: url.trim(),
+          url: url.trim(),
+          title: title.trim(),
+          tags: [],
+          isRead: false,
+          isFavorite: false,
+          addedAt: Date.now(),
+        };
+      }
+
+      // Also save locally for offline access
+      await StorageService.addArticle(article);
+
       Alert.alert('Success', 'Article added successfully', [
         {
           text: 'OK',
@@ -73,7 +83,8 @@ export const AddArticleScreen: React.FC = () => {
         },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to add article');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add article';
+      Alert.alert('Error', errorMessage);
       console.error('Failed to add article:', error);
     } finally {
       setLoading(false);
