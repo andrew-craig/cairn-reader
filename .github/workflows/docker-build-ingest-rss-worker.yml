@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
     tags:
       - 'v*'
     paths:
@@ -16,7 +15,6 @@ on:
   pull_request:
     branches:
       - main
-      - develop
     paths:
       - 'services/read/fetcher/**'
       - 'services/read/internal/**'

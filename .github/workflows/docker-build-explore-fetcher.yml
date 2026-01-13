@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
     tags:
       - 'v*'
     paths:
@@ -13,7 +12,6 @@ on:
   pull_request:
     branches:
       - main
-      - develop
     paths:
       - 'services/explore/**'
       - '.github/workflows/docker-build-explore-fetcher.yml'
