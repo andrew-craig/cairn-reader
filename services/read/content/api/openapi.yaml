@@ -332,6 +332,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/internal/content/user/bulk:
+    post:
+      x-internal: true
+      tags:
+        - Bulk Operations
+      summary: Bulk add content to users (internal only)
+      description: |
+        **Internal endpoint - for internal services only (e.g., Ingest RSS Service)**
+
+        Bulk add existing content items to multiple users. This endpoint is not authenticated
+        and should only be called from internal services within the system.
+
+        External clients should use `POST /api/v1/content/user/{user_id}` with authentication instead.
+      operationId: bulkAddToUsersInternal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAddToUsersRequest'
+      responses:
+        '200':
+          description: Bulk operation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAddToUsersResponse'
+        '400':
+          description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}:
     get:
       tags:
@@ -339,6 +379,8 @@ paths:
       summary: List user's contents
       description: Retrieve a paginated list of contents for a specific user with optional filtering
       operationId: listUserContents
+      security:
+        - BearerAuth: []
       parameters:
         - name: user_id
           in: path
@@ -384,6 +426,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -405,6 +459,8 @@ paths:
 
         **Content-ID-based submission (legacy)**: Provide a pre-created content_id to add existing content.
       operationId: addContentToUser
+      security:
+        - BearerAuth: []
       parameters:
         - name: user_id
           in: path
@@ -483,6 +539,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only add content to their own account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Content not found (content_id mode only)
           content:
@@ -509,6 +577,8 @@ paths:
       summary: Update user-content metadata
       description: Update user-specific metadata (status, scroll position, favorite flag)
       operationId: updateUserContent
+      security:
+        - BearerAuth: []
       parameters:
         - name: user_id
           in: path
@@ -543,6 +613,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User-content relationship not found
           content:
@@ -562,6 +644,8 @@ paths:
       summary: Remove content from user's list
       description: Remove a content item from a user's reading list (hard delete of user-content relationship)
       operationId: deleteUserContent
+      security:
+        - BearerAuth: []
       parameters:
         - name: user_id
           in: path
@@ -580,6 +664,18 @@ paths:
       responses:
         '204':
           description: Content removed from user's list
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User-content relationship not found
           content:
@@ -600,6 +696,8 @@ paths:
       summary: Search user's contents
       description: Search user's contents using PostgreSQL full-text search (title and author)
       operationId: searchUserContents
+      security:
+        - BearerAuth: []
       parameters:
         - name: user_id
           in: path
@@ -636,6 +734,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -644,6 +754,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from User Service for authentication
   schemas:
     CreateContentRequest:
       type: object
@@ -811,6 +927,67 @@ components:
               exists:
                 type: boolean
                 description: Whether content exists
+
+    BulkAddToUsersRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required:
+              - user_id
+              - content_id
+            properties:
+              user_id:
+                type: string
+                format: uuid
+                description: User ID
+              content_id:
+                type: string
+                format: uuid
+                description: Content ID to add
+              status:
+                type: string
+                enum: [unread, reading, completed, archived]
+                description: Initial reading status (default unread)
+
+    BulkAddToUsersResponse:
+      type: object
+      properties:
+        succeeded:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: IDs of successfully added user-content relationships
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+                description: Index in the input array
+              user_id:
+                type: string
+                format: uuid
+                description: User ID
+              content_id:
+                type: string
+                format: uuid
+                description: Content ID
+              error:
+                type: string
+                description: Error code
+              message:
+                type: string
+                description: Error message
+          description: Failed items with error details
 
     URLType:
       type: string

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
@@ -147,8 +148,12 @@ func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
-// BulkAddToUsers handles POST /api/v1/users/bulk/contents
+// BulkAddToUsers handles POST /api/v1/content/user/bulk (protected)
+// Requires authentication - user can only add content to their own account
 func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	var req dto.BulkAddToUsersRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
@@ -161,6 +166,38 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify user can only add content to their own account
+	for _, item := range req.Items {
+		if item.UserID != authenticatedUserID {
+			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only add content to their own account", nil, "v1")
+			return
+		}
+	}
+
+	h.bulkAddToUsersInternal(w, r, &req)
+}
+
+// BulkAddToUsersInternal handles POST /api/v1/internal/content/user/bulk (unprotected)
+// For internal services only - no authentication required
+// This endpoint is used by Ingest RSS Service and other internal services
+func (h *BulkHandler) BulkAddToUsersInternal(w http.ResponseWriter, r *http.Request) {
+	var req dto.BulkAddToUsersRequest
+	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+		return
+	}
+
+	h.bulkAddToUsersInternal(w, r, &req)
+}
+
+// bulkAddToUsersInternal is the shared implementation for both protected and internal endpoints
+func (h *BulkHandler) bulkAddToUsersInternal(w http.ResponseWriter, r *http.Request, req *dto.BulkAddToUsersRequest) {
 	// Prepare user-content records
 	userContents := make([]*models.UserContent, len(req.Items))
 	for i, item := range req.Items {

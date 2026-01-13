@@ -68,25 +68,28 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"service":"content-service","version":"0.4.0","status":"Phase 1.4 - Bulk Operations complete"}`)
+		fmt.Fprintf(w, `{"service":"content-service","version":"0.5.0","status":"Phase 2 - Router & Middleware Integration complete"}`)
 	})
 
 	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
 	r.Route("/api/v1/content", func(r chi.Router) {
-		// URL detection endpoint
+		// URL detection endpoint (unprotected)
 		r.Post("/detect", detectionHandler.DetectURL)
 
-		// Content management routes
+		// Content management routes (unprotected - used by internal services)
 		r.Post("/", contentHandler.CreateContent)
 		r.Get("/{content_id}", contentHandler.GetContent)
 		r.Put("/{content_id}", contentHandler.UpdateContent)
 
-		// Bulk operation routes
+		// Bulk operation routes (unprotected - used by internal services)
 		r.Post("/bulk", bulkHandler.BulkCreateContent)
 		r.Post("/check-duplicate", bulkHandler.CheckDuplicates)
 
-		// User-content routes (nested under /user/{user_id})
+		// Protected user-content routes (nested under /user/{user_id})
 		r.Route("/user/{user_id}", func(r chi.Router) {
+			// Apply RequireAuth middleware to all routes in this group
+			r.Use(authMiddleware.RequireAuth)
+
 			r.Get("/", userContentHandler.ListUserContents)
 			r.Post("/", userContentHandler.AddContentToUser)
 			r.Get("/search", userContentHandler.SearchUserContents)
@@ -94,8 +97,15 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 			r.Delete("/{content_id}", userContentHandler.DeleteUserContent)
 		})
 
-		// Bulk user-content routes
-		r.Post("/user/bulk", bulkHandler.BulkAddToUsers)
+		// Protected bulk user-content route
+		r.With(authMiddleware.RequireAuth).Post("/user/bulk", bulkHandler.BulkAddToUsers)
+	})
+
+	// Internal API routes - used by internal services (Ingest RSS, etc.)
+	// These routes do NOT require authentication as they are internal-only
+	r.Route("/api/v1/internal", func(r chi.Router) {
+		// Internal bulk operations for Ingest RSS Service
+		r.Post("/content/user/bulk", bulkHandler.BulkAddToUsersInternal)
 	})
 
 	return r

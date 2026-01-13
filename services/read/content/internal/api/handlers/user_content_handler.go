@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
@@ -45,11 +46,20 @@ func NewUserContentHandler(
 
 // ListUserContents handles GET /api/v1/users/:user_id/contents
 func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Verify user owns the content
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
@@ -152,11 +162,20 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 // 1. URL-based: Provide URL (optional Type/Title) for automatic detection and routing
 // 2. Content-ID-based (legacy): Provide ContentID for pre-created content
 func (h *UserContentHandler) AddContentToUser(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Verify user owns the content
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
@@ -384,18 +403,27 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 
 // UpdateUserContent handles PATCH /api/v1/users/:user_id/contents/:content_id
 func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	// Get user ID and content ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Verify user owns the content
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
 	contentIDStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(contentIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID format", nil, "v1")
 		return
 	}
 
@@ -456,18 +484,27 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 
 // DeleteUserContent handles DELETE /api/v1/users/:user_id/contents/:content_id
 func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	// Get user ID and content ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Verify user owns the content
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
 	contentIDStr := chi.URLParam(r, "content_id")
 	contentID, err := uuid.Parse(contentIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID format", nil, "v1")
 		return
 	}
 
@@ -483,11 +520,20 @@ func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Re
 
 // SearchUserContents handles GET /api/v1/users/:user_id/contents/search
 func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from context
+	authenticatedUserID := auth.MustGetUserID(r.Context())
+
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Verify user owns the content
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
