@@ -336,28 +336,43 @@ POST   /api/v1/content/check-duplicate               → Check for duplicates
        Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
 ```
 
-**User Content Management**:
+**User Content Management** (⚠️ Requires JWT authentication):
 ```
 POST   /api/v1/content/user/{user_id}                → Add URL to user's list
+       Auth: Bearer <JWT token>
        Body (recommended): {"url": "...", "type": "feed|page", "title": "..."}
        - If type=feed: Subscribes via Ingest RSS service
        - If type=page: Extracts content and adds to reading list
-       Body (legacy): {"content_id": "uuid"}
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 GET    /api/v1/content/user/{user_id}                → List user's contents
+       Auth: Bearer <JWT token>
        Query: ?status=..., ?is_favorite=true, ?limit=20, ?offset=0
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 GET    /api/v1/content/user/{user_id}/search         → Full-text search
+       Auth: Bearer <JWT token>
        Query: ?q=golang, ?limit=20, ?offset=0
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 PATCH  /api/v1/content/user/{user_id}/{content_id}   → Update user metadata
+       Auth: Bearer <JWT token>
        Body: {"status": "reading|completed|archived", "is_favorite": true,
               "scroll_position": 0.5, "notes": "..."}
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 DELETE /api/v1/content/user/{user_id}/{content_id}   → Remove from user's list
+       Auth: Bearer <JWT token>
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
-POST   /api/v1/content/user/bulk                     → Bulk add to multiple users
+POST   /api/v1/content/user/bulk                     → Bulk add to authenticated user
+       Auth: Bearer <JWT token>
+       Body: [{"url": "...", ...}, ...]
+       Returns: 401 if missing/invalid token, 403 if trying to add to other users
+
+POST   /api/v1/internal/content/user/bulk            → Bulk add (internal - no auth)
        Body: [{"user_id": "...", "url": "...", ...}, ...]
+       Note: Used by internal services (Ingest RSS) only
 ```
 
 ### Ingest RSS Service (port 8085)
@@ -389,6 +404,99 @@ PATCH  /api/v1/source/rss/feed/{feed_id}                       → Enable/disabl
 
 POST   /api/v1/source/rss/feed/{feed_id}/refresh               → Manually trigger refresh
 ```
+
+## JWT Authentication
+
+### Overview
+
+The Content Service now uses JWT-based authentication to ensure users can only access their own content. All user-specific endpoints require a valid JWT token signed by the User Service.
+
+### Protected Routes
+
+All routes under `/api/v1/content/user/{user_id}` are protected and require:
+- JWT token in `Authorization: Bearer <token>` header
+- Token must contain valid `user_id` claim matching the URL parameter
+- Expires: Token expiration validated by service
+- Signature: RS256 with public key fetched from Vault at startup
+
+**Protected endpoints**:
+- `GET /api/v1/content/user/{user_id}` - List user contents
+- `POST /api/v1/content/user/{user_id}` - Add content to user
+- `GET /api/v1/content/user/{user_id}/search` - Search user contents
+- `PATCH /api/v1/content/user/{user_id}/{content_id}` - Update content metadata
+- `DELETE /api/v1/content/user/{user_id}/{content_id}` - Delete from user
+- `POST /api/v1/content/user/bulk` - Bulk add for authenticated user
+
+### Public Routes (No Auth)
+
+- `GET /health/live` - Liveness probe
+- `GET /health/ready` - Readiness probe
+- `POST /api/v1/content/detect` - URL detection
+- `POST /api/v1/content/` - Create content (internal)
+- `GET /api/v1/content/{content_id}` - Get content (internal)
+- `PUT /api/v1/content/{content_id}` - Update content (internal)
+- `POST /api/v1/content/bulk` - Bulk create (internal)
+- `POST /api/v1/content/check-duplicate` - Check duplicates (internal)
+- `POST /api/v1/internal/content/user/bulk` - Bulk add by internal services
+
+### Configuration
+
+The service loads JWT public key from HashiCorp Vault at startup:
+
+```bash
+# Development
+VAULT_ADDR=http://localhost:8200
+VAULT_TOKEN=dev-root-token
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+VAULT_AUTH_PATH=approle
+
+# Production
+VAULT_ADDR=https://vault.example.com:8200
+VAULT_ROLE_ID=<role-id>
+VAULT_SECRET_ID=<secret-id>
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+VAULT_AUTH_PATH=approle
+```
+
+### Authorization Logic
+
+Each protected handler checks:
+1. Extract authenticated user ID from JWT context
+2. Extract requested user ID from URL parameter
+3. Compare IDs - must match or return 403 Forbidden
+4. User can only access their own content
+
+Example from `user_content_handler.go`:
+```go
+authenticatedUserID := auth.MustGetUserID(r.Context())  // From JWT
+requestedUserID, err := uuid.Parse(chi.URLParam(r, "user_id"))
+
+if authenticatedUserID != requestedUserID {
+    // Return 403 Forbidden
+}
+```
+
+### Error Responses
+
+**401 Unauthorized** - Missing or invalid token:
+```json
+{"error": "unauthorized", "message": "Missing or invalid authentication token"}
+```
+
+**403 Forbidden** - User lacks permission:
+```json
+{"error": "forbidden", "message": "User can only access their own content"}
+```
+
+### Internal Service Integration
+
+The Ingest RSS Service calls the internal bulk endpoint which does NOT require authentication:
+
+```bash
+POST /api/v1/internal/content/user/bulk
+```
+
+This endpoint allows Ingest RSS to add content to users without providing JWT tokens. It's marked as internal-only and should not be exposed to clients.
 
 ## Key Implementation Details
 
@@ -908,7 +1016,7 @@ When updating content:
 
 ## Status & Roadmap
 
-**Current Status**: ✅ Core functionality complete (Phases 0-5)
+**Current Status**: ✅ Core functionality complete (Phases 0-6)
 
 **Completed**:
 - ✅ Content Service with full CRUD, search, deduplication
@@ -917,6 +1025,7 @@ When updating content:
 - ✅ Content update detection via HTTP caching headers
 - ✅ Background workers and scheduled jobs
 - ✅ Comprehensive test coverage (80%+)
+- ✅ **JWT Authentication** (Phase 6) - User-content access control with RS256 token validation
 
 **Remaining Work**:
 - 🔲 API documentation (OpenAPI/Swagger UI)

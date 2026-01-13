@@ -2,11 +2,35 @@
 
 The Content Service is responsible for storing and serving article content with user-specific metadata.
 
-## Phase 1.1: Database Layer (Completed)
+## Security: JWT Authentication (Phase 6 - Completed)
 
-This phase implements the foundational database layer for the Content Service:
+This phase implements JWT-based authentication and authorization for user-specific endpoints:
 
 ### Implemented Features
+
+- **Vault Integration**: Fetches RS256 public key from HashiCorp Vault at startup
+- **JWT Validation**: Validates token signature, expiration, issuer, and audience claims
+- **Authorization Checks**: Compares authenticated user ID from JWT with requested user ID in URL
+- **Protected Routes**: All `/api/v1/content/user/{user_id}` endpoints require valid JWT
+- **Internal Routes**: Separate `/api/v1/internal/content/user/bulk` endpoint for service-to-service communication
+- **Error Responses**: Standard 401 Unauthorized and 403 Forbidden responses
+
+### Configuration
+
+```bash
+# Development
+VAULT_ADDR=http://localhost:8200
+VAULT_TOKEN=dev-root-token
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+
+# Production
+VAULT_ADDR=https://vault.example.com:8200
+VAULT_ROLE_ID=<role-id>
+VAULT_SECRET_ID=<secret-id>
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+```
+
+### Database Layer (Phase 1.1 - Foundation)
 
 - **Database Connection Pooling**: Configured PostgreSQL connection pooling with customizable settings
 - **Data Models**:
@@ -263,12 +287,50 @@ The mobile app uses these endpoints to provide a seamless "Add" experience:
 
 See `apps/mobile/src/components/AddLinkModal.tsx` for implementation.
 
+### API Endpoints
+
+**User-Specific Endpoints (Require JWT):**
+
+```
+POST   /api/v1/content/user/{user_id}                → Add content to user (requires auth)
+GET    /api/v1/content/user/{user_id}                → List user's contents (requires auth)
+GET    /api/v1/content/user/{user_id}/search         → Search user's contents (requires auth)
+PATCH  /api/v1/content/user/{user_id}/{content_id}   → Update content metadata (requires auth)
+DELETE /api/v1/content/user/{user_id}/{content_id}   → Delete from user (requires auth)
+POST   /api/v1/content/user/bulk                     → Bulk add to user (requires auth)
+```
+
+**Public Endpoints (No Auth Required):**
+
+```
+POST   /api/v1/content/detect                        → Detect if URL is feed or page
+POST   /api/v1/content/                              → Create content (internal use)
+GET    /api/v1/content/{content_id}                  → Get content (internal use)
+PUT    /api/v1/content/{content_id}                  → Update content (internal use)
+POST   /api/v1/content/bulk                          → Bulk create (internal use)
+POST   /api/v1/content/check-duplicate               → Check for duplicates (internal use)
+```
+
+**Internal Service Endpoints (No Auth Required):**
+
+```
+POST   /api/v1/internal/content/user/bulk            → Bulk add to users (Ingest RSS only)
+```
+
+**Health Checks:**
+
+```
+GET    /health/live                                  → Liveness probe
+GET    /health/ready                                 → Readiness probe (includes DB check)
+```
+
 ### Next Steps
 
 - **Phase 1.2**: Content processing (readability, sanitization, deduplication) ✅ Complete
 - **Phase 1.3**: REST API - Basic operations ✅ Complete
 - **Phase 1.4**: REST API - Bulk operations ✅ Complete
 - **URL Detection**: Smart URL submission and feed detection ✅ Complete
+- **Phase 6**: JWT Authentication and authorization ✅ Complete
 
 ## Development
 
@@ -281,11 +343,56 @@ See `apps/mobile/src/components/AddLinkModal.tsx` for implementation.
 ### Testing
 
 ```bash
-# Run tests (when available)
+# Run all tests
 go test ./...
 
 # Run tests with coverage
 go test -cover ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run specific test package
+go test -v ./internal/api/handlers/
+go test -v ./internal/api/handlers/ -run TestUserContent
+```
+
+### Testing Protected Endpoints
+
+When testing user-specific endpoints, you need a valid JWT token. Here's how:
+
+1. **Get a token from User Service**:
+   ```bash
+   curl -X POST http://localhost:8082/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "user@example.com", "password": "password"}'
+   ```
+
+2. **Use token in request header**:
+   ```bash
+   curl -X GET http://localhost:8083/api/v1/content/user/{user_id} \
+     -H "Authorization: Bearer <token>"
+   ```
+
+3. **Test authorization failure** (accessing other user's content):
+   ```bash
+   curl -X GET http://localhost:8083/api/v1/content/user/other-user-id \
+     -H "Authorization: Bearer <token>"
+   # Returns 403 Forbidden
+   ```
+
+### Testing Without JWT
+
+Public endpoints don't require authentication:
+
+```bash
+# URL detection (no auth needed)
+curl -X POST http://localhost:8083/api/v1/content/detect \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+
+# Health checks (no auth needed)
+curl http://localhost:8083/health/ready
 ```
 
 ## License
