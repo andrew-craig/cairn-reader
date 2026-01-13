@@ -46,6 +46,86 @@ cd recommender
 go run cmd/recommender/main.go
 ```
 
+## Testing
+
+The Explore services include both unit tests and integration tests using [Testcontainers](https://testcontainers.com/) for PostgreSQL.
+
+### Running Tests
+
+```bash
+# Run all tests (unit + integration)
+# Requires Docker to be running for integration tests
+go test ./... -v
+
+# Run only unit tests (skip integration tests)
+go test ./... -v -short
+
+# Run specific integration tests
+go test -tags=integration -v ./recommender/internal/db/
+
+# Run unit tests in a specific package
+go test -v ./recommender/internal/recommend/
+```
+
+### Test Types
+
+#### Unit Tests
+- Located alongside source code files (e.g., `engine_test.go`)
+- Test business logic in isolation using mocks
+- Run quickly without external dependencies
+- Use `-short` flag to skip integration tests: `go test -short ./...`
+
+#### Integration Tests
+- Located in files with `_integration_test.go` suffix
+- Use `//go:build integration` build tag
+- Automatically spin up PostgreSQL containers using Testcontainers
+- Run database migrations automatically
+- Clean up containers after tests complete
+- **Require Docker to be running**
+
+### Integration Test Setup
+
+Integration tests use Testcontainers to automatically:
+1. Start a PostgreSQL 16 container
+2. Run all database migrations
+3. Provide a clean database for each test
+4. Terminate the container after tests complete
+
+No manual database setup required! Just ensure Docker is running.
+
+**Example integration test:**
+
+```go
+func TestIntegration_Something(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    pool, cleanup := testutil.SetupTestDB(t)
+    defer cleanup()
+
+    repo := db.NewArticleRepository(pool)
+    // ... test code
+}
+```
+
+### CI/CD Considerations
+
+Integration tests require Docker to run. In CI/CD pipelines:
+- Use Docker-in-Docker or provide a Docker socket
+- Or skip integration tests with: `go test -short ./...`
+- GitHub Actions example:
+
+```yaml
+- name: Run tests
+  run: |
+    # Unit tests only (no Docker required)
+    go test -short ./...
+
+    # Or with Docker service for integration tests
+    go test ./...
+```
+
 ## Project Structure
 
 ```

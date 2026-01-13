@@ -5,72 +5,31 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/models"
-	_ "github.com/lib/pq"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/testutil"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// setupIntegrationDB creates a test database connection using environment variables
-func setupIntegrationDB(t *testing.T) *sql.DB {
+// cleanupTestData removes all test data from the database
+func cleanupTestData(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 
-	// Use environment variables or defaults
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "5432")
-	user := getEnv("DB_USER", "cairn")
-	password := getEnv("DB_PASSWORD", "cairn_password")
-	dbname := getEnv("DB_NAME", "cairn_db")
-
-	connStr := "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		t.Fatalf("could not connect to database: %v", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		db.Close()
-		t.Fatalf("could not ping database: %v", err)
-	}
-
-	// Clean up test data
-	cleanupIntegrationDB(t, db)
-
-	return db
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// cleanupIntegrationDB removes all test data from the database
-func cleanupIntegrationDB(t *testing.T, db *sql.DB) {
-	t.Helper()
-
+	ctx := context.Background()
 	queries := []string{
+		"DELETE FROM user_article_recommendations WHERE article_id LIKE 'test-%'",
 		"DELETE FROM user_articles WHERE article_id LIKE 'test-%'",
 		"DELETE FROM articles WHERE id LIKE 'test-%'",
 		"DELETE FROM users WHERE user_id LIKE 'test-%'",
 	}
 
 	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
+		if _, err := pool.Exec(ctx, query); err != nil {
 			t.Logf("Warning: failed to clean up: %v", err)
 		}
 	}
-}
-
-// teardownIntegrationDB cleans up and closes the database connection
-func teardownIntegrationDB(t *testing.T, db *sql.DB) {
-	t.Helper()
-	cleanupIntegrationDB(t, db)
-	db.Close()
 }
 
 // createIntegrationTestArticle creates a test article with default values
@@ -91,10 +50,15 @@ func createIntegrationTestArticle(id, link, title string) models.Article {
 
 // TestIntegration_Create_NewArticle tests inserting a new article
 func TestIntegration_Create_NewArticle(t *testing.T) {
-	db := setupIntegrationDB(t)
-	defer teardownIntegrationDB(t, db)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
 
-	repo := NewArticleRepository(db)
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
 	ctx := context.Background()
 
 	article := createIntegrationTestArticle("test-new-article-1", "https://example.com/test/article1", "Test Article 1")
@@ -135,10 +99,15 @@ func TestIntegration_Create_NewArticle(t *testing.T) {
 
 // TestIntegration_Create_DuplicateLink_UpdatesArticle tests Phase 2 deduplication
 func TestIntegration_Create_DuplicateLink_UpdatesArticle(t *testing.T) {
-	db := setupIntegrationDB(t)
-	defer teardownIntegrationDB(t, db)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
 
-	repo := NewArticleRepository(db)
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
 	ctx := context.Background()
 
 	// Create initial article
@@ -149,7 +118,7 @@ func TestIntegration_Create_DuplicateLink_UpdatesArticle(t *testing.T) {
 	}
 
 	// Manually set some engagement metrics
-	_, err = db.Exec("UPDATE articles SET upvotes = 5, downvotes = 2, recommends = 10 WHERE id = $1", article1.ID)
+	_, err = pool.Exec(ctx, "UPDATE articles SET upvotes = 5, downvotes = 2, recommends = 10 WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to update metrics: %v", err)
 	}
@@ -210,10 +179,15 @@ func TestIntegration_Create_DuplicateLink_UpdatesArticle(t *testing.T) {
 // TestIntegration_Create_DuplicateLink_DeletedArticle_NotUpdated tests Phase 2 requirement:
 // Don't update deleted articles
 func TestIntegration_Create_DuplicateLink_DeletedArticle_NotUpdated(t *testing.T) {
-	db := setupIntegrationDB(t)
-	defer teardownIntegrationDB(t, db)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
 
-	repo := NewArticleRepository(db)
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
 	ctx := context.Background()
 
 	// Create initial article
@@ -224,14 +198,14 @@ func TestIntegration_Create_DuplicateLink_DeletedArticle_NotUpdated(t *testing.T
 	}
 
 	// Mark the article as deleted
-	_, err = db.Exec("UPDATE articles SET deleted = true WHERE id = $1", article1.ID)
+	_, err = pool.Exec(ctx, "UPDATE articles SET deleted = true WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to mark article as deleted: %v", err)
 	}
 
 	// Get original updated_at timestamp
 	var originalUpdatedAt time.Time
-	err = db.QueryRow("SELECT updated_at FROM articles WHERE id = $1", article1.ID).Scan(&originalUpdatedAt)
+	err = pool.QueryRow(ctx, "SELECT updated_at FROM articles WHERE id = $1", article1.ID).Scan(&originalUpdatedAt)
 	if err != nil {
 		t.Fatalf("failed to get original updated_at: %v", err)
 	}
@@ -276,10 +250,15 @@ func TestIntegration_Create_DuplicateLink_DeletedArticle_NotUpdated(t *testing.T
 
 // TestIntegration_CreateBatch_WithDuplicates tests batch insertion with deduplication
 func TestIntegration_CreateBatch_WithDuplicates(t *testing.T) {
-	db := setupIntegrationDB(t)
-	defer teardownIntegrationDB(t, db)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
 
-	repo := NewArticleRepository(db)
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
 	ctx := context.Background()
 
 	// Create initial article
@@ -290,7 +269,7 @@ func TestIntegration_CreateBatch_WithDuplicates(t *testing.T) {
 	}
 
 	// Set engagement metrics
-	_, err = db.Exec("UPDATE articles SET upvotes = 10, downvotes = 3, recommends = 20 WHERE id = $1", article1.ID)
+	_, err = pool.Exec(ctx, "UPDATE articles SET upvotes = 10, downvotes = 3, recommends = 20 WHERE id = $1", article1.ID)
 	if err != nil {
 		t.Fatalf("failed to update metrics: %v", err)
 	}
