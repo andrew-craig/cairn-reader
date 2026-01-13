@@ -17,9 +17,13 @@ import (
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/config"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file in development (before logger initialization)
+	_ = godotenv.Load() // Ignore error as .env file is optional
+
 	// Load and validate configuration
 	cfg, err := config.Load()
 	if err != nil {

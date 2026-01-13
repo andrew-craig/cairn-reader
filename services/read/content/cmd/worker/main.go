@@ -17,10 +17,14 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/jobs"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
+	"github.com/joho/godotenv"
 	"github.com/robfig/cron/v3"
 )
 
 func main() {
+	// Load .env file in development (before logger initialization)
+	_ = godotenv.Load() // Ignore error as .env file is optional
+
 	// Initialize structured logger
 	logger := logging.NewLogger(logging.Config{
 		Level:       getEnv("LOG_LEVEL", "info"),
