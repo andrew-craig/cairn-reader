@@ -53,101 +53,6 @@ This starts:
 
 See [infrastructure/docker/README.md](infrastructure/docker/README.md) for detailed documentation.
 
-## Common Commands
-
-### Mobile App (apps/mobile)
-
-> 📖 **For detailed mobile app documentation, see [apps/mobile/CLAUDE.md](/apps/mobile/CLAUDE.md)**
-
-```bash
-# Navigate to mobile app
-cd apps/mobile
-
-# Install dependencies
-npm install
-
-# Development
-npm start                    # Start Expo dev server
-npm run ios                  # Run on iOS simulator
-npm run android              # Run on Android emulator
-
-# Code quality
-npm run lint                 # Run ESLint
-npm run type-check           # TypeScript type checking (tsc --noEmit)
-```
-
-### Explore Service (services/explore)
-
-> 📖 **For detailed Explore service documentation, see [services/explore/CLAUDE.md](/services/explore/CLAUDE.md)**
-
-```bash
-cd services/explore
-
-# Development (requires PostgreSQL running)
-make run-fetcher             # Start explore_fetcher service (port 8080)
-make run-recommender         # Start explore_recommender service (port 8081)
-
-# Build and test
-make build                   # Build both binaries to bin/
-make test                    # Run all tests
-
-# Docker (recommended for development)
-docker-compose up --build    # Start all services with databases
-
-# Code quality
-make fmt                     # Format Go code
-make lint                    # Run fmt + vet
-```
-
-### User Service (services/users)
-
-> 📖 **For detailed User service documentation, see [services/users/CLAUDE.md](/services/users/CLAUDE.md)**
-
-```bash
-cd services/users
-
-# Build and run
-make build                   # Build binaries to bin/
-make run                     # Run user service
-make dev                     # Run with live reload (requires air)
-
-# Testing
-make test                    # Run all tests
-make test-coverage           # Generate coverage report
-
-# Database migrations
-make migrate-up              # Run migrations
-make migrate-down            # Rollback migrations
-
-# Code quality
-make fmt                     # Format code
-make lint                    # Run golangci-lint
-```
-
-### Read Service (services/read)
-
-> 📖 **For detailed Read service documentation, see [services/read/CLAUDE.md](/services/read/CLAUDE.md)**
-
-```bash
-cd services/read
-
-# Development (requires Docker)
-docker-compose up --build    # Start all services (Content + RSS Fetcher)
-
-# Build and test
-make build                   # Build both services
-make test                    # Run all tests
-make test-integration        # Run integration tests
-
-# Database migrations
-make migrate-up              # Apply pending migrations
-make migrate-status          # Check migration status
-
-# Code quality
-make fmt                     # Format code
-make lint                    # Run linter
-```
-
 ## Architecture
 
 > 📖 **For detailed architectural principles and rationale, see [Engineering Principles - Core Architectural Principles](/docs/ENGINEERING_PRINCIPLES.md#core-architectural-principles)**
@@ -348,46 +253,20 @@ The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml]
 - Each service owns its own database
 - Use appropriate HTTP clients with timeouts and retry logic
 
-### Database Schema Notes
-
-**User Service** (`cairn_users`):
-- `users`: User accounts (email/password or device ID)
-- `refresh_tokens`: JWT refresh token management
-
-**Explore Fetcher** (`fetcher_db`):
-- `feeds`: RSS feed sources with health tracking
-
-**Explore Recommender** (`cairn_db`):
-- `articles`: SHA256-hashed article IDs for deduplication
-- `votes`: User voting (upvote/downvote)
-- `user_articles`: Read status tracking
-
-**Content Service** (`content_service`):
-- `contents`: Cleaned article content with deduplication
-- `user_contents`: User-specific metadata (status, favorites, scroll position)
-
-**Ingest RSS** (`ingest_rss`):
-- `feeds`: RSS feed metadata with tiered polling
-- `user_feeds`: User subscriptions (100 feed limit)
-- `outbox`: Reliable content delivery queue
 
 ## Documentation References
 
 ### Service-Specific Documentation
 - **Mobile App**: [apps/mobile/CLAUDE.md](/apps/mobile/CLAUDE.md) - React Native app details
-- **Explore Service**: [services/explore/CLAUDE.md](/services/explore/CLAUDE.md) - RSS fetching and recommendations
-- **Read Service**: [services/read/CLAUDE.md](/services/read/CLAUDE.md) - Content storage and feed management
-- **User Service**: [services/users/CLAUDE.md](/services/users/CLAUDE.md) - Authentication and user management
+- **Explore Service**: [services/explore/CLAUDE.md](/services/explore/CLAUDE.md), [services/explore/README.md](/services/explore/README.md)
+- **Read Service**: [services/read/CLAUDE.md](/services/read/CLAUDE.md), [services/read/README.md](/services/read/README.md)
+- **User Service**: [services/users/CLAUDE.md](/services/users/CLAUDE.md), [services/users/README.md](/services/users/README.md)
 
 ### Project-Wide Documentation
 - **Engineering Principles**: [docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) - Architectural principles, coding standards, testing philosophy
 - **Main README**: [README.md](/README.md) - Project overview and getting started
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md) - Docker Compose setup
 
-### Service READMEs
-- [services/explore/README.md](/services/explore/README.md) - Explore service details
-- [services/users/README.md](/services/users/README.md) - User service details
-- [services/read/README.md](/services/read/README.md) - Read service details
 
 ## Implementation Status
 
@@ -413,17 +292,3 @@ The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml]
 - ✅ Ingest RSS: Feed subscriptions with tiered polling
 - ✅ Outbox pattern for reliable delivery
 - ✅ Content update detection
-
-## Getting Help
-
-For service-specific questions:
-- **Mobile App**: See [apps/mobile/CLAUDE.md](/apps/mobile/CLAUDE.md)
-- **Explore Service**: See [services/explore/CLAUDE.md](/services/explore/CLAUDE.md)
-- **Read Service**: See [services/read/CLAUDE.md](/services/read/CLAUDE.md)
-- **User Service**: See [services/users/CLAUDE.md](/services/users/CLAUDE.md)
-
-For project-wide issues:
-- Check logs: `docker-compose logs -f <service-name>`
-- Review tests for usage examples
-- Consult OpenAPI specs for API details
-- See [docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) for conventions

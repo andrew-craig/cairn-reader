@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/handlers"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
@@ -15,7 +16,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *database.DB, ingestRSSServiceURL string) http.Handler {
+func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth.Middleware) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply global middleware

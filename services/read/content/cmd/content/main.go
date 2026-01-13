@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/config"
@@ -80,8 +81,44 @@ func main() {
 
 	slog.Info("component initialized", slog.String("component", "database"))
 
+	// Initialize Vault client and fetch JWT public key
+	slog.Info("component initializing", slog.String("component", "vault"))
+	vaultCfg := &auth.VaultConfig{
+		Address:   cfg.Vault.Address,
+		Token:     cfg.Vault.Token,
+		RoleID:    cfg.Vault.RoleID,
+		SecretID:  cfg.Vault.SecretID,
+		AuthPath:  cfg.Vault.AuthPath,
+		Namespace: "",
+	}
+
+	vaultClient, err := auth.NewVaultClient(vaultCfg)
+	if err != nil {
+		slog.Error("failed to create vault client", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Verify Vault connectivity
+	if err := vaultClient.Health(); err != nil {
+		slog.Error("vault health check failed", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Fetch JWT public key from Vault
+	publicKey, err := vaultClient.GetPublicKey(cfg.Vault.PublicKeyPath)
+	if err != nil {
+		slog.Error("failed to fetch public key from vault", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	slog.Info("component initialized", slog.String("component", "vault"))
+
+	// Create JWT validator and middleware
+	jwtValidator := auth.NewValidator(publicKey)
+	authMiddleware := auth.NewMiddleware(jwtValidator)
+
 	// Create router
-	router := api.NewRouter(db, cfg.IngestRSSServiceURL)
+	router := api.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware)
 
 	// Create HTTP server
 	server := &http.Server{
