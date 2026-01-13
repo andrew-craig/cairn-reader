@@ -22,9 +22,13 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/config"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file in development (before logger initialization)
+	_ = godotenv.Load() // Ignore error as .env file is optional
+
 	// Load and validate configuration
 	cfg, err := config.Load()
 	if err != nil {
