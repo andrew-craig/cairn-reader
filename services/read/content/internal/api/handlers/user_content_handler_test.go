@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -180,7 +181,7 @@ func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan ti
 func TestListUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -218,6 +219,7 @@ func TestListUserContents_Success(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -236,7 +238,7 @@ func TestListUserContents_Success(t *testing.T) {
 func TestListUserContents_WithFilters(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	status := "read"
@@ -250,6 +252,7 @@ func TestListUserContents_WithFilters(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -263,7 +266,7 @@ func TestListUserContents_WithFilters(t *testing.T) {
 func TestListUserContents_WithPagination(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -293,7 +296,7 @@ func TestListUserContents_WithPagination(t *testing.T) {
 func TestListUserContents_InvalidUserID(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/invalid-uuid/contents", nil)
 	rctx := chi.NewRouteContext()
@@ -314,7 +317,7 @@ func TestListUserContents_InvalidUserID(t *testing.T) {
 func TestListUserContents_InvalidStatus(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -337,7 +340,7 @@ func TestListUserContents_InvalidStatus(t *testing.T) {
 func TestAddContentToUser_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -370,6 +373,8 @@ func TestAddContentToUser_Success(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
+	req = addAuthContextToRequest(req, userID)
+
 	w := httptest.NewRecorder()
 
 	handler.AddContentToUser(w, req)
@@ -387,7 +392,7 @@ func TestAddContentToUser_Success(t *testing.T) {
 func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -416,6 +421,8 @@ func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
+	req = addAuthContextToRequest(req, userID)
+
 	w := httptest.NewRecorder()
 
 	handler.AddContentToUser(w, req)
@@ -432,7 +439,7 @@ func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -450,6 +457,8 @@ func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
+	req = addAuthContextToRequest(req, userID)
+
 	w := httptest.NewRecorder()
 
 	handler.AddContentToUser(w, req)
@@ -465,7 +474,7 @@ func TestAddContentToUser_ContentNotFound(t *testing.T) {
 func TestUpdateUserContent_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -541,7 +550,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 func TestUpdateUserContent_NotFound(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -575,7 +584,7 @@ func TestUpdateUserContent_NotFound(t *testing.T) {
 func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -606,7 +615,7 @@ func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 func TestDeleteUserContent_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -632,7 +641,7 @@ func TestDeleteUserContent_Success(t *testing.T) {
 func TestDeleteUserContent_Error(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -661,7 +670,7 @@ func TestDeleteUserContent_Error(t *testing.T) {
 func TestSearchUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -714,7 +723,7 @@ func TestSearchUserContents_Success(t *testing.T) {
 func TestSearchUserContents_MissingQuery(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -732,4 +741,249 @@ func TestSearchUserContents_MissingQuery(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "missing_query", response["error"])
+}
+
+// Helper function to add authenticated user ID to request context
+func addAuthContextToRequest(req *http.Request, userID uuid.UUID) *http.Request {
+	ctx := req.Context()
+	// Add the authenticated user ID to context (as middleware would do)
+	ctx = context.WithValue(ctx, auth.UserIDContextKey, userID)
+	return req.WithContext(ctx)
+}
+
+// Helper function to add both route context and auth context
+func setupUserContentRequest(userID uuid.UUID, authUserID uuid.UUID, path string, method string) *http.Request {
+	req := httptest.NewRequest(method, path, nil)
+
+	// Add route context with user_id parameter
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	// Add auth context
+	req = addAuthContextToRequest(req, authUserID)
+	return req
+}
+
+// ============================================================================
+// Authentication and Authorization Tests
+// ============================================================================
+
+// TestListUserContents_MissingAuth tests that missing authentication returns 401
+func TestListUserContents_MissingAuth(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	userID := uuid.New()
+
+	// Request without auth context - this should trigger a panic from MustGetUserID
+	// In a real scenario, the middleware would prevent this from reaching the handler
+	// But for testing the authorization check, we mock what the middleware provides
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	// NOTE: No auth context added - in production, middleware.RequireAuth would return 401
+
+	// NOTE: No auth context added - testing that handler panics without it
+	w := httptest.NewRecorder()
+
+	// This will panic because MustGetUserID requires auth context
+	// This is expected behavior - the middleware ensures context is set
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected MustGetUserID to panic when auth context missing")
+		}
+	}()
+
+	handler.ListUserContents(w, req)
+}
+
+// TestListUserContents_UnauthorizedUserAccess tests that user cannot access another user's content
+func TestListUserContents_UnauthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	requestedUserID := uuid.New()
+	authenticatedUserID := uuid.New() // Different user
+
+	req := setupUserContentRequest(requestedUserID, authenticatedUserID, "/api/v1/users/"+requestedUserID.String()+"/contents", http.MethodGet)
+	w := httptest.NewRecorder()
+
+	handler.ListUserContents(w, req)
+
+	// Should return 403 Forbidden
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "forbidden", response["error"])
+	assert.Contains(t, response["message"], "own content")
+	// Repository should not be called for unauthorized request
+	mockUserContentRepo.AssertNotCalled(t, "ListByUserWithFilter")
+}
+
+// TestListUserContents_AuthorizedUserAccess tests that authenticated user can access their own content
+func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	userID := uuid.New()
+	contentID := uuid.New()
+
+	userContents := []*models.UserContent{
+		{
+			ID:        uuid.New(),
+			UserID:    userID,
+			ContentID: contentID,
+			Status:    "unread",
+			AddedAt:   time.Now(),
+			UpdatedAt: time.Now(),
+		},
+	}
+
+	content := &models.Content{
+		ID:          contentID,
+		Title:       "Test Article",
+		OriginalURL: "https://example.com",
+		ContentHash: "hash123",
+		CleanedHTML: "<p>Test</p>",
+		SourceType:  "web",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	mockUserContentRepo.On("ListByUserWithFilter", mock.Anything, userID, (*string)(nil), (*bool)(nil), 20, 0).
+		Return(userContents, nil)
+	mockUserContentRepo.On("CountByUser", mock.Anything, userID).Return(int64(1), nil)
+	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
+
+	// Same user ID for both authenticated and requested user
+	req := setupUserContentRequest(userID, userID, "/api/v1/users/"+userID.String()+"/contents", http.MethodGet)
+	w := httptest.NewRecorder()
+
+	handler.ListUserContents(w, req)
+
+	// Should succeed
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, float64(1), response["total_count"])
+	mockUserContentRepo.AssertExpectations(t)
+	mockContentRepo.AssertExpectations(t)
+}
+
+// TestAddContentToUser_UnauthorizedUserAccess tests that user cannot add content to another user's account
+func TestAddContentToUser_UnauthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	requestedUserID := uuid.New()
+	authenticatedUserID := uuid.New() // Different user
+
+	req := setupUserContentRequest(requestedUserID, authenticatedUserID, "/api/v1/users/"+requestedUserID.String()+"/contents", http.MethodPost)
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	// Should return 403 Forbidden
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "forbidden", response["error"])
+	mockUserContentRepo.AssertNotCalled(t, "Create")
+}
+
+// TestUpdateUserContent_UnauthorizedUserAccess tests that user cannot update another user's content
+func TestUpdateUserContent_UnauthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	requestedUserID := uuid.New()
+	authenticatedUserID := uuid.New() // Different user
+	contentID := uuid.New()
+
+	path := "/api/v1/users/" + requestedUserID.String() + "/contents/" + contentID.String()
+	req := httptest.NewRequest(http.MethodPatch, path, nil)
+
+	// Add route context with user_id parameter
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", requestedUserID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	// Add auth context
+	req = addAuthContextToRequest(req, authenticatedUserID)
+
+	w := httptest.NewRecorder()
+
+	handler.UpdateUserContent(w, req)
+
+	// Should return 403 Forbidden
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "forbidden", response["error"])
+	mockUserContentRepo.AssertNotCalled(t, "UpdateMetadata")
+}
+
+// TestDeleteUserContent_UnauthorizedUserAccess tests that user cannot delete another user's content
+func TestDeleteUserContent_UnauthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	requestedUserID := uuid.New()
+	authenticatedUserID := uuid.New() // Different user
+	contentID := uuid.New()
+
+	path := "/api/v1/users/" + requestedUserID.String() + "/contents/" + contentID.String()
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
+
+	// Add route context with user_id parameter
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", requestedUserID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	// Add auth context
+	req = addAuthContextToRequest(req, authenticatedUserID)
+
+	w := httptest.NewRecorder()
+
+	handler.DeleteUserContent(w, req)
+
+	// Should return 403 Forbidden
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "forbidden", response["error"])
+	mockUserContentRepo.AssertNotCalled(t, "Delete")
+}
+
+// TestSearchUserContents_UnauthorizedUserAccess tests that user cannot search another user's content
+func TestSearchUserContents_UnauthorizedUserAccess(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	requestedUserID := uuid.New()
+	authenticatedUserID := uuid.New() // Different user
+
+	req := setupUserContentRequest(requestedUserID, authenticatedUserID, "/api/v1/users/"+requestedUserID.String()+"/contents/search?q=test", http.MethodGet)
+	w := httptest.NewRecorder()
+
+	handler.SearchUserContents(w, req)
+
+	// Should return 403 Forbidden
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "forbidden", response["error"])
+	mockUserContentRepo.AssertNotCalled(t, "Search")
 }
