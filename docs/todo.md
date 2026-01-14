@@ -19,85 +19,8 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 ## Low Priority
 
 
-### 12. Define Sentinel Errors for Common Cases
-**File:** `recommender/internal/db/article_repository.go`
 
-Replace string errors with sentinel errors for programmatic checking:
 
-```go
-var (
-    ErrArticleNotFound = errors.New("article not found")
-    ErrUserNotFound    = errors.New("user not found")
-)
-
-// Usage
-if err == sql.ErrNoRows {
-    return nil, ErrArticleNotFound
-}
-```
-
----
-
-### 4. Add Standardized Error Variables
-**Files:** All repository files in explore and user services
-
-**Issue:** String errors are used inline instead of defined error variables, preventing programmatic error checking.
-
-**Current pattern:**
-```go
-if err == sql.ErrNoRows {
-    return fmt.Errorf("article not found")
-}
-```
-
-**Implementation:**
-
-Create `pkg/errors/errors.go`:
-```go
-package errors
-
-import "errors"
-
-// Common repository errors
-var (
-    ErrNotFound         = errors.New("resource not found")
-    ErrAlreadyExists    = errors.New("resource already exists")
-    ErrInvalidInput     = errors.New("invalid input")
-    ErrUnauthorized     = errors.New("unauthorized")
-    ErrForbidden        = errors.New("forbidden")
-)
-
-// Domain-specific errors
-var (
-    ErrArticleNotFound   = errors.New("article not found")
-    ErrUserNotFound      = errors.New("user not found")
-    ErrFeedNotFound      = errors.New("feed not found")
-    ErrInvalidVoteType   = errors.New("invalid vote type")
-)
-```
-
-Use in repositories:
-```go
-import apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
-
-func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Article, error) {
-    var article models.Article
-    err := r.db.QueryRowContext(ctx, query, id).Scan(...)
-    if err == sql.ErrNoRows {
-        return nil, apperrors.ErrArticleNotFound
-    }
-    return &article, nil
-}
-
-// In handlers, check errors:
-article, err := repo.GetByID(ctx, id)
-if errors.Is(err, apperrors.ErrArticleNotFound) {
-    api.WriteError(w, http.StatusNotFound, "article not found", "ARTICLE_NOT_FOUND")
-    return
-}
-```
-
----
 
 ### 5. Improve Router for Path Parameter Handling
 **File:** `services/explore/recommender/internal/api/handlers.go`
