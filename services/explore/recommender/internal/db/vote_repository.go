@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,7 +33,7 @@ func NewVoteRepository(db *pgxpool.Pool, userRepo UserRepositoryInterface) VoteR
 func (r *voteRepository) RecordVote(ctx context.Context, userID string, articleID string, voteType string) error {
 	// Validate vote type
 	if voteType != "upvote" && voteType != "downvote" {
-		return fmt.Errorf("invalid vote type: %s (must be 'upvote' or 'downvote')", voteType)
+		return fmt.Errorf("invalid vote type %s (must be 'upvote' or 'downvote'): %w", voteType, apperrors.ErrInvalidVoteType)
 	}
 
 	// Ensure user exists
@@ -96,7 +97,7 @@ func (r *voteRepository) RecordVote(ctx context.Context, userID string, articleI
 				slog.String("old_vote_type", oldVoteType),
 				slog.String("new_vote_type", voteType),
 			)
-			return fmt.Errorf("article not found: %s", articleID)
+			return fmt.Errorf("article %s: %w", articleID, apperrors.ErrArticleNotFound)
 		}
 
 		// Update the vote record
@@ -131,7 +132,7 @@ func (r *voteRepository) RecordVote(ctx context.Context, userID string, articleI
 			return fmt.Errorf("failed to update article vote counts: %w", err)
 		}
 		if result.RowsAffected() == 0 {
-			return fmt.Errorf("article not found: %s", articleID)
+			return fmt.Errorf("article %s: %w", articleID, apperrors.ErrArticleNotFound)
 		}
 
 		// Insert the vote record
@@ -225,7 +226,7 @@ func (r *voteRepository) GetVoteCounts(ctx context.Context, articleID string) (u
 
 	err = r.db.QueryRow(ctx, query, articleID).Scan(&upvotes, &downvotes)
 	if err == pgx.ErrNoRows {
-		return 0, 0, fmt.Errorf("article not found")
+		return 0, 0, apperrors.ErrArticleNotFound
 	}
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get vote counts: %w", err)
