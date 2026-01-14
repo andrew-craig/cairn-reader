@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -161,7 +162,7 @@ func (r *articleRepository) GetByID(ctx context.Context, id string) (*models.Art
 	)
 
 	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("article not found")
+		return nil, apperrors.ErrArticleNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get article: %w", err)
@@ -285,7 +286,7 @@ func (r *articleRepository) IncrementRecommendCount(ctx context.Context, article
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("article not found")
+		return apperrors.ErrArticleNotFound
 	}
 
 	return nil

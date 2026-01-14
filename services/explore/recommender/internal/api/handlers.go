@@ -11,6 +11,7 @@ import (
 
 	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api/dto"
 )
 
@@ -222,6 +223,21 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.voteRepo.RecordVote(r.Context(), userID, articleID, payload.VoteType); err != nil {
 		slog.Error("failed to record vote", slog.Any("error", err))
+
+		// Check for specific errors to return appropriate status codes
+		if errors.Is(err, apperrors.ErrArticleNotFound) {
+			pkgapi.WriteError(w, http.StatusNotFound, pkgapi.ErrCodeNotFound, "Article not found", nil, "v1")
+			return
+		}
+		if errors.Is(err, apperrors.ErrInvalidVoteType) {
+			pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, "Invalid vote type", nil, "v1")
+			return
+		}
+		if errors.Is(err, apperrors.ErrInvalidUserID) {
+			pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, "Invalid user ID", nil, "v1")
+			return
+		}
+
 		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to record vote", nil, "v1")
 		return
 	}
@@ -283,6 +299,13 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	upvotes, downvotes, err := s.voteRepo.GetVoteCounts(r.Context(), articleID)
 	if err != nil {
 		slog.Error("failed to get vote counts", slog.Any("error", err))
+
+		// Check for specific errors to return appropriate status codes
+		if errors.Is(err, apperrors.ErrArticleNotFound) {
+			pkgapi.WriteError(w, http.StatusNotFound, pkgapi.ErrCodeNotFound, "Article not found", nil, "v1")
+			return
+		}
+
 		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get vote counts", nil, "v1")
 		return
 	}

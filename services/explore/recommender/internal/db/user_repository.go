@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,7 +25,7 @@ func NewUserRepository(db *pgxpool.Pool) UserRepositoryInterface {
 func (r *userRepository) EnsureUserExists(ctx context.Context, userID string) error {
 	// Validate UUID format
 	if _, err := uuid.Parse(userID); err != nil {
-		return fmt.Errorf("invalid user ID format (must be UUID): %w", err)
+		return fmt.Errorf("%w (must be UUID): %w", apperrors.ErrInvalidUserID, err)
 	}
 
 	query := `
