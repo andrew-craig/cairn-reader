@@ -18,60 +18,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## Low Priority
 
-### 3. Clean Up Unused Dependency in Mobile App
-**File:**
-- `apps/mobile/package.json:27` - Unused dependency `expo-linking`
-
-**Issue:** The `expo-linking` package is installed but never imported or used in the codebase. This increases node_modules size and installation time.
-
-**Status:**
-- ✅ **FIXED:** Unused imports (ArticleRow.tsx) - removed
-- ✅ **FIXED:** Variable declaration (ExploreScreen.tsx) - fixed/removed
-- ✅ **FIXED:** Unused file (src/navigation/index.ts) - deleted
-- ❌ **REMAINING:** expo-linking dependency still present
-
-**Impact:**
-- Increases node_modules size unnecessarily (~1-2MB)
-- Increases npm install time
-- Minor bundle size impact (if tree-shaking doesn't eliminate it)
-
-**Implementation:**
-
-**Option 1: Remove if truly unused (recommended)**
-```bash
-cd apps/mobile
-npm uninstall expo-linking
-```
-
-**Option 2: Document if reserved for future use**
-Add comment to package.json or create a file documenting planned features:
-```json
-{
-  "dependencies": {
-    "expo-linking": "~8.0.10"  // Reserved for deep linking feature (planned)
-  }
-}
-```
-
-**Note:** expo-linking is typically used for:
-- Deep linking (opening app from URLs)
-- Universal links (iOS/Android app links)
-- URL parsing and validation
-
-If these features are planned, keep the dependency and document it. Otherwise, remove to reduce bundle size.
-
-**Verification:**
-```bash
-cd apps/mobile
-npm run type-check  # Should pass
-npm run lint        # Should pass
-npm start           # App should work normally
-npm run ios         # Test deep linking if keeping dependency
-```
-
-
-
----
 
 ### 12. Define Sentinel Errors for Common Cases
 **File:** `recommender/internal/db/article_repository.go`
