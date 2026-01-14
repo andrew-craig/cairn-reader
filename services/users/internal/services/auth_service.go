@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
@@ -122,7 +123,7 @@ func (s *authService) Register(ctx context.Context, email, password string) (*Au
 	// Create user
 	user, err := s.userRepo.CreateUser(ctx, email, passwordHash)
 	if err != nil {
-		if errors.Is(err, database.ErrUserAlreadyExists) {
+		if errors.Is(err, apperrors.ErrUserAlreadyExists) {
 			return nil, ErrAccountExists
 		}
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -142,7 +143,7 @@ func (s *authService) RegisterMobile(ctx context.Context, expoDeviceID, deviceIn
 	// Create mobile user
 	user, err := s.userRepo.CreateMobileUser(ctx, expoDeviceID)
 	if err != nil {
-		if errors.Is(err, database.ErrUserAlreadyExists) {
+		if errors.Is(err, apperrors.ErrUserAlreadyExists) {
 			return nil, ErrAccountExists
 		}
 		return nil, fmt.Errorf("failed to create mobile user: %w", err)
@@ -171,7 +172,7 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 	// Retrieve user by email
 	user, err := s.userRepo.GetUserByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
@@ -216,7 +217,7 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 	// Retrieve user by Expo device ID
 	user, err := s.userRepo.GetUserByExpoDeviceID(ctx, expoDeviceID)
 	if err != nil {
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			return nil, ErrInvalidCredentials
 		}
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
@@ -276,7 +277,7 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 		if errors.Is(err, auth.ErrRefreshTokenNotFound) {
 			return nil, ErrInvalidCredentials
 		}
-		if errors.Is(err, database.ErrTokenExpired) {
+		if errors.Is(err, apperrors.ErrTokenExpired) {
 			return nil, fmt.Errorf("refresh token expired: %w", err)
 		}
 		return nil, fmt.Errorf("failed to validate refresh token: %w", err)

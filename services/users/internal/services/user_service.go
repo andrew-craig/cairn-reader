@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
@@ -82,8 +83,8 @@ func (s *userService) GetUser(ctx context.Context, requestingUserID, targetUserI
 	// Retrieve user
 	user, err := s.userRepo.GetUserByID(ctx, targetUserID)
 	if err != nil {
-		if errors.Is(err, database.ErrUserNotFound) {
-			return nil, database.ErrUserNotFound
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
@@ -107,11 +108,11 @@ func (s *userService) UpdateUser(ctx context.Context, requestingUserID, targetUs
 	// Update user
 	user, err := s.userRepo.UpdateUser(ctx, targetUserID, email)
 	if err != nil {
-		if errors.Is(err, database.ErrUserAlreadyExists) {
+		if errors.Is(err, apperrors.ErrUserAlreadyExists) {
 			return nil, ErrAccountExists
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
-			return nil, database.ErrUserNotFound
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
@@ -139,8 +140,8 @@ func (s *userService) UpgradeAccount(ctx context.Context, requestingUserID, targ
 	// Verify the user exists and is mobile-only
 	user, err := s.userRepo.GetUserByID(ctx, targetUserID)
 	if err != nil {
-		if errors.Is(err, database.ErrUserNotFound) {
-			return nil, database.ErrUserNotFound
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
@@ -160,11 +161,11 @@ func (s *userService) UpgradeAccount(ctx context.Context, requestingUserID, targ
 	// Upgrade account
 	upgradedUser, err := s.userRepo.UpgradeAccount(ctx, targetUserID, email, passwordHash)
 	if err != nil {
-		if errors.Is(err, database.ErrUserAlreadyExists) {
+		if errors.Is(err, apperrors.ErrUserAlreadyExists) {
 			return nil, ErrAccountExists
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
-			return nil, database.ErrUserNotFound
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to upgrade account: %w", err)
 	}
@@ -187,8 +188,8 @@ func (s *userService) DeleteUser(ctx context.Context, requestingUserID, targetUs
 
 	// Delete user
 	if err := s.userRepo.DeleteUser(ctx, targetUserID); err != nil {
-		if errors.Is(err, database.ErrUserNotFound) {
-			return database.ErrUserNotFound
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return apperrors.ErrUserNotFound
 		}
 		return fmt.Errorf("failed to delete user: %w", err)
 	}

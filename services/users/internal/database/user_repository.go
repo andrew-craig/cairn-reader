@@ -6,21 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-)
-
-var (
-	// ErrUserNotFound is returned when a user is not found
-	ErrUserNotFound = errors.New("user not found")
-
-	// ErrUserAlreadyExists is returned when attempting to create a user with an email or device ID that already exists
-	ErrUserAlreadyExists = errors.New("user already exists")
-
-	// ErrInvalidUserData is returned when user data is invalid
-	ErrInvalidUserData = errors.New("invalid user data")
 )
 
 // UserRepository defines the interface for user data operations
@@ -66,7 +56,7 @@ func NewUserRepository(db *DB) UserRepository {
 // CreateUser creates a new user with email and password
 func (r *userRepository) CreateUser(ctx context.Context, email, passwordHash string) (*models.User, error) {
 	if email == "" || passwordHash == "" {
-		return nil, ErrInvalidUserData
+		return nil, apperrors.ErrInvalidUserData
 	}
 
 	user := &models.User{
@@ -109,7 +99,7 @@ func (r *userRepository) CreateUser(ctx context.Context, email, passwordHash str
 		// Check for unique constraint violation
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return nil, ErrUserAlreadyExists
+			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -120,7 +110,7 @@ func (r *userRepository) CreateUser(ctx context.Context, email, passwordHash str
 // CreateMobileUser creates a new mobile-only user with Expo device ID
 func (r *userRepository) CreateMobileUser(ctx context.Context, expoDeviceID string) (*models.User, error) {
 	if expoDeviceID == "" {
-		return nil, ErrInvalidUserData
+		return nil, apperrors.ErrInvalidUserData
 	}
 
 	user := &models.User{
@@ -163,7 +153,7 @@ func (r *userRepository) CreateMobileUser(ctx context.Context, expoDeviceID stri
 		// Check for unique constraint violation
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return nil, ErrUserAlreadyExists
+			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to create mobile user: %w", err)
 	}
@@ -193,7 +183,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by ID: %w", err)
 	}
@@ -204,7 +194,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models
 // GetUserByEmail retrieves a user by their email address
 func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	if email == "" {
-		return nil, ErrInvalidUserData
+		return nil, apperrors.ErrInvalidUserData
 	}
 
 	user := &models.User{}
@@ -227,7 +217,7 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
@@ -238,7 +228,7 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 // GetUserByExpoDeviceID retrieves a user by their Expo device ID
 func (r *userRepository) GetUserByExpoDeviceID(ctx context.Context, expoDeviceID string) (*models.User, error) {
 	if expoDeviceID == "" {
-		return nil, ErrInvalidUserData
+		return nil, apperrors.ErrInvalidUserData
 	}
 
 	user := &models.User{}
@@ -261,7 +251,7 @@ func (r *userRepository) GetUserByExpoDeviceID(ctx context.Context, expoDeviceID
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by expo device ID: %w", err)
 	}
@@ -312,7 +302,7 @@ func (r *userRepository) UpdateUser(ctx context.Context, id uuid.UUID, email *st
 		// Check for unique constraint violation
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return nil, ErrUserAlreadyExists
+			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
@@ -323,7 +313,7 @@ func (r *userRepository) UpdateUser(ctx context.Context, id uuid.UUID, email *st
 // UpgradeAccount adds email and password to a mobile-only account
 func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email, passwordHash string) (*models.User, error) {
 	if email == "" || passwordHash == "" {
-		return nil, ErrInvalidUserData
+		return nil, apperrors.ErrInvalidUserData
 	}
 
 	// First, verify the user exists and is mobile-only
@@ -334,7 +324,7 @@ func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email
 
 	// Verify this is a mobile-only account
 	if !user.IsMobileOnly() {
-		return nil, fmt.Errorf("account is not mobile-only: %w", ErrInvalidUserData)
+		return nil, fmt.Errorf("account is not mobile-only: %w", apperrors.ErrInvalidUserData)
 	}
 
 	user.Email = &email
@@ -369,7 +359,7 @@ func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email
 		// Check for unique constraint violation on email
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return nil, ErrUserAlreadyExists
+			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to upgrade account: %w", err)
 	}
@@ -387,7 +377,7 @@ func (r *userRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
 	return nil
@@ -409,7 +399,7 @@ func (r *userRepository) UpdateLastLoginAt(ctx context.Context, id uuid.UUID) er
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrUserNotFound
+		return apperrors.ErrUserNotFound
 	}
 
 	return nil

@@ -31,6 +31,12 @@ var (
 	// ErrUserNotFound indicates that a user was not found
 	ErrUserNotFound = errors.New("user not found")
 
+	// ErrUserAlreadyExists indicates that a user already exists with the given email or device ID
+	ErrUserAlreadyExists = errors.New("user already exists")
+
+	// ErrInvalidUserData indicates that user data is invalid
+	ErrInvalidUserData = errors.New("invalid user data")
+
 	// ErrFeedNotFound indicates that a feed was not found
 	ErrFeedNotFound = errors.New("feed not found")
 
@@ -39,4 +45,13 @@ var (
 
 	// ErrInvalidUserID indicates that the user ID format is invalid
 	ErrInvalidUserID = errors.New("invalid user ID format")
+
+	// ErrTokenNotFound indicates that a refresh token was not found
+	ErrTokenNotFound = errors.New("refresh token not found")
+
+	// ErrTokenExpired indicates that a refresh token has expired
+	ErrTokenExpired = errors.New("refresh token expired")
+
+	// ErrInvalidTokenData indicates that refresh token data is invalid
+	ErrInvalidTokenData = errors.New("invalid refresh token data")
 )
