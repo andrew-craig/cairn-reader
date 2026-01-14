@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -249,7 +250,7 @@ func (r *feedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.F
 	)
 
 	if err == pgx.ErrNoRows {
-		return nil, fmt.Errorf("feed %d not found", feedID)
+		return nil, apperrors.ErrFeedNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("query feed: %w", err)

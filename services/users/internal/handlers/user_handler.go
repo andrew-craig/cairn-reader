@@ -6,7 +6,7 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -60,7 +60,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only access your own user data", nil, "v1")
 			return
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
@@ -113,7 +113,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
 			return
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
@@ -178,7 +178,7 @@ func (h *UserHandler) UpgradeAccount(c *gin.Context) {
 			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 			return
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}
@@ -218,7 +218,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "you can only delete your own account", nil, "v1")
 			return
 		}
-		if errors.Is(err, database.ErrUserNotFound) {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
 			api.GinWriteError(c, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
 			return
 		}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
@@ -135,7 +136,7 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 	// Retrieve token from database
 	tokenModel, err := s.repo.GetRefreshTokenByHash(ctx, hash)
 	if err != nil {
-		if errors.Is(err, database.ErrTokenNotFound) {
+		if errors.Is(err, apperrors.ErrTokenNotFound) {
 			return "", uuid.Nil, ErrRefreshTokenNotFound
 		}
 		return "", uuid.Nil, fmt.Errorf("failed to retrieve token: %w", err)
@@ -223,7 +224,7 @@ func (s *RefreshTokenService) RevokeToken(ctx context.Context, token string) err
 
 	tokenModel, err := s.repo.GetRefreshTokenByHash(ctx, hash)
 	if err != nil {
-		if errors.Is(err, database.ErrTokenNotFound) {
+		if errors.Is(err, apperrors.ErrTokenNotFound) {
 			return ErrRefreshTokenNotFound
 		}
 		return fmt.Errorf("failed to retrieve token: %w", err)

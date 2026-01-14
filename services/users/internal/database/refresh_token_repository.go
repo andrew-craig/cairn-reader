@@ -6,21 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-)
-
-var (
-	// ErrTokenNotFound is returned when a refresh token is not found
-	ErrTokenNotFound = errors.New("refresh token not found")
-
-	// ErrTokenExpired is returned when a refresh token has expired
-	ErrTokenExpired = errors.New("refresh token expired")
-
-	// ErrInvalidTokenData is returned when refresh token data is invalid
-	ErrInvalidTokenData = errors.New("invalid refresh token data")
 )
 
 // RefreshTokenRepository defines the interface for refresh token data operations
@@ -67,7 +57,7 @@ func (r *refreshTokenRepository) CreateRefreshToken(
 	tokenFamily *uuid.UUID,
 ) (*models.RefreshToken, error) {
 	if userID == uuid.Nil || tokenHash == "" {
-		return nil, ErrInvalidTokenData
+		return nil, apperrors.ErrInvalidTokenData
 	}
 
 	token := &models.RefreshToken{
@@ -131,7 +121,7 @@ func (r *refreshTokenRepository) CreateRefreshToken(
 // GetRefreshTokenByHash retrieves a refresh token by its hash
 func (r *refreshTokenRepository) GetRefreshTokenByHash(ctx context.Context, tokenHash string) (*models.RefreshToken, error) {
 	if tokenHash == "" {
-		return nil, ErrInvalidTokenData
+		return nil, apperrors.ErrInvalidTokenData
 	}
 
 	token := &models.RefreshToken{}
@@ -156,7 +146,7 @@ func (r *refreshTokenRepository) GetRefreshTokenByHash(ctx context.Context, toke
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrTokenNotFound
+			return nil, apperrors.ErrTokenNotFound
 		}
 		return nil, fmt.Errorf("failed to get refresh token by hash: %w", err)
 	}
@@ -180,7 +170,7 @@ func (r *refreshTokenRepository) UpdateLastUsedAt(ctx context.Context, id uuid.U
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrTokenNotFound
+		return apperrors.ErrTokenNotFound
 	}
 
 	return nil
@@ -196,7 +186,7 @@ func (r *refreshTokenRepository) RevokeToken(ctx context.Context, id uuid.UUID) 
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrTokenNotFound
+		return apperrors.ErrTokenNotFound
 	}
 
 	return nil
@@ -223,7 +213,7 @@ func (r *refreshTokenRepository) RevokeAllUserTokens(ctx context.Context, userID
 // all tokens in its family should be revoked as a security measure
 func (r *refreshTokenRepository) RevokeTokenFamily(ctx context.Context, tokenFamily uuid.UUID) error {
 	if tokenFamily == uuid.Nil {
-		return ErrInvalidTokenData
+		return apperrors.ErrInvalidTokenData
 	}
 
 	query := `DELETE FROM refresh_tokens WHERE token_family = $1`
