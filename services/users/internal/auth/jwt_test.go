@@ -486,3 +486,162 @@ func BenchmarkValidateToken(b *testing.B) {
 		_, _ = manager.ValidateToken(token)
 	}
 }
+
+// Tests for kid (Key ID) functionality
+
+func TestComputeKeyID(t *testing.T) {
+	_, publicKey := generateTestKeyPair(t)
+
+	t.Run("generates consistent key ID", func(t *testing.T) {
+		keyID1, err := ComputeKeyID(publicKey)
+		require.NoError(t, err)
+
+		keyID2, err := ComputeKeyID(publicKey)
+		require.NoError(t, err)
+
+		assert.Equal(t, keyID1, keyID2, "Key ID should be consistent")
+		assert.Len(t, keyID1, 16, "Key ID should be 16 characters")
+	})
+
+	t.Run("different keys have different IDs", func(t *testing.T) {
+		_, publicKey2 := generateTestKeyPair(t)
+
+		keyID1, err := ComputeKeyID(publicKey)
+		require.NoError(t, err)
+
+		keyID2, err := ComputeKeyID(publicKey2)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, keyID1, keyID2, "Different keys should have different IDs")
+	})
+
+	t.Run("nil key returns error", func(t *testing.T) {
+		_, err := ComputeKeyID(nil)
+		assert.Error(t, err, "Expected error for nil key")
+	})
+}
+
+func TestNewJWTManager_ComputesKeyID(t *testing.T) {
+	privateKey, publicKey := generateTestKeyPair(t)
+
+	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
+
+	expectedKeyID, _ := ComputeKeyID(publicKey)
+	assert.Equal(t, expectedKeyID, manager.GetKeyID(), "Key ID should be computed from public key")
+	assert.NotEmpty(t, manager.GetKeyID(), "Key ID should not be empty")
+}
+
+func TestNewJWTManagerWithConfig_KeyID(t *testing.T) {
+	privateKey, publicKey := generateTestKeyPair(t)
+
+	t.Run("uses provided key ID", func(t *testing.T) {
+		config := JWTManagerConfig{
+			PrivateKey: privateKey,
+			PublicKey:  publicKey,
+			Expiry:     60 * time.Minute,
+			KeyID:      "custom-key-id",
+		}
+
+		manager := NewJWTManagerWithConfig(config)
+		assert.Equal(t, "custom-key-id", manager.GetKeyID())
+	})
+
+	t.Run("computes key ID when not provided", func(t *testing.T) {
+		config := JWTManagerConfig{
+			PrivateKey: privateKey,
+			PublicKey:  publicKey,
+			Expiry:     60 * time.Minute,
+		}
+
+		manager := NewJWTManagerWithConfig(config)
+
+		expectedKeyID, _ := ComputeKeyID(publicKey)
+		assert.Equal(t, expectedKeyID, manager.GetKeyID())
+	})
+}
+
+func TestUpdateKeys_UpdatesKeyID(t *testing.T) {
+	oldPrivateKey, oldPublicKey := generateTestKeyPair(t)
+	newPrivateKey, newPublicKey := generateTestKeyPair(t)
+
+	manager := NewJWTManager(oldPrivateKey, oldPublicKey, 60*time.Minute)
+	originalKeyID := manager.GetKeyID()
+
+	manager.UpdateKeys(newPrivateKey, newPublicKey)
+
+	newKeyID := manager.GetKeyID()
+	expectedKeyID, _ := ComputeKeyID(newPublicKey)
+
+	assert.Equal(t, expectedKeyID, newKeyID, "Key ID should be updated to match new key")
+	assert.NotEqual(t, originalKeyID, newKeyID, "Key ID should change after key update")
+}
+
+func TestGetKeyID(t *testing.T) {
+	privateKey, publicKey := generateTestKeyPair(t)
+	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
+
+	keyID := manager.GetKeyID()
+
+	assert.NotEmpty(t, keyID, "Key ID should not be empty")
+
+	expectedKeyID, _ := ComputeKeyID(publicKey)
+	assert.Equal(t, expectedKeyID, keyID)
+}
+
+func TestGenerateToken_IncludesKidHeader(t *testing.T) {
+	privateKey, publicKey := generateTestKeyPair(t)
+	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
+	userID := uuid.New()
+
+	token, err := manager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	// Parse the token to check the kid header
+	parsedToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return publicKey, nil
+	})
+	require.NoError(t, err)
+
+	// Verify kid header is present and matches expected value
+	kid, ok := parsedToken.Header["kid"].(string)
+	assert.True(t, ok, "kid header should be present")
+
+	expectedKeyID := manager.GetKeyID()
+	assert.Equal(t, expectedKeyID, kid, "kid header should match manager's key ID")
+}
+
+func TestGenerateToken_KidHeaderChangesWithKeyUpdate(t *testing.T) {
+	oldPrivateKey, oldPublicKey := generateTestKeyPair(t)
+	newPrivateKey, newPublicKey := generateTestKeyPair(t)
+
+	manager := NewJWTManager(oldPrivateKey, oldPublicKey, 60*time.Minute)
+	userID := uuid.New()
+
+	// Generate token with old keys
+	oldToken, err := manager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	// Parse to get old kid
+	oldParsedToken, err := jwt.Parse(oldToken, func(token *jwt.Token) (interface{}, error) {
+		return oldPublicKey, nil
+	})
+	require.NoError(t, err)
+	oldKid := oldParsedToken.Header["kid"].(string)
+
+	// Update keys
+	manager.UpdateKeys(newPrivateKey, newPublicKey)
+
+	// Generate token with new keys
+	newToken, err := manager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	// Parse to get new kid
+	newParsedToken, err := jwt.Parse(newToken, func(token *jwt.Token) (interface{}, error) {
+		return newPublicKey, nil
+	})
+	require.NoError(t, err)
+	newKid := newParsedToken.Header["kid"].(string)
+
+	// Kids should be different after key update
+	assert.NotEqual(t, oldKid, newKid, "kid header should change after key update")
+}

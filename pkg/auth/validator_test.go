@@ -420,3 +420,218 @@ func BenchmarkExtractTokenFromHeader(b *testing.B) {
 		_, _ = ExtractTokenFromHeader(header)
 	}
 }
+
+// Tests for kid (Key ID) functionality
+
+func TestComputeKeyID(t *testing.T) {
+	_, publicKey := generateTestKeys(t)
+
+	t.Run("generates consistent key ID", func(t *testing.T) {
+		keyID1, err := ComputeKeyID(publicKey)
+		if err != nil {
+			t.Fatalf("Failed to compute key ID: %v", err)
+		}
+
+		keyID2, err := ComputeKeyID(publicKey)
+		if err != nil {
+			t.Fatalf("Failed to compute key ID: %v", err)
+		}
+
+		if keyID1 != keyID2 {
+			t.Errorf("Key ID should be consistent, got %s and %s", keyID1, keyID2)
+		}
+
+		// Key ID should be 16 characters (truncated base64url)
+		if len(keyID1) != 16 {
+			t.Errorf("Expected key ID length of 16, got %d", len(keyID1))
+		}
+	})
+
+	t.Run("different keys have different IDs", func(t *testing.T) {
+		_, publicKey2 := generateTestKeys(t)
+
+		keyID1, err := ComputeKeyID(publicKey)
+		if err != nil {
+			t.Fatalf("Failed to compute key ID 1: %v", err)
+		}
+
+		keyID2, err := ComputeKeyID(publicKey2)
+		if err != nil {
+			t.Fatalf("Failed to compute key ID 2: %v", err)
+		}
+
+		if keyID1 == keyID2 {
+			t.Error("Different keys should have different IDs")
+		}
+	})
+
+	t.Run("nil key returns error", func(t *testing.T) {
+		_, err := ComputeKeyID(nil)
+		if err == nil {
+			t.Error("Expected error for nil key")
+		}
+	})
+}
+
+func TestNewValidator_ComputesKeyID(t *testing.T) {
+	_, publicKey := generateTestKeys(t)
+
+	validator := NewValidator(publicKey)
+
+	expectedKeyID, _ := ComputeKeyID(publicKey)
+	if validator.GetKeyID() != expectedKeyID {
+		t.Errorf("Expected key ID %s, got %s", expectedKeyID, validator.GetKeyID())
+	}
+}
+
+func TestNewValidatorWithConfig_KeyID(t *testing.T) {
+	_, publicKey := generateTestKeys(t)
+
+	t.Run("uses provided key ID", func(t *testing.T) {
+		config := ValidatorConfig{
+			PublicKey: publicKey,
+			KeyID:     "custom-key-id",
+		}
+
+		validator := NewValidatorWithConfig(config)
+
+		if validator.GetKeyID() != "custom-key-id" {
+			t.Errorf("Expected key ID 'custom-key-id', got %s", validator.GetKeyID())
+		}
+	})
+
+	t.Run("computes key ID when not provided", func(t *testing.T) {
+		config := ValidatorConfig{
+			PublicKey: publicKey,
+		}
+
+		validator := NewValidatorWithConfig(config)
+
+		expectedKeyID, _ := ComputeKeyID(publicKey)
+		if validator.GetKeyID() != expectedKeyID {
+			t.Errorf("Expected computed key ID %s, got %s", expectedKeyID, validator.GetKeyID())
+		}
+	})
+}
+
+func TestUpdatePublicKey_UpdatesKeyID(t *testing.T) {
+	_, publicKey1 := generateTestKeys(t)
+	_, publicKey2 := generateTestKeys(t)
+
+	validator := NewValidator(publicKey1)
+	originalKeyID := validator.GetKeyID()
+
+	validator.UpdatePublicKey(publicKey2)
+
+	newKeyID := validator.GetKeyID()
+	expectedKeyID, _ := ComputeKeyID(publicKey2)
+
+	if newKeyID != expectedKeyID {
+		t.Errorf("Expected key ID %s after update, got %s", expectedKeyID, newKeyID)
+	}
+
+	if newKeyID == originalKeyID {
+		t.Error("Key ID should change after updating public key")
+	}
+}
+
+func TestGetKeyID(t *testing.T) {
+	_, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+
+	keyID := validator.GetKeyID()
+
+	if keyID == "" {
+		t.Error("Expected non-empty key ID")
+	}
+
+	expectedKeyID, _ := ComputeKeyID(publicKey)
+	if keyID != expectedKeyID {
+		t.Errorf("GetKeyID returned %s, expected %s", keyID, expectedKeyID)
+	}
+}
+
+// Helper function to generate a test token with kid header
+func generateTestTokenWithKid(t *testing.T, privateKey *rsa.PrivateKey, userID uuid.UUID, issuer, audience string, expiry time.Duration, kid string) string {
+	t.Helper()
+
+	now := time.Now()
+	claims := &Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Audience:  jwt.ClaimStrings{audience},
+			Subject:   userID.String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+			NotBefore: jwt.NewNumericDate(now),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	if kid != "" {
+		token.Header["kid"] = kid
+	}
+
+	signedToken, err := token.SignedString(privateKey)
+	if err != nil {
+		t.Fatalf("Failed to sign token: %v", err)
+	}
+
+	return signedToken
+}
+
+func TestValidateToken_WithMatchingKid(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	userID := uuid.New()
+
+	expectedKeyID, _ := ComputeKeyID(publicKey)
+	token := generateTestTokenWithKid(t, privateKey, userID, "cairn-user-service", "cairn-api", 1*time.Hour, expectedKeyID)
+
+	claims, err := validator.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("Expected valid token, got error: %v", err)
+	}
+
+	if claims.UserID != userID {
+		t.Errorf("Expected user ID %s, got %s", userID, claims.UserID)
+	}
+}
+
+func TestValidateToken_WithMismatchedKid(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	userID := uuid.New()
+
+	// Token with different kid should still validate (signature is correct)
+	// but will log a warning
+	token := generateTestTokenWithKid(t, privateKey, userID, "cairn-user-service", "cairn-api", 1*time.Hour, "wrong-kid")
+
+	claims, err := validator.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("Token should still validate with correct signature, got error: %v", err)
+	}
+
+	if claims.UserID != userID {
+		t.Errorf("Expected user ID %s, got %s", userID, claims.UserID)
+	}
+}
+
+func TestValidateToken_WithoutKid(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	userID := uuid.New()
+
+	// Token without kid header should still validate (backward compatibility)
+	token := generateTestTokenWithKid(t, privateKey, userID, "cairn-user-service", "cairn-api", 1*time.Hour, "")
+
+	claims, err := validator.ValidateToken(token)
+	if err != nil {
+		t.Fatalf("Token without kid should validate, got error: %v", err)
+	}
+
+	if claims.UserID != userID {
+		t.Errorf("Expected user ID %s, got %s", userID, claims.UserID)
+	}
+}

@@ -2,6 +2,9 @@ package auth
 
 import (
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,6 +29,7 @@ var (
 type JWTManager struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
+	keyID      string // Key ID (kid) for JWT header - identifies which key signed the token
 	expiry     time.Duration
 	issuer     string
 	audience   string
@@ -44,13 +48,46 @@ type JWTManagerConfig struct {
 	Expiry     time.Duration
 	Issuer     string // Optional: issuer claim for JWT
 	Audience   string // Optional: audience claim for JWT
+	KeyID      string // Optional: custom key ID (if empty, computed from public key)
+}
+
+// ComputeKeyID generates a key ID from an RSA public key.
+// The key ID is the first 16 characters of the base64url-encoded SHA256 hash
+// of the DER-encoded public key. This provides a stable, unique identifier
+// that can be used to select the correct key during validation.
+func ComputeKeyID(publicKey *rsa.PublicKey) (string, error) {
+	if publicKey == nil {
+		return "", errors.New("public key cannot be nil")
+	}
+
+	// Encode public key to DER format
+	derBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal public key: %w", err)
+	}
+
+	// Compute SHA256 hash
+	hash := sha256.Sum256(derBytes)
+
+	// Base64url encode and truncate to 16 characters for readability
+	// 16 chars = 96 bits of entropy, sufficient for key identification
+	encoded := base64.RawURLEncoding.EncodeToString(hash[:])
+	if len(encoded) > 16 {
+		encoded = encoded[:16]
+	}
+
+	return encoded, nil
 }
 
 // NewJWTManager creates a new JWT manager
 func NewJWTManager(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey, expiry time.Duration) *JWTManager {
+	// Compute key ID from public key (ignore error, use empty string if computation fails)
+	keyID, _ := ComputeKeyID(publicKey)
+
 	return &JWTManager{
 		privateKey: privateKey,
 		publicKey:  publicKey,
+		keyID:      keyID,
 		expiry:     expiry,
 		issuer:     "cairn-user-service",
 		audience:   "cairn-api",
@@ -59,9 +96,16 @@ func NewJWTManager(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey, expiry 
 
 // NewJWTManagerWithConfig creates a new JWT manager with custom configuration
 func NewJWTManagerWithConfig(config JWTManagerConfig) *JWTManager {
+	// Use provided key ID or compute from public key
+	keyID := config.KeyID
+	if keyID == "" && config.PublicKey != nil {
+		keyID, _ = ComputeKeyID(config.PublicKey)
+	}
+
 	jm := &JWTManager{
 		privateKey: config.PrivateKey,
 		publicKey:  config.PublicKey,
+		keyID:      keyID,
 		expiry:     config.Expiry,
 		issuer:     config.Issuer,
 		audience:   config.Audience,
@@ -94,6 +138,14 @@ func (j *JWTManager) GenerateToken(userID uuid.UUID) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+
+	// Add kid (Key ID) header to identify which key signed the token
+	// This is essential for key rotation - validators can use the kid
+	// to select the correct public key for signature verification
+	if j.keyID != "" {
+		token.Header["kid"] = j.keyID
+	}
+
 	signedToken, err := token.SignedString(j.privateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
@@ -208,14 +260,22 @@ func (j *JWTManager) GetTokenExpiry() time.Duration {
 }
 
 // UpdateKeys updates the RSA key pair (useful for key rotation)
+// Note: This also recomputes the key ID based on the new public key
 func (j *JWTManager) UpdateKeys(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey) {
 	j.privateKey = privateKey
 	j.publicKey = publicKey
+	// Recompute key ID for the new key pair
+	j.keyID, _ = ComputeKeyID(publicKey)
 }
 
 // GetPublicKey returns the current public key (useful for other services)
 func (j *JWTManager) GetPublicKey() *rsa.PublicKey {
 	return j.publicKey
+}
+
+// GetKeyID returns the current key ID (kid)
+func (j *JWTManager) GetKeyID() string {
+	return j.keyID
 }
 
 // TokenInfo holds information about a token

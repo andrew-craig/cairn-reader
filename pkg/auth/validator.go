@@ -2,8 +2,12 @@ package auth
 
 import (
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -31,21 +35,55 @@ type Claims struct {
 // Validator handles JWT token validation using RS256 public key
 type Validator struct {
 	publicKey *rsa.PublicKey
+	keyID     string // Key ID (kid) for identifying which key to use for validation
 	issuer    string
 	audience  string
+}
+
+// ComputeKeyID generates a key ID from an RSA public key.
+// The key ID is the first 16 characters of the base64url-encoded SHA256 hash
+// of the DER-encoded public key. This provides a stable, unique identifier
+// that can be used to select the correct key during validation.
+func ComputeKeyID(publicKey *rsa.PublicKey) (string, error) {
+	if publicKey == nil {
+		return "", errors.New("public key cannot be nil")
+	}
+
+	// Encode public key to DER format
+	derBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal public key: %w", err)
+	}
+
+	// Compute SHA256 hash
+	hash := sha256.Sum256(derBytes)
+
+	// Base64url encode and truncate to 16 characters for readability
+	// 16 chars = 96 bits of entropy, sufficient for key identification
+	encoded := base64.RawURLEncoding.EncodeToString(hash[:])
+	if len(encoded) > 16 {
+		encoded = encoded[:16]
+	}
+
+	return encoded, nil
 }
 
 // ValidatorConfig holds configuration for the JWT validator
 type ValidatorConfig struct {
 	PublicKey *rsa.PublicKey
+	KeyID     string // Key ID (kid) - if empty, computed from public key
 	Issuer    string // Expected issuer claim (optional, validates if set)
 	Audience  string // Expected audience claim (optional, validates if set)
 }
 
 // NewValidator creates a new JWT validator with a public key
 func NewValidator(publicKey *rsa.PublicKey) *Validator {
+	// Compute key ID from public key (ignore error, use empty string if computation fails)
+	keyID, _ := ComputeKeyID(publicKey)
+
 	return &Validator{
 		publicKey: publicKey,
+		keyID:     keyID,
 		issuer:    "cairn-user-service",
 		audience:  "cairn-api",
 	}
@@ -53,8 +91,15 @@ func NewValidator(publicKey *rsa.PublicKey) *Validator {
 
 // NewValidatorWithConfig creates a new JWT validator with custom configuration
 func NewValidatorWithConfig(config ValidatorConfig) *Validator {
+	// Use provided key ID or compute from public key
+	keyID := config.KeyID
+	if keyID == "" && config.PublicKey != nil {
+		keyID, _ = ComputeKeyID(config.PublicKey)
+	}
+
 	v := &Validator{
 		publicKey: config.PublicKey,
+		keyID:     keyID,
 		issuer:    config.Issuer,
 		audience:  config.Audience,
 	}
@@ -81,6 +126,20 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
+
+		// Check kid (Key ID) header if present
+		// This enables key rotation by allowing validators to identify which key to use
+		if tokenKid, ok := token.Header["kid"].(string); ok && tokenKid != "" {
+			if v.keyID != "" && tokenKid != v.keyID {
+				// Log warning but continue validation - the signature check will determine validity
+				// In a multi-key setup, this is where you'd look up the correct key by kid
+				slog.Warn("JWT kid mismatch - token may have been signed with a different key",
+					"token_kid", tokenKid,
+					"expected_kid", v.keyID,
+				)
+			}
+		}
+
 		return v.publicKey, nil
 	})
 
@@ -153,13 +212,21 @@ func ExtractTokenFromHeader(authHeader string) (string, error) {
 }
 
 // UpdatePublicKey updates the RSA public key (useful for key rotation)
+// Note: This also recomputes the key ID based on the new public key
 func (v *Validator) UpdatePublicKey(publicKey *rsa.PublicKey) {
 	v.publicKey = publicKey
+	// Recompute key ID for the new key
+	v.keyID, _ = ComputeKeyID(publicKey)
 }
 
 // GetPublicKey returns the current public key
 func (v *Validator) GetPublicKey() *rsa.PublicKey {
 	return v.publicKey
+}
+
+// GetKeyID returns the current key ID (kid)
+func (v *Validator) GetKeyID() string {
+	return v.keyID
 }
 
 // TokenInfo holds information about a token
