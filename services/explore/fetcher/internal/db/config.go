@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,17 +22,17 @@ type Config struct {
 // NewConfigFromEnv creates a Config from environment variables
 func NewConfigFromEnv() *Config {
 	return &Config{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "fetcher"),
-		Password: getEnv("DB_PASSWORD", "fetcher_password"),
-		DBName:   getEnv("DB_NAME", "fetcher_db"),
+		Host:     env.GetString("DB_HOST", "localhost"),
+		Port:     env.GetString("DB_PORT", "5432"),
+		User:     env.GetString("DB_USER", "fetcher"),
+		Password: env.GetString("DB_PASSWORD", "fetcher_password"),
+		DBName:   env.GetString("DB_NAME", "fetcher_db"),
 	}
 }
 
 // Connect establishes a database connection pool
 func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
-	sslMode := getEnv("DB_SSLMODE", "require")
+	sslMode := env.GetString("DB_SSLMODE", "require")
 	connStr := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.User, c.Password, c.Host, c.Port, c.DBName, sslMode,
@@ -65,11 +65,4 @@ func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 		slog.String("port", c.Port),
 	)
 	return pool, nil
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

@@ -9,11 +9,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
@@ -36,11 +36,11 @@ type IntegrationTestSuite struct {
 
 func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 	// Use test database
-	dbHost := getEnv("TEST_DB_HOST", "localhost")
-	dbPort := getEnv("TEST_DB_PORT", "5432")
-	dbUser := getEnv("TEST_DB_USER", "cairn")
-	dbPassword := getEnv("TEST_DB_PASSWORD", "cairn_password")
-	dbName := getEnv("TEST_DB_NAME", "cairn_test_db")
+	dbHost := env.GetString("TEST_DB_HOST", "localhost")
+	dbPort := env.GetString("TEST_DB_PORT", "5432")
+	dbUser := env.GetString("TEST_DB_USER", "cairn")
+	dbPassword := env.GetString("TEST_DB_PASSWORD", "cairn_password")
+	dbName := env.GetString("TEST_DB_NAME", "cairn_test_db")
 
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost, dbPort, dbUser, dbPassword, dbName)
@@ -119,13 +119,6 @@ func cleanupTestData(t *testing.T, db *pgxpool.Pool) {
 			t.Logf("Warning: cleanup query failed: %v", err)
 		}
 	}
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // testJWTHelper helps generate JWT tokens for integration tests
