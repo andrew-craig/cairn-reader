@@ -5,12 +5,11 @@ package api
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
-	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -38,49 +37,38 @@ func NewServer(database *pgxpool.Pool, articleRepo db.ArticleRepositoryInterface
 	}
 }
 
-// Routes sets up the HTTP routes (v1 API)
+// Routes sets up the HTTP routes (v1 API) using chi router
 func (s *Server) Routes() http.Handler {
-	mux := http.NewServeMux()
+	r := chi.NewRouter()
+
+	// Global middleware
+	r.Use(s.loggingMiddleware)
 
 	// Health check endpoints (Kubernetes-compatible) - public
-	mux.HandleFunc("/health/live", s.handleLiveness)
-	mux.HandleFunc("/health/ready", s.handleReadiness)
+	r.Get("/health/live", s.handleLiveness)
+	r.Get("/health/ready", s.handleReadiness)
 
-	// Public API routes - no authentication required
-	mux.HandleFunc("/api/v1/explore/article", s.handleArticles)
+	// API v1 routes
+	r.Route("/api/v1/explore", func(r chi.Router) {
+		// Public API routes - no authentication required
+		r.Post("/article", s.handleArticles)
 
-	// Protected API routes - require authentication
-	mux.Handle("/api/v1/explore/recommendation/", s.authMiddleware.RequireAuth(
-		http.HandlerFunc(s.handleRecommendations),
-	))
+		// Protected recommendation route
+		r.With(s.authMiddleware.RequireAuth).Get("/recommendation/{user_id}", s.handleRecommendations)
 
-	// Voting routes - require authentication
-	// Note: These routes need to be registered in a specific order for proper matching
-	mux.Handle("/api/v1/explore/article/", s.authMiddleware.RequireAuth(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Route voting and read endpoints based on path patterns and HTTP method
-			if strings.HasSuffix(r.URL.Path, "/vote") {
-				switch r.Method {
-				case http.MethodPost:
-					s.handleVote(w, r)
-				case http.MethodDelete:
-					s.handleRemoveVote(w, r)
-				case http.MethodGet:
-					s.handleGetVotes(w, r)
-				default:
-					pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-				}
-			} else if strings.HasSuffix(r.URL.Path, "/read") {
-				if r.Method == http.MethodPost {
-					s.handleMarkAsRead(w, r)
-				} else {
-					pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-				}
-			} else {
-				pkgapi.WriteError(w, http.StatusNotFound, pkgapi.ErrCodeNotFound, "Endpoint not found", nil, "v1")
-			}
-		}),
-	))
+		// Protected article routes - require authentication
+		r.Route("/article/{article_id}", func(r chi.Router) {
+			r.Use(s.authMiddleware.RequireAuth)
 
-	return s.loggingMiddleware(mux)
+			// Vote endpoints
+			r.Get("/vote", s.handleGetVotes)
+			r.Post("/vote", s.handleVote)
+			r.Delete("/vote", s.handleRemoveVote)
+
+			// Read endpoint
+			r.Post("/read", s.handleMarkAsRead)
+		})
+	})
+
+	return r
 }
