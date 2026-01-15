@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
-	"strconv"
 
+	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -18,12 +17,12 @@ func RunMigrations(migrationsPath string) error {
 	// Create a standard database/sql connection for migrations
 	connString := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		getEnv("DB_HOST", "localhost"),
-		getEnvInt("DB_PORT", 5432),
-		getEnv("DB_USER", "cairn"),
-		getEnv("DB_PASSWORD", "cairn_password"),
-		getEnv("DB_NAME", "cairn_db"),
-		getEnv("DB_SSLMODE", "disable"),
+		env.GetString("DB_HOST", "localhost"),
+		env.GetInt("DB_PORT", 5432),
+		env.GetString("DB_USER", "cairn"),
+		env.GetString("DB_PASSWORD", "cairn_password"),
+		env.GetString("DB_NAME", "cairn_db"),
+		env.GetString("DB_SSLMODE", "disable"),
 	)
 
 	db, err := sql.Open("postgres", connString)
@@ -58,22 +57,4 @@ func RunMigrations(migrationsPath string) error {
 	}
 
 	return nil
-}
-
-// getEnv gets an environment variable or returns a default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// getEnvInt gets an environment variable as an integer or returns a default value
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
-		}
-	}
-	return defaultValue
 }

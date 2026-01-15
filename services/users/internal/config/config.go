@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"time"
+
+	"github.com/cairn-app/cairn-reader/pkg/env"
 )
 
 // Config holds all configuration for the user service
@@ -77,48 +77,48 @@ type SecurityConfig struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
-			Port:            getEnv("PORT", "8080"),
-			Environment:     getEnv("ENVIRONMENT", "development"),
-			ShutdownTimeout: getDurationEnv("SHUTDOWN_TIMEOUT", 30*time.Second),
+			Port:            env.GetString("PORT", "8080"),
+			Environment:     env.GetString("ENVIRONMENT", "development"),
+			ShutdownTimeout: env.GetDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
 		},
 		Database: DatabaseConfig{
-			Host:            getEnv("DB_HOST", "localhost"),
-			Port:            getEnv("DB_PORT", "5432"),
-			User:            getEnv("DB_USER", ""),
-			Password:        getEnv("DB_PASSWORD", ""),
-			Database:        getEnv("DB_NAME", "cairn_users"),
-			SSLMode:         getEnv("DB_SSLMODE", "disable"),
-			MaxOpenConns:    getIntEnv("DB_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:    getIntEnv("DB_MAX_IDLE_CONNS", 5),
-			ConnMaxLifetime: getDurationEnv("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+			Host:            env.GetString("DB_HOST", "localhost"),
+			Port:            env.GetString("DB_PORT", "5432"),
+			User:            env.GetString("DB_USER", ""),
+			Password:        env.GetString("DB_PASSWORD", ""),
+			Database:        env.GetString("DB_NAME", "cairn_users"),
+			SSLMode:         env.GetString("DB_SSLMODE", "disable"),
+			MaxOpenConns:    env.GetInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:    env.GetInt("DB_MAX_IDLE_CONNS", 5),
+			ConnMaxLifetime: env.GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
 		},
 		Vault: VaultConfig{
-			Address:              getEnv("VAULT_ADDR", "http://localhost:8200"),
-			Token:                getEnv("VAULT_TOKEN", ""),
-			Namespace:            getEnv("VAULT_NAMESPACE", ""),
-			RoleID:               getEnv("VAULT_ROLE_ID", ""),
-			SecretID:             getEnv("VAULT_SECRET_ID", ""),
-			AuthPath:             getEnv("VAULT_AUTH_PATH", "approle"),
-			DBCredsPath:          getEnv("VAULT_DB_CREDS_PATH", "secret/data/database/credentials"),
-			TokenRenewalInterval: getDurationEnv("VAULT_TOKEN_RENEWAL_INTERVAL", 1*time.Hour),
+			Address:              env.GetString("VAULT_ADDR", "http://localhost:8200"),
+			Token:                env.GetString("VAULT_TOKEN", ""),
+			Namespace:            env.GetString("VAULT_NAMESPACE", ""),
+			RoleID:               env.GetString("VAULT_ROLE_ID", ""),
+			SecretID:             env.GetString("VAULT_SECRET_ID", ""),
+			AuthPath:             env.GetString("VAULT_AUTH_PATH", "approle"),
+			DBCredsPath:          env.GetString("VAULT_DB_CREDS_PATH", "secret/data/database/credentials"),
+			TokenRenewalInterval: env.GetDuration("VAULT_TOKEN_RENEWAL_INTERVAL", 1*time.Hour),
 		},
 		JWT: JWTConfig{
-			PrivateKeyPath:      getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/jwt/private-key"),
-			PublicKeyPath:       getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
-			AccessTokenExpiry:   getDurationEnv("JWT_ACCESS_TOKEN_EXPIRY", 60*time.Minute),
-			RefreshTokenExpiry:  getDurationEnv("JWT_REFRESH_TOKEN_EXPIRY", 30*24*time.Hour),
-			KeyRotationInterval: getDurationEnv("JWT_KEY_ROTATION_INTERVAL", 24*time.Hour),
+			PrivateKeyPath:      env.GetString("JWT_PRIVATE_KEY_PATH", "secret/data/jwt/private-key"),
+			PublicKeyPath:       env.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
+			AccessTokenExpiry:   env.GetDuration("JWT_ACCESS_TOKEN_EXPIRY", 60*time.Minute),
+			RefreshTokenExpiry:  env.GetDuration("JWT_REFRESH_TOKEN_EXPIRY", 30*24*time.Hour),
+			KeyRotationInterval: env.GetDuration("JWT_KEY_ROTATION_INTERVAL", 24*time.Hour),
 		},
 		Security: SecurityConfig{
-			BcryptCost:              getIntEnv("BCRYPT_COST", 12),
-			MinPasswordLength:       getIntEnv("MIN_PASSWORD_LENGTH", 8),
-			RequirePasswordComplexity: getBoolEnv("REQUIRE_PASSWORD_COMPLEXITY", true),
-			RateLimitRequests:       getIntEnv("RATE_LIMIT_REQUESTS", 100),
-			RateLimitWindow:         getDurationEnv("RATE_LIMIT_WINDOW", 1*time.Minute),
+			BcryptCost:              env.GetInt("BCRYPT_COST", 12),
+			MinPasswordLength:       env.GetInt("MIN_PASSWORD_LENGTH", 8),
+			RequirePasswordComplexity: env.GetBool("REQUIRE_PASSWORD_COMPLEXITY", true),
+			RateLimitRequests:       env.GetInt("RATE_LIMIT_REQUESTS", 100),
+			RateLimitWindow:         env.GetDuration("RATE_LIMIT_WINDOW", 1*time.Minute),
 		},
 		Logging: LoggingConfig{
-			Level:  getEnv("LOG_LEVEL", "info"),
-			Format: getEnv("LOG_FORMAT", "text"),
+			Level:  env.GetString("LOG_LEVEL", "info"),
+			Format: env.GetString("LOG_FORMAT", "text"),
 		},
 	}
 
@@ -179,40 +179,4 @@ func (c *Config) IsProduction() bool {
 // IsDevelopment returns true if running in development environment
 func (c *Config) IsDevelopment() bool {
 	return c.Server.Environment == "development"
-}
-
-// Helper functions to read environment variables
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getIntEnv(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
-
-func getBoolEnv(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		if boolValue, err := strconv.ParseBool(value); err == nil {
-			return boolValue
-		}
-	}
-	return defaultValue
-}
-
-func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
-		}
-	}
-	return defaultValue
 }
