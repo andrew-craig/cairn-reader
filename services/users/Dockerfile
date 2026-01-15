@@ -6,6 +6,9 @@ ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 
+# Copy root go.mod and go.sum for dependency resolution
+COPY go.mod go.sum ./
+
 # Copy user service and shared pkg
 COPY services/users services/users/
 COPY pkg pkg/
