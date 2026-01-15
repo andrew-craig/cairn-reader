@@ -6,13 +6,13 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api/dto"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -77,12 +77,8 @@ func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleArticles receives articles from the fetcher
+// POST /api/v1/explore/article
 func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
 	// Limit request body size to prevent DoS attacks
 	r.Body = http.MaxBytesReader(w, r.Body, maxArticlesBatchSize)
 
@@ -122,12 +118,8 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleRecommendations returns recommended articles for a user
+// GET /api/v1/explore/recommendation/{user_id}
 func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
@@ -150,22 +142,12 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 // handleMarkAsRead marks an article as read for a user
 // POST /api/v1/explore/article/{article_id}/read
 func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /api/v1/explore/article/{article_id}/read
-	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/read")
-
-	if articleID == "" {
-		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "article_id is required", nil, "v1")
-		return
-	}
+	// Extract article ID from chi URL parameter
+	articleID := chi.URLParam(r, "article_id")
 
 	if err := s.userRepo.MarkArticleAsRead(r.Context(), userID, articleID); err != nil {
 		slog.Error("failed to mark article as read", slog.Any("error", err))
@@ -182,22 +164,12 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 // handleVote handles upvoting or downvoting an article
 // POST /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
-	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
-
-	if articleID == "" {
-		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
-		return
-	}
+	// Extract article ID from chi URL parameter
+	articleID := chi.URLParam(r, "article_id")
 
 	// Limit request body size to prevent DoS attacks
 	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
@@ -251,22 +223,12 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 // handleRemoveVote removes a user's vote from an article
 // DELETE /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID := auth.MustGetUserID(r.Context())
 	userID := authenticatedUserID.String()
 
-	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
-	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
-
-	if articleID == "" {
-		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
-		return
-	}
+	// Extract article ID from chi URL parameter
+	articleID := chi.URLParam(r, "article_id")
 
 	if err := s.voteRepo.RemoveVote(r.Context(), userID, articleID); err != nil {
 		slog.Error("failed to remove vote", slog.Any("error", err))
@@ -283,18 +245,8 @@ func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 // handleGetVotes returns vote counts for an article
 // GET /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		pkgapi.WriteError(w, http.StatusMethodNotAllowed, pkgapi.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-		return
-	}
-
-	// Extract article ID from path: /api/v1/explore/article/{article_id}/vote
-	articleID := extractPathParam(r.URL.Path, "/api/v1/explore/article/", "/vote")
-
-	if articleID == "" {
-		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Article ID is required", nil, "v1")
-		return
-	}
+	// Extract article ID from chi URL parameter
+	articleID := chi.URLParam(r, "article_id")
 
 	upvotes, downvotes, err := s.voteRepo.GetVoteCounts(r.Context(), articleID)
 	if err != nil {
@@ -334,13 +286,4 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
-}
-
-// extractPathParam extracts a path parameter from a URL path
-// by removing a prefix and suffix, then trimming whitespace.
-// Example: extractPathParam("/explore/articles/123/vote", "/explore/articles/", "/vote") returns "123"
-func extractPathParam(path, prefix, suffix string) string {
-	path = strings.TrimPrefix(path, prefix)
-	path = strings.TrimSuffix(path, suffix)
-	return strings.TrimSpace(path)
 }
