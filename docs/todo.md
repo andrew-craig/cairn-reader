@@ -10,164 +10,156 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## High Priority
 
+### Task 1. Missing kid (Key ID) Header for Key Rotation
+
+Issue: JWTs don't include a kid header to identify which key signed them.
+
+Current code (jwt.go:96):
+
+token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+
+Risk: During key rotation, validators won't know which key to use. This can cause:
+
+    Rejected valid tokens signed with old key
+    Accepting tokens signed with compromised keys
+
+Recommendation: Add kid header to tokens:
+
+token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+token.Header["kid"] = keyID  // e.g., hash of public key
+
+### Task 2. Access Token Expiry Too Long (Default 60 Minutes)
+
+Issue: Default access token lifetime is 60 minutes (config.go:108).
+
+Risk: Long-lived access tokens increase window of attack if compromised.
+
+Recommendation: Reduce to 15 minutes maximum:
+
+AccessTokenExpiry: getDurationEnv("JWT_ACCESS_TOKEN_EXPIRY", 15*time.Minute),
+
+### Task 3. Non-Atomic Key Updates in JWTManager
+
+Issue: UpdateKeys() is not thread-safe (jwt.go:211-214):
+
+func (j *JWTManager) UpdateKeys(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey) {
+    j.privateKey = privateKey
+    j.publicKey = publicKey
+}
+
+Risk: Race condition during key rotation - token generation could use mismatched keys.
+
+Recommendation: Use sync.RWMutex or atomic.Pointer for key updates:
+
+type JWTManager struct {
+    mu         sync.RWMutex
+    privateKey *rsa.PrivateKey
+    publicKey  *rsa.PublicKey
+    // ...
+}
+
+### Task 4. Validator UpdatePublicKey Also Non-Atomic
+
+Issue: pkg/auth/validator.go:156-158 has same thread-safety issue.
+
 ---
 
 ## Medium Priority
+
+### Task 5. Token Reuse Grace Period Too Short
+
+Issue: 5-second grace period (refresh_token.go:35) may cause legitimate requests to be flagged as reuse.
+
+TokenReuseGracePeriod = 5 * time.Second
+
+Risk: Network latency or retry logic could trigger false positives, locking users out.
+
+Recommendation: Consider increasing to 10-30 seconds or implementing a "one-time use" pattern with immediate invalidation after single use.
+
+### Task 6. Internal API Routes Without Authentication
+
+Issue: services/read/content/internal/api/router.go:104-109:
+
+// Internal API routes - used by internal services (Ingest RSS, etc.)
+// These routes do NOT require authentication as they are internal-only
+r.Route("/api/v1/internal", func(r chi.Router) {
+    r.Post("/content/user/bulk", bulkHandler.BulkAddToUsersInternal)
+})
+
+Risk: If internal network is compromised, these endpoints are unprotected.
+
+Recommendation: Use service-to-service authentication:
+
+    Mutual TLS (mTLS)
+    API keys validated against Vault
+    JWT tokens with service-level claims
+
+### Task 7. Panic on Missing User ID in Context
+
+Issue: MustGetUserID() panics if user ID not found (middleware.go:114-119).
+
+Risk: Programming errors could cause service crashes.
+
+Recommendation: Consider returning errors instead of panicking, or ensure comprehensive testing covers all code paths.
+
+### Task 8. Error Messages May Leak Information
+
+Issue: Detailed error messages returned to clients (gin_adapter.go:71-89):
+
+"error": "token has expired"
+"error": "invalid token signature"
+"error": "invalid token issuer"
+
+Recommendation: Return generic "unauthorized" message; log specific errors server-side.
+
 
 ---
 
 ## Low Priority
 
+### Task 9. No JTI (JWT ID) for Token Revocation
+
+Issue: JWTs don't include unique identifiers.
+
+Impact: Cannot revoke individual access tokens if compromised.
+
+Recommendation: Add jti claim for token blacklisting capability if needed.
+
+
+### Task 10. Console Logging for Security Events
+
+Issue: Security events logged to stdout (refresh_token.go:159):
+
+fmt.Printf("failed to revoke token family on reuse: %v\n", err)
+
+Recommendation: Use structured logging with proper log levels and security event tagging.
+
+
+Concerns
+### Task 11. No Vault Response Caching
+
+Keys are fetched synchronously on startup. Consider caching with TTL.
+
+### Task 12. Vault Connection Not Retried
+
+If Vault is temporarily unavailable at startup, service fails immediately.
+
+Recommendation: Implement retry with exponential backoff for Vault connection.
+
+### Task 13. Align on Gin middleware
+
+Framework variations: User Service uses Gin with pkg/auth.GinMiddleware, while Read/Explore use net/http with pkg/auth.Middleware. Both use the same underlying validator - acceptable.
+
+### Task 14. Review OptionalAuth behaviour
+
+Optional Auth behavior: When invalid token provided, OptionalAuth continues without authentication. This is documented but could allow requests that appear authenticated to proceed unauthenticated.
 
 
 
-
-### 5. Improve Router for Path Parameter Handling
-**File:** `services/explore/recommender/internal/api/handlers.go`
-
-**Issue:** Manual string manipulation for extracting path parameters is fragile and error-prone.
-
-**Current:**
-```go
-// Lines 205, 264
-articleID := strings.TrimPrefix(r.URL.Path, "/explore/articles/")
-articleID = strings.TrimSuffix(articleID, "/vote")
-```
-
-**Implementation:**
-
-Add lightweight router library (chi or httprouter):
-
-**Option 1: chi (recommended - stdlib-style)**
-```bash
-go get github.com/go-chi/chi/v5
-```
-
-```go
-import "github.com/go-chi/chi/v5"
-
-func (s *Server) setupRoutes() {
-    r := chi.NewRouter()
-
-    // Middleware
-    r.Use(s.loggingMiddleware)
-    r.Use(s.authMiddleware)
-
-    // Routes with path parameters
-    r.Get("/health", s.handleHealth)
-    r.Get("/explore/recommendations/{userID}", s.handleRecommendations)
-    r.Post("/explore/articles/{articleID}/vote", s.handleVote)
-    r.Delete("/explore/articles/{articleID}/vote", s.handleDeleteVote)
-
-    s.router = r
-}
-
-func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
-    articleID := chi.URLParam(r, "articleID")  // Clean extraction
-    // ... rest of handler
-}
-```
-
-**Option 2: httprouter (faster, minimal)**
-```bash
-go get github.com/julienschmidt/httprouter
-```
-
-```go
-import "github.com/julienschmidt/httprouter"
-
-router := httprouter.New()
-router.GET("/health", s.handleHealth)
-router.POST("/explore/articles/:id/vote", s.handleVoteWithParams)
-
-func (s *Server) handleVoteWithParams(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-    articleID := ps.ByName("id")
-    // ... rest of handler
-}
-```
 
 ---
 
-### 6. Consolidate getEnv Helper Functions
-**Files:**
-- `services/explore/fetcher/cmd/fetcher/main.go:173-179`
-- `services/explore/recommender/cmd/recommender/main.go:182-187`
-- `services/users/internal/config/config.go:186-218`
-
-**Issue:** Same `getEnv()` helper function duplicated across services with slight variations.
-
-**Implementation:**
-
-Extract to `pkg/env/env.go`:
-```go
-package env
-
-import (
-    "os"
-    "strconv"
-    "time"
-)
-
-// GetString returns the environment variable value or default
-func GetString(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
-
-// GetInt returns the environment variable as int or default
-func GetInt(key string, defaultValue int) int {
-    if value := os.Getenv(key); value != "" {
-        if intVal, err := strconv.Atoi(value); err == nil {
-            return intVal
-        }
-    }
-    return defaultValue
-}
-
-// GetBool returns the environment variable as bool or default
-func GetBool(key string, defaultValue bool) bool {
-    if value := os.Getenv(key); value != "" {
-        if boolVal, err := strconv.ParseBool(value); err == nil {
-            return boolVal
-        }
-    }
-    return defaultValue
-}
-
-// GetDuration returns the environment variable as duration or default
-func GetDuration(key string, defaultValue time.Duration) time.Duration {
-    if value := os.Getenv(key); value != "" {
-        if duration, err := time.ParseDuration(value); err == nil {
-            return duration
-        }
-    }
-    return defaultValue
-}
-
-// MustGetString returns the value or panics if not set
-func MustGetString(key string) string {
-    value := os.Getenv(key)
-    if value == "" {
-        panic("required environment variable not set: " + key)
-    }
-    return value
-}
-```
-
-Use in all services:
-```go
-import "github.com/cairn-app/cairn-reader/pkg/env"
-
-port := env.GetString("PORT", "8080")
-timeout := env.GetDuration("FETCH_TIMEOUT", 30*time.Second)
-maxRetries := env.GetInt("MAX_RETRIES", 3)
-```
-
----
-
-### 7. Add Package-Level Documentation
+### Task 17. Add Package-Level Documentation
 **Files:** Various package files across services
 
 **Issue:** User service has excellent package documentation, while explore services have minimal package comments.
@@ -226,7 +218,7 @@ Add to all packages in:
 
 ---
 
-### 22. Add HTTP Framework Decision Documentation
+### Task 22. Add HTTP Framework Decision Documentation
 **File:** Create `docs/architecture/http-frameworks.md`
 
 **Issue:** Different HTTP frameworks used across services (Gin vs stdlib) without documented rationale.
@@ -292,7 +284,7 @@ If explore services grow significantly (>10 endpoints), consider:
 
 ---
 
-### 8. Add Mobile App Test Infrastructure
+### Task 18. Add Mobile App Test Infrastructure
 **Files:** `apps/mobile/src/`
 
 **Issue:** Mobile app has no test files (0 test coverage).
@@ -371,7 +363,7 @@ npm test
 
 ---
 
-### 9. Optimize N+1 Query in Recommendation Flow
+### Task 19. Optimize N+1 Query in Recommendation Flow
 **File:** `services/explore/recommender/internal/db/article_repository.go:327`
 
 **Issue:** Recording recommendations happens in a loop, creating N database calls instead of 1 batch operation.
