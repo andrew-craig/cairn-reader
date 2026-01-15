@@ -7,6 +7,7 @@ ENV GOTOOLCHAIN=auto
 WORKDIR /app
 
 # Copy necessary directories to handle go.mod replace directives
+COPY go.mod go.sum ./
 COPY services/users services/users/
 COPY services/explore services/explore/
 COPY pkg pkg/
