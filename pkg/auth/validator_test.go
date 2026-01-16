@@ -635,3 +635,161 @@ func TestValidateToken_WithoutKid(t *testing.T) {
 		t.Errorf("Expected user ID %s, got %s", userID, claims.UserID)
 	}
 }
+
+// TestUpdatePublicKey_ConcurrentAccess verifies thread-safety of key updates.
+// This test checks that concurrent token validation and key updates don't
+// cause race conditions or mismatched key usage.
+func TestUpdatePublicKey_ConcurrentAccess(t *testing.T) {
+	privateKey1, publicKey1 := generateTestKeys(t)
+	_, publicKey2 := generateTestKeys(t)
+
+	validator := NewValidator(publicKey1)
+	userID := uuid.New()
+
+	// Generate token with key1
+	token := generateTestToken(t, privateKey1, userID, "cairn-user-service", "cairn-api", 1*time.Hour)
+
+	// Run with race detector: go test -race
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that validate tokens
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			// Validation may fail if key was updated, but should not panic or race
+			_, _ = validator.ValidateToken(token)
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			// Alternate between key pairs
+			if i%2 == 0 {
+				validator.UpdatePublicKey(publicKey1)
+			} else {
+				validator.UpdatePublicKey(publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentValidateToken tests that tokens can be validated
+// concurrently without race conditions.
+func TestConcurrentValidateToken(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines)
+
+	// Start goroutines that validate tokens
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			userID := uuid.New()
+			token := generateTestToken(t, privateKey, userID, "cairn-user-service", "cairn-api", 1*time.Hour)
+
+			claims, err := validator.ValidateToken(token)
+			if err != nil {
+				t.Errorf("ValidateToken failed: %v", err)
+				return
+			}
+			if claims == nil {
+				t.Error("ValidateToken returned nil claims")
+			}
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentGetPublicKeyAndUpdate tests that GetPublicKey and UpdatePublicKey
+// can be called concurrently without race conditions.
+func TestConcurrentGetPublicKeyAndUpdate(t *testing.T) {
+	_, publicKey1 := generateTestKeys(t)
+	_, publicKey2 := generateTestKeys(t)
+
+	validator := NewValidator(publicKey1)
+
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that get public key
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			key := validator.GetPublicKey()
+			if key == nil {
+				t.Error("GetPublicKey returned nil")
+			}
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			if i%2 == 0 {
+				validator.UpdatePublicKey(publicKey1)
+			} else {
+				validator.UpdatePublicKey(publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentGetKeyIDAndUpdate tests that GetKeyID and UpdatePublicKey
+// can be called concurrently without race conditions.
+func TestConcurrentGetKeyIDAndUpdate(t *testing.T) {
+	_, publicKey1 := generateTestKeys(t)
+	_, publicKey2 := generateTestKeys(t)
+
+	validator := NewValidator(publicKey1)
+
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that get key ID
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			keyID := validator.GetKeyID()
+			if keyID == "" {
+				t.Error("GetKeyID returned empty string")
+			}
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			if i%2 == 0 {
+				validator.UpdatePublicKey(publicKey1)
+			} else {
+				validator.UpdatePublicKey(publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}

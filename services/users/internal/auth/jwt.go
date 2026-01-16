@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -27,6 +28,7 @@ var (
 
 // JWTManager handles JWT token operations
 type JWTManager struct {
+	mu         sync.RWMutex    // Protects key fields during rotation
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
 	keyID      string // Key ID (kid) for JWT header - identifies which key signed the token
@@ -139,14 +141,20 @@ func (j *JWTManager) GenerateToken(userID uuid.UUID) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 
+	// Hold read lock while accessing key fields
+	j.mu.RLock()
+	keyID := j.keyID
+	privateKey := j.privateKey
+	j.mu.RUnlock()
+
 	// Add kid (Key ID) header to identify which key signed the token
 	// This is essential for key rotation - validators can use the kid
 	// to select the correct public key for signature verification
-	if j.keyID != "" {
-		token.Header["kid"] = j.keyID
+	if keyID != "" {
+		token.Header["kid"] = keyID
 	}
 
-	signedToken, err := token.SignedString(j.privateKey)
+	signedToken, err := token.SignedString(privateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -160,12 +168,17 @@ func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
 		return nil, ErrMissingToken
 	}
 
+	// Capture public key under read lock for use in the key function
+	j.mu.RLock()
+	publicKey := j.publicKey
+	j.mu.RUnlock()
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Verify signing method
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return j.publicKey, nil
+		return publicKey, nil
 	})
 
 	if err != nil {
@@ -259,22 +272,33 @@ func (j *JWTManager) GetTokenExpiry() time.Duration {
 	return j.expiry
 }
 
-// UpdateKeys updates the RSA key pair (useful for key rotation)
+// UpdateKeys updates the RSA key pair atomically (useful for key rotation).
+// This method is thread-safe and ensures that all key fields are updated
+// together, preventing race conditions where token generation could use
+// mismatched keys during rotation.
 // Note: This also recomputes the key ID based on the new public key
 func (j *JWTManager) UpdateKeys(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey) {
+	// Compute key ID outside the lock since it's a pure function
+	keyID, _ := ComputeKeyID(publicKey)
+
+	j.mu.Lock()
 	j.privateKey = privateKey
 	j.publicKey = publicKey
-	// Recompute key ID for the new key pair
-	j.keyID, _ = ComputeKeyID(publicKey)
+	j.keyID = keyID
+	j.mu.Unlock()
 }
 
 // GetPublicKey returns the current public key (useful for other services)
 func (j *JWTManager) GetPublicKey() *rsa.PublicKey {
+	j.mu.RLock()
+	defer j.mu.RUnlock()
 	return j.publicKey
 }
 
 // GetKeyID returns the current key ID (kid)
 func (j *JWTManager) GetKeyID() string {
+	j.mu.RLock()
+	defer j.mu.RUnlock()
 	return j.keyID
 }
 

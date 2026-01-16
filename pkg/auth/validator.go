@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -34,6 +35,7 @@ type Claims struct {
 
 // Validator handles JWT token validation using RS256 public key
 type Validator struct {
+	mu        sync.RWMutex   // Protects key fields during rotation
 	publicKey *rsa.PublicKey
 	keyID     string // Key ID (kid) for identifying which key to use for validation
 	issuer    string
@@ -121,6 +123,12 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 		return nil, ErrMissingToken
 	}
 
+	// Capture key fields under read lock for use in the key function
+	v.mu.RLock()
+	publicKey := v.publicKey
+	keyID := v.keyID
+	v.mu.RUnlock()
+
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Verify signing method is RS256
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
@@ -130,17 +138,17 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 		// Check kid (Key ID) header if present
 		// This enables key rotation by allowing validators to identify which key to use
 		if tokenKid, ok := token.Header["kid"].(string); ok && tokenKid != "" {
-			if v.keyID != "" && tokenKid != v.keyID {
+			if keyID != "" && tokenKid != keyID {
 				// Log warning but continue validation - the signature check will determine validity
 				// In a multi-key setup, this is where you'd look up the correct key by kid
 				slog.Warn("JWT kid mismatch - token may have been signed with a different key",
 					"token_kid", tokenKid,
-					"expected_kid", v.keyID,
+					"expected_kid", keyID,
 				)
 			}
 		}
 
-		return v.publicKey, nil
+		return publicKey, nil
 	})
 
 	if err != nil {
@@ -211,21 +219,32 @@ func ExtractTokenFromHeader(authHeader string) (string, error) {
 	return token, nil
 }
 
-// UpdatePublicKey updates the RSA public key (useful for key rotation)
+// UpdatePublicKey updates the RSA public key atomically (useful for key rotation).
+// This method is thread-safe and ensures that both key fields are updated
+// together, preventing race conditions where token validation could use
+// mismatched key and keyID during rotation.
 // Note: This also recomputes the key ID based on the new public key
 func (v *Validator) UpdatePublicKey(publicKey *rsa.PublicKey) {
+	// Compute key ID outside the lock since it's a pure function
+	keyID, _ := ComputeKeyID(publicKey)
+
+	v.mu.Lock()
 	v.publicKey = publicKey
-	// Recompute key ID for the new key
-	v.keyID, _ = ComputeKeyID(publicKey)
+	v.keyID = keyID
+	v.mu.Unlock()
 }
 
 // GetPublicKey returns the current public key
 func (v *Validator) GetPublicKey() *rsa.PublicKey {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.publicKey
 }
 
 // GetKeyID returns the current key ID (kid)
 func (v *Validator) GetKeyID() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
 	return v.keyID
 }
 

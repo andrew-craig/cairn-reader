@@ -645,3 +645,182 @@ func TestGenerateToken_KidHeaderChangesWithKeyUpdate(t *testing.T) {
 	// Kids should be different after key update
 	assert.NotEqual(t, oldKid, newKid, "kid header should change after key update")
 }
+
+// TestUpdateKeys_ConcurrentAccess verifies thread-safety of key updates.
+// This test checks that concurrent token generation and key updates don't
+// cause race conditions or mismatched key usage.
+func TestUpdateKeys_ConcurrentAccess(t *testing.T) {
+	privateKey1, publicKey1 := generateTestKeyPair(t)
+	privateKey2, publicKey2 := generateTestKeyPair(t)
+
+	manager := NewJWTManager(privateKey1, publicKey1, 60*time.Minute)
+	userID := uuid.New()
+
+	// Run with race detector: go test -race
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that generate tokens
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			token, err := manager.GenerateToken(userID)
+			if err != nil {
+				t.Errorf("GenerateToken failed: %v", err)
+				return
+			}
+			// Token should be non-empty
+			if token == "" {
+				t.Error("Generated empty token")
+			}
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			// Alternate between key pairs
+			if i%2 == 0 {
+				manager.UpdateKeys(privateKey1, publicKey1)
+			} else {
+				manager.UpdateKeys(privateKey2, publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentGenerateAndValidate tests that tokens can be generated and
+// validated concurrently without race conditions.
+func TestConcurrentGenerateAndValidate(t *testing.T) {
+	privateKey, publicKey := generateTestKeyPair(t)
+	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
+
+	const numGoroutines = 50
+	tokens := make(chan string, numGoroutines)
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that generate tokens
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			userID := uuid.New()
+			token, err := manager.GenerateToken(userID)
+			if err != nil {
+				t.Errorf("GenerateToken failed: %v", err)
+				return
+			}
+			tokens <- token
+		}()
+	}
+
+	// Start goroutines that validate tokens
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			select {
+			case token := <-tokens:
+				claims, err := manager.ValidateToken(token)
+				if err != nil {
+					t.Errorf("ValidateToken failed: %v", err)
+					return
+				}
+				if claims == nil {
+					t.Error("ValidateToken returned nil claims")
+				}
+			case <-time.After(100 * time.Millisecond):
+				// Timeout waiting for token, ok to skip
+			}
+		}()
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentGetPublicKeyAndUpdate tests that GetPublicKey and UpdateKeys
+// can be called concurrently without race conditions.
+func TestConcurrentGetPublicKeyAndUpdate(t *testing.T) {
+	privateKey1, publicKey1 := generateTestKeyPair(t)
+	privateKey2, publicKey2 := generateTestKeyPair(t)
+
+	manager := NewJWTManager(privateKey1, publicKey1, 60*time.Minute)
+
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that get public key
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			key := manager.GetPublicKey()
+			if key == nil {
+				t.Error("GetPublicKey returned nil")
+			}
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			if i%2 == 0 {
+				manager.UpdateKeys(privateKey1, publicKey1)
+			} else {
+				manager.UpdateKeys(privateKey2, publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}
+
+// TestConcurrentGetKeyIDAndUpdate tests that GetKeyID and UpdateKeys
+// can be called concurrently without race conditions.
+func TestConcurrentGetKeyIDAndUpdate(t *testing.T) {
+	privateKey1, publicKey1 := generateTestKeyPair(t)
+	privateKey2, publicKey2 := generateTestKeyPair(t)
+
+	manager := NewJWTManager(privateKey1, publicKey1, 60*time.Minute)
+
+	const numGoroutines = 100
+	done := make(chan bool, numGoroutines*2)
+
+	// Start goroutines that get key ID
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer func() { done <- true }()
+			keyID := manager.GetKeyID()
+			if keyID == "" {
+				t.Error("GetKeyID returned empty string")
+			}
+		}()
+	}
+
+	// Start goroutines that update keys
+	for i := 0; i < numGoroutines; i++ {
+		go func(i int) {
+			defer func() { done <- true }()
+			if i%2 == 0 {
+				manager.UpdateKeys(privateKey1, publicKey1)
+			} else {
+				manager.UpdateKeys(privateKey2, publicKey2)
+			}
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < numGoroutines*2; i++ {
+		<-done
+	}
+}

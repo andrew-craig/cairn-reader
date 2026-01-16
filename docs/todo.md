@@ -2,6 +2,8 @@
 
 Comprehensive code review findings from December 2025. Issues are organized by priority and span all services (explore, users, mobile app).
 
+IMPORTANT: After implementing a task, move it to the completed section at the end of the file. Include only a 1-2 description 
+
 ---
 
 ## Critical Priority
@@ -9,30 +11,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 ---
 
 ## High Priority
-
-### Task 3. Non-Atomic Key Updates in JWTManager
-
-Issue: UpdateKeys() is not thread-safe (jwt.go:211-214):
-
-func (j *JWTManager) UpdateKeys(privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey) {
-    j.privateKey = privateKey
-    j.publicKey = publicKey
-}
-
-Risk: Race condition during key rotation - token generation could use mismatched keys.
-
-Recommendation: Use sync.RWMutex or atomic.Pointer for key updates:
-
-type JWTManager struct {
-    mu         sync.RWMutex
-    privateKey *rsa.PrivateKey
-    publicKey  *rsa.PublicKey
-    // ...
-}
-
-### Task 4. Validator UpdatePublicKey Also Non-Atomic
-
-Issue: pkg/auth/validator.go:156-158 has same thread-safety issue.
 
 ---
 
@@ -458,8 +436,10 @@ The following items have been successfully implemented and verified:
 - **Make SSL Mode Configurable (Default: Require)** - DB_SSLMODE environment variable with "require" default
 - **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables.
 - **Add Input Validation Library** (Task #1) - Implemented comprehensive request validation across all services using appropriate validation libraries. Stdlib services (Explore Recommender, Read Content, Read Ingest RSS) now use `github.com/go-ozzo/ozzo-validation/v4` with declarative validation methods on all DTOs. Gin service (User Service) already uses built-in Gin validation tags (`binding:"required,email"`). All handlers updated to call validation methods before processing requests. Benefits include consistent validation, better error messages, reduced boilerplate code, and improved maintainability.
-- **Reduce Access Token Expiry** (Task #2) - Changed default JWT access token lifetime from 60 minutes to 15 minutes in `services/users/internal/config/config.go`. This reduces the attack window if tokens are compromised. The value remains configurable via `JWT_ACCESS_TOKEN_EXPIRY` environment variable. 
+- **Reduce Access Token Expiry** (Task #2) - Changed default JWT access token lifetime from 60 minutes to 15 minutes in `services/users/internal/config/config.go`. This reduces the attack window if tokens are compromised. The value remains configurable via `JWT_ACCESS_TOKEN_EXPIRY` environment variable.
 - Missing kid (Key ID) Header for Key Rotation
+- **Thread-Safe Key Updates in JWTManager** (Task #3) - Added `sync.RWMutex` to `JWTManager` struct in `services/users/internal/auth/jwt.go` to protect key fields during rotation. Updated `GenerateToken()`, `ValidateToken()`, `UpdateKeys()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. This prevents race conditions where token generation could use mismatched keys during key rotation. Added comprehensive concurrent access tests that pass with Go's race detector.
+- **Thread-Safe Key Updates in Validator** (Task #4) - Added `sync.RWMutex` to `Validator` struct in `pkg/auth/validator.go` to protect key fields during rotation. Updated `ValidateToken()`, `UpdatePublicKey()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. Added comprehensive concurrent access tests that pass with Go's race detector.
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
