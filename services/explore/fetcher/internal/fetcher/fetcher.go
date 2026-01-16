@@ -13,6 +13,7 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sanitizer"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -24,6 +25,7 @@ type Fetcher struct {
 	feedRepo          db.FeedRepositoryInterface
 	recommenderClient client.RecommenderClientInterface
 	parser            *gofeed.Parser
+	sanitizer         *sanitizer.HTMLSanitizer
 	fetchInterval     time.Duration
 }
 
@@ -34,6 +36,7 @@ func NewFetcher(feedRepo db.FeedRepositoryInterface, recommenderClient client.Re
 		feedRepo:          feedRepo,
 		recommenderClient: recommenderClient,
 		parser:            gofeed.NewParser(),
+		sanitizer:         sanitizer.New(),
 		fetchInterval:     fetchInterval,
 	}
 }
@@ -179,6 +182,7 @@ func (f *Fetcher) convertItems(items []*gofeed.Item, feed *gofeed.Feed, feedURL 
 // convertToArticle converts a gofeed.Item to our Article model.
 // Generates a unique ID from the article link using SHA256 hashing.
 // Falls back to current time if no publication date is available.
+// Sanitizes HTML content: description is stripped to plain text, content preserves safe HTML.
 func (f *Fetcher) convertToArticle(item *gofeed.Item, feed *gofeed.Feed, feedURL string) models.Article {
 	// Determine publication date with fallback chain: Published > Updated > Now
 	published := time.Now()
@@ -203,6 +207,11 @@ func (f *Fetcher) convertToArticle(item *gofeed.Item, feed *gofeed.Feed, feedURL
 		content = item.Description
 	}
 
+	// Sanitize content: strip HTML from description (for previews),
+	// but preserve safe HTML in content (for full article display)
+	cleanDescription := f.sanitizer.StripHTML(item.Description)
+	cleanContent := f.sanitizer.SanitizeContent(content)
+
 	// Copy categories slice to avoid referencing the original item's slice
 	categories := append([]string(nil), item.Categories...)
 
@@ -210,8 +219,8 @@ func (f *Fetcher) convertToArticle(item *gofeed.Item, feed *gofeed.Feed, feedURL
 		ID:          id,
 		Title:       item.Title,
 		Link:        item.Link,
-		Description: item.Description,
-		Content:     content,
+		Description: cleanDescription,
+		Content:     cleanContent,
 		Author:      author,
 		Published:   published,
 		FeedURL:     feedURL,
