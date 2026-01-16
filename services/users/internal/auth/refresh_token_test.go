@@ -676,18 +676,18 @@ func TestIsTokenReused_EdgeCases(t *testing.T) {
 	t.Run("grace period boundary conditions", func(t *testing.T) {
 		now := time.Now().UTC()
 
-		// Exactly at grace period boundary (5 seconds)
+		// Exactly at grace period boundary (15 seconds)
 		token1 := &models.RefreshToken{
 			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-5 * time.Second),
+			LastUsedAt: now.Add(-15 * time.Second),
 		}
 		// Should not be considered reuse (>= grace period)
 		assert.False(t, service.isTokenReused(token1))
 
-		// Just inside grace period (4.9 seconds ago)
+		// Just inside grace period (14.9 seconds ago)
 		token2 := &models.RefreshToken{
 			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-4900 * time.Millisecond),
+			LastUsedAt: now.Add(-14900 * time.Millisecond),
 		}
 		assert.True(t, service.isTokenReused(token2))
 	})

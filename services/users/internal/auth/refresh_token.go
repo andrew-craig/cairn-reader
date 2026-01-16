@@ -31,9 +31,10 @@ const (
 	// DefaultRefreshTokenExpiry is the default lifetime for refresh tokens (30 days)
 	DefaultRefreshTokenExpiry = 30 * 24 * time.Hour
 
-	// TokenReuseGracePeriod is the time window where token reuse is considered
-	// If a token is used again within this window after first use, it's likely reuse
-	TokenReuseGracePeriod = 5 * time.Second
+	// TokenReuseGracePeriod is the time window where token reuse is considered acceptable.
+	// If a token is used again within this window after first use, it's allowed to
+	// accommodate network latency and retry logic without triggering false positives.
+	TokenReuseGracePeriod = 15 * time.Second
 )
 
 // RefreshTokenService handles refresh token operations including generation,

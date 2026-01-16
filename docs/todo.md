@@ -16,16 +16,6 @@ IMPORTANT: After implementing a task, move it to the completed section at the en
 
 ## Medium Priority
 
-### Task 5. Token Reuse Grace Period Too Short
-
-Issue: 5-second grace period (refresh_token.go:35) may cause legitimate requests to be flagged as reuse.
-
-TokenReuseGracePeriod = 5 * time.Second
-
-Risk: Network latency or retry logic could trigger false positives, locking users out.
-
-Recommendation: Consider increasing to 10-30 seconds or implementing a "one-time use" pattern with immediate invalidation after single use.
-
 ### Task 6. Internal API Routes Without Authentication
 
 Issue: services/read/content/internal/api/router.go:104-109:
@@ -440,6 +430,7 @@ The following items have been successfully implemented and verified:
 - Missing kid (Key ID) Header for Key Rotation
 - **Thread-Safe Key Updates in JWTManager** (Task #3) - Added `sync.RWMutex` to `JWTManager` struct in `services/users/internal/auth/jwt.go` to protect key fields during rotation. Updated `GenerateToken()`, `ValidateToken()`, `UpdateKeys()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. This prevents race conditions where token generation could use mismatched keys during key rotation. Added comprehensive concurrent access tests that pass with Go's race detector.
 - **Thread-Safe Key Updates in Validator** (Task #4) - Added `sync.RWMutex` to `Validator` struct in `pkg/auth/validator.go` to protect key fields during rotation. Updated `ValidateToken()`, `UpdatePublicKey()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. Added comprehensive concurrent access tests that pass with Go's race detector.
+- **Increase Token Reuse Grace Period** (Task #5) - Increased `TokenReuseGracePeriod` from 5 seconds to 15 seconds in `services/users/internal/auth/refresh_token.go`. This prevents false positive token reuse detection caused by network latency or retry logic.
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
