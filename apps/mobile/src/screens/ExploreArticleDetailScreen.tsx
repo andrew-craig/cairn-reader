@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  ScrollView,
   useColorScheme,
   TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { Colors, Spacing, FontSizes } from '../constants';
+import { Colors, Spacing } from '../constants';
 import { ExploreService } from '../services';
+import { ArticleContent } from '../components/common';
 
 type ExploreArticleDetailRouteProp = RouteProp<RootStackParamList, 'ExploreArticleDetail'>;
 
@@ -76,20 +75,11 @@ export const ExploreArticleDetailScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>
-          {article.title}
-        </Text>
-
-        {article.description && (
-          <Text style={[styles.content, { color: colors.text }]}>
-            {article.description}
-          </Text>
-        )}
-      </ScrollView>
+      <ArticleContent
+        article={article}
+        colors={colors}
+        showMetadata={false}
+      />
 
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <TouchableOpacity style={styles.bottomButton} onPress={handleBack}>
@@ -127,23 +117,6 @@ export const ExploreArticleDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing.lg,
-    paddingBottom: Spacing.xl,
-  },
-  title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: 'bold',
-    marginBottom: Spacing.lg,
-    lineHeight: 32,
-  },
-  content: {
-    fontSize: FontSizes.md,
-    lineHeight: 24,
   },
   bottomBar: {
     flexDirection: 'row',

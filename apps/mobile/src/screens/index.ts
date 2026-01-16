@@ -3,7 +3,7 @@ export * from './ExploreArticleDetailScreen';
 export * from './ReadScreen';
 export * from './SettingsScreen';
 export * from './AddArticleScreen';
-export * from './ArticleDetailScreen';
+export * from './ReadArticleDetailScreen';
 export * from './FavoritesScreen';
 export * from './ArchiveScreen';
 export * from './LoginScreen';

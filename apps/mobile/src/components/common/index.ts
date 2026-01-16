@@ -1,4 +1,5 @@
 export * from './ArticleCard';
+export * from './ArticleContent';
 export * from './ArticleRow';
 export * from './EmptyState';
 export * from './Button';

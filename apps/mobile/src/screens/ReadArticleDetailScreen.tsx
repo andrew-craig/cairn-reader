@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  ScrollView,
   useColorScheme,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,13 +12,13 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import { RootStackParamList } from '../types';
 import { StorageService, ReadService } from '../services';
-import { formatDate, extractDomain } from '../utils';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
+import { Colors, Spacing } from '../constants';
+import { ArticleContent } from '../components/common';
 
-type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
+type ReadArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 
-export const ArticleDetailScreen: React.FC = () => {
-  const route = useRoute<ArticleDetailRouteProp>();
+export const ReadArticleDetailScreen: React.FC = () => {
+  const route = useRoute<ReadArticleDetailRouteProp>();
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -142,44 +139,12 @@ export const ArticleDetailScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView}>
-        {article.imageUrl && (
-          <Image
-            source={{ uri: article.imageUrl }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        )}
-        <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {article.title}
-          </Text>
-          {article.description && (
-            <Text style={[styles.description, { color: colors.textSecondary }]}>
-              {article.description}
-            </Text>
-          )}
-          <View style={styles.metadata}>
-            <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-              {extractDomain(article.url)}
-            </Text>
-            <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-              Added {formatDate(article.addedAt)}
-            </Text>
-            {article.isRead && article.readAt && (
-              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-                Read {formatDate(article.readAt)}
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity
-            style={[styles.openButton, { backgroundColor: colors.primary }]}
-            onPress={handleOpenInBrowser}
-          >
-            <Text style={styles.openButtonText}>Open in Browser</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      <ArticleContent
+        article={article}
+        colors={colors}
+        onOpenInBrowser={handleOpenInBrowser}
+        showMetadata={true}
+      />
 
       <View style={[styles.actionBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <TouchableOpacity style={styles.actionButton} onPress={handleToggleFavorite}>
@@ -210,44 +175,6 @@ export const ArticleDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  image: {
-    width: '100%',
-    height: 250,
-  },
-  content: {
-    padding: Spacing.md,
-  },
-  title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: 'bold',
-    marginBottom: Spacing.md,
-  },
-  description: {
-    fontSize: FontSizes.md,
-    lineHeight: 24,
-    marginBottom: Spacing.md,
-  },
-  metadata: {
-    marginBottom: Spacing.lg,
-  },
-  metadataText: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.xs,
-  },
-  openButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  openButtonText: {
-    color: '#FFFFFF',
-    fontSize: FontSizes.md,
-    fontWeight: '600',
   },
   actionBar: {
     flexDirection: 'row',
