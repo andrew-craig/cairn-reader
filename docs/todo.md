@@ -10,34 +10,6 @@ Comprehensive code review findings from December 2025. Issues are organized by p
 
 ## High Priority
 
-### Task 1. Missing kid (Key ID) Header for Key Rotation
-
-Issue: JWTs don't include a kid header to identify which key signed them.
-
-Current code (jwt.go:96):
-
-token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-
-Risk: During key rotation, validators won't know which key to use. This can cause:
-
-    Rejected valid tokens signed with old key
-    Accepting tokens signed with compromised keys
-
-Recommendation: Add kid header to tokens:
-
-token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-token.Header["kid"] = keyID  // e.g., hash of public key
-
-### Task 2. Access Token Expiry Too Long (Default 60 Minutes)
-
-Issue: Default access token lifetime is 60 minutes (config.go:108).
-
-Risk: Long-lived access tokens increase window of attack if compromised.
-
-Recommendation: Reduce to 15 minutes maximum:
-
-AccessTokenExpiry: getDurationEnv("JWT_ACCESS_TOKEN_EXPIRY", 15*time.Minute),
-
 ### Task 3. Non-Atomic Key Updates in JWTManager
 
 Issue: UpdateKeys() is not thread-safe (jwt.go:211-214):
@@ -485,7 +457,9 @@ The following items have been successfully implemented and verified:
 - **Validate Article Exists Before Recording Vote** - Added rowsAffected check and error handling
 - **Make SSL Mode Configurable (Default: Require)** - DB_SSLMODE environment variable with "require" default
 - **Remove Hardcoded Secrets from Docker Compose** - Migrated all hardcoded secrets from docker-compose files to environment variables.
-- **Add Input Validation Library** (Task #1) - Implemented comprehensive request validation across all services using appropriate validation libraries. Stdlib services (Explore Recommender, Read Content, Read Ingest RSS) now use `github.com/go-ozzo/ozzo-validation/v4` with declarative validation methods on all DTOs. Gin service (User Service) already uses built-in Gin validation tags (`binding:"required,email"`). All handlers updated to call validation methods before processing requests. Benefits include consistent validation, better error messages, reduced boilerplate code, and improved maintainability. 
+- **Add Input Validation Library** (Task #1) - Implemented comprehensive request validation across all services using appropriate validation libraries. Stdlib services (Explore Recommender, Read Content, Read Ingest RSS) now use `github.com/go-ozzo/ozzo-validation/v4` with declarative validation methods on all DTOs. Gin service (User Service) already uses built-in Gin validation tags (`binding:"required,email"`). All handlers updated to call validation methods before processing requests. Benefits include consistent validation, better error messages, reduced boilerplate code, and improved maintainability.
+- **Reduce Access Token Expiry** (Task #2) - Changed default JWT access token lifetime from 60 minutes to 15 minutes in `services/users/internal/config/config.go`. This reduces the attack window if tokens are compromised. The value remains configurable via `JWT_ACCESS_TOKEN_EXPIRY` environment variable. 
+- Missing kid (Key ID) Header for Key Rotation
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
