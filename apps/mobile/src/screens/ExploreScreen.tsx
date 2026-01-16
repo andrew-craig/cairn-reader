@@ -32,7 +32,7 @@ export const ExploreScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [lastVisibleIndex, setLastVisibleIndex] = useState(0);
+  const lastVisibleIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
   const articlesRef = useRef<Article[]>([]);
   const loadMoreRef = useRef<((minArticles?: number) => Promise<void>) | null>(null);
@@ -44,17 +44,17 @@ export const ExploreScreen: React.FC = () => {
     setLoadingMore(true);
 
     try {
-      let previousLength = 0;
-
       // Use provided minimum or calculate based on scroll position
       const targetMinimum = minArticles ?? MIN_LOOKAHEAD_ARTICLES;
 
       // Keep fetching until we have enough articles
       while (true) {
-        // Get current articles count to check buffer
-        const currentArticlesCount = await new Promise<number>((resolve) => {
+        // Get current articles and lastVisibleIndex from state
+        const { count: currentArticlesCount, visibleIndex } = await new Promise<{ count: number; visibleIndex: number }>((resolve) => {
+          // Read lastVisibleIndex from ref to avoid stale closure
+          const visibleIdx = lastVisibleIndexRef.current;
           setArticles(prev => {
-            resolve(prev.length);
+            resolve({ count: prev.length, visibleIndex: visibleIdx });
             return prev;
           });
         });
@@ -63,7 +63,7 @@ export const ExploreScreen: React.FC = () => {
         // For scroll-based loading, check remaining articles beyond visible position
         const articlesToCheck = minArticles !== undefined
           ? currentArticlesCount
-          : currentArticlesCount - lastVisibleIndex;
+          : currentArticlesCount - visibleIndex;
 
         // Stop if we have enough articles
         if (articlesToCheck >= targetMinimum) {
@@ -79,23 +79,20 @@ export const ExploreScreen: React.FC = () => {
 
         // Filter out duplicates and add new articles
         let addedCount = 0;
-        setArticles(prev => {
-          const existingIds = new Set(prev.map(a => a.id));
-          const uniqueNew = newRecommendations.filter(a => !existingIds.has(a.id));
-          addedCount = uniqueNew.length;
-          return [...prev, ...uniqueNew];
+        await new Promise<void>((resolve) => {
+          setArticles(prev => {
+            const existingIds = new Set(prev.map(a => a.id));
+            const uniqueNew = newRecommendations.filter(a => !existingIds.has(a.id));
+            addedCount = uniqueNew.length;
+            resolve();
+            return [...prev, ...uniqueNew];
+          });
         });
 
         // If we didn't get any new unique articles, break to avoid infinite loop
         if (addedCount === 0) {
           break;
         }
-
-        // Safety check: if articles count hasn't changed, break
-        if (currentArticlesCount === previousLength) {
-          break;
-        }
-        previousLength = currentArticlesCount;
       }
     } catch (error) {
       console.error('Error loading more articles:', error);
@@ -103,20 +100,47 @@ export const ExploreScreen: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, [lastVisibleIndex]);
+  }, []); // No dependencies - uses refs for mutable values
 
   const loadExploreArticles = useCallback(async () => {
     try {
       const recommendations = await ExploreService.getRecommendations();
-      setArticles(recommendations);
 
-      // After initial load, ensure we have enough articles to fill the screen
-      // Calculate dynamically based on viewport height
+      // Calculate how many articles we need
       const minInitialArticles = calculateInitialArticleCount();
       console.log(`Initial article count needed: ${minInitialArticles} (screen height: ${Dimensions.get('window').height}px)`);
 
+      // Set initial articles
+      setArticles(recommendations);
+      // Also update ref immediately so loadMoreUntilBuffer can see current count
+      articlesRef.current = recommendations;
+
+      // If we need more articles, fetch them
       if (recommendations.length < minInitialArticles) {
-        await loadMoreUntilBuffer(minInitialArticles);
+        // Fetch more batches until we have enough
+        let allArticles = [...recommendations];
+
+        while (allArticles.length < minInitialArticles) {
+          const moreRecommendations = await ExploreService.getRecommendations();
+
+          if (moreRecommendations.length === 0) {
+            break;
+          }
+
+          // Filter duplicates
+          const existingIds = new Set(allArticles.map(a => a.id));
+          const uniqueNew = moreRecommendations.filter(a => !existingIds.has(a.id));
+
+          if (uniqueNew.length === 0) {
+            break;
+          }
+
+          allArticles = [...allArticles, ...uniqueNew];
+        }
+
+        // Set all articles at once
+        setArticles(allArticles);
+        articlesRef.current = allArticles;
       }
     } catch (error) {
       console.error('Error loading explore articles:', error);
@@ -124,7 +148,7 @@ export const ExploreScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [loadMoreUntilBuffer]);
+  }, []);
 
   // Keep refs updated with latest values
   useEffect(() => {
@@ -142,7 +166,7 @@ export const ExploreScreen: React.FC = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     setArticles([]);
-    setLastVisibleIndex(0);
+    lastVisibleIndexRef.current = 0;
     loadExploreArticles();
   };
 
@@ -161,7 +185,7 @@ export const ExploreScreen: React.FC = () => {
       const currentArticles = articlesRef.current;
       const index = currentArticles.findIndex(a => a.id === lastVisible.item.id);
       if (index !== -1) {
-        setLastVisibleIndex(index);
+        lastVisibleIndexRef.current = index;
 
         // Check if we need to load more articles
         const remainingArticles = currentArticles.length - index;

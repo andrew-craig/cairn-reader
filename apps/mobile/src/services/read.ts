@@ -14,6 +14,7 @@ import {
 import { API_CONFIG } from '../config/api';
 
 const READ_SERVICE_BASE_URL = API_CONFIG.READ_SERVICE_URL;
+const PAGE_SIZE_DEFAULT = 20;
 
 export class ReadService {
   private static async fetchWithAuth(
@@ -96,7 +97,14 @@ export class ReadService {
         throw new Error(result.message || result.error || 'Failed to list user contents');
       }
 
-      return result.data;
+      // Ensure we always return a valid response with contents array
+      const data = result.data || {};
+      return {
+        contents: data.contents || [],
+        total_count: data.total_count || 0,
+        limit: data.limit || params?.limit || PAGE_SIZE_DEFAULT,
+        offset: data.offset || params?.offset || 0,
+      };
     } catch (error) {
       console.error('Error listing user contents:', error);
       throw error;
