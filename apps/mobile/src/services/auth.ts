@@ -15,17 +15,26 @@ const API_BASE_URL = API_CONFIG.USER_SERVICE_URL;
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
 const USER_KEY = '@cairn:user';
+const TOKEN_EXPIRES_AT_KEY = '@cairn:token_expires_at';
+
+// Buffer time before expiration to trigger proactive refresh (5 minutes)
+const TOKEN_EXPIRATION_BUFFER_MS = 5 * 60 * 1000;
 
 export class AuthService {
   private static accessToken: string | null = null;
   private static refreshToken: string | null = null;
   private static user: User | null = null;
+  private static expiresAt: number | null = null;
+  private static isRefreshing: boolean = false;
+  private static refreshPromise: Promise<void> | null = null;
 
   static async initialize(): Promise<void> {
     this.accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
     this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
     const userJson = await AsyncStorage.getItem(USER_KEY);
     this.user = userJson ? JSON.parse(userJson) : null;
+    const expiresAtStr = await AsyncStorage.getItem(TOKEN_EXPIRES_AT_KEY);
+    this.expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
   }
 
   static async getDeviceId(): Promise<string> {
@@ -61,9 +70,11 @@ export class AuthService {
     }
 
     const data: LoginResponse = result.data;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresAt,
     });
     await this.saveUser(data.user);
     return data;
@@ -87,9 +98,11 @@ export class AuthService {
     }
 
     const data: LoginResponse = result.data;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresAt,
     });
     await this.saveUser(data.user);
     return data;
@@ -111,9 +124,11 @@ export class AuthService {
     }
 
     const data: LoginResponse = result.data;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresAt,
     });
     await this.saveUser(data.user);
     return data;
@@ -135,9 +150,11 @@ export class AuthService {
     }
 
     const data: LoginResponse = result.data;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresAt,
     });
     await this.saveUser(data.user);
     return data;
@@ -165,19 +182,25 @@ export class AuthService {
   static async saveTokens(tokens: AuthTokens): Promise<void> {
     this.accessToken = tokens.accessToken;
     this.refreshToken = tokens.refreshToken;
+    this.expiresAt = tokens.expiresAt || null;
 
     await AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     await AsyncStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    if (tokens.expiresAt) {
+      await AsyncStorage.setItem(TOKEN_EXPIRES_AT_KEY, tokens.expiresAt.toString());
+    }
   }
 
   static async clearTokens(): Promise<void> {
     this.accessToken = null;
     this.refreshToken = null;
     this.user = null;
+    this.expiresAt = null;
 
     await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
     await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     await AsyncStorage.removeItem(USER_KEY);
+    await AsyncStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
   }
 
   static async getAccessToken(): Promise<string | null> {
@@ -192,7 +215,85 @@ export class AuthService {
     return token !== null;
   }
 
+  /**
+   * Check if the access token is expired or will expire soon.
+   * Returns true if token should be refreshed.
+   */
+  static async isTokenExpired(): Promise<boolean> {
+    if (!this.expiresAt) {
+      const expiresAtStr = await AsyncStorage.getItem(TOKEN_EXPIRES_AT_KEY);
+      this.expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+    }
+
+    // If no expiration stored, assume expired to trigger refresh
+    if (!this.expiresAt) {
+      return true;
+    }
+
+    // Consider expired if within buffer time of expiration
+    return Date.now() >= (this.expiresAt - TOKEN_EXPIRATION_BUFFER_MS);
+  }
+
+  /**
+   * Check if we have a refresh token available.
+   */
+  static async hasRefreshToken(): Promise<boolean> {
+    if (!this.refreshToken) {
+      this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+    }
+    return this.refreshToken !== null;
+  }
+
+  /**
+   * Ensure we have a valid access token, refreshing if necessary.
+   * This method handles concurrent refresh requests by reusing the same promise.
+   * Returns true if a valid token is available, false if user needs to re-login.
+   */
+  static async ensureValidToken(): Promise<boolean> {
+    const hasToken = await this.isAuthenticated();
+    if (!hasToken) {
+      return false;
+    }
+
+    const isExpired = await this.isTokenExpired();
+    if (!isExpired) {
+      return true;
+    }
+
+    // Token is expired, need to refresh
+    const hasRefresh = await this.hasRefreshToken();
+    if (!hasRefresh) {
+      await this.clearTokens();
+      return false;
+    }
+
+    try {
+      await this.refreshAccessToken();
+      return true;
+    } catch (error) {
+      console.error('Failed to refresh token:', error);
+      return false;
+    }
+  }
+
   static async refreshAccessToken(): Promise<void> {
+    // If already refreshing, wait for the existing refresh to complete
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this.doRefreshAccessToken();
+
+    try {
+      await this.refreshPromise;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  private static async doRefreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
       this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
     }
@@ -217,9 +318,11 @@ export class AuthService {
     }
 
     const data: LoginResponse = result.data;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     await this.saveTokens({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresAt,
     });
   }
 

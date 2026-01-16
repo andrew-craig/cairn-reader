@@ -23,14 +23,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkAuthStatus = async () => {
     try {
       await AuthService.initialize();
-      const authenticated = await AuthService.isAuthenticated();
+      const hasToken = await AuthService.isAuthenticated();
 
-      if (authenticated) {
-        const user = await AuthService.getUser();
-        setUser(user);
+      if (hasToken) {
+        // Proactively check and refresh token if expired
+        const isValid = await AuthService.ensureValidToken();
+
+        if (isValid) {
+          const user = await AuthService.getUser();
+          setUser(user);
+        } else {
+          // Token refresh failed - user needs to re-login
+          console.log('Token refresh failed during init, clearing auth state');
+          setUser(null);
+        }
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
+      // On error, clear auth state to force re-login
+      setUser(null);
     } finally {
       setIsLoading(false);
     }

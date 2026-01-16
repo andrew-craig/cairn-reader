@@ -10,6 +10,7 @@ export interface User {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+  expiresAt?: number; // Unix timestamp in milliseconds
 }
 
 export interface LoginResponse {

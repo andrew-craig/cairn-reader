@@ -38,6 +38,12 @@ export class ExploreService {
     url: string,
     options: RequestInit = {}
   ): Promise<Response> {
+    // Proactively check and refresh token if expired before making request
+    const isValid = await AuthService.ensureValidToken();
+    if (!isValid) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
     const accessToken = await AuthService.getAccessToken();
 
     if (!accessToken) {
@@ -53,7 +59,7 @@ export class ExploreService {
       },
     });
 
-    // Handle 401 Unauthorized - try to refresh token
+    // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
     if (response.status === 401) {
       try {
         await AuthService.refreshAccessToken();
