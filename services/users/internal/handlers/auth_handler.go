@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -209,6 +210,10 @@ func (h *AuthHandler) LoginMobile(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		slog.Error("refresh request: failed to parse JSON",
+			slog.String("error", err.Error()),
+			slog.String("ip", c.ClientIP()),
+		)
 		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
@@ -216,6 +221,20 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	// Get device info and IP address from request
 	deviceInfo := c.GetHeader("User-Agent")
 	ipAddress := c.ClientIP()
+
+	// Log incoming refresh request with token preview
+	tokenPreview := ""
+	if len(req.RefreshToken) > 20 {
+		tokenPreview = req.RefreshToken[:20] + "..."
+	} else if len(req.RefreshToken) > 0 {
+		tokenPreview = req.RefreshToken[:len(req.RefreshToken)] + "..."
+	}
+
+	slog.Info("refresh request: processing",
+		slog.String("token_preview", tokenPreview),
+		slog.String("ip", ipAddress),
+		slog.String("user_agent", deviceInfo),
+	)
 
 	// Refresh access token
 	authResp, err := h.authService.RefreshAccessToken(
@@ -226,24 +245,54 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
+			slog.Warn("refresh request: invalid credentials",
+				slog.String("token_preview", tokenPreview),
+				slog.String("ip", ipAddress),
+				slog.String("error", err.Error()),
+			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "token reuse detected") {
+			slog.Warn("refresh request: token reuse detected",
+				slog.String("token_preview", tokenPreview),
+				slog.String("ip", ipAddress),
+				slog.String("error", err.Error()),
+			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "expired") {
+			slog.Warn("refresh request: token expired",
+				slog.String("token_preview", tokenPreview),
+				slog.String("ip", ipAddress),
+				slog.String("error", err.Error()),
+			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
+			slog.Warn("refresh request: invalid input",
+				slog.String("token_preview", tokenPreview),
+				slog.String("ip", ipAddress),
+				slog.String("error", err.Error()),
+			)
 			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
+		slog.Error("refresh request: unexpected error",
+			slog.String("token_preview", tokenPreview),
+			slog.String("ip", ipAddress),
+			slog.String("error", err.Error()),
+		)
 		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
 		return
 	}
+
+	slog.Info("refresh request: success",
+		slog.String("user_id", authResp.User.ID.String()),
+		slog.String("ip", ipAddress),
+	)
 
 	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
 }
