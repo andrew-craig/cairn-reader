@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, ViewToken } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { Article, RootStackParamList } from '../types';
 import { ExploreService } from '../services';
+import { useAuth } from '../contexts/AuthContext';
 
 type ExploreScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -28,6 +29,7 @@ const calculateInitialArticleCount = (): number => {
 
 export const ExploreScreen: React.FC = () => {
   const navigation = useNavigation<ExploreScreenNavigationProp>();
+  const { logout } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -144,11 +146,23 @@ export const ExploreScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading explore articles:', error);
+
+      // Check if this is a session expiration error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Session expired') || errorMessage.includes('Not authenticated')) {
+        // Clear articles on auth failure to prevent showing stale content
+        setArticles([]);
+        articlesRef.current = [];
+
+        // Log out the user to force re-authentication
+        console.log('Authentication failed, logging out user');
+        await logout();
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [logout]);
 
   // Keep refs updated with latest values
   useEffect(() => {
@@ -162,6 +176,18 @@ export const ExploreScreen: React.FC = () => {
   useEffect(() => {
     loadExploreArticles();
   }, [loadExploreArticles]);
+
+  // Reload articles when the screen comes into focus
+  // This ensures we don't show stale articles after token expiration
+  useFocusEffect(
+    useCallback(() => {
+      // Don't reload if we're already loading or refreshing
+      if (!loading && !refreshing) {
+        // Silently refresh articles in the background
+        loadExploreArticles();
+      }
+    }, [loading, refreshing, loadExploreArticles])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -213,6 +239,14 @@ export const ExploreScreen: React.FC = () => {
       );
     } catch (error) {
       console.error('Error marking article as read:', error);
+
+      // Check if this is a session expiration error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Session expired') || errorMessage.includes('Not authenticated')) {
+        // Log out the user to force re-authentication
+        console.log('Authentication failed while marking article as read, logging out user');
+        await logout();
+      }
     }
   };
 

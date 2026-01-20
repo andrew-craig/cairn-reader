@@ -302,28 +302,33 @@ export class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: this.refreshToken }),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: this.refreshToken }),
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to refresh token');
+      }
+
+      const data: LoginResponse = result.data;
+      const expiresAt = Date.now() + (data.expires_in * 1000);
+      await this.saveTokens({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt,
+      });
+    } catch (error) {
+      // Clear tokens on ANY error (network issues, parsing errors, HTTP errors, etc.)
       await this.clearTokens();
-      throw new Error(result.message || result.error || 'Failed to refresh token');
+      throw error;
     }
-
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
   }
 
   static async saveUser(user: User): Promise<void> {
