@@ -135,11 +135,12 @@ func (gm *GinMiddleware) OptionalAuth() gin.HandlerFunc {
 }
 
 // GetUserIDFromGinContext extracts the user ID from the Gin context
-// This should be called after the JWTAuth middleware has run
+// This is the recommended approach for handlers that require authentication.
+// Returns an error if user ID is not found or has invalid type.
 func GetUserIDFromGinContext(c *gin.Context) (uuid.UUID, error) {
 	userID, exists := c.Get(string(UserIDContextKey))
 	if !exists {
-		return uuid.Nil, errors.New("user ID not found in context")
+		return uuid.Nil, ErrUserIDNotFound
 	}
 
 	id, ok := userID.(uuid.UUID)
@@ -151,7 +152,8 @@ func GetUserIDFromGinContext(c *gin.Context) (uuid.UUID, error) {
 }
 
 // MustGetUserIDFromGin extracts the user ID from Gin context and panics if not found
-// Only use this after JWTAuth middleware where user ID is guaranteed to exist
+// DEPRECATED: Use GetUserIDFromGinContext instead to avoid service crashes on programming errors.
+// Only use this after JWTAuth middleware where user ID is guaranteed to exist.
 func MustGetUserIDFromGin(c *gin.Context) uuid.UUID {
 	userID, err := GetUserIDFromGinContext(c)
 	if err != nil {

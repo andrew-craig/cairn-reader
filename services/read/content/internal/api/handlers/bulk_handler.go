@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
@@ -152,7 +153,12 @@ func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
 // Requires authentication - user can only add content to their own account
 func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	var req dto.BulkAddToUsersRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {

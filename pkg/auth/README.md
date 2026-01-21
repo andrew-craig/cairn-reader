@@ -173,7 +173,16 @@ optionalHandler := middleware.OptionalAuth(handler)
 // Extract user ID from context (returns zero UUID if not found)
 userID, ok := auth.GetUserIDFromContext(ctx)
 
-// Must get user ID - panics if not found (use only with RequireAuth)
+// Get user ID or error - RECOMMENDED approach for protected handlers
+// This prevents service crashes on programming errors
+userID, err := auth.GetUserIDOrError(ctx)
+if err != nil {
+    // Handle authentication context error
+    return err
+}
+
+// Must get user ID - panics if not found (DEPRECATED)
+// Use GetUserIDOrError instead to avoid service crashes
 userID := auth.MustGetUserID(ctx)
 
 // Check if request is authenticated
@@ -181,6 +190,8 @@ if auth.IsAuthenticated(ctx) {
     // User is logged in
 }
 ```
+
+**Best Practice:** Always use `GetUserIDOrError()` in handlers instead of `MustGetUserID()` to prevent service crashes if middleware is misconfigured.
 
 ### Vault Integration
 
@@ -329,7 +340,12 @@ func (s *Server) Routes() http.Handler {
 
 func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request) {
     // Extract authenticated user ID from context
-    userID := auth.MustGetUserID(r.Context())
+    // RECOMMENDED: Use GetUserIDOrError to prevent service crashes
+    userID, err := auth.GetUserIDOrError(r.Context())
+    if err != nil {
+        http.Error(w, "Authentication context error", http.StatusInternalServerError)
+        return
+    }
 
     // Use userID for recommendations logic
     log.Printf("Getting recommendations for user: %s", userID)
@@ -341,11 +357,11 @@ func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request
 ## Best Practices
 
 1. **Store Public Key Securely**: Fetch from Vault, not from environment variables
-2. **Use `MustGetUserID()` Only with `RequireAuth`**: It panics if user ID is missing
+2. **Use `GetUserIDOrError()` Instead of `MustGetUserID()`**: Return errors instead of panicking to prevent service crashes on middleware misconfiguration
 3. **Handle Key Rotation**: Update the validator's public key when rotated
 4. **Validate Issuer/Audience**: Always set these to prevent token misuse
 5. **Use HTTPS in Production**: JWT tokens should only be transmitted over TLS
-6. **Set Short Token Expiry**: Default is 60 minutes for access tokens
+6. **Set Short Token Expiry**: Default is 15 minutes for access tokens
 7. **Log Authentication Failures**: For security monitoring and debugging
 
 ## Key Rotation Support

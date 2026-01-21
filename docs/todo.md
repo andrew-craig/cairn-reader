@@ -34,13 +34,6 @@ Recommendation: Use service-to-service authentication:
     API keys validated against Vault
     JWT tokens with service-level claims
 
-### Task 7. Panic on Missing User ID in Context
-
-Issue: MustGetUserID() panics if user ID not found (middleware.go:114-119).
-
-Risk: Programming errors could cause service crashes.
-
-Recommendation: Consider returning errors instead of panicking, or ensure comprehensive testing covers all code paths.
 
 ### Task 8. Error Messages May Leak Information
 
@@ -431,6 +424,7 @@ The following items have been successfully implemented and verified:
 - **Thread-Safe Key Updates in JWTManager** (Task #3) - Added `sync.RWMutex` to `JWTManager` struct in `services/users/internal/auth/jwt.go` to protect key fields during rotation. Updated `GenerateToken()`, `ValidateToken()`, `UpdateKeys()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. This prevents race conditions where token generation could use mismatched keys during key rotation. Added comprehensive concurrent access tests that pass with Go's race detector.
 - **Thread-Safe Key Updates in Validator** (Task #4) - Added `sync.RWMutex` to `Validator` struct in `pkg/auth/validator.go` to protect key fields during rotation. Updated `ValidateToken()`, `UpdatePublicKey()`, `GetPublicKey()`, and `GetKeyID()` methods to use appropriate read/write locks. Added comprehensive concurrent access tests that pass with Go's race detector.
 - **Increase Token Reuse Grace Period** (Task #5) - Increased `TokenReuseGracePeriod` from 5 seconds to 15 seconds in `services/users/internal/auth/refresh_token.go`. This prevents false positive token reuse detection caused by network latency or retry logic.
+- **Replace Panic-Based User ID Extraction with Error Handling** (Task #7) - Added `GetUserIDOrError()` function to `pkg/auth/middleware.go` and `GetUserIDFromGinContext()` update to `pkg/auth/gin_adapter.go` that return errors instead of panicking when user ID is not found in context. Updated all handler implementations in explore/recommender and read/content services to use the error-returning functions. This prevents service crashes from programming errors (e.g., missing middleware). Deprecated `MustGetUserID()` and `MustGetUserIDFromGin()` functions with documentation recommending the new approach. Added comprehensive tests for error handling scenarios.
 
 ### Code Quality & Performance
 - **Replace O(n²) Sorting with Standard Library** - Using sort.Slice for O(n log n) performance
