@@ -121,7 +121,12 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/explore/recommendation/{user_id}
 func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 	userID := authenticatedUserID.String()
 
 	// Get recommendations
@@ -143,7 +148,12 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/explore/article/{article_id}/read
 func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 	userID := authenticatedUserID.String()
 
 	// Extract article ID from chi URL parameter
@@ -165,7 +175,12 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 	userID := authenticatedUserID.String()
 
 	// Extract article ID from chi URL parameter
@@ -224,7 +239,12 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/explore/article/{article_id}/vote
 func (s *Server) handleRemoveVote(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 	userID := authenticatedUserID.String()
 
 	// Extract article ID from chi URL parameter
@@ -265,7 +285,12 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	// Get the authenticated user's vote using the JWT context
 	// TODO: Consider removing the query parameter option and always using JWT user ID
 	userVote := ""
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 	userID := authenticatedUserID.String()
 	if userID != "" {
 		userVote, err = s.voteRepo.GetUserVote(r.Context(), userID, articleID)

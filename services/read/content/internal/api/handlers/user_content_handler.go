@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -47,7 +48,12 @@ func NewUserContentHandler(
 // ListUserContents handles GET /api/v1/users/:user_id/contents
 func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
@@ -163,7 +169,12 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 // 2. Content-ID-based (legacy): Provide ContentID for pre-created content
 func (h *UserContentHandler) AddContentToUser(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
@@ -404,7 +415,12 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 // UpdateUserContent handles PATCH /api/v1/users/:user_id/contents/:content_id
 func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	// Get user ID and content ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
@@ -485,7 +501,12 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 // DeleteUserContent handles DELETE /api/v1/users/:user_id/contents/:content_id
 func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	// Get user ID and content ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
@@ -521,7 +542,12 @@ func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Re
 // SearchUserContents handles GET /api/v1/users/:user_id/contents/search
 func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from context
-	authenticatedUserID := auth.MustGetUserID(r.Context())
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
 
 	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")

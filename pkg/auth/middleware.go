@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -14,6 +15,12 @@ type ContextKey string
 const (
 	// UserIDContextKey is the context key for storing the user ID
 	UserIDContextKey ContextKey = "user_id"
+)
+
+// Errors
+var (
+	// ErrUserIDNotFound is returned when user ID is not found in context
+	ErrUserIDNotFound = errors.New("user ID not found in context - ensure RequireAuth middleware is applied")
 )
 
 // ErrorResponse represents a JSON error response
@@ -109,8 +116,20 @@ func GetUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	return userID, ok
 }
 
+// GetUserIDOrError retrieves the user ID from context and returns an error if not found
+// This is the recommended approach for handlers that require authentication.
+// Returns ErrUserIDNotFound if user ID is not in context.
+func GetUserIDOrError(ctx context.Context) (uuid.UUID, error) {
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return uuid.Nil, ErrUserIDNotFound
+	}
+	return userID, nil
+}
+
 // MustGetUserID retrieves the user ID from context and panics if not found
-// Use this only in handlers that are protected by RequireAuth middleware
+// DEPRECATED: Use GetUserIDOrError instead to avoid service crashes on programming errors.
+// Use this only in handlers that are protected by RequireAuth middleware.
 func MustGetUserID(ctx context.Context) uuid.UUID {
 	userID, ok := GetUserIDFromContext(ctx)
 	if !ok {

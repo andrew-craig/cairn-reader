@@ -294,6 +294,37 @@ func TestGetUserIDFromContext(t *testing.T) {
 	})
 }
 
+func TestGetUserIDOrError(t *testing.T) {
+	userID := uuid.New()
+
+	t.Run("with user ID", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), UserIDContextKey, userID)
+
+		retrievedID, err := GetUserIDOrError(ctx)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if retrievedID != userID {
+			t.Errorf("Expected user ID %s, got %s", userID, retrievedID)
+		}
+	})
+
+	t.Run("without user ID returns error", func(t *testing.T) {
+		ctx := context.Background()
+
+		retrievedID, err := GetUserIDOrError(ctx)
+		if err == nil {
+			t.Error("Expected error, got nil")
+		}
+		if err != ErrUserIDNotFound {
+			t.Errorf("Expected ErrUserIDNotFound, got %v", err)
+		}
+		if retrievedID != uuid.Nil {
+			t.Errorf("Expected nil UUID, got %s", retrievedID)
+		}
+	})
+}
+
 func TestMustGetUserID(t *testing.T) {
 	userID := uuid.New()
 
