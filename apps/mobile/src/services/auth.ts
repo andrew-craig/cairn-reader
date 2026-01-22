@@ -252,26 +252,33 @@ export class AuthService {
   static async ensureValidToken(): Promise<boolean> {
     const hasToken = await this.isAuthenticated();
     if (!hasToken) {
+      console.log('[Auth] No access token found, authentication required');
       return false;
     }
 
     const isExpired = await this.isTokenExpired();
     if (!isExpired) {
+      const timeLeft = this.expiresAt ? Math.floor((this.expiresAt - Date.now()) / 1000) : 'unknown';
+      console.log(`[Auth] Access token still valid (${timeLeft}s remaining)`);
       return true;
     }
+
+    console.log('[Auth] Access token expired or expiring soon, attempting refresh');
 
     // Token is expired, need to refresh
     const hasRefresh = await this.hasRefreshToken();
     if (!hasRefresh) {
+      console.log('[Auth] No refresh token available, clearing tokens');
       await this.clearTokens();
       return false;
     }
 
     try {
       await this.refreshAccessToken();
+      console.log('[Auth] Token refresh successful');
       return true;
     } catch (error) {
-      console.error('Failed to refresh token:', error);
+      console.error('[Auth] Failed to refresh token:', error);
       return false;
     }
   }
@@ -279,9 +286,11 @@ export class AuthService {
   static async refreshAccessToken(): Promise<void> {
     // If already refreshing, wait for the existing refresh to complete
     if (this.isRefreshing && this.refreshPromise) {
+      console.log('[Auth] Refresh already in progress, waiting for existing refresh');
       return this.refreshPromise;
     }
 
+    console.log('[Auth] Starting token refresh');
     this.isRefreshing = true;
     this.refreshPromise = this.doRefreshAccessToken();
 
@@ -299,31 +308,86 @@ export class AuthService {
     }
 
     if (!this.refreshToken) {
+      console.error('[Auth] No refresh token available in doRefreshAccessToken');
       throw new Error('No refresh token available');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: this.refreshToken }),
-    });
+    const refreshTokenPreview = `${this.refreshToken.substring(0, 20)}...`;
+    console.log(`[Auth] Attempting refresh with token: ${refreshTokenPreview}`);
+    console.log(`[Auth] Refresh endpoint: ${API_BASE_URL}/api/v1/auth/refresh`);
 
-    const result = await response.json();
+    try {
+      const requestBody = { refresh_token: this.refreshToken };
+      console.log('[Auth] Sending refresh request...');
 
-    if (!response.ok) {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log(`[Auth] Refresh response status: ${response.status} ${response.statusText}`);
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('[Auth] Failed to parse refresh response as JSON:', parseError);
+        console.error('[Auth] Response text will be logged separately');
+        throw new Error('Invalid JSON response from refresh endpoint');
+      }
+
+      if (!response.ok) {
+        console.error('[Auth] Refresh failed with error response:', {
+          status: response.status,
+          message: result.message || result.error,
+          fullResponse: result,
+        });
+        throw new Error(result.message || result.error || 'Failed to refresh token');
+      }
+
+      const data: LoginResponse = result.data;
+
+      if (!data || !data.access_token || !data.refresh_token || !data.expires_in) {
+        console.error('[Auth] Refresh response missing required fields:', {
+          hasData: !!data,
+          hasAccessToken: !!data?.access_token,
+          hasRefreshToken: !!data?.refresh_token,
+          hasExpiresIn: !!data?.expires_in,
+        });
+        throw new Error('Invalid refresh response: missing required fields');
+      }
+
+      const expiresAt = Date.now() + (data.expires_in * 1000);
+      const expiresAtDate = new Date(expiresAt).toISOString();
+
+      console.log('[Auth] Refresh successful, saving new tokens', {
+        expiresIn: data.expires_in,
+        expiresAt: expiresAtDate,
+        accessTokenPreview: `${data.access_token.substring(0, 20)}...`,
+        refreshTokenPreview: `${data.refresh_token.substring(0, 20)}...`,
+      });
+
+      await this.saveTokens({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt,
+      });
+
+      console.log('[Auth] New tokens saved successfully');
+    } catch (error) {
+      // Clear tokens on ANY error (network issues, parsing errors, HTTP errors, etc.)
+      console.error('[Auth] Refresh failed, clearing all tokens. Error details:', {
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
+
       await this.clearTokens();
-      throw new Error(result.message || result.error || 'Failed to refresh token');
+      throw error;
     }
-
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
   }
 
   static async saveUser(user: User): Promise<void> {

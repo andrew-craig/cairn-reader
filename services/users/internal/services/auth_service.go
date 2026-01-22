@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
@@ -251,8 +252,18 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, deviceInfo, ipAddress string) (*AuthResponse, error) {
 	// Validate input
 	if refreshToken == "" {
+		slog.Warn("refresh token validation: empty token provided")
 		return nil, ErrInvalidInput
 	}
+
+	tokenPreview := ""
+	if len(refreshToken) > 20 {
+		tokenPreview = refreshToken[:20] + "..."
+	}
+
+	slog.Debug("refresh token validation: starting",
+		slog.String("token_preview", tokenPreview),
+	)
 
 	// Prepare device info and IP for token creation
 	var deviceInfoPtr, ipAddressPtr *string
@@ -272,28 +283,59 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 	)
 	if err != nil {
 		if errors.Is(err, auth.ErrTokenReused) {
+			slog.Warn("refresh token validation: token reuse detected",
+				slog.String("token_preview", tokenPreview),
+				slog.String("error", err.Error()),
+			)
 			return nil, fmt.Errorf("token reuse detected: %w", err)
 		}
 		if errors.Is(err, auth.ErrRefreshTokenNotFound) {
+			slog.Warn("refresh token validation: token not found",
+				slog.String("token_preview", tokenPreview),
+			)
 			return nil, ErrInvalidCredentials
 		}
 		if errors.Is(err, apperrors.ErrTokenExpired) {
+			slog.Warn("refresh token validation: token expired",
+				slog.String("token_preview", tokenPreview),
+				slog.String("error", err.Error()),
+			)
 			return nil, fmt.Errorf("refresh token expired: %w", err)
 		}
+		slog.Error("refresh token validation: unexpected error",
+			slog.String("token_preview", tokenPreview),
+			slog.String("error", err.Error()),
+		)
 		return nil, fmt.Errorf("failed to validate refresh token: %w", err)
 	}
+
+	slog.Debug("refresh token validation: token validated successfully",
+		slog.String("user_id", userID.String()),
+	)
 
 	// Retrieve user
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
+		slog.Error("refresh token validation: failed to retrieve user",
+			slog.String("user_id", userID.String()),
+			slog.String("error", err.Error()),
+		)
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
 	// Generate new access token
 	accessToken, err := s.jwtManager.GenerateToken(user.ID)
 	if err != nil {
+		slog.Error("refresh token validation: failed to generate access token",
+			slog.String("user_id", userID.String()),
+			slog.String("error", err.Error()),
+		)
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
+
+	slog.Debug("refresh token validation: completed successfully",
+		slog.String("user_id", userID.String()),
+	)
 
 	return &AuthResponse{
 		User:         user,
