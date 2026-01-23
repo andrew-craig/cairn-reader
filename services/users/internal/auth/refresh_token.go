@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
@@ -157,14 +158,20 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 		if tokenModel.TokenFamily != nil {
 			err := s.repo.RevokeTokenFamily(ctx, *tokenModel.TokenFamily)
 			if err != nil {
-				// Log error but still return reuse error to caller
-				fmt.Printf("failed to revoke token family on reuse: %v\n", err)
+				slog.Error("failed to revoke token family on reuse",
+					slog.String("user_id", tokenModel.UserID.String()),
+					slog.String("token_family", tokenModel.TokenFamily.String()),
+					slog.Any("error", err),
+				)
 			}
 		} else {
 			// Fallback: revoke all user tokens if no family tracking
 			err := s.repo.RevokeAllUserTokens(ctx, tokenModel.UserID)
 			if err != nil {
-				fmt.Printf("failed to revoke user tokens on reuse: %v\n", err)
+				slog.Error("failed to revoke user tokens on reuse",
+					slog.String("user_id", tokenModel.UserID.String()),
+					slog.Any("error", err),
+				)
 			}
 		}
 		return "", uuid.Nil, ErrTokenReused
@@ -193,7 +200,11 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 	if err != nil {
 		// If we fail to revoke the old token, we should still succeed but log the error
 		// The old token will be cleaned up eventually
-		fmt.Printf("warning: failed to revoke old token during rotation: %v\n", err)
+		slog.Warn("failed to revoke old token during rotation",
+			slog.String("user_id", tokenModel.UserID.String()),
+			slog.String("token_id", tokenModel.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	return newToken, tokenModel.UserID, nil

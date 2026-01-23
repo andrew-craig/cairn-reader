@@ -18,6 +18,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     checkAuthStatus();
+
+    // Subscribe to auth state changes (e.g., when tokens are cleared by services)
+    const unsubscribe = AuthService.onAuthStateChange((isAuthenticated) => {
+      if (!isAuthenticated) {
+        console.log('Auth state changed: user logged out');
+        setUser(null);
+      }
+    });
+
+    return unsubscribe;
   }, []);
 
   const checkAuthStatus = async () => {

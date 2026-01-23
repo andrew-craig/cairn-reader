@@ -20,6 +20,9 @@ const TOKEN_EXPIRES_AT_KEY = '@cairn:token_expires_at';
 // Buffer time before expiration to trigger proactive refresh (5 minutes)
 const TOKEN_EXPIRATION_BUFFER_MS = 5 * 60 * 1000;
 
+// Listener type for auth state changes
+type AuthStateListener = (isAuthenticated: boolean) => void;
+
 export class AuthService {
   private static accessToken: string | null = null;
   private static refreshToken: string | null = null;
@@ -27,6 +30,28 @@ export class AuthService {
   private static expiresAt: number | null = null;
   private static isRefreshing: boolean = false;
   private static refreshPromise: Promise<void> | null = null;
+  private static listeners: Set<AuthStateListener> = new Set();
+
+  /**
+   * Register a listener for auth state changes.
+   * Returns an unsubscribe function.
+   */
+  static onAuthStateChange(listener: AuthStateListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private static notifyListeners(isAuthenticated: boolean): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener(isAuthenticated);
+      } catch (error) {
+        console.error('Error in auth state listener:', error);
+      }
+    });
+  }
 
   static async initialize(): Promise<void> {
     this.accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
@@ -201,6 +226,9 @@ export class AuthService {
     await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
     await AsyncStorage.removeItem(USER_KEY);
     await AsyncStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
+
+    // Notify listeners that user is no longer authenticated
+    this.notifyListeners(false);
   }
 
   static async getAccessToken(): Promise<string | null> {

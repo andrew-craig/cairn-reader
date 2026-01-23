@@ -8,6 +8,7 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -222,7 +223,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	deviceInfo := c.GetHeader("User-Agent")
 	ipAddress := c.ClientIP()
 
-	// Log incoming refresh request with token preview
+	// Get logger for structured logging
+	logger := logging.GetLogger(c)
+	requestID := logging.GetRequestID(c)
+
+	// Create token preview for debugging (first 20 chars)
 	tokenPreview := ""
 	if len(req.RefreshToken) > 20 {
 		tokenPreview = req.RefreshToken[:20] + "..."
@@ -230,10 +235,10 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		tokenPreview = req.RefreshToken[:len(req.RefreshToken)] + "..."
 	}
 
-	slog.Info("refresh request: processing",
+	logger.Info("refresh request: processing",
+		slog.String("request_id", requestID),
 		slog.String("token_preview", tokenPreview),
-		slog.String("ip", ipAddress),
-		slog.String("user_agent", deviceInfo),
+		slog.String("client_ip", ipAddress),
 	)
 
 	// Refresh access token
@@ -245,53 +250,58 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			slog.Warn("refresh request: invalid credentials",
+			logger.Warn("refresh token invalid or not found",
+				slog.String("request_id", requestID),
 				slog.String("token_preview", tokenPreview),
-				slog.String("ip", ipAddress),
+				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "token reuse detected") {
-			slog.Warn("refresh request: token reuse detected",
+			logger.Warn("refresh token reuse detected - potential security issue",
+				slog.String("request_id", requestID),
 				slog.String("token_preview", tokenPreview),
-				slog.String("ip", ipAddress),
+				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "expired") {
-			slog.Warn("refresh request: token expired",
+			logger.Info("refresh token expired",
+				slog.String("request_id", requestID),
 				slog.String("token_preview", tokenPreview),
-				slog.String("ip", ipAddress),
-				slog.String("error", err.Error()),
+				slog.String("client_ip", ipAddress),
 			)
 			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			slog.Warn("refresh request: invalid input",
+			logger.Warn("refresh request: invalid input",
+				slog.String("request_id", requestID),
 				slog.String("token_preview", tokenPreview),
-				slog.String("ip", ipAddress),
+				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
 			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		slog.Error("refresh request: unexpected error",
+		logger.Error("failed to refresh access token",
+			slog.String("request_id", requestID),
 			slog.String("token_preview", tokenPreview),
-			slog.String("ip", ipAddress),
+			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),
 		)
 		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
 		return
 	}
 
-	slog.Info("refresh request: success",
+	logger.Info("refresh request: success",
+		slog.String("request_id", requestID),
 		slog.String("user_id", authResp.User.ID.String()),
-		slog.String("ip", ipAddress),
+		slog.String("client_ip", ipAddress),
 	)
 
 	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
