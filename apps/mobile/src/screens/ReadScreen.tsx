@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { AddLinkModal } from '../components/AddLinkModal';
-import { Article } from '../types';
+import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
+
+type ReadScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
 const PAGE_SIZE = 20;
 
 export const ReadScreen: React.FC = () => {
+  const navigation = useNavigation<ReadScreenNavigationProp>();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,8 +81,7 @@ export const ReadScreen: React.FC = () => {
   }, [loadingMore, hasMore, loading, offset]);
 
   const handleArticlePress = (article: Article) => {
-    // TODO: Navigate to article detail screen
-    console.log('Article pressed:', article.id);
+    navigation.navigate('ArticleDetail', { article });
   };
 
   const handleAddPress = () => {

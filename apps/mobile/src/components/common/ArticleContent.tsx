@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   Image,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RenderHTML from 'react-native-render-html';
 import { Article } from '../../types';
 import { formatDate, extractDomain } from '../../utils';
 import { Colors, Spacing, FontSizes, BorderRadius } from '../../constants';
@@ -28,6 +30,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   showMetadata = true,
 }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
 
   const handleOpenInBrowser = async () => {
     if (onOpenInBrowser) {
@@ -39,6 +42,77 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
         console.error('Failed to open browser:', error);
       }
     }
+  };
+
+  // HTML rendering configuration
+  const tagsStyles = {
+    body: {
+      color: colors.text,
+      fontSize: FontSizes.md,
+      lineHeight: 24,
+    },
+    p: {
+      marginBottom: Spacing.md,
+      color: colors.text,
+    },
+    a: {
+      color: colors.primary,
+      textDecorationLine: 'underline' as const,
+    },
+    h1: {
+      fontSize: FontSizes.xl,
+      fontWeight: 'bold' as const,
+      marginTop: Spacing.lg,
+      marginBottom: Spacing.md,
+      color: colors.text,
+    },
+    h2: {
+      fontSize: FontSizes.lg,
+      fontWeight: 'bold' as const,
+      marginTop: Spacing.lg,
+      marginBottom: Spacing.sm,
+      color: colors.text,
+    },
+    h3: {
+      fontSize: FontSizes.md,
+      fontWeight: 'bold' as const,
+      marginTop: Spacing.md,
+      marginBottom: Spacing.sm,
+      color: colors.text,
+    },
+    blockquote: {
+      borderLeftWidth: 4,
+      borderLeftColor: colors.border,
+      paddingLeft: Spacing.md,
+      marginLeft: 0,
+      marginVertical: Spacing.md,
+      fontStyle: 'italic' as const,
+      color: colors.textSecondary,
+    },
+    pre: {
+      backgroundColor: colors.card,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.sm,
+      marginVertical: Spacing.md,
+    },
+    code: {
+      backgroundColor: colors.card,
+      paddingHorizontal: Spacing.xs,
+      fontFamily: 'monospace',
+      fontSize: FontSizes.sm,
+    },
+    img: {
+      marginVertical: Spacing.md,
+    },
+    ul: {
+      marginBottom: Spacing.md,
+    },
+    ol: {
+      marginBottom: Spacing.md,
+    },
+    li: {
+      marginBottom: Spacing.xs,
+    },
   };
 
   return (
@@ -63,10 +137,22 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
             {extractDomain(article.url)}
           </Text>
         </Text>
-        {article.description && (
+        {article.description && !article.content && (
           <Text style={[styles.description, { color: colors.textSecondary }]}>
             {article.description}
           </Text>
+        )}
+        {article.content && (
+          <View style={styles.htmlContent}>
+            <RenderHTML
+              contentWidth={width - (Spacing.md * 2)}
+              source={{ html: article.content }}
+              tagsStyles={tagsStyles}
+              defaultTextProps={{
+                selectable: true,
+              }}
+            />
+          </View>
         )}
         {showMetadata && (
           <View style={styles.metadata}>
@@ -120,6 +206,9 @@ const styles = StyleSheet.create({
   description: {
     fontSize: FontSizes.md,
     lineHeight: 24,
+    marginBottom: Spacing.md,
+  },
+  htmlContent: {
     marginBottom: Spacing.md,
   },
   metadata: {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, ViewToken } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
@@ -176,18 +176,6 @@ export const ExploreScreen: React.FC = () => {
   useEffect(() => {
     loadExploreArticles();
   }, [loadExploreArticles]);
-
-  // Reload articles when the screen comes into focus
-  // This ensures we don't show stale articles after token expiration
-  useFocusEffect(
-    useCallback(() => {
-      // Don't reload if we're already loading or refreshing
-      if (!loading && !refreshing) {
-        // Silently refresh articles in the background
-        loadExploreArticles();
-      }
-    }, [loading, refreshing, loadExploreArticles])
-  );
 
   const handleRefresh = () => {
     setRefreshing(true);

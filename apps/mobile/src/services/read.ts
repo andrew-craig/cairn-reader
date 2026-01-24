@@ -103,13 +103,16 @@ export class ReadService {
         throw new Error(result.message || result.error || 'Failed to list user contents');
       }
 
-      // Ensure we always return a valid response with contents array
-      const data = result.data || {};
+      // The backend returns a paginated response where:
+      // - result.data is the array of contents directly (not { contents: [...] })
+      // - result.pagination contains limit, offset, total, etc.
+      const contents = Array.isArray(result.data) ? result.data : [];
+      const pagination = result.pagination || {};
       return {
-        contents: data.contents || [],
-        total_count: data.total_count || 0,
-        limit: data.limit || params?.limit || PAGE_SIZE_DEFAULT,
-        offset: data.offset || params?.offset || 0,
+        contents: contents,
+        total_count: pagination.total || 0,
+        limit: pagination.limit || params?.limit || PAGE_SIZE_DEFAULT,
+        offset: pagination.offset || params?.offset || 0,
       };
     } catch (error) {
       console.error('Error listing user contents:', error);
@@ -346,6 +349,7 @@ export class ReadService {
       url: content.original_url,
       title: content.title,
       description: content.description || content.excerpt,
+      content: content.cleaned_html,
       imageUrl: content.lead_image_url,
       author: content.author || content.site_name,
       publishedDate: content.published_at,

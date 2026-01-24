@@ -3,6 +3,7 @@ export interface Article {
   url: string;
   title: string;
   description?: string;
+  content?: string; // Cleaned HTML content from readability extraction
   imageUrl?: string;
   author?: string;
   publishedDate?: string;
