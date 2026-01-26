@@ -17,6 +17,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -54,6 +55,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -74,6 +76,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -94,6 +97,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -114,6 +118,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -134,6 +139,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
     networks:
       - cairn-network
 
