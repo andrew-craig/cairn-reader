@@ -127,7 +127,17 @@ fi
 # At this point we need a valid token to continue
 # Check if we have a root token from initialization or need to use provided credentials
 if [ -z "$VAULT_TOKEN" ]; then
-    # Try to use AppRole if available (for subsequent runs)
+    # Check if this is a subsequent run where everything is already configured
+    if [ -f /vault-keys/approle-credentials.env ]; then
+        echo "Vault is already initialized and AppRole credentials exist"
+        echo "Assuming Vault is fully configured. Skipping further setup."
+        echo ""
+        echo "=== Vault Already Configured ==="
+        echo "If you need to reconfigure, remove the vault-keys volume and restart"
+        exit 0
+    fi
+
+    # Try to use AppRole if available (for subsequent runs with manual configuration)
     if [ -n "$VAULT_INIT_ROLE_ID" ] && [ -n "$VAULT_INIT_SECRET_ID" ]; then
         echo "Authenticating with AppRole..."
         VAULT_TOKEN=$(vault write -format=json auth/approle/login \

@@ -29,7 +29,8 @@ type RouterConfig struct {
 }
 
 // Router sets up the HTTP routes and returns a configured gin.Engine.
-// It applies the following middleware chain to all routes:
+// Health endpoints are registered without security middleware to allow internal HTTP checks.
+// API endpoints have the following middleware chain:
 //   - Recovery: Recovers from panics and returns 500 errors
 //   - RequestLogger: Structured logging with slog for all requests
 //   - CORS: Handles Cross-Origin Resource Sharing
@@ -38,12 +39,9 @@ type RouterConfig struct {
 func Router(config RouterConfig) *gin.Engine {
 	router := gin.New() // Use gin.New() instead of gin.Default() to avoid default logger
 
-	// Apply global middleware stack for security and observability
+	// Apply only recovery and logging globally (needed for all routes including health checks)
 	router.Use(middleware.Recovery())
-	router.Use(logging.RequestLogger(config.Logger)) // Use structured logging middleware
-	router.Use(middleware.CORS())
-	router.Use(middleware.RequireHTTPS())
-	router.Use(middleware.SecureHeadersRelaxed())
+	router.Use(logging.RequestLogger(config.Logger))
 
 	// Initialize handlers
 	healthHandler := NewHealthHandler(config.DB, config.VaultClient)
@@ -55,6 +53,7 @@ func Router(config RouterConfig) *gin.Engine {
 	authMiddleware := auth.NewGinMiddleware(config.JWTManager)
 
 	// Health endpoints (Kubernetes-compatible)
+	// No security middleware applied to allow HTTP health checks within Docker
 	router.GET("/health/live", healthHandler.LivenessCheck)
 	router.GET("/health/ready", healthHandler.ReadinessCheck)
 
@@ -68,8 +67,11 @@ func Router(config RouterConfig) *gin.Engine {
 		authRateLimitWindow = 1 * time.Minute // Default: 1 minute window
 	}
 
-	// API v1 routes
+	// API v1 routes with security middleware
 	v1 := router.Group("/api/v1")
+	v1.Use(middleware.CORS())
+	v1.Use(middleware.RequireHTTPS())
+	v1.Use(middleware.SecureHeadersRelaxed())
 	{
 		// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
 		// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
