@@ -54,8 +54,11 @@ func Router(config RouterConfig) *gin.Engine {
 
 	// Health endpoints (Kubernetes-compatible)
 	// No security middleware applied to allow HTTP health checks within Docker
+	// Support both GET and HEAD methods for health checks (HEAD used by Docker/wget --spider)
 	router.GET("/health/live", healthHandler.LivenessCheck)
+	router.HEAD("/health/live", healthHandler.LivenessCheck)
 	router.GET("/health/ready", healthHandler.ReadinessCheck)
+	router.HEAD("/health/ready", healthHandler.ReadinessCheck)
 
 	// Set default rate limit values if not provided
 	authRateLimit := config.AuthRateLimit

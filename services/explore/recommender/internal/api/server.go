@@ -45,8 +45,11 @@ func (s *Server) Routes() http.Handler {
 	r.Use(s.loggingMiddleware)
 
 	// Health check endpoints (Kubernetes-compatible) - public
+	// Support both GET and HEAD methods for health checks (HEAD used by Docker/wget --spider)
 	r.Get("/health/live", s.handleLiveness)
+	r.Head("/health/live", s.handleLiveness)
 	r.Get("/health/ready", s.handleReadiness)
+	r.Head("/health/ready", s.handleReadiness)
 
 	// API v1 routes
 	r.Route("/api/v1/explore", func(r chi.Router) {
