@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../types';
@@ -25,6 +26,7 @@ export const AddArticleScreen: React.FC = () => {
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
 
   const handlePasteFromClipboard = async () => {
     try {
@@ -93,12 +95,18 @@ export const AddArticleScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + Spacing.md,
+            paddingBottom: insets.bottom + Spacing.md,
+          },
+        ]}
       >
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.text }]}>URL</Text>

@@ -13,7 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../constants';
 import { ReadService } from '../services/read';
 import { DetectURLResponse } from '../types/read';
 
@@ -32,8 +32,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
 
-  // Header height (64px) + safe area top
-  const modalTopPosition = insets.top + 64;
+  // Position modal below the header + safe area top
+  const modalTopPosition = insets.top + Layout.headerHeight;
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);

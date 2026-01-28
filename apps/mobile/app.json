@@ -25,6 +25,10 @@
       },
       "package": "com.readitlater.app"
     },
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "transparent"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
