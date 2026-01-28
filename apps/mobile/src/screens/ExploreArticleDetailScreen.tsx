@@ -3,14 +3,12 @@ import {
   View,
   StyleSheet,
   useColorScheme,
-  TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { Colors, Spacing } from '../constants';
+import { Colors } from '../constants';
 import { ExploreService } from '../services';
-import { ArticleContent } from '../components/common';
+import { ArticleContent, BottomActionMenu } from '../components/common';
 
 type ExploreArticleDetailRouteProp = RouteProp<RootStackParamList, 'ExploreArticleDetail'>;
 
@@ -80,35 +78,29 @@ export const ExploreArticleDetailScreen: React.FC = () => {
         colors={colors}
       />
 
-      <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-        <TouchableOpacity style={styles.bottomButton} onPress={handleBack}>
-          <Ionicons name="arrow-back" size={28} color={colors.text} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.bottomButton} onPress={handleSave}>
-          <Ionicons
-            name={isSaved ? 'bookmark' : 'bookmark-outline'}
-            size={28}
-            color={isSaved ? colors.primary : colors.text}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.bottomButton} onPress={handleUpvote}>
-          <Ionicons
-            name={hasUpvoted ? 'thumbs-up' : 'thumbs-up-outline'}
-            size={28}
-            color={hasUpvoted ? colors.success : colors.text}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.bottomButton} onPress={handleDownvote}>
-          <Ionicons
-            name={hasDownvoted ? 'thumbs-down' : 'thumbs-down-outline'}
-            size={28}
-            color={hasDownvoted ? colors.error : colors.text}
-          />
-        </TouchableOpacity>
-      </View>
+      <BottomActionMenu
+        actions={[
+          {
+            icon: 'return',
+            onPress: handleBack,
+          },
+          {
+            icon: 'bookmark',
+            onPress: handleSave,
+            active: isSaved,
+          },
+          {
+            icon: 'thumbs-up',
+            onPress: handleUpvote,
+            active: hasUpvoted,
+          },
+          {
+            icon: 'thumbs-down',
+            onPress: handleDownvote,
+            active: hasDownvoted,
+          },
+        ]}
+      />
     </View>
   );
 };
@@ -116,17 +108,5 @@ export const ExploreArticleDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderTopWidth: 1,
-    paddingBottom: Spacing.lg,
-  },
-  bottomButton: {
-    padding: Spacing.sm,
   },
 });

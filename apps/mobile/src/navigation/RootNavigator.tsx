@@ -56,7 +56,7 @@ export default function RootNavigator() {
         name="ArticleDetail"
         component={ReadArticleDetailScreen}
         options={{
-          title: 'Article',
+          headerShown: false,
           presentation: 'card',
         }}
       />

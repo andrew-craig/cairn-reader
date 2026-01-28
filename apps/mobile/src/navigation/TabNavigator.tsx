@@ -4,7 +4,7 @@ import { MainTabParamList } from '../types';
 import {
   ExploreScreen,
   ReadScreen,
-  SettingsScreen,
+  YouScreen,
 } from '../screens';
 import { CustomTabBar } from '../components/common';
 
@@ -20,7 +20,7 @@ export const TabNavigator: React.FC = () => {
     >
       <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Read" component={ReadScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="You" component={YouScreen} />
     </Tab.Navigator>
   );
 };
