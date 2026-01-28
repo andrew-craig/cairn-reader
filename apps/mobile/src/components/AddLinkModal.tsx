@@ -12,8 +12,8 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
-import { Button } from './common/Button';
 import { ReadService } from '../services/read';
 import { DetectURLResponse } from '../types/read';
 
@@ -30,6 +30,10 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+
+  // Header height (64px) + safe area top
+  const modalTopPosition = insets.top + 64;
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -243,49 +247,34 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <TouchableOpacity
+        style={[styles.overlay, { paddingTop: modalTopPosition }]}
+        activeOpacity={1}
+        onPress={handleClose}
       >
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={handleClose}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
           <TouchableOpacity
             activeOpacity={1}
             style={[
               styles.modalContent,
-              { backgroundColor: colors.background }
+              { backgroundColor: colors.hover }
             ]}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                Add link
-              </Text>
-              <TouchableOpacity
-                onPress={handleClose}
-                disabled={loading}
-                style={styles.closeButton}
-              >
-                <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>
-                  ✕
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={styles.inputContainer}>
               <TextInput
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.card,
+                    backgroundColor: colors.background,
                     color: colors.text,
-                    borderColor: error ? colors.error : colors.border,
+                    borderColor: error ? colors.error : 'transparent',
                   }
                 ]}
                 placeholder="Add link"
@@ -336,8 +325,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                   style={[
                     styles.secondaryButton,
                     {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
+                      backgroundColor: colors.background,
+                      borderColor: colors.textSecondary,
                       opacity: loading || !url.trim() ? 0.5 : 1,
                     }
                   ]}
@@ -352,8 +341,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
               </View>
             </View>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -361,41 +350,33 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'flex-start',
+    paddingHorizontal: Spacing.md,
+  },
+  keyboardView: {
+    width: '100%',
   },
   modalContent: {
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.xxl : Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    minHeight: 200,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  title: {
-    fontSize: FontSizes.xl,
-    fontFamily: FontFamily.headingSemiBold,
-  },
-  closeButton: {
-    padding: Spacing.sm,
-  },
-  closeButtonText: {
-    fontSize: FontSizes.xl,
-    fontFamily: FontFamily.default,
+    borderRadius: 21,
+    padding: Spacing.md,
+    gap: Spacing.md,
+    shadowColor: 'rgba(15, 23, 42, 0.2)',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   inputContainer: {
-    marginBottom: Spacing.lg,
+    width: '100%',
   },
   input: {
     height: 48,
     borderRadius: BorderRadius.md,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingHorizontal: Spacing.md,
     fontSize: FontSizes.md,
     fontFamily: FontFamily.default,
@@ -408,14 +389,15 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: 12,
+    width: '100%',
   },
   buttonWrapper: {
     flex: 1,
   },
   primaryButton: {
     height: 48,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -426,7 +408,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     height: 48,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',

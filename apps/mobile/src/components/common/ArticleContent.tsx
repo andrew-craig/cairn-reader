@@ -4,45 +4,24 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Image,
   Linking,
   useWindowDimensions,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHTML from 'react-native-render-html';
 import { Article } from '../../types';
 import { formatDate, extractDomain } from '../../utils';
-import { Colors, Spacing, FontSizes, BorderRadius } from '../../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
 
 interface ArticleContentProps {
   article: Article;
   colors: typeof Colors.light;
-  onOpenInBrowser?: () => void;
-  showMetadata?: boolean;
 }
 
 export const ArticleContent: React.FC<ArticleContentProps> = ({
   article,
   colors,
-  onOpenInBrowser,
-  showMetadata = true,
 }) => {
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-
-  const handleOpenInBrowser = async () => {
-    if (onOpenInBrowser) {
-      onOpenInBrowser();
-    } else {
-      try {
-        await WebBrowser.openBrowserAsync(article.url);
-      } catch (error) {
-        console.error('Failed to open browser:', error);
-      }
-    }
-  };
 
   // HTML rendering configuration
   const tagsStyles = {
@@ -116,34 +95,32 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   };
 
   return (
-    <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top }}>
-      {article.imageUrl && (
-        <Image
-          source={{ uri: article.imageUrl }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      )}
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: 100 }}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {article.title}
-        </Text>
-        <Text style={[styles.publishedOn, { color: colors.textSecondary }]}>
-          Published on{' '}
-          <Text
-            style={[styles.publisherLink, { color: colors.primary }]}
-            onPress={() => Linking.openURL(article.url)}
-          >
-            {extractDomain(article.url)}
+        {/* Article Header */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {article.title}
           </Text>
-        </Text>
-        {article.description && !article.content && (
-          <Text style={[styles.description, { color: colors.textSecondary }]}>
-            {article.description}
+          <Text style={[styles.publishedOn, { color: colors.textSecondary }]}>
+            Published on{' '}
+            <Text
+              style={[styles.publisherLink, { color: colors.textSecondary }]}
+              onPress={() => Linking.openURL(article.url)}
+            >
+              {extractDomain(article.url)}
+            </Text>
+            {article.addedAt && ` | ${formatDate(article.addedAt)}`}
           </Text>
-        )}
-        {article.content && (
-          <View style={styles.htmlContent}>
+        </View>
+
+        {/* Article Body */}
+        <View style={styles.textFrame}>
+          {article.content ? (
             <RenderHTML
               contentWidth={width - (Spacing.md * 2)}
               source={{ html: article.content }}
@@ -152,29 +129,12 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
                 selectable: true,
               }}
             />
-          </View>
-        )}
-        {showMetadata && (
-          <View style={styles.metadata}>
-            <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-              {extractDomain(article.url)}
+          ) : article.description ? (
+            <Text style={[styles.bodyText, { color: colors.text }]}>
+              {article.description}
             </Text>
-            <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-              Added {formatDate(article.addedAt)}
-            </Text>
-            {article.isRead && article.readAt && (
-              <Text style={[styles.metadataText, { color: colors.textSecondary }]}>
-                Read {formatDate(article.readAt)}
-              </Text>
-            )}
-          </View>
-        )}
-        <TouchableOpacity
-          style={[styles.openButton, { backgroundColor: colors.primary }]}
-          onPress={handleOpenInBrowser}
-        >
-          <Text style={styles.openButtonText}>Open in Browser</Text>
-        </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </ScrollView>
   );
@@ -184,49 +144,35 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  image: {
-    width: '100%',
-    height: 250,
-  },
   content: {
-    padding: Spacing.md,
+    flex: 1,
+  },
+  header: {
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    gap: 10,
   },
   title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: 'bold',
-    marginBottom: Spacing.sm,
+    fontSize: 24,
+    fontFamily: FontFamily.defaultSemiBold,
+    lineHeight: 32,
   },
   publishedOn: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.md,
+    fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
+    lineHeight: 22,
   },
   publisherLink: {
     textDecorationLine: 'underline',
   },
-  description: {
+  textFrame: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 0,
+  },
+  bodyText: {
     fontSize: FontSizes.md,
-    lineHeight: 24,
-    marginBottom: Spacing.md,
-  },
-  htmlContent: {
-    marginBottom: Spacing.md,
-  },
-  metadata: {
-    marginBottom: Spacing.lg,
-  },
-  metadataText: {
-    fontSize: FontSizes.sm,
-    marginBottom: Spacing.xs,
-  },
-  openButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  openButtonText: {
-    color: '#FFFFFF',
-    fontSize: FontSizes.md,
-    fontWeight: '600',
+    fontFamily: FontFamily.default,
+    lineHeight: 22.4,
   },
 });

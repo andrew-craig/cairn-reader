@@ -78,7 +78,6 @@ export const ExploreArticleDetailScreen: React.FC = () => {
       <ArticleContent
         article={article}
         colors={colors}
-        showMetadata={false}
       />
 
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
