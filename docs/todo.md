@@ -59,15 +59,6 @@ Impact: Cannot revoke individual access tokens if compromised.
 Recommendation: Add jti claim for token blacklisting capability if needed.
 
 
-### Task 10. Console Logging for Security Events
-
-Issue: Security events logged to stdout (refresh_token.go:159):
-
-fmt.Printf("failed to revoke token family on reuse: %v\n", err)
-
-Recommendation: Use structured logging with proper log levels and security event tagging.
-
-
 Concerns
 ### Task 11. No Vault Response Caching
 
@@ -448,4 +439,7 @@ The following items have been successfully implemented and verified:
 
 ### Testing & Quality Assurance
 - **Add Tests for Recommendation Engine**
-- **Setup Testcontainers for Integration Tests** (Task #2) - Implemented testcontainers-go for PostgreSQL integration tests in the Explore Recommender service. Created `services/explore/recommender/internal/testutil/db.go` with `SetupTestDB()` helper function that automatically spins up PostgreSQL 16 containers, runs migrations, and provides pgxpool connections. Updated `article_repository_integration_test.go` to use testcontainers and migrated from database/sql to pgxpool for consistency. Integration tests now work without manual database setup - just require Docker. Added comprehensive testing documentation to services/explore/README.md covering unit tests, integration tests, and CI/CD considerations. Tests can be skipped with `-short` flag for environments without Docker. 
+- **Setup Testcontainers for Integration Tests** (Task #2) - Implemented testcontainers-go for PostgreSQL integration tests in the Explore Recommender service. Created `services/explore/recommender/internal/testutil/db.go` with `SetupTestDB()` helper function that automatically spins up PostgreSQL 16 containers, runs migrations, and provides pgxpool connections. Updated `article_repository_integration_test.go` to use testcontainers and migrated from database/sql to pgxpool for consistency. Integration tests now work without manual database setup - just require Docker. Added comprehensive testing documentation to services/explore/README.md covering unit tests, integration tests, and CI/CD considerations. Tests can be skipped with `-short` flag for environments without Docker.
+
+### Logging & Monitoring
+- **Replace Console Logging for Security Events with Structured Logging** (Task #10) - Replaced all console logging (`fmt.Printf`, `fmt.Println`) with structured logging using `log/slog` across the user service. Updated `services/users/internal/services/user_service.go`, `services/users/internal/services/auth_service.go`, and `services/users/internal/auth/vault.go` to use `slog.Warn` and `slog.Error` with proper context (user_id, error details). Security events now include structured logging with appropriate log levels (Error for critical security operations like key rotation failures, Warn for non-critical failures like last login timestamp updates). 

@@ -192,7 +192,10 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 	// Update last login timestamp
 	if err := s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
 		// Log error but don't fail login
-		fmt.Printf("warning: failed to update last login timestamp: %v\n", err)
+		slog.Warn("failed to update last login timestamp",
+			slog.String("user_id", user.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Prepare device info and IP for token creation
@@ -232,7 +235,10 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 	// Update last login timestamp
 	if err := s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
 		// Log error but don't fail login
-		fmt.Printf("warning: failed to update last login timestamp: %v\n", err)
+		slog.Warn("failed to update last login timestamp",
+			slog.String("user_id", user.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Prepare device info and IP for token creation

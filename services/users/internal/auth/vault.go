@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -356,8 +357,9 @@ func (krm *KeyRotationManager) rotateKeysLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := krm.rotateKeys(); err != nil {
 				// Log error but don't stop the loop
-				// In production, this should use proper logging
-				fmt.Printf("Key rotation failed: %v\n", err)
+				slog.Error("key rotation failed",
+					slog.Any("error", err),
+				)
 			}
 		}
 	}
@@ -377,8 +379,9 @@ func (krm *KeyRotationManager) renewTokenLoop(ctx context.Context) {
 		case <-ticker.C:
 			if err := krm.vaultClient.RenewToken(); err != nil {
 				// Log error but don't stop the loop
-				// In production, this should use proper logging
-				fmt.Printf("Token renewal failed: %v\n", err)
+				slog.Error("vault token renewal failed",
+					slog.Any("error", err),
+				)
 			}
 		}
 	}
