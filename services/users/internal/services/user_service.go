@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
@@ -183,7 +184,10 @@ func (s *userService) DeleteUser(ctx context.Context, requestingUserID, targetUs
 	// First, revoke all refresh tokens for the user
 	if err := s.refreshTokenRepo.RevokeAllUserTokens(ctx, targetUserID); err != nil {
 		// Log error but continue with deletion
-		fmt.Printf("warning: failed to revoke user tokens during deletion: %v\n", err)
+		slog.Warn("failed to revoke user tokens during deletion",
+			slog.String("user_id", targetUserID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Delete user
