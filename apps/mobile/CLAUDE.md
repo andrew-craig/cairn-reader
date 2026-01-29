@@ -470,6 +470,93 @@ function MyComponent() {
 }
 ```
 
+## Safe Area Strategy
+
+The app uses an edge-to-edge display strategy where content can scroll behind OS UI elements (status bar, home indicator) while keeping interactive UI within safe areas.
+
+### Core Principles
+
+1. **Content scrolls behind OS UI** - Article content, lists, and scrollable areas extend behind the status bar and tab bar/action menu when scrolling
+2. **Initial render within safe areas** - Headers, titles, and initial content position below the status bar
+3. **Floating UI accounts for safe areas** - Tab bar and bottom action menu add bottom inset to their positioning
+
+### Implementation Pattern
+
+**DO NOT use `SafeAreaView`** for wrapping entire screens. Instead:
+
+1. Use plain `View` containers
+2. Import `useSafeAreaInsets` from `react-native-safe-area-context`
+3. Apply insets to specific content areas
+
+```typescript
+import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Layout, Spacing } from '../constants';
+
+function MyScreen() {
+  const insets = useSafeAreaInsets();
+
+  // For tab screens: account for tab bar + bottom safe area
+  const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
+
+  // For detail screens: account for action menu + bottom safe area
+  const detailBottomPadding = Layout.bottomActionMenuHeight + insets.bottom + Spacing.md;
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        ListHeaderComponent={() => (
+          <View style={{ paddingTop: insets.top + Spacing.md }}>
+            <Text>Header renders below status bar</Text>
+          </View>
+        )}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
+        // Content can scroll behind status bar and tab bar
+      />
+    </View>
+  );
+}
+```
+
+### Layout Constants
+
+Use the `Layout` constants from `src/constants/theme.ts`:
+
+```typescript
+Layout.tabBarHeight           // 70 - Height of floating tab bar (54px pill + 16px padding)
+Layout.bottomActionMenuHeight // 70 - Height of floating action menu
+Layout.headerHeight           // 64 - Standard header height
+```
+
+### Screen-Specific Guidelines
+
+| Screen Type | Top Handling | Bottom Handling |
+|-------------|--------------|-----------------|
+| **Tab screens** (Explore, Read, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
+| **Detail screens** (ArticleContent) | Content with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.bottomActionMenuHeight + insets.bottom + Spacing.md` |
+| **Modal screens** (AddArticle, Login) | Content with `paddingTop: insets.top` | Content with `paddingBottom: insets.bottom` |
+| **Floating UI** (TabBar, ActionMenu) | N/A | Position absolutely, add `insets.bottom + Spacing.sm` to paddingBottom |
+
+### StatusBar Configuration
+
+The app configures StatusBar in `App.tsx` for edge-to-edge display:
+
+```typescript
+<StatusBar
+  style={colorScheme === 'dark' ? 'light' : 'dark'}
+  translucent={Platform.OS === 'android'}
+  backgroundColor="transparent"
+/>
+```
+
+Android also has `androidStatusBar.translucent: true` in `app.json`.
+
+### Common Mistakes to Avoid
+
+1. **Don't wrap screens in SafeAreaView** - This prevents content from scrolling behind OS UI
+2. **Don't use hardcoded padding values** (e.g., `paddingBottom: 100`) - Use dynamic values based on `useSafeAreaInsets()` and `Layout` constants
+3. **Don't forget bottom padding on scrollable content** - Content will be hidden behind floating tab bar or action menu
+
 ## Development Workflow
 
 ### Initial Setup

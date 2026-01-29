@@ -8,13 +8,18 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StorageService } from '../services';
-import { Colors, Spacing, FontSizes, BorderRadius, GlobalStyles, FontFamily } from '../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, GlobalStyles, FontFamily, Layout } from '../constants';
 
 export const SettingsScreen: React.FC = () => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+
+  // Calculate padding to account for tab bar + bottom safe area
+  const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
 
   const handleClearAllData = () => {
     Alert.alert(
@@ -42,7 +47,10 @@ export const SettingsScreen: React.FC = () => {
   return (
     <ScrollView
       style={[GlobalStyles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: 100 }}
+      contentContainerStyle={{
+        paddingTop: insets.top + Spacing.md,
+        paddingBottom: bottomPadding,
+      }}
     >
       <View style={GlobalStyles.section}>
         <Text style={[GlobalStyles.sectionTitle, { color: colors.text }]}>

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { Colors, Spacing, FontSizes, FontFamily } from '../constants/theme';
+import { Colors, Spacing, FontSizes, FontFamily, Layout } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
 import { ChevronRightIcon } from '../components/icons';
 
@@ -40,6 +40,10 @@ export const YouScreen: React.FC = () => {
   const isDark = colorScheme === 'dark';
   const { user, logout } = useAuth();
   const colors = isDark ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+
+  // Calculate bottom padding to account for tab bar + bottom safe area
+  const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
 
   // Placeholder data - these will be replaced with actual data from API
   const accountName = user?.email || 'Anonymous user';
@@ -77,9 +81,20 @@ export const YouScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={[styles.header, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}
+      >
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.background,
+              paddingTop: insets.top + Spacing.md,
+            },
+          ]}
+        >
           <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>You</Text>
         </View>
 
@@ -118,7 +133,7 @@ export const YouScreen: React.FC = () => {
           />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

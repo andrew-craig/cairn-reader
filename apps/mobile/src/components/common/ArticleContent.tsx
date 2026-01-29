@@ -7,10 +7,11 @@ import {
   Linking,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHTML from 'react-native-render-html';
 import { Article } from '../../types';
 import { formatDate, extractDomain } from '../../utils';
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../../constants';
 
 interface ArticleContentProps {
   article: Article;
@@ -22,6 +23,11 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   colors,
 }) => {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  // Calculate padding to account for safe areas and floating action menu
+  const topPadding = insets.top + Spacing.md;
+  const bottomPadding = Layout.bottomActionMenuHeight + insets.bottom + Spacing.md;
 
   // HTML rendering configuration
   const tagsStyles = {
@@ -97,7 +103,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   return (
     <ScrollView
       style={styles.scrollView}
-      contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: 100 }}
+      contentContainerStyle={{ paddingTop: topPadding, paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.content}>

@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   ViewToken,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, GlobalStyles } from '../constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, GlobalStyles, Layout, Spacing } from '../constants';
 import { ArticleRow } from './common/ArticleRow';
 import { Article } from '../types';
 
@@ -44,6 +44,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const insets = useSafeAreaInsets();
+
+  // Calculate bottom padding to account for tab bar + bottom safe area
+  const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
 
   // Memoize viewability config to prevent recreating on each render
   const viewabilityConfigRef = useRef({
@@ -51,7 +55,15 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   });
 
   const renderHeader = () => (
-    <View style={[GlobalStyles.header, { backgroundColor: colors.background }]}>
+    <View
+      style={[
+        GlobalStyles.header,
+        {
+          backgroundColor: colors.background,
+          paddingTop: insets.top + Spacing.md,
+        },
+      ]}
+    >
       <View style={GlobalStyles.headerLeft}>
         <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
       </View>
@@ -85,14 +97,20 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 
   if (loading) {
     return (
-      <SafeAreaView style={[GlobalStyles.container, GlobalStyles.centerContent, { backgroundColor: colors.background }]}>
+      <View
+        style={[
+          GlobalStyles.container,
+          GlobalStyles.centerContent,
+          { backgroundColor: colors.background },
+        ]}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
+    <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={articles}
         renderItem={renderArticle}
@@ -107,8 +125,8 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfigRef.current}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
       />
-    </SafeAreaView>
+    </View>
   );
 };

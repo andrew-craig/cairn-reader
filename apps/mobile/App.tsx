@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform, useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +20,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 
 export default function App() {
+  const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -39,7 +41,11 @@ export default function App() {
       <AuthProvider>
         <NavigationContainer>
           <RootNavigator />
-          <StatusBar style="auto" />
+          <StatusBar
+            style={colorScheme === 'dark' ? 'light' : 'dark'}
+            translucent={Platform.OS === 'android'}
+            backgroundColor="transparent"
+          />
         </NavigationContainer>
       </AuthProvider>
     </SafeAreaProvider>
