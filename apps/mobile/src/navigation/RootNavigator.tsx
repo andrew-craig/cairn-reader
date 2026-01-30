@@ -3,7 +3,7 @@ import { useColorScheme, TouchableOpacity, ActivityIndicator, View } from 'react
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen } from '../screens';
+import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen, BookmarksScreen } from '../screens';
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
@@ -74,6 +74,14 @@ export default function RootNavigator() {
         options={{
           title: 'Add Article',
           presentation: 'modal',
+        }}
+      />
+      <Stack.Screen
+        name="Bookmarks"
+        component={BookmarksScreen}
+        options={{
+          headerShown: false,
+          presentation: 'card',
         }}
       />
     </Stack.Navigator>

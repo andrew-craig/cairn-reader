@@ -1,10 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Spacing, FontSizes, FontFamily, Layout } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
 import { ChevronRightIcon } from '../components/icons';
+import { RootStackParamList } from '../types';
+
+type YouScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface MenuItemProps {
   title: string;
@@ -18,7 +23,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ title, subtitle, onPress, isDark })
 
   return (
     <TouchableOpacity
-      style={[styles.menuItem, { backgroundColor: colors.background }]}
+      style={[styles.menuItem, { borderColor: colors.border }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -30,9 +35,18 @@ const MenuItem: React.FC<MenuItemProps> = ({ title, subtitle, onPress, isDark })
           </Text>
         )}
       </View>
-      <ChevronRightIcon size={20} color={colors.text} />
+      <ChevronRightIcon size={24} color={colors.textSecondary} />
     </TouchableOpacity>
   );
+};
+
+interface SpacerProps {
+  isDark: boolean;
+}
+
+const Spacer: React.FC<SpacerProps> = ({ isDark }) => {
+  const colors = isDark ? Colors.dark : Colors.light;
+  return <View style={[styles.spacer, { borderColor: colors.border }]} />;
 };
 
 export const YouScreen: React.FC = () => {
@@ -41,6 +55,7 @@ export const YouScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<YouScreenNavigationProp>();
 
   // Calculate bottom padding to account for tab bar + bottom safe area
   const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
@@ -63,8 +78,7 @@ export const YouScreen: React.FC = () => {
   };
 
   const handleBookmarksPress = () => {
-    // TODO: Navigate to bookmarks
-    console.log('Bookmarks pressed');
+    navigation.navigate('Bookmarks');
   };
 
   const handleVotesPress = () => {
@@ -92,6 +106,7 @@ export const YouScreen: React.FC = () => {
             {
               backgroundColor: colors.background,
               paddingTop: insets.top + Spacing.md,
+              height: undefined, // Override fixed height to allow safe area padding
             },
           ]}
         >
@@ -105,6 +120,7 @@ export const YouScreen: React.FC = () => {
             onPress={handleAccountPress}
             isDark={isDark}
           />
+          <Spacer isDark={isDark} />
           <MenuItem
             title="Feeds"
             subtitle={`${feedsCount} subscriptions`}
@@ -123,9 +139,7 @@ export const YouScreen: React.FC = () => {
             onPress={handleVotesPress}
             isDark={isDark}
           />
-        </View>
-
-        <View style={styles.logoutSection}>
+          <Spacer isDark={isDark} />
           <MenuItem
             title="Log out"
             onPress={handleLogoutPress}
@@ -150,14 +164,11 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    height: 64,
+    height: 48,
     justifyContent: 'center',
   },
   menuSection: {
-    marginTop: Spacing.lg,
-  },
-  logoutSection: {
-    marginTop: Spacing.xl,
+    marginTop: Spacing.md,
   },
   menuItem: {
     flexDirection: 'row',
@@ -165,20 +176,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    minHeight: 60,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
   },
   menuItemContent: {
     flex: 1,
-    marginRight: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginRight: Spacing.sm,
   },
   menuItemTitle: {
     fontSize: FontSizes.md,
     fontFamily: FontFamily.default,
-    marginBottom: 2,
   },
   menuItemSubtitle: {
-    fontSize: FontSizes.sm,
+    fontSize: FontSizes.md,
     fontFamily: FontFamily.default,
-    marginTop: 2,
+  },
+  spacer: {
+    height: Spacing.xl,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
   },
 });

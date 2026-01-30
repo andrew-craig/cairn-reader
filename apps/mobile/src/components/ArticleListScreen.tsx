@@ -61,6 +61,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         {
           backgroundColor: colors.background,
           paddingTop: insets.top + Spacing.md,
+          height: undefined, // Override fixed height to allow safe area padding
         },
       ]}
     >
