@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,23 +10,22 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/gin-gonic/gin"
 )
 
 // Recovery creates a middleware that recovers from panics and returns a 500 error
-func Recovery() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func Recovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				// Get request ID if available
-				requestID := logging.GetRequestID(c)
+				requestID := logging.GetRequestIDFromContext(r.Context())
 				if requestID == "" {
 					requestID = "unknown"
 				}
 
 				// Get user ID if available
 				userID := ""
-				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
+				if id, e := auth.GetUserIDOrError(r.Context()); e == nil {
 					userID = id.String()
 				}
 
@@ -34,40 +34,40 @@ func Recovery() gin.HandlerFunc {
 					slog.String("request_id", requestID),
 					slog.Any("error", err),
 					slog.String("user_id", userID),
-					slog.String("path", c.Request.URL.Path),
-					slog.String("method", c.Request.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("method", r.Method),
 					slog.String("stack", string(debug.Stack())),
 				)
 
 				// Return 500 error
-				c.JSON(http.StatusInternalServerError, gin.H{
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
 					"error":      "internal server error",
 					"request_id": requestID,
 				})
-
-				c.Abort()
 			}
 		}()
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // RecoveryWithDetails creates a middleware that recovers from panics and returns detailed error info
 // WARNING: Only use in development! This exposes stack traces which can be a security risk
-func RecoveryWithDetails() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func RecoveryWithDetails(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				// Get request ID if available
-				requestID := logging.GetRequestID(c)
+				requestID := logging.GetRequestIDFromContext(r.Context())
 				if requestID == "" {
 					requestID = "unknown"
 				}
 
 				// Get user ID if available
 				userID := ""
-				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
+				if id, e := auth.GetUserIDOrError(r.Context()); e == nil {
 					userID = id.String()
 				}
 
@@ -79,60 +79,58 @@ func RecoveryWithDetails() gin.HandlerFunc {
 					slog.String("request_id", requestID),
 					slog.Any("error", err),
 					slog.String("user_id", userID),
-					slog.String("path", c.Request.URL.Path),
-					slog.String("method", c.Request.Method),
+					slog.String("path", r.URL.Path),
+					slog.String("method", r.Method),
 					slog.String("stack", stack),
 				)
 
 				// Return 500 error with details (development only!)
-				c.JSON(http.StatusInternalServerError, gin.H{
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]interface{}{
 					"error":      fmt.Sprintf("%v", err),
 					"request_id": requestID,
 					"stack":      stack,
-					"path":       c.Request.URL.Path,
-					"method":     c.Request.Method,
+					"path":       r.URL.Path,
+					"method":     r.Method,
 				})
-
-				c.Abort()
 			}
 		}()
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
+// PanicHandler is a function type for custom panic handlers
+type PanicHandler func(w http.ResponseWriter, r *http.Request, err interface{}, stack []byte)
+
 // RecoveryWithHandler creates a middleware that recovers from panics and calls a custom handler
-type PanicHandler func(c *gin.Context, err interface{}, stack []byte)
+func RecoveryWithHandler(handler PanicHandler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					stack := debug.Stack()
 
-func RecoveryWithHandler(handler PanicHandler) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		defer func() {
-			if err := recover(); err != nil {
-				stack := debug.Stack()
-
-				// Call custom handler
-				handler(c, err, stack)
-
-				// Abort if not already aborted
-				if !c.IsAborted() {
-					c.Abort()
+					// Call custom handler
+					handler(w, r, err, stack)
 				}
-			}
-		}()
+			}()
 
-		c.Next()
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
 // DefaultPanicHandler is a default panic handler implementation
-func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
-	requestID := logging.GetRequestID(c)
+func DefaultPanicHandler(w http.ResponseWriter, r *http.Request, err interface{}, stack []byte) {
+	requestID := logging.GetRequestIDFromContext(r.Context())
 	if requestID == "" {
 		requestID = "unknown"
 	}
 
 	userID := ""
-	if id, e := auth.GetUserIDFromGinContext(c); e == nil {
+	if id, e := auth.GetUserIDOrError(r.Context()); e == nil {
 		userID = id.String()
 	}
 
@@ -141,15 +139,17 @@ func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
 		slog.String("request_id", requestID),
 		slog.Any("error", err),
 		slog.String("user_id", userID),
-		slog.String("path", c.Request.URL.Path),
-		slog.String("method", c.Request.Method),
-		slog.String("client_ip", c.ClientIP()),
+		slog.String("path", r.URL.Path),
+		slog.String("method", r.Method),
+		slog.String("client_ip", getClientIP(r)),
 		slog.Time("timestamp", time.Now()),
 		slog.String("stack", string(stack)),
 	)
 
 	// Return error response
-	c.JSON(http.StatusInternalServerError, gin.H{
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(map[string]string{
 		"error":      "internal server error",
 		"request_id": requestID,
 	})
@@ -157,22 +157,23 @@ func DefaultPanicHandler(c *gin.Context, err interface{}, stack []byte) {
 
 // RecoveryWithMetrics creates a middleware that recovers from panics and increments metrics
 // This is useful for monitoring and alerting on panics in production
-func RecoveryWithMetrics(metricsFunc func(path string, method string)) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		defer func() {
-			if err := recover(); err != nil {
-				// Increment panic metric
-				if metricsFunc != nil {
-					metricsFunc(c.Request.URL.Path, c.Request.Method)
+func RecoveryWithMetrics(metricsFunc func(path string, method string)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					// Increment panic metric
+					if metricsFunc != nil {
+						metricsFunc(r.URL.Path, r.Method)
+					}
+
+					// Use default panic handler
+					DefaultPanicHandler(w, r, err, debug.Stack())
 				}
+			}()
 
-				// Use default panic handler
-				DefaultPanicHandler(c, err, debug.Stack())
-				c.Abort()
-			}
-		}()
-
-		c.Next()
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
@@ -181,17 +182,17 @@ func RecoveryWithMetrics(metricsFunc func(path string, method string)) gin.Handl
 // - Returns generic error messages (no stack traces)
 // - Includes request ID for tracking
 // - Doesn't expose internal details
-func SafeRecovery() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func SafeRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				requestID := logging.GetRequestID(c)
+				requestID := logging.GetRequestIDFromContext(r.Context())
 				if requestID == "" {
 					requestID = "unknown"
 				}
 
 				userID := ""
-				if id, e := auth.GetUserIDFromGinContext(c); e == nil {
+				if id, e := auth.GetUserIDOrError(r.Context()); e == nil {
 					userID = id.String()
 				}
 
@@ -200,9 +201,9 @@ func SafeRecovery() gin.HandlerFunc {
 					slog.String("request_id", requestID),
 					slog.Any("error", err),
 					slog.String("user_id", userID),
-					slog.String("client_ip", c.ClientIP()),
-					slog.String("path", c.Request.URL.Path),
-					slog.String("method", c.Request.Method),
+					slog.String("client_ip", getClientIP(r)),
+					slog.String("path", r.URL.Path),
+					slog.String("method", r.Method),
 					slog.Time("timestamp", time.Now()),
 				)
 
@@ -213,15 +214,15 @@ func SafeRecovery() gin.HandlerFunc {
 				)
 
 				// Return generic error (don't expose internal details)
-				c.JSON(http.StatusInternalServerError, gin.H{
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
 					"error":      "an unexpected error occurred, please try again later",
 					"request_id": requestID,
 				})
-
-				c.Abort()
 			}
 		}()
 
-		c.Next()
-	}
+		next.ServeHTTP(w, r)
+	})
 }

@@ -9,28 +9,29 @@ import (
 	"testing"
 	"time"
 
-	pkgAuth "github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/cairn-app/cairn-reader/services/users/internal/models"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/gin-gonic/gin"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/models"
+	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 )
 
 // setupTestUserHandler creates a test user handler with all dependencies
-func setupTestUserHandler(t *testing.T) (*UserHandler, *database.DB, *auth.JWTManager, func()) {
+func setupTestUserHandler(t *testing.T) (*UserHandler, *database.DB, *internalAuth.JWTManager, func()) {
 	db := setupTestDB(t)
 
 	// Create password hasher (bcrypt cost 10 for faster tests)
-	passwordHasher := auth.NewPasswordHasher(10)
+	passwordHasher := internalAuth.NewPasswordHasher(10)
 
 	// Create JWT manager with test keys
 	privateKey, publicKey := generateTestRSAKeys(t)
 
-	jwtManager := auth.NewJWTManagerWithConfig(auth.JWTManagerConfig{
+	jwtManager := internalAuth.NewJWTManagerWithConfig(internalAuth.JWTManagerConfig{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 		Expiry:     60 * time.Minute,
@@ -65,7 +66,7 @@ func setupTestUserHandler(t *testing.T) (*UserHandler, *database.DB, *auth.JWTMa
 // createTestUser creates a user for testing
 func createTestUser(t *testing.T, db *database.DB, email string, password string) (uuid.UUID, string) {
 	userRepo := database.NewUserRepository(db)
-	passwordHasher := auth.NewPasswordHasher(10)
+	passwordHasher := internalAuth.NewPasswordHasher(10)
 
 	hashedPassword, err := passwordHasher.HashPassword(password)
 	require.NoError(t, err)
@@ -86,6 +87,15 @@ func createTestMobileUser(t *testing.T, db *database.DB, deviceID string) uuid.U
 	return user.ID
 }
 
+// withChiURLParams adds Chi URL parameters to a request context
+func withChiURLParams(r *http.Request, params map[string]string) *http.Request {
+	rctx := chi.NewRouteContext()
+	for key, value := range params {
+		rctx.URLParams.Add(key, value)
+	}
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
+
 // TestGetUser tests the GET /users/:id endpoint
 func TestGetUser(t *testing.T) {
 	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
@@ -100,17 +110,16 @@ func TestGetUser(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Valid user retrieval", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
 
-		// Apply JWT middleware
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.GetUser(c)
-		}
+		// Add Chi URL params and user ID to context
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -123,13 +132,12 @@ func TestGetUser(t *testing.T) {
 	})
 
 	t.Run("Authentication required returns 401", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
-		// No Authorization header
+		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		// No Authorization header, no user ID in context
 
-		handler.GetUser(c)
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "authentication required")
@@ -140,17 +148,16 @@ func TestGetUser(t *testing.T) {
 		otherUserID, _ := createTestUser(t, db, "otheruser@example.com", "SecurePass123!")
 		defer cleanupTestUser(t, db, otherUserID)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+otherUserID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
+		req := httptest.NewRequest(http.MethodGet, "/users/"+otherUserID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
 
-		// Apply JWT middleware (authenticates as userID)
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.GetUser(c)
-		}
+		// Add Chi URL params with otherUserID but authenticate as userID
+		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.Contains(t, w.Body.String(), "only access your own")
@@ -160,48 +167,42 @@ func TestGetUser(t *testing.T) {
 		nonExistentID := uuid.New()
 		nonExistentToken, _ := jwtManager.GenerateToken(nonExistentID)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+nonExistentID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
+		req := httptest.NewRequest(http.MethodGet, "/users/"+nonExistentID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
+		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		ctx := auth.WithUserID(req.Context(), nonExistentID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.GetUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Contains(t, w.Body.String(), "not found")
 	})
 
 	t.Run("Invalid user ID format returns 400", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: "invalid-uuid"}}
+		req := httptest.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": "invalid-uuid"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.GetUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid user ID format")
 	})
 
 	t.Run("Response structure validation", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.GetUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.GetUser(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -235,17 +236,15 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -257,17 +256,15 @@ func TestUpdateUser(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -279,17 +276,15 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "no fields to update")
@@ -302,14 +297,13 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
-		// No Authorization header
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		// No Authorization header, no user ID in context
 
-		handler.UpdateUser(c)
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
@@ -325,17 +319,15 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+otherUserID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+otherUserID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
@@ -352,17 +344,15 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 		assert.Contains(t, w.Body.String(), "already exists")
@@ -378,17 +368,15 @@ func TestUpdateUser(t *testing.T) {
 		}
 		body, _ := json.Marshal(updateReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPatch, "/users/"+nonExistentID.String(), bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
+		req := httptest.NewRequest(http.MethodPatch, "/users/"+nonExistentID.String(), bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
+		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		ctx := auth.WithUserID(req.Context(), nonExistentID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpdateUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpdateUser(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
@@ -415,17 +403,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -438,17 +424,15 @@ func TestUpgradeAccount(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -460,14 +444,13 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
-		// No Authorization header
+		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		// No Authorization header, no user ID in context
 
-		handler.UpgradeAccount(c)
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
@@ -484,17 +467,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+otherUserID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+otherUserID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
@@ -513,17 +494,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+newAccessToken)
-		c.Params = gin.Params{{Key: "id", Value: newUserID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+newAccessToken)
+		req = withChiURLParams(req, map[string]string{"id": newUserID.String()})
+		ctx := auth.WithUserID(req.Context(), newUserID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "password")
@@ -542,17 +521,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+emailUserID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+emailAccessToken)
-		c.Params = gin.Params{{Key: "id", Value: emailUserID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+emailUserID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+emailAccessToken)
+		req = withChiURLParams(req, map[string]string{"id": emailUserID.String()})
+		ctx := auth.WithUserID(req.Context(), emailUserID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "not a mobile-only account")
@@ -576,17 +553,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+newAccessToken)
-		c.Params = gin.Params{{Key: "id", Value: newUserID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+newAccessToken)
+		req = withChiURLParams(req, map[string]string{"id": newUserID.String()})
+		ctx := auth.WithUserID(req.Context(), newUserID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 	})
@@ -605,17 +580,15 @@ func TestUpgradeAccount(t *testing.T) {
 		}
 		body, _ := json.Marshal(upgradeReq)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/users/"+verifyUserID.String()+"/upgrade", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("Authorization", "Bearer "+verifyAccessToken)
-		c.Params = gin.Params{{Key: "id", Value: verifyUserID.String()}}
+		req := httptest.NewRequest(http.MethodPost, "/users/"+verifyUserID.String()+"/upgrade", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+verifyAccessToken)
+		req = withChiURLParams(req, map[string]string{"id": verifyUserID.String()})
+		ctx := auth.WithUserID(req.Context(), verifyUserID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.UpgradeAccount(c)
-		}
+		w := httptest.NewRecorder()
+		handler.UpgradeAccount(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -642,16 +615,14 @@ func TestDeleteUser(t *testing.T) {
 		accessToken, err := jwtManager.GenerateToken(userID)
 		require.NoError(t, err)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		req := httptest.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.DeleteUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.DeleteUser(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "successfully deleted")
@@ -661,13 +632,12 @@ func TestDeleteUser(t *testing.T) {
 		userID, _ := createTestUser(t, db, "deleteuser2@example.com", "SecurePass123!")
 		defer cleanupTestUser(t, db, userID)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
-		// No Authorization header
+		req := httptest.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		// No Authorization header, no user ID in context
 
-		handler.DeleteUser(c)
+		w := httptest.NewRecorder()
+		handler.DeleteUser(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
@@ -681,16 +651,14 @@ func TestDeleteUser(t *testing.T) {
 
 		accessToken, _ := jwtManager.GenerateToken(userID)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodDelete, "/users/"+otherUserID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+accessToken)
-		c.Params = gin.Params{{Key: "id", Value: otherUserID.String()}}
+		req := httptest.NewRequest(http.MethodDelete, "/users/"+otherUserID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.DeleteUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.DeleteUser(w, req)
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
@@ -699,16 +667,14 @@ func TestDeleteUser(t *testing.T) {
 		nonExistentID := uuid.New()
 		nonExistentToken, _ := jwtManager.GenerateToken(nonExistentID)
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodDelete, "/users/"+nonExistentID.String(), nil)
-		c.Request.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		c.Params = gin.Params{{Key: "id", Value: nonExistentID.String()}}
+		req := httptest.NewRequest(http.MethodDelete, "/users/"+nonExistentID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
+		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		ctx := auth.WithUserID(req.Context(), nonExistentID)
+		req = req.WithContext(ctx)
 
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.DeleteUser(c)
-		}
+		w := httptest.NewRecorder()
+		handler.DeleteUser(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})

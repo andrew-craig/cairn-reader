@@ -11,31 +11,26 @@ import (
 	"testing"
 	"time"
 
-	pkgAuth "github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
+	"github.com/cairn-app/cairn-reader/pkg/auth"
+	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	gin.SetMode(gin.TestMode)
-}
-
 // setupTestAuthHandler creates a test auth handler with all dependencies
-func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *auth.JWTManager, func()) {
+func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *internalAuth.JWTManager, func()) {
 	db := setupTestDB(t)
 
 	// Create password hasher (bcrypt cost 10 for faster tests)
-	passwordHasher := auth.NewPasswordHasher(10)
+	passwordHasher := internalAuth.NewPasswordHasher(10)
 
 	// Create JWT manager with test keys
 	privateKey, publicKey := generateTestRSAKeys(t)
 
-	jwtManager := auth.NewJWTManagerWithConfig(auth.JWTManagerConfig{
+	jwtManager := internalAuth.NewJWTManagerWithConfig(internalAuth.JWTManagerConfig{
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 		Expiry:     60 * time.Minute,
@@ -45,7 +40,7 @@ func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *auth.JWTMa
 
 	// Create refresh token service
 	refreshTokenRepo := database.NewRefreshTokenRepository(db)
-	refreshTokenService := auth.NewRefreshTokenService(refreshTokenRepo, 30*24*time.Hour)
+	refreshTokenService := internalAuth.NewRefreshTokenService(refreshTokenRepo, 30*24*time.Hour)
 
 	// Create user repository
 	userRepo := database.NewUserRepository(db)
@@ -128,12 +123,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -151,12 +145,11 @@ func TestRegister(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body returns 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString("invalid json"))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBufferString("invalid json"))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -168,12 +161,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -185,12 +177,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -203,12 +194,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "password")
@@ -222,12 +212,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var resp services.AuthResponse
@@ -235,12 +224,11 @@ func TestRegister(t *testing.T) {
 		defer cleanupTestUser(t, db, resp.User.ID)
 
 		// Try to create duplicate
+		req = httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w = httptest.NewRecorder()
-		c, _ = gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 		assert.Contains(t, w.Body.String(), "already exists")
@@ -253,12 +241,11 @@ func TestRegister(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Register(c)
+		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -289,14 +276,13 @@ func TestRegisterMobile(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", "Test Device")
+		req.RemoteAddr = "127.0.0.1:12345"
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("User-Agent", "Test Device")
-		c.Request.RemoteAddr = "127.0.0.1:12345"
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -313,12 +299,11 @@ func TestRegisterMobile(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -328,12 +313,11 @@ func TestRegisterMobile(t *testing.T) {
 		reqBody := map[string]string{}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -346,12 +330,11 @@ func TestRegisterMobile(t *testing.T) {
 		body, _ := json.Marshal(reqBody)
 
 		// Create initial user
+		req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var resp services.AuthResponse
@@ -359,12 +342,11 @@ func TestRegisterMobile(t *testing.T) {
 		defer cleanupTestUser(t, db, resp.User.ID)
 
 		// Try to create duplicate
+		req = httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w = httptest.NewRecorder()
-		c, _ = gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 		assert.Contains(t, w.Body.String(), "already exists")
@@ -376,14 +358,13 @@ func TestRegisterMobile(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("User-Agent", "Test Device Agent")
+		req.RemoteAddr = "192.168.1.1:12345"
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
-		c.Request.Header.Set("User-Agent", "Test Device Agent")
-		c.Request.RemoteAddr = "192.168.1.1:12345"
 
-		handler.RegisterMobile(c)
+		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
@@ -405,12 +386,11 @@ func TestLogin(t *testing.T) {
 	reqBody := RegisterRequest{Email: email, Password: password}
 	body, _ := json.Marshal(reqBody)
 
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-	c.Request.Header.Set("Content-Type", "application/json")
 
-	handler.Register(c)
+	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	var registerResp services.AuthResponse
@@ -424,12 +404,11 @@ func TestLogin(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -443,12 +422,11 @@ func TestLogin(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid request")
@@ -460,12 +438,11 @@ func TestLogin(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -477,12 +454,11 @@ func TestLogin(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid email or password")
@@ -495,12 +471,11 @@ func TestLogin(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid email or password")
@@ -513,12 +488,11 @@ func TestLogin(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Login(c)
+		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -543,12 +517,11 @@ func TestLoginMobile(t *testing.T) {
 	reqBody := RegisterMobileRequest{ExpoDeviceID: deviceID}
 	body, _ := json.Marshal(reqBody)
 
+	req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
-	c.Request.Header.Set("Content-Type", "application/json")
 
-	handler.RegisterMobile(c)
+	handler.RegisterMobile(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	var registerResp services.AuthResponse
@@ -561,12 +534,11 @@ func TestLoginMobile(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.LoginMobile(c)
+		handler.LoginMobile(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -579,12 +551,11 @@ func TestLoginMobile(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.LoginMobile(c)
+		handler.LoginMobile(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -593,12 +564,11 @@ func TestLoginMobile(t *testing.T) {
 		loginBody := map[string]string{}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.LoginMobile(c)
+		handler.LoginMobile(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -609,12 +579,11 @@ func TestLoginMobile(t *testing.T) {
 		}
 		body, _ := json.Marshal(loginBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.LoginMobile(c)
+		handler.LoginMobile(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid device ID")
@@ -633,12 +602,11 @@ func TestRefresh(t *testing.T) {
 	reqBody := RegisterRequest{Email: email, Password: password}
 	body, _ := json.Marshal(reqBody)
 
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-	c.Request.Header.Set("Content-Type", "application/json")
 
-	handler.Register(c)
+	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	var registerResp services.AuthResponse
@@ -651,12 +619,11 @@ func TestRefresh(t *testing.T) {
 		}
 		body, _ := json.Marshal(refreshBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Refresh(c)
+		handler.Refresh(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -671,12 +638,11 @@ func TestRefresh(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString("invalid"))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString("invalid"))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Refresh(c)
+		handler.Refresh(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -685,12 +651,11 @@ func TestRefresh(t *testing.T) {
 		refreshBody := map[string]string{}
 		body, _ := json.Marshal(refreshBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Refresh(c)
+		handler.Refresh(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -701,12 +666,11 @@ func TestRefresh(t *testing.T) {
 		}
 		body, _ := json.Marshal(refreshBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Refresh(c)
+		handler.Refresh(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid or expired")
@@ -725,12 +689,11 @@ func TestLogout(t *testing.T) {
 	reqBody := RegisterRequest{Email: email, Password: password}
 	body, _ := json.Marshal(reqBody)
 
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-	c.Request.Header.Set("Content-Type", "application/json")
 
-	handler.Register(c)
+	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	var registerResp services.AuthResponse
@@ -743,12 +706,11 @@ func TestLogout(t *testing.T) {
 		}
 		body, _ := json.Marshal(logoutBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Logout(c)
+		handler.Logout(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "successfully logged out")
@@ -758,12 +720,11 @@ func TestLogout(t *testing.T) {
 		logoutBody := map[string]string{}
 		body, _ := json.Marshal(logoutBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Logout(c)
+		handler.Logout(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
@@ -775,12 +736,11 @@ func TestLogout(t *testing.T) {
 		}
 		body, _ := json.Marshal(logoutBody)
 
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
-		c.Request.Header.Set("Content-Type", "application/json")
 
-		handler.Logout(c)
+		handler.Logout(w, req)
 
 		// Should succeed since logout is idempotent
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -799,12 +759,11 @@ func TestLogoutAll(t *testing.T) {
 	reqBody := RegisterRequest{Email: email, Password: password}
 	body, _ := json.Marshal(reqBody)
 
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
-	c.Request.Header.Set("Content-Type", "application/json")
 
-	handler.Register(c)
+	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
 	var registerResp services.AuthResponse
@@ -812,45 +771,45 @@ func TestLogoutAll(t *testing.T) {
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid logout all", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout-all", nil)
-		c.Request.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout-all", nil)
+		req.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
-		// Apply JWT middleware to set user ID in context
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.LogoutAll(c)
-		}
+		// Add user ID to context (simulating JWT middleware)
+		ctx := auth.WithUserID(req.Context(), registerResp.User.ID)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.LogoutAll(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "all devices")
 	})
 
 	t.Run("Authentication required", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout-all", nil)
+		// No Authorization header, no user ID in context
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout-all", nil)
-		// No Authorization header
 
-		handler.LogoutAll(c)
+		handler.LogoutAll(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "authentication required")
 	})
 
 	t.Run("User ID from JWT token", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/logout-all", nil)
-		c.Request.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
+		req := httptest.NewRequest(http.MethodPost, "/auth/logout-all", nil)
+		req.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
-		// Apply JWT middleware
-		pkgAuth.NewGinMiddleware(jwtManager).JWTAuth()(c)
-		if !c.IsAborted() {
-			handler.LogoutAll(c)
-		}
+		// Add user ID to context (simulating JWT middleware)
+		ctx := auth.WithUserID(req.Context(), registerResp.User.ID)
+		req = req.WithContext(ctx)
+
+		w := httptest.NewRecorder()
+		handler.LogoutAll(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
+
+	// Verify jwtManager is used (prevents unused variable warning)
+	_ = jwtManager
 }

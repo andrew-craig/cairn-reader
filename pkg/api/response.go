@@ -98,50 +98,14 @@ func WritePaginated(w http.ResponseWriter, status int, data interface{}, paginat
 
 // Common error codes
 const (
-	ErrCodeBadRequest          = "bad_request"
-	ErrCodeUnauthorized        = "unauthorized"
-	ErrCodeForbidden           = "forbidden"
-	ErrCodeNotFound            = "not_found"
-	ErrCodeConflict            = "conflict"
-	ErrCodeValidation          = "validation_error"
-	ErrCodeInternal            = "internal_error"
-	ErrCodeMethodNotAllowed    = "method_not_allowed"
-	ErrCodeTooManyRequests     = "too_many_requests"
-	ErrCodeServiceUnavailable  = "service_unavailable"
+	ErrCodeBadRequest         = "bad_request"
+	ErrCodeUnauthorized       = "unauthorized"
+	ErrCodeForbidden          = "forbidden"
+	ErrCodeNotFound           = "not_found"
+	ErrCodeConflict           = "conflict"
+	ErrCodeValidation         = "validation_error"
+	ErrCodeInternal           = "internal_error"
+	ErrCodeMethodNotAllowed   = "method_not_allowed"
+	ErrCodeTooManyRequests    = "too_many_requests"
+	ErrCodeServiceUnavailable = "service_unavailable"
 )
-
-// GinContext is an interface that represents the minimal Gin context methods we need
-// This allows us to avoid importing gin-gonic/gin in this package
-type GinContext interface {
-	JSON(code int, obj interface{})
-}
-
-// GinWriteSuccess writes a successful response using Gin's JSON method
-func GinWriteSuccess(c GinContext, status int, data interface{}, version string) {
-	response := SuccessResponse{
-		Data: data,
-		Meta: NewMeta(version),
-	}
-	c.JSON(status, response)
-}
-
-// GinWriteError writes an error response using Gin's JSON method
-func GinWriteError(c GinContext, status int, errorCode, message string, details map[string]interface{}, version string) {
-	response := ErrorResponse{
-		Error:   errorCode,
-		Message: message,
-		Details: details,
-		Meta:    NewMeta(version),
-	}
-	c.JSON(status, response)
-}
-
-// GinWritePaginated writes a paginated response using Gin's JSON method
-func GinWritePaginated(c GinContext, status int, data interface{}, pagination PaginationInfo, version string) {
-	response := PaginatedResponse{
-		Data:       data,
-		Pagination: pagination,
-		Meta:       NewMeta(version),
-	}
-	c.JSON(status, response)
-}

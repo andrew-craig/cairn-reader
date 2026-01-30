@@ -34,8 +34,9 @@ func ChiRequestLogger(logger *slog.Logger) func(next http.Handler) http.Handler 
 			// Wrap the response writer to capture status code and size
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-			// Store logger in context
+			// Store logger and request ID in context
 			ctx := WithLogger(r.Context(), reqLogger)
+			ctx = WithRequestID(ctx, requestID)
 			r = r.WithContext(ctx)
 
 			// Process request

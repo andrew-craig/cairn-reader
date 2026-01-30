@@ -1,61 +1,69 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
+
+// withChiURLParams adds Chi URL parameters to a request context
+func withChiURLParams(r *http.Request, params map[string]string) *http.Request {
+	rctx := chi.NewRouteContext()
+	for key, value := range params {
+		rctx.URLParams.Add(key, value)
+	}
+	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+}
 
 // TestRequireSameUser tests the RequireSameUser middleware
 func TestRequireSameUser(t *testing.T) {
 	t.Run("Authorized access (same user)", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		// Set user ID in context (from JWTAuth middleware)
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		w := httptest.NewRecorder()
 
 		handlerCalled := false
 		middleware := RequireSameUser()
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.False(t, c.IsAborted())
 		assert.True(t, handlerCalled)
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("Unauthorized access (different user)", func(t *testing.T) {
 		authenticatedUserID := uuid.New()
 		requestedUserID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": requestedUserID.String()})
+		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		req = req.WithContext(ctx)
 
-		// Set different user ID in context
-		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
-		c.Params = gin.Params{{Key: "id", Value: requestedUserID.String()}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUser()
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.Contains(t, w.Body.String(), "you can only access your own resources")
 	})
@@ -63,17 +71,19 @@ func TestRequireSameUser(t *testing.T) {
 	t.Run("Missing authentication (401)", func(t *testing.T) {
 		requestedUserID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
-
+		req := httptest.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": requestedUserID.String()})
 		// Don't set user ID in context
-		c.Params = gin.Params{{Key: "id", Value: requestedUserID.String()}}
+
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUser()
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "authentication required")
 	})
@@ -81,17 +91,20 @@ func TestRequireSameUser(t *testing.T) {
 	t.Run("Missing ID parameter (400)", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users", nil)
-
-		c.Set(string(auth.UserIDContextKey), userID)
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 		// No :id parameter
 
-		middleware := RequireSameUser()
-		middleware(c)
+		w := httptest.NewRecorder()
 
-		assert.True(t, c.IsAborted())
+		middleware := RequireSameUser()
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
+
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "user ID parameter is required")
 	})
@@ -99,17 +112,20 @@ func TestRequireSameUser(t *testing.T) {
 	t.Run("Invalid UUID format (400)", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
+		req = withChiURLParams(req, map[string]string{"id": "invalid-uuid"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "id", Value: "invalid-uuid"}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUser()
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid user ID format")
 	})
@@ -118,22 +134,19 @@ func TestRequireSameUser(t *testing.T) {
 		userID := uuid.New()
 		handlerCalled := false
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "id", Value: userID.String()}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUser()
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.True(t, handlerCalled, "Handler should have been called")
 	})
@@ -144,25 +157,21 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 	t.Run("Custom parameter name handling", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "user_id", Value: userID.String()}}
+		w := httptest.NewRecorder()
 
 		handlerCalled := false
 		middleware := RequireSameUserWithCustomParam("user_id")
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.False(t, c.IsAborted())
 		assert.True(t, handlerCalled)
 	})
 
@@ -170,67 +179,78 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		authenticatedUserID := uuid.New()
 		requestedUserID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+requestedUserID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/profiles/"+requestedUserID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"user_id": requestedUserID.String()})
+		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
-		c.Params = gin.Params{{Key: "user_id", Value: requestedUserID.String()}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUserWithCustomParam("user_id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
 
 	t.Run("Missing custom parameter", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles", nil)
+		req := httptest.NewRequest(http.MethodGet, "/profiles", nil)
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUserWithCustomParam("user_id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("Invalid UUID in custom parameter", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/not-a-uuid", nil)
+		req := httptest.NewRequest(http.MethodGet, "/profiles/not-a-uuid", nil)
+		req = withChiURLParams(req, map[string]string{"user_id": "not-a-uuid"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "user_id", Value: "not-a-uuid"}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUserWithCustomParam("user_id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("Missing authentication with custom param", func(t *testing.T) {
 		userID := uuid.New()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
-
+		req := httptest.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		// No user in context
-		c.Params = gin.Params{{Key: "user_id", Value: userID.String()}}
+
+		w := httptest.NewRecorder()
 
 		middleware := RequireSameUserWithCustomParam("user_id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 }
@@ -239,34 +259,30 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 func TestRequireOwnership(t *testing.T) {
 	t.Run("Authorized access with custom owner check", func(t *testing.T) {
 		userID := uuid.New()
-		ownerCheckFunc := func(c *gin.Context) (uuid.UUID, error) {
+		ownerCheckFunc := func(r *http.Request) (uuid.UUID, error) {
 			// Simulating fetching resource owner from database
-			resourceID := c.Param("resource_id")
+			resourceID := chi.URLParam(r, "resource_id")
 			if resourceID == "123" {
 				return userID, nil
 			}
 			return uuid.Nil, errors.New("resource not found")
 		}
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
+		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
+		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
+		w := httptest.NewRecorder()
 
 		handlerCalled := false
 		middleware := RequireOwnership(ownerCheckFunc)
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.False(t, c.IsAborted())
 		assert.True(t, handlerCalled)
 	})
 
@@ -274,62 +290,70 @@ func TestRequireOwnership(t *testing.T) {
 		authenticatedUserID := uuid.New()
 		resourceOwnerID := uuid.New()
 
-		ownerCheckFunc := func(c *gin.Context) (uuid.UUID, error) {
+		ownerCheckFunc := func(r *http.Request) (uuid.UUID, error) {
 			return resourceOwnerID, nil
 		}
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
+		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
+		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
+		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), authenticatedUserID)
-		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireOwnership(ownerCheckFunc)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.Contains(t, w.Body.String(), "you can only access your own resources")
 	})
 
 	t.Run("Owner check function error", func(t *testing.T) {
 		userID := uuid.New()
-		ownerCheckFunc := func(c *gin.Context) (uuid.UUID, error) {
+		ownerCheckFunc := func(r *http.Request) (uuid.UUID, error) {
 			return uuid.Nil, errors.New("database error")
 		}
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
+		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
+		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireOwnership(ownerCheckFunc)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "database error")
 	})
 
 	t.Run("Missing authentication", func(t *testing.T) {
-		ownerCheckFunc := func(c *gin.Context) (uuid.UUID, error) {
+		ownerCheckFunc := func(r *http.Request) (uuid.UUID, error) {
 			return uuid.New(), nil
 		}
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
-
+		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
+		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
 		// No user in context
-		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
+
+		w := httptest.NewRecorder()
 
 		middleware := RequireOwnership(ownerCheckFunc)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "authentication required")
 	})
@@ -338,26 +362,23 @@ func TestRequireOwnership(t *testing.T) {
 		userID := uuid.New()
 		handlerCalled := false
 
-		ownerCheckFunc := func(c *gin.Context) (uuid.UUID, error) {
+		ownerCheckFunc := func(r *http.Request) (uuid.UUID, error) {
 			return userID, nil
 		}
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/resources/123", nil)
+		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
+		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 
-		c.Set(string(auth.UserIDContextKey), userID)
-		c.Params = gin.Params{{Key: "resource_id", Value: "123"}}
+		w := httptest.NewRecorder()
 
 		middleware := RequireOwnership(ownerCheckFunc)
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.True(t, handlerCalled, "Handler should have been called")
 	})
@@ -369,50 +390,50 @@ func TestCheckUserIDParam(t *testing.T) {
 		validUUID := uuid.New()
 		handlerCalled := false
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/"+validUUID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/"+validUUID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"id": validUUID.String()})
 
-		c.Params = gin.Params{{Key: "id", Value: validUUID.String()}}
+		w := httptest.NewRecorder()
 
 		middleware := CheckUserIDParam("id")
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.False(t, c.IsAborted())
 		assert.True(t, handlerCalled, "Handler should have been called")
 	})
 
 	t.Run("Missing parameter returns 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/users", nil)
+
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users", nil)
 
 		middleware := CheckUserIDParam("id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "user ID parameter is required")
 	})
 
 	t.Run("Invalid UUID format returns 400", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/not-a-uuid", nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/not-a-uuid", nil)
+		req = withChiURLParams(req, map[string]string{"id": "not-a-uuid"})
 
-		c.Params = gin.Params{{Key: "id", Value: "not-a-uuid"}}
+		w := httptest.NewRecorder()
 
 		middleware := CheckUserIDParam("id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid user ID format")
 	})
@@ -421,37 +442,34 @@ func TestCheckUserIDParam(t *testing.T) {
 		validUUID := uuid.New()
 		handlerCalled := false
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/profiles/"+validUUID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, "/profiles/"+validUUID.String(), nil)
+		req = withChiURLParams(req, map[string]string{"user_id": validUUID.String()})
 
-		c.Params = gin.Params{{Key: "user_id", Value: validUUID.String()}}
+		w := httptest.NewRecorder()
 
 		middleware := CheckUserIDParam("user_id")
-		handler := func(c *gin.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			handlerCalled = true
-		}
+		})
 
-		middleware(c)
-		if !c.IsAborted() {
-			handler(c)
-		}
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.False(t, c.IsAborted())
 		assert.True(t, handlerCalled)
 	})
 
 	t.Run("Empty UUID string returns 400", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/users/", nil)
+		req := httptest.NewRequest(http.MethodGet, "/users/", nil)
+		req = withChiURLParams(req, map[string]string{"id": ""})
 
-		c.Params = gin.Params{{Key: "id", Value: ""}}
+		w := httptest.NewRecorder()
 
 		middleware := CheckUserIDParam("id")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
 
-		assert.True(t, c.IsAborted())
+		middleware(handler).ServeHTTP(w, req)
+
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, w.Body.String(), "user ID parameter is required")
 	})
