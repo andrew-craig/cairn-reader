@@ -33,6 +33,21 @@ export interface VoteRequest {
   vote_type: 'upvote' | 'downvote';
 }
 
+export interface VotedArticle {
+  article: BackendArticle;
+  vote_type: 'upvote' | 'downvote';
+}
+
+export interface UserVotesResponse {
+  user_id: string;
+  votes: VotedArticle[];
+  count: number;
+}
+
+export interface VotedArticleWithType extends Article {
+  voteType: 'upvote' | 'downvote';
+}
+
 export class ExploreService {
   private static async fetchWithAuth(
     url: string,
@@ -200,6 +215,40 @@ export class ExploreService {
       return result.data;
     } catch (error) {
       console.error('Error getting vote counts:', error);
+      throw error;
+    }
+  }
+
+  static async getUserVotedArticles(
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<VotedArticleWithType[]> {
+    try {
+      const userId = await AuthService.getUserId();
+
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await this.fetchWithAuth(
+        `${RECOMMENDER_BASE_URL}/api/v1/explore/user/${userId}/votes?limit=${limit}&offset=${offset}`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to get voted articles');
+      }
+
+      const data: UserVotesResponse = result.data;
+
+      // Transform backend articles to mobile Article format with vote type
+      return data.votes.map((votedArticle) => ({
+        ...this.transformArticle(votedArticle.article),
+        voteType: votedArticle.vote_type,
+      }));
+    } catch (error) {
+      console.error('Error fetching user voted articles:', error);
       throw error;
     }
   }

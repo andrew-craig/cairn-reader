@@ -234,6 +234,10 @@ curl -X DELETE \
 # Get vote counts
 curl -H "Authorization: Bearer <JWT>" \
   http://localhost:8081/api/v1/explore/article/{article_id}/vote
+
+# Get all articles user has voted on (with pagination)
+curl -H "Authorization: Bearer <JWT>" \
+  "http://localhost:8081/api/v1/explore/user/{user_id}/votes?limit=20&offset=0"
 ```
 
 ## Data Models
@@ -452,6 +456,7 @@ go run recommender/cmd/cleanup/main.go
 
 **Protected Endpoints** (require JWT):
 - Recommendations (`GET /api/v1/explore/recommendation/:user_id`)
+- User voted articles (`GET /api/v1/explore/user/:user_id/votes`)
 - Voting (`POST/DELETE /api/v1/explore/article/:id/vote`)
 - Read tracking (`POST /api/v1/explore/article/:id/read`)
 

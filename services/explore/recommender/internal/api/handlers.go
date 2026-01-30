@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
@@ -311,4 +312,46 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
+}
+
+// handleGetUserVotedArticles returns all articles a user has voted on
+// GET /api/v1/explore/user/{user_id}/votes
+func (s *Server) handleGetUserVotedArticles(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from JWT token context
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+	userID := authenticatedUserID.String()
+
+	// Parse pagination query params
+	limit := 20
+	offset := 0
+
+	if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
+		if parsed, err := strconv.Atoi(limitParam); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	if offsetParam := r.URL.Query().Get("offset"); offsetParam != "" {
+		if parsed, err := strconv.Atoi(offsetParam); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	votedArticles, err := s.voteRepo.GetUserVotedArticles(r.Context(), userID, limit, offset)
+	if err != nil {
+		slog.Error("failed to get user voted articles", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get voted articles", nil, "v1")
+		return
+	}
+
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+		"user_id": userID,
+		"votes":   votedArticles,
+		"count":   len(votedArticles),
+	}, "v1")
 }

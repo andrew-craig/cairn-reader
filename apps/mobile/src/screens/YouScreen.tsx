@@ -82,8 +82,7 @@ export const YouScreen: React.FC = () => {
   };
 
   const handleVotesPress = () => {
-    // TODO: Navigate to votes history
-    console.log('Votes pressed');
+    navigation.navigate('Votes');
   };
 
   const handleLogoutPress = async () => {

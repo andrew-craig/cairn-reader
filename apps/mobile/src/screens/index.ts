@@ -9,3 +9,4 @@ export * from './FavoritesScreen';
 export * from './ArchiveScreen';
 export * from './LoginScreen';
 export * from './BookmarksScreen';
+export * from './VotesScreen';

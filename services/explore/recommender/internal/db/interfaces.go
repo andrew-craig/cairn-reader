@@ -48,6 +48,12 @@ type ArticleRepositoryInterface interface {
 	SetUserRepository(userRepo UserRepositoryInterface)
 }
 
+// VotedArticle represents an article with the user's vote type
+type VotedArticle struct {
+	Article  models.Article `json:"article"`
+	VoteType string         `json:"vote_type"`
+}
+
 // VoteRepositoryInterface defines the contract for vote database operations
 type VoteRepositoryInterface interface {
 	// RecordVote inserts or updates a vote (upsert)
@@ -63,6 +69,9 @@ type VoteRepositoryInterface interface {
 	// GetUserVote returns the user's vote for an article (if any)
 	// Returns empty string if user hasn't voted
 	GetUserVote(ctx context.Context, userID string, articleID string) (voteType string, err error)
+
+	// GetUserVotedArticles returns all articles a user has voted on with their vote types
+	GetUserVotedArticles(ctx context.Context, userID string, limit int, offset int) ([]VotedArticle, error)
 }
 
 // UserRepositoryInterface defines the contract for user database operations

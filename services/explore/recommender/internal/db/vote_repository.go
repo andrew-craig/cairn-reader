@@ -9,8 +9,10 @@ import (
 	"log/slog"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
+	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lib/pq"
 )
 
 // voteRepository handles vote database operations
@@ -249,4 +251,58 @@ func (r *voteRepository) GetUserVote(ctx context.Context, userID string, article
 	}
 
 	return voteType, nil
+}
+
+// GetUserVotedArticles returns all articles a user has voted on with their vote types
+// Results are ordered by vote creation time (most recent first)
+func (r *voteRepository) GetUserVotedArticles(ctx context.Context, userID string, limit int, offset int) ([]VotedArticle, error) {
+	query := `
+		SELECT
+			a.id, a.title, a.link, a.description, a.content, a.author,
+			a.published, a.feed_url, a.feed_title, a.categories,
+			a.upvotes, a.downvotes, a.recommends, a.deleted,
+			a.created_at, a.updated_at,
+			v.vote_type
+		FROM votes v
+		JOIN articles a ON v.article_id = a.id
+		WHERE v.user_id = $1 AND a.deleted = false
+		ORDER BY v.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.Query(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user voted articles: %w", err)
+	}
+	defer rows.Close()
+
+	var votedArticles []VotedArticle
+	for rows.Next() {
+		var article models.Article
+		var voteType string
+		var categories []string
+
+		err := rows.Scan(
+			&article.ID, &article.Title, &article.Link, &article.Description, &article.Content, &article.Author,
+			&article.Published, &article.FeedURL, &article.FeedTitle, pq.Array(&categories),
+			&article.Upvotes, &article.Downvotes, &article.Recommends, &article.Deleted,
+			&article.CreatedAt, &article.UpdatedAt,
+			&voteType,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan voted article: %w", err)
+		}
+
+		article.Categories = categories
+		votedArticles = append(votedArticles, VotedArticle{
+			Article:  article,
+			VoteType: voteType,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating voted articles: %w", err)
+	}
+
+	return votedArticles, nil
 }

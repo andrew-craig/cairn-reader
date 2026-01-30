@@ -59,6 +59,14 @@ func (s *Server) Routes() http.Handler {
 		// Protected recommendation route
 		r.With(s.authMiddleware.RequireAuth).Get("/recommendation/{user_id}", s.handleRecommendations)
 
+		// Protected user routes - require authentication
+		r.Route("/user/{user_id}", func(r chi.Router) {
+			r.Use(s.authMiddleware.RequireAuth)
+
+			// Get all articles the user has voted on
+			r.Get("/votes", s.handleGetUserVotedArticles)
+		})
+
 		// Protected article routes - require authentication
 		r.Route("/article/{article_id}", func(r chi.Router) {
 			r.Use(s.authMiddleware.RequireAuth)

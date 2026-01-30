@@ -130,6 +130,7 @@ GET  /api/v1/explore/feed/stats          → Get feed statistics
 **Recommender (port 8081)**:
 ```
 GET  /api/v1/explore/recommendation/{user_id}       → Get recommendations (requires auth)
+GET  /api/v1/explore/user/{user_id}/votes           → Get user's voted articles (requires auth)
 POST /api/v1/explore/article/{id}/vote              → Vote on article (requires auth)
 POST /api/v1/explore/article/{id}/read              → Mark as read (requires auth)
 ```
