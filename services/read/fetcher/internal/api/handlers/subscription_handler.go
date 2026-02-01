@@ -25,7 +25,7 @@ func NewSubscriptionHandler(feedService service.FeedService) *SubscriptionHandle
 	}
 }
 
-// Subscribe handles POST /api/v1/users/:user_id/feeds/subscribe
+// Subscribe handles POST /api/v1/source/rss/user/{user_id}/subscription
 func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -79,7 +79,7 @@ func (h *SubscriptionHandler) Subscribe(w http.ResponseWriter, r *http.Request) 
 	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
-// Unsubscribe handles DELETE /api/v1/users/:user_id/feeds/:feed_id
+// Unsubscribe handles DELETE /api/v1/source/rss/user/{user_id}/subscription/{feed_id}
 func (h *SubscriptionHandler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -118,7 +118,7 @@ func (h *SubscriptionHandler) Unsubscribe(w http.ResponseWriter, r *http.Request
 	}, "v1")
 }
 
-// ListSubscriptions handles GET /api/v1/users/:user_id/feeds
+// ListSubscriptions handles GET /api/v1/source/rss/user/{user_id}/subscription
 func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -145,7 +145,8 @@ func (h *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
-// EnableFeed handles PATCH /api/v1/feeds/:feed_id/enable
+// EnableFeed handles PATCH /api/v1/source/rss/feed/{feed_id}/enable
+// Note: This handler is not currently registered in the router. Use UpdateFeed instead.
 func (h *SubscriptionHandler) EnableFeed(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

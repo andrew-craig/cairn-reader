@@ -38,6 +38,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, contentService, urlDetector, ingestRSSClient)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 	detectionHandler := handlers.NewDetectionHandler(urlDetector)
+	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient)
 
 	// Health check endpoints (Kubernetes-compatible)
 	// Liveness probe - indicates if the process is running
@@ -95,6 +96,9 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 			r.Get("/search", userContentHandler.SearchUserContents)
 			r.Patch("/{content_id}", userContentHandler.UpdateUserContent)
 			r.Delete("/{content_id}", userContentHandler.DeleteUserContent)
+
+			// Subscription aggregation endpoint - returns unified list from all sources
+			r.Get("/subscriptions", subscriptionAggregator.ListAllSubscriptions)
 		})
 
 		// Protected bulk user-content route

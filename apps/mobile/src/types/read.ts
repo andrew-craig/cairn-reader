@@ -103,3 +103,58 @@ export interface ListContentsParams {
   limit?: number;
   offset?: number;
 }
+
+// Feed Subscription Types (Legacy - kept for backward compatibility)
+export interface FeedSubscriptionResponse {
+  subscription_id: string;
+  feed_id: string;
+  feed_url: string;
+  feed_title: string;
+  feed_status: string;
+  polling_tier: string;
+  last_fetched_at?: string;
+  subscribed_at: string;
+}
+
+export interface ListFeedSubscriptionsResponse {
+  subscriptions: FeedSubscriptionResponse[];
+  count: number;
+}
+
+// Unified Subscription Types
+export type SubscriptionType = 'rss' | 'social' | 'email';
+
+export interface RSSSubscriptionData {
+  feed_url: string;
+  site_url?: string;
+  polling_tier?: string;
+  last_fetched_at?: string;
+}
+
+export interface SocialSubscriptionData {
+  platform: string;
+  handle: string;
+}
+
+export interface EmailSubscriptionData {
+  email_address: string;
+  filter_rules?: string;
+}
+
+export interface UnifiedSubscription {
+  id: string;
+  type: SubscriptionType;
+  title: string;
+  description?: string;
+  subscribed_at: string;
+
+  // Type-specific data (only one will be populated based on type)
+  rss_data?: RSSSubscriptionData;
+  social_data?: SocialSubscriptionData;
+  email_data?: EmailSubscriptionData;
+}
+
+export interface UnifiedSubscriptionsResponse {
+  subscriptions: UnifiedSubscription[];
+  total_count: number;
+}

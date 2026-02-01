@@ -10,6 +10,8 @@ import {
   DetectURLResponse,
   AddURLRequest,
   AddURLResponse,
+  ListFeedSubscriptionsResponse,
+  UnifiedSubscriptionsResponse,
 } from '../types/read';
 import { API_CONFIG } from '../config/api';
 
@@ -320,6 +322,76 @@ export class ReadService {
       return result.data;
     } catch (error) {
       console.error('Error adding URL:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List all user's subscriptions (unified across all sources: RSS, social, email, etc.)
+   * This is the new aggregated endpoint that returns subscriptions from all sources.
+   */
+  static async listAllSubscriptions(): Promise<UnifiedSubscriptionsResponse> {
+    try {
+      const userId = await AuthService.getUserId();
+
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
+
+      // Use the new aggregated endpoint in Content Service
+      const url = `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}/subscriptions`;
+      console.log('Fetching subscriptions from:', url);
+
+      const response = await this.fetchWithAuth(url);
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to list subscriptions');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error listing subscriptions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List user's feed subscriptions (RSS only)
+   * @deprecated Use listAllSubscriptions() for unified subscriptions across all sources
+   */
+  static async listFeedSubscriptions(): Promise<ListFeedSubscriptionsResponse> {
+    try {
+      const userId = await AuthService.getUserId();
+
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
+
+      const url = `${READ_SERVICE_BASE_URL}/api/v1/source/rss/user/${userId}/subscription`;
+      console.log('Fetching feed subscriptions from:', url);
+
+      const response = await this.fetchWithAuth(url);
+
+      console.log('Feed subscriptions response status:', response.status);
+      const responseText = await response.text();
+      console.log('Feed subscriptions response (first 300 chars):', responseText.substring(0, 300));
+
+      if (!response.ok) {
+        throw new Error(`Failed to list feed subscriptions (HTTP ${response.status}): ${responseText.substring(0, 100)}`);
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Invalid JSON response from ${url}. Response: ${responseText.substring(0, 200)}`);
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error listing feed subscriptions:', error);
       throw error;
     }
   }

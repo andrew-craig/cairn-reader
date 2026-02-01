@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -8,6 +8,8 @@ import { Colors, Spacing, FontSizes, FontFamily, Layout } from '../constants/the
 import { GlobalStyles } from '../constants/globalStyles';
 import { ChevronRightIcon } from '../components/icons';
 import { RootStackParamList } from '../types';
+import { ExploreService } from '../services/explore';
+import { ReadService } from '../services/read';
 
 type YouScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -60,12 +62,44 @@ export const YouScreen: React.FC = () => {
   // Calculate bottom padding to account for tab bar + bottom safe area
   const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
 
-  // Placeholder data - these will be replaced with actual data from API
+  // State for user statistics
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [feedsCount, setFeedsCount] = useState(0);
+  const [bookmarksCount, setBookmarksCount] = useState(0);
+  const [upVotesCount, setUpVotesCount] = useState(0);
+  const [downVotesCount, setDownVotesCount] = useState(0);
+
   const accountName = user?.email || 'Anonymous user';
-  const feedsCount = 8;
-  const bookmarksCount = 98;
-  const upVotesCount = 8;
-  const downVotesCount = 5;
+
+  // Fetch user statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch all stats in parallel
+        const [voteStats, subscriptions, bookmarks] = await Promise.all([
+          ExploreService.getUserVoteStats(),
+          ReadService.listAllSubscriptions(), // Use new aggregated endpoint
+          ReadService.listUserContents({ limit: 1 }), // Just get count, not all items
+        ]);
+
+        setUpVotesCount(voteStats.upvotes);
+        setDownVotesCount(voteStats.downvotes);
+        setFeedsCount(subscriptions.total_count); // Now includes all subscription types
+        setBookmarksCount(bookmarks.total_count);
+      } catch (err) {
+        console.error('Error fetching user stats:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load statistics');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const handleAccountPress = () => {
     // TODO: Navigate to account settings
@@ -112,6 +146,14 @@ export const YouScreen: React.FC = () => {
           <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>You</Text>
         </View>
 
+        {error && (
+          <View style={[styles.errorContainer, { backgroundColor: colors.border }]}>
+            <Text style={[styles.errorText, { color: colors.error }]}>
+              {error}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.menuSection}>
           <MenuItem
             title="Account"
@@ -122,19 +164,23 @@ export const YouScreen: React.FC = () => {
           <Spacer isDark={isDark} />
           <MenuItem
             title="Feeds"
-            subtitle={`${feedsCount} subscriptions`}
+            subtitle={loading ? 'Loading...' : `${feedsCount} subscriptions`}
             onPress={handleFeedsPress}
             isDark={isDark}
           />
           <MenuItem
             title="Bookmarks"
-            subtitle={`${bookmarksCount} saved`}
+            subtitle={loading ? 'Loading...' : `${bookmarksCount} saved`}
             onPress={handleBookmarksPress}
             isDark={isDark}
           />
           <MenuItem
             title="Votes"
-            subtitle={`${upVotesCount} up votes, ${downVotesCount} down votes`}
+            subtitle={
+              loading
+                ? 'Loading...'
+                : `${upVotesCount} up votes, ${downVotesCount} down votes`
+            }
             onPress={handleVotesPress}
             isDark={isDark}
           />
@@ -165,6 +211,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     height: 48,
     justifyContent: 'center',
+  },
+  errorContainer: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: 8,
+  },
+  errorText: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
+    textAlign: 'center',
   },
   menuSection: {
     marginTop: Spacing.md,
