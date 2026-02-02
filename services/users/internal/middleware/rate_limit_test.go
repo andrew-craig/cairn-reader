@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -149,22 +149,18 @@ func TestRateLimit(t *testing.T) {
 		middleware := RateLimit(3, 1*time.Second)
 
 		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
 
 			handlerCalled := false
-			handler := func(c *gin.Context) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handlerCalled = true
-			}
+			})
 
-			middleware(c)
-			if !c.IsAborted() {
-				handler(c)
-			}
+			middleware(handler).ServeHTTP(w, req)
 
-			assert.False(t, c.IsAborted())
 			assert.True(t, handlerCalled)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 	})
 
@@ -173,20 +169,21 @@ func TestRateLimit(t *testing.T) {
 
 		// First 2 requests pass
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request is blocked
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("Handler should not be called")
+		})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 		assert.Contains(t, w.Body.String(), "rate limit exceeded")
 	})
@@ -195,16 +192,15 @@ func TestRateLimit(t *testing.T) {
 		middleware := RateLimit(1, 1*time.Minute)
 
 		// Use up the limit
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c1)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
 
 		// Second request should be rejected with headers
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c)
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.Contains(t, w.Header().Get("X-RateLimit-Limit"), "")
 		assert.Equal(t, "1m0s", w.Header().Get("X-RateLimit-Window"))
@@ -214,16 +210,15 @@ func TestRateLimit(t *testing.T) {
 		middleware := RateLimit(1, 1*time.Second)
 
 		// Use up the limit
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c1)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
 
 		// Second request should include retry_after
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c)
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.Contains(t, w.Body.String(), "retry_after")
 		assert.Contains(t, w.Body.String(), "1s")
@@ -234,29 +229,28 @@ func TestRateLimit(t *testing.T) {
 
 		// Requests from same IP
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = "192.168.1.1:1234"
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Request.RemoteAddr = "192.168.1.1:1234"
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request from same IP is blocked
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.1:1234"
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Request.RemoteAddr = "192.168.1.1:1234"
-		middleware(c)
-		assert.True(t, c.IsAborted())
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 
 		// But different IP should work
+		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req2.RemoteAddr = "192.168.1.2:1234"
 		w2 := httptest.NewRecorder()
-		c2, _ := gin.CreateTestContext(w2)
-		c2.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c2.Request.RemoteAddr = "192.168.1.2:1234"
-		middleware(c2)
-		assert.False(t, c2.IsAborted())
+		middleware(handler).ServeHTTP(w2, req2)
+		assert.NotEqual(t, http.StatusTooManyRequests, w2.Code)
 	})
 }
 
@@ -268,22 +262,23 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// First 2 requests pass
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			ctx := auth.WithUserID(req.Context(), userID)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Set(string(auth.UserIDContextKey), userID)
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request is blocked
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Set(string(auth.UserIDContextKey), userID)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 
@@ -292,22 +287,22 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// First 2 requests pass (no user ID set)
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.RemoteAddr = "192.168.1.1:1234"
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Request.RemoteAddr = "192.168.1.1:1234"
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request is blocked
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "192.168.1.1:1234"
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Request.RemoteAddr = "192.168.1.1:1234"
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 
 	t.Run("Different users have separate limits", func(t *testing.T) {
@@ -317,28 +312,30 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// User 1 uses up their limit
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			ctx := auth.WithUserID(req.Context(), user1)
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Set(string(auth.UserIDContextKey), user1)
-			middleware(c)
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
 		}
 
 		// User 1 is blocked
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx1 := auth.WithUserID(req1.Context(), user1)
+		req1 = req1.WithContext(ctx1)
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c1.Set(string(auth.UserIDContextKey), user1)
-		middleware(c1)
-		assert.True(t, c1.IsAborted())
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
+		assert.Equal(t, http.StatusTooManyRequests, w1.Code)
 
 		// User 2 can still make requests
+		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx2 := auth.WithUserID(req2.Context(), user2)
+		req2 = req2.WithContext(ctx2)
 		w2 := httptest.NewRecorder()
-		c2, _ := gin.CreateTestContext(w2)
-		c2.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c2.Set(string(auth.UserIDContextKey), user2)
-		middleware(c2)
-		assert.False(t, c2.IsAborted())
+		middleware(handler).ServeHTTP(w2, req2)
+		assert.NotEqual(t, http.StatusTooManyRequests, w2.Code)
 	})
 
 	t.Run("Sets headers on rate limit exceeded", func(t *testing.T) {
@@ -346,18 +343,19 @@ func TestRateLimitByUser(t *testing.T) {
 		userID := uuid.New()
 
 		// Use up limit
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx1 := auth.WithUserID(req1.Context(), userID)
+		req1 = req1.WithContext(ctx1)
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c1.Set(string(auth.UserIDContextKey), userID)
-		middleware(c1)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
 
 		// Second request
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := auth.WithUserID(req.Context(), userID)
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Set(string(auth.UserIDContextKey), userID)
-		middleware(c)
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.Equal(t, "1m0s", w.Header().Get("X-RateLimit-Window"))
 		assert.Contains(t, w.Body.String(), "rate limit exceeded")
@@ -367,111 +365,120 @@ func TestRateLimitByUser(t *testing.T) {
 // TestRateLimitWithKey tests the RateLimitWithKey middleware
 func TestRateLimitWithKey(t *testing.T) {
 	t.Run("Uses custom key function", func(t *testing.T) {
-		keyFunc := func(c *gin.Context) string {
-			return c.GetHeader("X-API-Key")
+		keyFunc := func(r *http.Request) string {
+			return r.Header.Get("X-API-Key")
 		}
 		middleware := RateLimitWithKey(2, 1*time.Second, keyFunc)
 
 		// First 2 requests with same key
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("X-API-Key", "test-key-123")
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Request.Header.Set("X-API-Key", "test-key-123")
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request is blocked
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("X-API-Key", "test-key-123")
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c.Request.Header.Set("X-API-Key", "test-key-123")
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 
 	t.Run("Different keys have separate limits", func(t *testing.T) {
-		keyFunc := func(c *gin.Context) string {
-			return c.GetHeader("X-API-Key")
+		keyFunc := func(r *http.Request) string {
+			return r.Header.Get("X-API-Key")
 		}
 		middleware := RateLimitWithKey(2, 1*time.Second, keyFunc)
 
 		// Use up limit for key1
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("X-API-Key", "key1")
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-			c.Request.Header.Set("X-API-Key", "key1")
-			middleware(c)
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
 		}
 
 		// key1 is blocked
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req1.Header.Set("X-API-Key", "key1")
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c1.Request.Header.Set("X-API-Key", "key1")
-		middleware(c1)
-		assert.True(t, c1.IsAborted())
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
+		assert.Equal(t, http.StatusTooManyRequests, w1.Code)
 
 		// key2 still works
+		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req2.Header.Set("X-API-Key", "key2")
 		w2 := httptest.NewRecorder()
-		c2, _ := gin.CreateTestContext(w2)
-		c2.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		c2.Request.Header.Set("X-API-Key", "key2")
-		middleware(c2)
-		assert.False(t, c2.IsAborted())
+		middleware(handler).ServeHTTP(w2, req2)
+		assert.NotEqual(t, http.StatusTooManyRequests, w2.Code)
 	})
 
 	t.Run("Custom key from path parameter", func(t *testing.T) {
-		keyFunc := func(c *gin.Context) string {
-			return c.Param("tenant_id")
+		keyFunc := func(r *http.Request) string {
+			// Get tenant ID from context (would be set by Chi router)
+			rctx := r.Context().Value(tenantIDKey)
+			if rctx != nil {
+				return rctx.(string)
+			}
+			return ""
 		}
 		middleware := RateLimitWithKey(2, 1*time.Second, keyFunc)
 
 		// Requests for tenant1
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodGet, "/api/tenant1/data", nil)
+			ctx := context.WithValue(req.Context(), tenantIDKey, "tenant1")
+			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/api/tenant1/data", nil)
-			c.Params = gin.Params{{Key: "tenant_id", Value: "tenant1"}}
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request for tenant1 is blocked
+		req := httptest.NewRequest(http.MethodGet, "/api/tenant1/data", nil)
+		ctx := context.WithValue(req.Context(), tenantIDKey, "tenant1")
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/api/tenant1/data", nil)
-		c.Params = gin.Params{{Key: "tenant_id", Value: "tenant1"}}
-		middleware(c)
-		assert.True(t, c.IsAborted())
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 
 	t.Run("Sets headers on rejection", func(t *testing.T) {
-		keyFunc := func(c *gin.Context) string {
+		keyFunc := func(r *http.Request) string {
 			return "static-key"
 		}
 		middleware := RateLimitWithKey(1, 2*time.Second, keyFunc)
 
 		// Use up limit
+		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w1 := httptest.NewRecorder()
-		c1, _ := gin.CreateTestContext(w1)
-		c1.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c1)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w1, req1)
 
 		// Second request
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/test", nil)
-		middleware(c)
+		middleware(handler).ServeHTTP(w, req)
 
 		assert.Equal(t, "2s", w.Header().Get("X-RateLimit-Window"))
 		assert.Contains(t, w.Body.String(), "retry_after")
 	})
 }
+
+// tenantIDKey is a context key for testing
+type tenantIDKeyType string
+
+const tenantIDKey tenantIDKeyType = "tenant_id"
 
 // TestRateLimitAuth tests the RateLimitAuth middleware
 func TestRateLimitAuth(t *testing.T) {
@@ -480,20 +487,19 @@ func TestRateLimitAuth(t *testing.T) {
 
 		// First 2 requests pass
 		for i := 0; i < 2; i++ {
+			req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", nil)
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Third request is blocked
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", nil)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 
@@ -503,20 +509,20 @@ func TestRateLimitAuth(t *testing.T) {
 
 		// Simulate failed login attempts
 		for i := 0; i < 3; i++ {
+			req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", nil)
-			middleware(c)
-			assert.False(t, c.IsAborted())
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+			middleware(handler).ServeHTTP(w, req)
+			assert.NotEqual(t, http.StatusTooManyRequests, w.Code)
 		}
 
 		// Fourth attempt is blocked
+		req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodPost, "/auth/login", nil)
-		middleware(c)
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+		middleware(handler).ServeHTTP(w, req)
 
-		assert.True(t, c.IsAborted())
+		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	})
 }
 

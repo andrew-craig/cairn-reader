@@ -5,13 +5,14 @@
 package middleware
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/gin-gonic/gin"
 )
 
 // RateLimiter implements a token bucket rate limiter
@@ -105,98 +106,123 @@ func (rl *RateLimiter) allow(key string) bool {
 	return false
 }
 
+// getClientIP extracts the client IP address from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (comma-separated list, first is client)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	// RemoteAddr is "IP:port", so strip the port
+	addr := r.RemoteAddr
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
+}
+
 // RateLimit creates a middleware that limits requests per IP address
-func RateLimit(limit int, window time.Duration) gin.HandlerFunc {
+func RateLimit(limit int, window time.Duration) func(http.Handler) http.Handler {
 	limiter := NewRateLimiter(limit, window)
 
-	return func(c *gin.Context) {
-		// Use client IP as the key
-		key := c.ClientIP()
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Use client IP as the key
+			key := getClientIP(r)
 
-		if !limiter.allow(key) {
-			// Set rate limit headers to inform the client of the limits
-			c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
-			c.Header("X-RateLimit-Window", window.String())
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "rate limit exceeded",
-				"retry_after": window.String(),
-			})
-			c.Abort()
-			return
-		}
+			if !limiter.allow(key) {
+				// Set rate limit headers to inform the client of the limits
+				w.Header().Set("X-RateLimit-Limit", fmt.Sprint(limit))
+				w.Header().Set("X-RateLimit-Window", window.String())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error":       "rate limit exceeded",
+					"retry_after": window.String(),
+				})
+				return
+			}
 
-		c.Next()
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
 // RateLimitByUser creates a middleware that limits requests per authenticated user.
 // This should be used after the JWTAuth middleware. If the user is not authenticated,
 // it falls back to IP-based rate limiting.
-func RateLimitByUser(limit int, window time.Duration) gin.HandlerFunc {
+func RateLimitByUser(limit int, window time.Duration) func(http.Handler) http.Handler {
 	limiter := NewRateLimiter(limit, window)
 
-	return func(c *gin.Context) {
-		// Get user ID from context (set by JWTAuth middleware)
-		userID, err := auth.GetUserIDFromGinContext(c)
-		if err != nil {
-			// If user is not authenticated, fall back to IP-based rate limiting
-			key := c.ClientIP()
-			if !limiter.allow(key) {
-				c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
-				c.Header("X-RateLimit-Window", window.String())
-				c.JSON(http.StatusTooManyRequests, gin.H{
-					"error":       "rate limit exceeded",
-					"retry_after": window.String(),
-				})
-				c.Abort()
-				return
-			}
-		} else {
-			// Use user ID as the key for authenticated users
-			key := userID.String()
-			if !limiter.allow(key) {
-				c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
-				c.Header("X-RateLimit-Window", window.String())
-				c.JSON(http.StatusTooManyRequests, gin.H{
-					"error":       "rate limit exceeded",
-					"retry_after": window.String(),
-				})
-				c.Abort()
-				return
-			}
-		}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var key string
 
-		c.Next()
+			// Get user ID from context (set by JWTAuth middleware)
+			userID, err := auth.GetUserIDOrError(r.Context())
+			if err != nil {
+				// If user is not authenticated, fall back to IP-based rate limiting
+				key = getClientIP(r)
+			} else {
+				// Use user ID as the key for authenticated users
+				key = userID.String()
+			}
+
+			if !limiter.allow(key) {
+				w.Header().Set("X-RateLimit-Limit", fmt.Sprint(limit))
+				w.Header().Set("X-RateLimit-Window", window.String())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error":       "rate limit exceeded",
+					"retry_after": window.String(),
+				})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
+// KeyFunc is a function that extracts a rate limit key from a request
+type KeyFunc func(*http.Request) string
+
 // RateLimitWithKey creates a middleware that limits requests using a custom key function.
 // This allows for flexible rate limiting strategies based on any request attribute.
-type KeyFunc func(*gin.Context) string
-
-func RateLimitWithKey(limit int, window time.Duration, keyFunc KeyFunc) gin.HandlerFunc {
+func RateLimitWithKey(limit int, window time.Duration, keyFunc KeyFunc) func(http.Handler) http.Handler {
 	limiter := NewRateLimiter(limit, window)
 
-	return func(c *gin.Context) {
-		key := keyFunc(c)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := keyFunc(r)
 
-		if !limiter.allow(key) {
-			c.Header("X-RateLimit-Limit", fmt.Sprint(limit))
-			c.Header("X-RateLimit-Window", window.String())
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "rate limit exceeded",
-				"retry_after": window.String(),
-			})
-			c.Abort()
-			return
-		}
+			if !limiter.allow(key) {
+				w.Header().Set("X-RateLimit-Limit", fmt.Sprint(limit))
+				w.Header().Set("X-RateLimit-Window", window.String())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error":       "rate limit exceeded",
+					"retry_after": window.String(),
+				})
+				return
+			}
 
-		c.Next()
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 
 // RateLimitAuth creates a rate limiter specifically for authentication endpoints
 // This is more restrictive to prevent brute force attacks
-func RateLimitAuth(limit int, window time.Duration) gin.HandlerFunc {
+func RateLimitAuth(limit int, window time.Duration) func(http.Handler) http.Handler {
 	return RateLimit(limit, window)
 }

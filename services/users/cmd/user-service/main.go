@@ -17,7 +17,6 @@ import (
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/handlers"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
 
@@ -180,11 +179,6 @@ func main() {
 	slog.Info("starting token cleanup scheduler")
 	go tokenCleanupScheduler(ctx, refreshTokenService)
 	slog.Info("token cleanup scheduler started")
-
-	// Set Gin mode based on environment
-	if cfg.Server.Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
 
 	// Set up HTTP router
 	slog.Info("setting up HTTP router")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler handles authentication-related HTTP requests
@@ -27,34 +27,34 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
 
 // RegisterRequest represents the request body for email/password registration
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // RegisterMobileRequest represents the request body for mobile device registration
 type RegisterMobileRequest struct {
-	ExpoDeviceID string `json:"expo_device_id" binding:"required"`
+	ExpoDeviceID string `json:"expo_device_id"`
 }
 
 // LoginRequest represents the request body for email/password login
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // LoginMobileRequest represents the request body for mobile device login
 type LoginMobileRequest struct {
-	ExpoDeviceID string `json:"expo_device_id" binding:"required"`
+	ExpoDeviceID string `json:"expo_device_id"`
 }
 
 // RefreshRequest represents the request body for token refresh
 type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // LogoutRequest represents the request body for logout
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 // ErrorResponse represents an error response
@@ -64,87 +64,117 @@ type ErrorResponse struct {
 
 // Register handles POST /auth/register
 // Creates a new user account with email and password
-func (h *AuthHandler) Register(c *gin.Context) {
+func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.Email == "" || req.Password == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "email and password are required", nil, "v1")
+		return
+	}
+
+	// Basic email validation
+	if !strings.Contains(req.Email, "@") {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid email format", nil, "v1")
+		return
+	}
+
+	// Password minimum length
+	if len(req.Password) < 8 {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "password must be at least 8 characters", nil, "v1")
 		return
 	}
 
 	// Register user
-	authResp, err := h.authService.Register(c.Request.Context(), req.Email, req.Password)
+	authResp, err := h.authService.Register(r.Context(), req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, services.ErrAccountExists) {
-			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
+			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrWeakPassword) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register user", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register user", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusCreated, authResp, "v1")
+	api.WriteSuccess(w, http.StatusCreated, authResp, "v1")
 }
 
 // RegisterMobile handles POST /auth/register/mobile
 // Creates a new mobile-only account with Expo device ID
-func (h *AuthHandler) RegisterMobile(c *gin.Context) {
+func (h *AuthHandler) RegisterMobile(w http.ResponseWriter, r *http.Request) {
 	var req RegisterMobileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.ExpoDeviceID == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "expo_device_id is required", nil, "v1")
 		return
 	}
 
 	// Get device info and IP address from request
-	deviceInfo := c.GetHeader("User-Agent")
-	ipAddress := c.ClientIP()
+	deviceInfo := r.Header.Get("User-Agent")
+	ipAddress := getClientIP(r)
 
 	// Register mobile user
 	authResp, err := h.authService.RegisterMobile(
-		c.Request.Context(),
+		r.Context(),
 		req.ExpoDeviceID,
 		deviceInfo,
 		ipAddress,
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrAccountExists) {
-			api.GinWriteError(c, http.StatusConflict, api.ErrCodeConflict, "an account with this device ID already exists", nil, "v1")
+			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this device ID already exists", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register mobile user", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register mobile user", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusCreated, authResp, "v1")
+	api.WriteSuccess(w, http.StatusCreated, authResp, "v1")
 }
 
 // Login handles POST /auth/login
 // Authenticates a user with email and password
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.Email == "" || req.Password == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "email and password are required", nil, "v1")
 		return
 	}
 
 	// Get device info and IP address from request
-	deviceInfo := c.GetHeader("User-Agent")
-	ipAddress := c.ClientIP()
+	deviceInfo := r.Header.Get("User-Agent")
+	ipAddress := getClientIP(r)
 
 	// Authenticate user
 	authResp, err := h.authService.Login(
-		c.Request.Context(),
+		r.Context(),
 		req.Email,
 		req.Password,
 		deviceInfo,
@@ -152,80 +182,93 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid email or password", nil, "v1")
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid email or password", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
+	api.WriteSuccess(w, http.StatusOK, authResp, "v1")
 }
 
 // LoginMobile handles POST /auth/login/mobile
 // Authenticates a user with Expo device ID
-func (h *AuthHandler) LoginMobile(c *gin.Context) {
+func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
 	var req LoginMobileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.ExpoDeviceID == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "expo_device_id is required", nil, "v1")
 		return
 	}
 
 	// Get device info and IP address from request
-	deviceInfo := c.GetHeader("User-Agent")
-	ipAddress := c.ClientIP()
+	deviceInfo := r.Header.Get("User-Agent")
+	ipAddress := getClientIP(r)
 
 	// Authenticate user
 	authResp, err := h.authService.LoginMobile(
-		c.Request.Context(),
+		r.Context(),
 		req.ExpoDeviceID,
 		deviceInfo,
 		ipAddress,
 	)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid device ID", nil, "v1")
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid device ID", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrHybridAccountDeviceLogin) {
-			api.GinWriteError(c, http.StatusForbidden, api.ErrCodeForbidden, "device login not allowed for accounts with email/password", nil, "v1")
+			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "device login not allowed for accounts with email/password", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
+	api.WriteSuccess(w, http.StatusOK, authResp, "v1")
 }
 
 // Refresh handles POST /auth/refresh
 // Validates a refresh token and issues a new access token
-func (h *AuthHandler) Refresh(c *gin.Context) {
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ipAddress := getClientIP(r)
 		slog.Error("refresh request: failed to parse JSON",
 			slog.String("error", err.Error()),
-			slog.String("ip", c.ClientIP()),
+			slog.String("ip", ipAddress),
 		)
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.RefreshToken == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "refresh_token is required", nil, "v1")
 		return
 	}
 
 	// Get device info and IP address from request
-	deviceInfo := c.GetHeader("User-Agent")
-	ipAddress := c.ClientIP()
+	deviceInfo := r.Header.Get("User-Agent")
+	ipAddress := getClientIP(r)
 
 	// Get logger for structured logging
-	logger := logging.GetLogger(c)
-	requestID := logging.GetRequestID(c)
+	logger := logging.FromContext(r.Context())
+	requestID := logging.GetRequestIDFromContext(r.Context())
 
 	// Create token preview for debugging (first 20 chars)
 	tokenPreview := ""
@@ -243,7 +286,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	// Refresh access token
 	authResp, err := h.authService.RefreshAccessToken(
-		c.Request.Context(),
+		r.Context(),
 		req.RefreshToken,
 		deviceInfo,
 		ipAddress,
@@ -256,7 +299,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
-			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "token reuse detected") {
@@ -266,7 +309,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
-			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
 			return
 		}
 		if strings.Contains(err.Error(), "expired") {
@@ -275,7 +318,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 				slog.String("token_preview", tokenPreview),
 				slog.String("client_ip", ipAddress),
 			)
-			api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
 			return
 		}
 		if errors.Is(err, services.ErrInvalidInput) {
@@ -285,7 +328,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
 		logger.Error("failed to refresh access token",
@@ -294,7 +337,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),
 		)
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
 		return
 	}
 
@@ -304,52 +347,81 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		slog.String("client_ip", ipAddress),
 	)
 
-	api.GinWriteSuccess(c, http.StatusOK, authResp, "v1")
+	api.WriteSuccess(w, http.StatusOK, authResp, "v1")
 }
 
 // Logout handles POST /auth/logout
 // Revokes a specific refresh token
-func (h *AuthHandler) Logout(c *gin.Context) {
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	var req LogoutRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.RefreshToken == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "refresh_token is required", nil, "v1")
 		return
 	}
 
 	// Revoke the token
-	err := h.authService.Logout(c.Request.Context(), req.RefreshToken)
+	err := h.authService.Logout(r.Context(), req.RefreshToken)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidInput) {
-			api.GinWriteError(c, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
 			return
 		}
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusOK, gin.H{
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message": "successfully logged out",
 	}, "v1")
 }
 
 // LogoutAll handles POST /auth/logout-all
 // Revokes all refresh tokens for the authenticated user
-func (h *AuthHandler) LogoutAll(c *gin.Context) {
+func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from context (set by JWT middleware)
-	userID, err := auth.GetUserIDFromGinContext(c)
+	userID, err := auth.GetUserIDOrError(r.Context())
 	if err != nil {
-		api.GinWriteError(c, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
+		api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
 		return
 	}
 
 	// Revoke all user tokens
-	err = h.authService.LogoutAll(c.Request.Context(), userID)
+	err = h.authService.LogoutAll(r.Context(), userID)
 	if err != nil {
-		api.GinWriteError(c, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout from all devices", nil, "v1")
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout from all devices", nil, "v1")
 		return
 	}
 
-	api.GinWriteSuccess(c, http.StatusOK, gin.H{
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message": "successfully logged out from all devices",
 	}, "v1")
+}
+
+// getClientIP extracts the client IP address from the request
+// It checks X-Forwarded-For and X-Real-IP headers first (for reverse proxy setups)
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header (comma-separated list, first is client)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	// RemoteAddr is "IP:port", so strip the port
+	addr := r.RemoteAddr
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
 }

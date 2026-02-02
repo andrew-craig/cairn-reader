@@ -6,32 +6,29 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestHealthCheck tests the GET /health endpoint
-func TestHealthCheck(t *testing.T) {
-	// We don't need actual DB or Vault for basic health check
+// TestLivenessCheck tests the GET /health/live endpoint
+func TestLivenessCheck(t *testing.T) {
+	// We don't need actual DB or Vault for basic liveness check
 	handler := NewHealthHandler(nil, nil)
 
 	t.Run("Returns 200 OK", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/health", nil)
 
-		handler.HealthCheck(c)
+		handler.LivenessCheck(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("Response structure", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/health", nil)
 
-		handler.HealthCheck(c)
+		handler.LivenessCheck(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -39,12 +36,12 @@ func TestHealthCheck(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
-		assert.Equal(t, "ok", resp.Status)
+		assert.Equal(t, "healthy", resp.Status)
 	})
 }
 
-// TestReadyCheck tests the GET /ready endpoint
-func TestReadyCheck(t *testing.T) {
+// TestReadinessCheck tests the GET /health/ready endpoint
+func TestReadinessCheck(t *testing.T) {
 	t.Run("Returns 200 when all dependencies healthy", func(t *testing.T) {
 		db := setupTestDB(t)
 		defer db.Close()
@@ -52,11 +49,10 @@ func TestReadyCheck(t *testing.T) {
 		// For Vault, we'll test with nil (not configured)
 		handler := NewHealthHandler(db, nil)
 
+		req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/ready", nil)
 
-		handler.ReadyCheck(c)
+		handler.ReadinessCheck(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -64,9 +60,8 @@ func TestReadyCheck(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
-		assert.Equal(t, "ready", resp.Status)
-		assert.Equal(t, "healthy", resp.Checks["database"])
-		assert.Equal(t, "not_configured", resp.Checks["vault"])
+		assert.Equal(t, "healthy", resp.Status)
+		assert.Equal(t, "ok", resp.Checks["database"])
 	})
 
 	t.Run("Returns 503 when database unavailable", func(t *testing.T) {
@@ -84,11 +79,10 @@ func TestReadyCheck(t *testing.T) {
 
 		handler := NewHealthHandler(db, nil)
 
+		req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest(http.MethodGet, "/ready", nil)
 
-		handler.ReadyCheck(c)
+		handler.ReadinessCheck(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -98,6 +92,5 @@ func TestReadyCheck(t *testing.T) {
 
 		assert.NotNil(t, resp.Checks)
 		assert.Contains(t, resp.Checks, "database")
-		assert.Contains(t, resp.Checks, "vault")
 	})
 }

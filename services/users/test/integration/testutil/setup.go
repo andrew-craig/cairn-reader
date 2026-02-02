@@ -2,6 +2,8 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 	"os"
 	"testing"
@@ -43,27 +45,43 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 	db, err := database.New(dbConfig)
 	require.NoError(t, err, "Failed to connect to test database")
 
-	// Initialize Vault client
+	// Initialize Vault client (optional for unit tests)
+	var vaultClient *auth.VaultClient
 	vaultConfig := &auth.VaultConfig{
 		Address: getEnv("VAULT_ADDR", "http://localhost:8201"),
 		Token:   getEnv("VAULT_TOKEN", "test-root-token"),
 	}
 
-	vaultClient, err := auth.NewVaultClient(vaultConfig)
-	require.NoError(t, err, "Failed to connect to Vault")
+	vaultClient, err = auth.NewVaultClient(vaultConfig)
+	if err != nil {
+		t.Logf("Warning: Vault not available, using generated keys: %v", err)
+	}
 
-	// Load JWT keys from Vault
-	keyPair, err := vaultClient.GetJWTKeyPair(context.Background())
-	require.NoError(t, err, "Failed to load JWT keys from Vault")
+	// Load JWT keys from Vault or generate test keys
+	var privateKey *rsa.PrivateKey
+	var publicKey *rsa.PublicKey
+
+	if vaultClient != nil {
+		privateKey, publicKey, err = vaultClient.GetJWTKeys(
+			getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/cairn/jwt/private"),
+			getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/cairn/jwt/public"),
+		)
+		if err != nil {
+			t.Logf("Warning: Could not load keys from Vault, generating test keys: %v", err)
+			privateKey, publicKey = generateTestRSAKeys(t)
+		}
+	} else {
+		privateKey, publicKey = generateTestRSAKeys(t)
+	}
 
 	// Initialize JWT manager
-	jwtConfig := &auth.JWTConfig{
-		Issuer:         "cairn-test",
-		Audience:       "cairn-api-test",
-		AccessLifetime: 15 * time.Minute,
-	}
-	jwtManager, err := auth.NewJWTManagerWithConfig(keyPair.PrivateKey, keyPair.PublicKey, jwtConfig)
-	require.NoError(t, err, "Failed to initialize JWT manager")
+	jwtManager := auth.NewJWTManagerWithConfig(auth.JWTManagerConfig{
+		PrivateKey: privateKey,
+		PublicKey:  publicKey,
+		Expiry:     15 * time.Minute,
+		Issuer:     "cairn-test",
+		Audience:   "cairn-api-test",
+	})
 
 	// Initialize repositories
 	userRepo := database.NewUserRepository(db)
@@ -82,6 +100,13 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		PasswordHash: passwordHash,
 		TokenService: tokenService,
 	}
+}
+
+// generateTestRSAKeys generates RSA key pairs for testing
+func generateTestRSAKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err, "Failed to generate RSA key pair")
+	return privateKey, &privateKey.PublicKey
 }
 
 // Cleanup cleans up test environment
@@ -155,7 +180,7 @@ func (env *TestEnv) GenerateTestTokens(t *testing.T, userID uuid.UUID, deviceInf
 	ctx := context.Background()
 
 	// Generate access token
-	accessToken, err := env.JWTManager.GenerateToken(userID, 15*time.Minute)
+	accessToken, err := env.JWTManager.GenerateToken(userID)
 	require.NoError(t, err, "Failed to generate access token")
 
 	// Generate refresh token
@@ -163,7 +188,8 @@ func (env *TestEnv) GenerateTestTokens(t *testing.T, userID uuid.UUID, deviceInf
 	require.NoError(t, err, "Failed to generate refresh token")
 
 	// Store refresh token
-	_, err = env.TokenService.CreateRefreshToken(ctx, userID, tokenHash, nil, deviceInfo, ipAddress)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	_, err = env.TokenRepo.CreateRefreshToken(ctx, userID, tokenHash, expiresAt, deviceInfo, ipAddress, nil)
 	require.NoError(t, err, "Failed to store refresh token")
 
 	return accessToken, refreshToken
@@ -208,8 +234,11 @@ func WaitForVault(t *testing.T, maxWait time.Duration) {
 		client, err := auth.NewVaultClient(vaultConfig)
 		if err == nil {
 			// Try to read a key to verify it's fully initialized
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, err = client.GetJWTKeyPair(ctx)
+			_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, _, err = client.GetJWTKeys(
+				getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/cairn/jwt/private"),
+				getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/cairn/jwt/public"),
+			)
 			cancel()
 
 			if err == nil {

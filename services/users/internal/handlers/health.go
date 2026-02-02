@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/gin-gonic/gin"
 )
 
 // HealthHandler handles health check endpoints
@@ -34,8 +34,10 @@ type HealthResponse struct {
 // LivenessCheck returns a simple liveness check response
 // GET /health/live
 // Used by orchestrators to determine if the service process should be restarted
-func (h *HealthHandler) LivenessCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, HealthResponse{
+func (h *HealthHandler) LivenessCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(HealthResponse{
 		Status: "healthy",
 	})
 }
@@ -44,8 +46,8 @@ func (h *HealthHandler) LivenessCheck(c *gin.Context) {
 // GET /health/ready
 // Returns 503 Service Unavailable if dependencies are unreachable
 // Used by load balancers to determine if traffic should be routed to this instance
-func (h *HealthHandler) ReadinessCheck(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+func (h *HealthHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	checks := make(map[string]string)
@@ -69,13 +71,16 @@ func (h *HealthHandler) ReadinessCheck(c *gin.Context) {
 		}
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	if allHealthy {
-		c.JSON(http.StatusOK, HealthResponse{
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(HealthResponse{
 			Status: "healthy",
 			Checks: checks,
 		})
 	} else {
-		c.JSON(http.StatusServiceUnavailable, HealthResponse{
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(HealthResponse{
 			Status:  "unhealthy",
 			Checks:  checks,
 			Message: "One or more dependencies are unavailable",

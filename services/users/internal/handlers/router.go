@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
@@ -12,7 +13,7 @@ import (
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/middleware"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
 )
 
 // RouterConfig holds all dependencies needed to set up the HTTP router.
@@ -28,7 +29,7 @@ type RouterConfig struct {
 	Logger              *slog.Logger           // Structured logger for request logging
 }
 
-// Router sets up the HTTP routes and returns a configured gin.Engine.
+// Router sets up the HTTP routes and returns a configured http.Handler.
 // Health endpoints are registered without security middleware to allow internal HTTP checks.
 // API endpoints have the following middleware chain:
 //   - Recovery: Recovers from panics and returns 500 errors
@@ -36,29 +37,28 @@ type RouterConfig struct {
 //   - CORS: Handles Cross-Origin Resource Sharing
 //   - RequireHTTPS: Enforces HTTPS in production
 //   - SecureHeadersRelaxed: Adds security headers (CSP, X-Frame-Options, etc.)
-func Router(config RouterConfig) *gin.Engine {
-	router := gin.New() // Use gin.New() instead of gin.Default() to avoid default logger
+func Router(config RouterConfig) http.Handler {
+	r := chi.NewRouter()
 
 	// Apply only recovery and logging globally (needed for all routes including health checks)
-	router.Use(middleware.Recovery())
-	router.Use(logging.RequestLogger(config.Logger))
+	r.Use(middleware.Recovery)
+	r.Use(logging.ChiRequestLogger(config.Logger))
 
 	// Initialize handlers
 	healthHandler := NewHealthHandler(config.DB, config.VaultClient)
 	authHandler := NewAuthHandler(config.AuthService)
 	userHandler := NewUserHandler(config.UserService)
 
-	// Create Gin middleware adapter from pkg/auth
-	// This provides Gin-compatible wrappers around the stdlib auth middleware
-	authMiddleware := auth.NewGinMiddleware(config.JWTManager)
+	// Create stdlib middleware from pkg/auth
+	authMiddleware := auth.NewMiddleware(auth.NewValidator(config.JWTManager.GetPublicKey()))
 
 	// Health endpoints (Kubernetes-compatible)
 	// No security middleware applied to allow HTTP health checks within Docker
 	// Support both GET and HEAD methods for health checks (HEAD used by Docker/wget --spider)
-	router.GET("/health/live", healthHandler.LivenessCheck)
-	router.HEAD("/health/live", healthHandler.LivenessCheck)
-	router.GET("/health/ready", healthHandler.ReadinessCheck)
-	router.HEAD("/health/ready", healthHandler.ReadinessCheck)
+	r.Get("/health/live", healthHandler.LivenessCheck)
+	r.Head("/health/live", healthHandler.LivenessCheck)
+	r.Get("/health/ready", healthHandler.ReadinessCheck)
+	r.Head("/health/ready", healthHandler.ReadinessCheck)
 
 	// Set default rate limit values if not provided
 	authRateLimit := config.AuthRateLimit
@@ -71,38 +71,38 @@ func Router(config RouterConfig) *gin.Engine {
 	}
 
 	// API v1 routes with security middleware
-	v1 := router.Group("/api/v1")
-	v1.Use(middleware.CORS())
-	v1.Use(middleware.RequireHTTPS())
-	v1.Use(middleware.SecureHeadersRelaxed())
-	{
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(middleware.CORS(middleware.DefaultCORSConfig()))
+		r.Use(middleware.RequireHTTPS)
+		r.Use(middleware.SecureHeadersRelaxed)
+
 		// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
 		// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
-		authGroup := v1.Group("/auth")
-		authGroup.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
-		{
-			authGroup.POST("/register", authHandler.Register)              // Create account with email/password
-			authGroup.POST("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
-			authGroup.POST("/login", authHandler.Login)                    // Authenticate with email/password
-			authGroup.POST("/login/mobile", authHandler.LoginMobile)       // Authenticate with device ID
-			authGroup.POST("/refresh", authHandler.Refresh)                // Exchange refresh token for new access token
-			authGroup.POST("/logout", authHandler.Logout)                  // Revoke a specific refresh token
+		r.Route("/auth", func(r chi.Router) {
+			r.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
+
+			r.Post("/register", authHandler.Register)              // Create account with email/password
+			r.Post("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID
+			r.Post("/login", authHandler.Login)                    // Authenticate with email/password
+			r.Post("/login/mobile", authHandler.LoginMobile)       // Authenticate with device ID
+			r.Post("/refresh", authHandler.Refresh)                // Exchange refresh token for new access token
+			r.Post("/logout", authHandler.Logout)                  // Revoke a specific refresh token
 			// logout-all requires authentication since it needs to know which user's tokens to revoke
-			authGroup.POST("/logout-all", authMiddleware.JWTAuth(), authHandler.LogoutAll)
-		}
+			r.With(authMiddleware.RequireAuth).Post("/logout-all", authHandler.LogoutAll)
+		})
 
 		// User management endpoints - all routes require JWT authentication
 		// Authorization (ensuring users can only access their own data) is handled in the service layer
-		// Note: Using :user_id parameter for consistency with API standards
-		users := v1.Group("/user")
-		users.Use(authMiddleware.JWTAuth())
-		{
-			users.GET("/:user_id", userHandler.GetUser)                 // Get user profile
-			users.PATCH("/:user_id", userHandler.UpdateUser)            // Update user email
-			users.POST("/:user_id/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
-			users.DELETE("/:user_id", userHandler.DeleteUser)           // Delete user account and all associated data
-		}
-	}
+		// Note: Using {user_id} parameter for consistency with API standards
+		r.Route("/user", func(r chi.Router) {
+			r.Use(authMiddleware.RequireAuth)
 
-	return router
+			r.Get("/{user_id}", userHandler.GetUser)                 // Get user profile
+			r.Patch("/{user_id}", userHandler.UpdateUser)            // Update user email
+			r.Post("/{user_id}/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
+			r.Delete("/{user_id}", userHandler.DeleteUser)           // Delete user account and all associated data
+		})
+	})
+
+	return r
 }
