@@ -242,8 +242,11 @@ export class ExploreService {
 
       const data: UserVotesResponse = result.data;
 
+      // Handle null votes (when user has no votes yet)
+      const votes = data.votes || [];
+
       // Transform backend articles to mobile Article format with vote type
-      return data.votes.map((votedArticle) => ({
+      return votes.map((votedArticle) => ({
         ...this.transformArticle(votedArticle.article),
         voteType: votedArticle.vote_type,
       }));
