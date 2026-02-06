@@ -281,6 +281,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSLMODE=disable
+      - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
       # Vault AppRole authentication (scoped to content-service policy)
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID=${CONTENT_SERVICE_ROLE_ID}
@@ -288,6 +289,8 @@ services:
       - VAULT_AUTH_PATH=approle
     depends_on:
       content-db:
+        condition: service_healthy
+      ingest-rss:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
