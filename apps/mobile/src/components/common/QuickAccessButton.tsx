@@ -25,24 +25,21 @@ export const QuickAccessButton: React.FC<QuickAccessButtonProps> = ({
 
     switch (icon) {
       case 'bookmark':
-        return <BookmarkIcon size={size} color={iconColor} />;
+        return <BookmarkIcon size={size} color={iconColor} filled={active} />;
       case 'archive':
         return <ArchiveIcon size={size} color={iconColor} />;
       case 'return':
         return <ReturnIcon size={size} color={iconColor} />;
       case 'thumbs-up':
-        return <ThumbsUpIcon size={size} color={iconColor} />;
+        return <ThumbsUpIcon size={size} color={iconColor} filled={active} />;
       case 'thumbs-down':
-        return <ThumbsDownIcon size={size} color={iconColor} />;
+        return <ThumbsDownIcon size={size} color={iconColor} filled={active} />;
     }
   };
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        { backgroundColor: active ? colors.hover : 'transparent' }
-      ]}
+      style={styles.button}
       onPress={onPress}
       activeOpacity={0.7}
     >

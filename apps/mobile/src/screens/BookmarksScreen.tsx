@@ -3,7 +3,6 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
-import { AddLinkModal } from '../components/AddLinkModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 
@@ -19,7 +18,6 @@ export const BookmarksScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  const [modalVisible, setModalVisible] = useState(false);
 
   const loadBookmarks = useCallback(async (reset = false) => {
     try {
@@ -80,45 +78,27 @@ export const BookmarksScreen: React.FC = () => {
     navigation.navigate('ArticleDetail', { article });
   };
 
-  const handleAddPress = () => {
-    setModalVisible(true);
-  };
-
-  const handleAddSuccess = () => {
-    handleRefresh();
-  };
-
   const handleSearchPress = () => {
     // TODO: Navigate to search screen
     console.log('Search pressed');
   };
 
   const headerActions = (
-    <>
-      <IconButton icon="add-outline" onPress={handleAddPress} />
-      <IconButton icon="search-outline" onPress={handleSearchPress} />
-    </>
+    <IconButton icon="search-outline" onPress={handleSearchPress} />
   );
 
   return (
-    <>
-      <ArticleListScreen
-        title="Bookmarks"
-        articles={articles}
-        loading={loading}
-        headerActions={headerActions}
-        onArticlePress={handleArticlePress}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        emptyMessage="No bookmarked articles yet"
-        onEndReached={handleLoadMore}
-        loadingMore={loadingMore}
-      />
-      <AddLinkModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSuccess={handleAddSuccess}
-      />
-    </>
+    <ArticleListScreen
+      title="Bookmarks"
+      articles={articles}
+      loading={loading}
+      headerActions={headerActions}
+      onArticlePress={handleArticlePress}
+      onRefresh={handleRefresh}
+      refreshing={refreshing}
+      emptyMessage="No bookmarked articles yet"
+      onEndReached={handleLoadMore}
+      loadingMore={loadingMore}
+    />
   );
 };

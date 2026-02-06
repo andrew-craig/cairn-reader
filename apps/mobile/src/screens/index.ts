@@ -1,7 +1,6 @@
 export * from './ExploreScreen';
 export * from './ExploreArticleDetailScreen';
 export * from './ReadScreen';
-export * from './SettingsScreen';
 export * from './YouScreen';
 export * from './AddArticleScreen';
 export * from './ReadArticleDetailScreen';
