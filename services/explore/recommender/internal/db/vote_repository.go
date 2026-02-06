@@ -276,7 +276,8 @@ func (r *voteRepository) GetUserVotedArticles(ctx context.Context, userID string
 	}
 	defer rows.Close()
 
-	var votedArticles []VotedArticle
+	// Initialize as empty slice to return [] instead of null when no votes exist
+	votedArticles := make([]VotedArticle, 0)
 	for rows.Next() {
 		var article models.Article
 		var voteType string

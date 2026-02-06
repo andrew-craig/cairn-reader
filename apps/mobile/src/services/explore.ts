@@ -242,11 +242,8 @@ export class ExploreService {
 
       const data: UserVotesResponse = result.data;
 
-      // Handle null votes (when user has no votes yet)
-      const votes = data.votes || [];
-
       // Transform backend articles to mobile Article format with vote type
-      return votes.map((votedArticle) => ({
+      return data.votes.map((votedArticle) => ({
         ...this.transformArticle(votedArticle.article),
         voteType: votedArticle.vote_type,
       }));
@@ -277,12 +274,9 @@ export class ExploreService {
 
       const data: UserVotesResponse = result.data;
 
-      // Handle null votes (when user has no votes yet)
-      const votes = data.votes || [];
-
       // Count upvotes and downvotes
-      const upvotes = votes.filter((v) => v.vote_type === 'upvote').length;
-      const downvotes = votes.filter((v) => v.vote_type === 'downvote').length;
+      const upvotes = data.votes.filter((v) => v.vote_type === 'upvote').length;
+      const downvotes = data.votes.filter((v) => v.vote_type === 'downvote').length;
 
       return { upvotes, downvotes };
     } catch (error) {
