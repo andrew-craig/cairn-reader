@@ -1,0 +1,8 @@
+# Fastlane Match configuration
+# See setup documentation for instructions on creating a certificates repository
+
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/your-org/certificates")
+storage_mode("git")
+type("appstore")
+app_identifier(["com.readitlater.app"])
+username(ENV["FASTLANE_APPLE_ID"] || "your-apple-id@example.com")

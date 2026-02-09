@@ -1,0 +1,68 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    # Automatically manage code signing with match
+    setup_ci if ENV['CI']
+
+    # Sync code signing certificates and profiles
+    match(
+      type: "appstore",
+      readonly: is_ci,
+      app_identifier: "com.readitlater.app"
+    )
+
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "ReadItLater.xcodeproj"
+    )
+
+    # Build the app
+    build_app(
+      workspace: "ReadItLater.xcworkspace",
+      scheme: "ReadItLater",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "com.readitlater.app" => "match AppStore com.readitlater.app"
+        }
+      }
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      api_key_path: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
+      skip_waiting_for_build_processing: true
+    )
+  end
+
+  desc "Download certificates and profiles"
+  lane :certificates do
+    match(
+      type: "appstore",
+      app_identifier: "com.readitlater.app"
+    )
+  end
+
+  desc "Test local build without uploading"
+  lane :build_only do
+    setup_ci if ENV['CI']
+
+    match(
+      type: "appstore",
+      readonly: is_ci,
+      app_identifier: "com.readitlater.app"
+    )
+
+    increment_build_number(
+      xcodeproj: "ReadItLater.xcodeproj"
+    )
+
+    build_app(
+      workspace: "ReadItLater.xcworkspace",
+      scheme: "ReadItLater",
+      export_method: "app-store"
+    )
+  end
+end

@@ -16,7 +16,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.readitlater.app"
+      "bundleIdentifier": "com.readitlater.app",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {

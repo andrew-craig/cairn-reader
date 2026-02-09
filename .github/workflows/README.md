@@ -178,8 +178,57 @@ The workflows use GitHub Actions cache to speed up builds:
 - Clear cache by re-running workflow with "Re-run all jobs"
 - Or modify workflow to use `cache-from: type=gha,mode=min`
 
+## iOS Deployment Workflows
+
+### 🚀 Recommended: Fastlane (Free)
+
+**File:** `ios-testflight-fastlane.yml`
+
+- ✅ **Free** (uses GitHub Actions macOS runners)
+- ✅ **Industry standard** for iOS deployment
+- ✅ **Full control** over build process
+- ⚙️ **Setup:** Follow [apps/mobile/FASTLANE_SETUP.md](../../apps/mobile/FASTLANE_SETUP.md)
+
+**Triggers:**
+- Manual: Actions tab → "iOS TestFlight (Fastlane)" → Run workflow
+- Automatic: Push a tag like `mobile-v1.0.0`
+
+**What it does:**
+- Generates native iOS code with `expo prebuild`
+- Installs dependencies and CocoaPods
+- Downloads code signing certificates via Fastlane Match
+- Builds the app with Xcode
+- Auto-increments build number
+- Uploads to TestFlight
+
+### 💰 Alternative: EAS Build (Easiest)
+
+**File:** `ios-testflight.yml`
+
+- 💵 **Paid** service ($29/month after free tier)
+- ✅ **Easiest setup** (minimal configuration)
+- ✅ **Managed** by Expo
+- ⚙️ **Setup:** Follow [TESTFLIGHT_SETUP.md](TESTFLIGHT_SETUP.md)
+
+**Triggers:**
+- Manual: Actions tab → "iOS TestFlight Deployment" → Run workflow
+
+### 🔧 Advanced: Native Xcode Build
+
+**File:** `ios-testflight-local-build.yml`
+
+- ✅ **Free** but complex
+- ⚙️ **Maximum control** over every build step
+- 🛠️ **Manual** certificate management required
+
+### Comparison of iOS Options
+
+See [BUILD_OPTIONS.md](BUILD_OPTIONS.md) for a detailed comparison of all iOS build approaches.
+
 ## Related Documentation
 
 - [Docker Compose Setup](/infrastructure/docker/README.md)
 - [Service Documentation](/CLAUDE.md)
 - [GitHub Container Registry Docs](https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
+- [Fastlane Setup Guide](../../apps/mobile/FASTLANE_SETUP.md) - iOS deployment setup
+- [iOS Build Options Comparison](BUILD_OPTIONS.md) - Compare EAS vs Fastlane vs Native
