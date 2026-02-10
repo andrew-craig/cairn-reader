@@ -29,21 +29,19 @@ export const BottomActionMenu: React.FC<BottomActionMenuProps> = ({ actions }) =
         },
       ]}
     >
-      {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint={colorScheme === 'dark' ? 'dark' : 'light'} style={styles.blurContainer}>
-          <View style={[styles.menuContainer, { backgroundColor: colors.card }]}>
-            {actions.map((action, index) => (
-              <QuickAccessButton
-                key={index}
-                icon={action.icon}
-                onPress={action.onPress}
-                active={action.active}
-              />
-            ))}
-          </View>
-        </BlurView>
-      ) : (
-        <View style={[styles.menuContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.shadowWrapper}>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 10 : 20}
+          tint={colorScheme === 'dark' ? 'dark' : 'light'}
+          style={[
+            styles.menuContainer,
+            {
+              backgroundColor: colorScheme === 'dark'
+                ? 'rgba(28, 28, 30, 0.85)'
+                : 'rgba(251, 250, 249, 0.85)',
+            },
+          ]}
+        >
           {actions.map((action, index) => (
             <QuickAccessButton
               key={index}
@@ -52,8 +50,8 @@ export const BottomActionMenu: React.FC<BottomActionMenuProps> = ({ actions }) =
               active={action.active}
             />
           ))}
-        </View>
-      )}
+        </BlurView>
+      </View>
     </View>
   );
 };
@@ -68,9 +66,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: Spacing.sm,
   },
-  blurContainer: {
+  shadowWrapper: {
     borderRadius: 32,
-    overflow: 'hidden',
+    // Shadow matching Figma design: 0px 2px 4px 0px rgba(15, 23, 42, 0.2)
+    shadowColor: '#0F172A',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   menuContainer: {
     flexDirection: 'row',
@@ -81,13 +87,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 6,
     borderRadius: 32,
-    shadowColor: 'rgba(30, 41, 59, 0.2)',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
+    overflow: 'hidden',
   },
 });

@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/crimson-pro';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
+import { TopBlurGradient } from './src/components/common';
 
 export default function App() {
   const colorScheme = useColorScheme();
@@ -41,6 +42,7 @@ export default function App() {
       <AuthProvider>
         <NavigationContainer>
           <RootNavigator />
+          <TopBlurGradient />
           <StatusBar
             style={colorScheme === 'dark' ? 'light' : 'dark'}
             translucent={Platform.OS === 'android'}
