@@ -102,8 +102,7 @@ export const YouScreen: React.FC = () => {
   }, []);
 
   const handleAccountPress = () => {
-    // TODO: Navigate to account settings
-    console.log('Account pressed');
+    navigation.navigate('Account');
   };
 
   const handleFeedsPress = () => {

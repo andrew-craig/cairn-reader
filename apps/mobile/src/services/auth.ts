@@ -435,4 +435,62 @@ export class AuthService {
     const user = await this.getUser();
     return user?.id || null;
   }
+
+  static async upgradeAccount(email: string, password: string): Promise<User> {
+    const isValid = await this.ensureValidToken();
+    if (!isValid) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const userId = await this.getUserId();
+    if (!userId) {
+      throw new Error('No user found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/user/${userId}/upgrade`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to upgrade account');
+    }
+
+    const user: User = result.data || result;
+    await this.saveUser(user);
+    return user;
+  }
+
+  static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const isValid = await this.ensureValidToken();
+    if (!isValid) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const userId = await this.getUserId();
+    if (!userId) {
+      throw new Error('No user found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/user/${userId}/password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to change password');
+    }
+  }
 }
