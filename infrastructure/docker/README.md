@@ -34,12 +34,8 @@ The Docker Compose configuration includes:
 - **Content Worker**: Article cleanup jobs (health port 8084)
 - **Ingest RSS Worker**: Feed polling and processing (health port 8086)
 
-### Databases (PostgreSQL)
-- `users-db` (port 5432) - User service database
-- `recommender-db` (port 5433) - Explore Recommender database
-- `fetcher-db` (port 5434) - Explore Fetcher database
-- `content-db` (port 5435) - Content service database
-- `rss-db` (port 5436) - Ingest RSS database
+### Database (PostgreSQL)
+- `cairn-db` (port 5432) - Single PostgreSQL instance hosting all service databases as separate logical DBs
 
 ## Architecture
 
@@ -56,22 +52,17 @@ The Docker Compose configuration includes:
 │   :8082       │  │     :8088      │─▶│      :8087         │
 └───────┬───────┘  └────────┬───────┘  └──────────┬─────────┘
         │                   │                     │
-        │                   │                     │
-   ┌────▼─────┐      ┌──────▼──────┐      ┌──────▼──────┐
-   │users-db  │      │fetcher-db   │      │recommender-db│
-   │  :5432   │      │   :5434     │      │    :5433     │
-   └──────────┘      └─────────────┘      └──────────────┘
-
 ┌──────────────────┐           ┌────────────────────┐
 │ Ingest RSS       │──────────▶│  Content Service   │
 │   :8085          │           │      :8083         │
 └────────┬─────────┘           └──────────┬─────────┘
          │                                │
-         │                                │
-    ┌────▼────────┐                ┌─────▼──────┐
-    │ingest-rss-db│                │content-db  │
-    │   :5436     │                │  :5435     │
-    └─────────────┘                └────────────┘
+         └───────────┬────────────────────┘
+                     │
+              ┌──────▼──────┐
+              │  cairn-db   │  (5 logical databases)
+              │   :5432     │
+              └─────────────┘
 
 Background Workers:
 ├── Content Worker (:8084) - Content cleanup
@@ -169,47 +160,17 @@ Keys are stored at:
 
 ## Database Structure
 
-Each service has its own dedicated PostgreSQL database:
+All services share a single PostgreSQL container (`cairn-db` on port 5432) but each service has its own **logical database** with a dedicated user. An init script (`scripts/init-databases.sh`) creates all databases and users on first startup.
 
-### users-db (cairn_users, port 5432)
-User service database containing:
-- `users` - User accounts
-- `refresh_tokens` - JWT refresh token management
+| Logical Database | User | Service |
+|---|---|---|
+| `cairn_users` | `cairn_user` | User Service |
+| `cairn_recommender` | `cairn_recommender` | Explore Recommender |
+| `cairn_fetcher` | `cairn_fetcher` | Explore Fetcher |
+| `content_service` | `cairn_content` | Content Service |
+| `rss_fetcher_service` | `cairn_rss` | Ingest RSS |
 
-**Migrations**: `services/users/migrations/`
-
-### explore-recommender-db (cairn_recommender, port 5433)
-Recommender service database containing:
-- `users` - User activity tracking
-- `articles` - RSS articles with metadata
-- `user_articles` - User read status
-- `votes` - Article voting (upvote/downvote)
-- `recommendations` - Recommendation history
-
-**Migrations**: `services/explore/recommender/migrations/`
-
-### explore-fetcher-db (cairn_fetcher, port 5434)
-Fetcher service database containing:
-- `feeds` - RSS feed sources
-- `fetch_history` - Fetch attempt tracking
-
-**Migrations**: `services/explore/fetcher/migrations/`
-
-### content-db (content_service, port 5435)
-Content service database containing:
-- `contents` - Cleaned article content
-- `user_contents` - User-specific metadata
-
-**Migrations**: Managed by Content Service
-
-### ingest-rss-db (ingest_rss, port 5436)
-Ingest RSS service database containing:
-- `feeds` - RSS feed metadata
-- `user_feeds` - User subscriptions
-- `feed_items` - Pending feed items
-- `outbox` - Content delivery queue
-
-**Migrations**: Managed by Ingest RSS Service
+Each service connects to the same host (`cairn-db:5432`) but authenticates with its own user and targets its own database. Schema isolation is fully maintained.
 
 ### Resetting Databases
 
@@ -233,14 +194,14 @@ Key configurations:
 - `VAULT_DEV_ROOT_TOKEN_ID=dev-token`
 - `VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200`
 
-### PostgreSQL
-- `POSTGRES_USER=cairn`
-- `POSTGRES_PASSWORD=cairn_password`
-- `POSTGRES_DB=postgres` (default, not used by services)
+### PostgreSQL (consolidated)
+- `POSTGRES_ADMIN_USER=cairn_admin` (superuser for init script)
+- `POSTGRES_ADMIN_PASSWORD=...` (superuser password)
+- Per-service credentials: `POSTGRES_USER_*`, `POSTGRES_PASSWORD_*`, `POSTGRES_DB_*`
 
 ### User Service
 - `PORT=8080` (internal), exposed as 8082
-- `DB_HOST=users-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_NAME=${POSTGRES_DB_USERS}`
 - `DB_USER=${POSTGRES_USER_USERS}`
@@ -253,7 +214,7 @@ Key configurations:
 
 ### Explore Recommender (explore-recommender)
 - `PORT=8081` (internal), exposed as 8087
-- `DB_HOST=explore-recommender-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_NAME=${POSTGRES_DB_RECOMMENDER}`
 - `DB_USER=${POSTGRES_USER_RECOMMENDER}`
@@ -266,7 +227,7 @@ Key configurations:
 
 ### Explore Fetcher (explore-fetcher)
 - `PORT=8080` (internal), exposed as 8088
-- `DB_HOST=explore-fetcher-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_NAME=${POSTGRES_DB_FETCHER}`
 - `DB_USER=${POSTGRES_USER_FETCHER}`
@@ -280,7 +241,7 @@ Key configurations:
 
 ### Content Service (content-service)
 - `PORT=8080` (internal), exposed as 8083
-- `DB_HOST=content-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_USER=${POSTGRES_USER_CONTENT}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
@@ -288,7 +249,7 @@ Key configurations:
 - `DB_SSL_MODE=disable`
 
 ### Content Worker (content-worker)
-- `DB_HOST=content-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_USER=${POSTGRES_USER_CONTENT}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
@@ -299,7 +260,7 @@ Key configurations:
 
 ### Ingest RSS Service (ingest-rss)
 - `PORT=8081` (internal), exposed as 8085
-- `DB_HOST=ingest-rss-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_USER=${POSTGRES_USER_RSS}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
@@ -307,7 +268,7 @@ Key configurations:
 - `DB_SSL_MODE=disable`
 
 ### Ingest RSS Worker (ingest-rss-worker)
-- `DB_HOST=ingest-rss-db`
+- `DB_HOST=cairn-db`
 - `DB_PORT=5432`
 - `DB_USER=${POSTGRES_USER_RSS}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
@@ -405,17 +366,17 @@ Vault should be initialized and keys stored before other services start.
 
 Check database health:
 ```bash
-docker compose ps postgres
+docker compose ps cairn-db
 ```
 
-Ensure migrations ran successfully:
+Ensure the init script ran successfully:
 ```bash
-docker compose logs postgres
+docker compose logs cairn-db
 ```
 
-Check that all three databases were created:
+Check that all databases were created:
 ```bash
-docker compose exec postgres psql -U cairn -l
+docker compose exec cairn-db psql -U cairn_admin -l
 ```
 
 ### Port conflicts
@@ -566,23 +527,19 @@ Runs on first production startup to securely initialize Vault:
 
 Located at: `infrastructure/docker/scripts/init-vault-prod.sh`
 
-### init-postgres.sh
+### init-databases.sh
 
 Automatically runs on PostgreSQL first startup to:
-- Create three separate databases (cairn_users, cairn_recommender, cairn_fetcher)
-- Run all migrations for each service
+- Create all five service databases with dedicated users
+- Each service gets its own logical database within the single PostgreSQL instance
 
-Located at: `infrastructure/docker/scripts/init-postgres.sh`
+Located at: `infrastructure/docker/scripts/init-databases.sh`
 
 ## Volumes
 
 Persistent data is stored in Docker volumes:
 
-- `users_db_data`: User service PostgreSQL data
-- `explore_recommender_db_data`: Explore recommender PostgreSQL data
-- `explore_fetcher_db_data`: Explore fetcher PostgreSQL data
-- `content_db_data`: Content service PostgreSQL data
-- `ingest_rss_db_data`: Ingest RSS service PostgreSQL data
+- `cairn_db_data`: Consolidated PostgreSQL data (all service databases)
 - `vault-keys`: Generated JWT keys (temporary, recreated on volume reset)
 
 ## Networking
@@ -591,11 +548,7 @@ All services communicate on the `cairn-network` bridge network.
 
 Internal service communication uses service names as hostnames:
 - `vault:8200`
-- `users-db:5432`
-- `explore-recommender-db:5432`
-- `explore-fetcher-db:5432`
-- `content-db:5432`
-- `ingest-rss-db:5432`
+- `cairn-db:5432` (all services connect here, each to its own logical database)
 - `user-service:8080`
 - `explore-recommender:8081`
 - `explore-fetcher:8080`
