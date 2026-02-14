@@ -43,7 +43,7 @@ docker-compose down
 
 This starts:
 - HashiCorp Vault (port 8200) with auto-initialization
-- All PostgreSQL databases (ports 5432-5436)
+- Consolidated PostgreSQL database (port 5432) with all service databases
 - User Service (port 8082)
 - Explore Recommender Service (port 8081)
 - Explore Fetcher Service (port 8080)
@@ -71,7 +71,7 @@ Mobile App (React Native) → REST APIs → Backend Services
 ```
 
 **Key Principles**:
-- Each service owns its own database
+- Each service owns its own logical database (hosted in a single PostgreSQL instance)
 - Services communicate only via HTTP REST APIs
 - JWT-based authentication (stateless)
 - HashiCorp Vault for secrets management
@@ -251,7 +251,7 @@ The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml]
 
 - **ALWAYS** use REST APIs for inter-service communication
 - **NEVER** access another service's database directly
-- Each service owns its own database
+- Each service owns its own logical database (shared PostgreSQL instance, separate DBs)
 - Use appropriate HTTP clients with timeouts and retry logic
 
 
