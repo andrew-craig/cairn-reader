@@ -827,11 +827,11 @@ FEED_BATCH_SIZE=10
 
 ```bash
 # Check if services start successfully
-docker-compose up -d
+docker compose up -d
 
 # Check logs for configuration errors
-docker-compose logs content-service | grep -i error
-docker-compose logs rss-fetcher-service | grep -i error
+docker compose logs content-service | grep -i error
+docker compose logs rss-fetcher-service | grep -i error
 
 # Test health endpoints
 curl http://localhost:8080/health/ready

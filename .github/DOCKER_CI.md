@@ -31,7 +31,7 @@ ghcr.io/cairn-app/cairn-user-service:main-abc123
 ### Development Environment (using latest)
 
 ```yaml
-# infrastructure/docker/docker-compose.yml
+# infrastructure/docker/dev/docker-compose.yml
 services:
   user-service:
     image: ghcr.io/cairn-app/cairn-user-service:develop
@@ -58,15 +58,14 @@ services:
 
 ## Using Images Locally
 
-### Pull and run with docker-compose:
+### Pull and run with docker compose:
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/prod
 
-# Update docker-compose.yml to use published images
-# Then:
-docker-compose pull
-docker-compose up -d
+# Pull and run pre-built images
+docker compose pull
+docker compose up -d
 ```
 
 ### Pull individual service:
@@ -114,10 +113,10 @@ docker pull ghcr.io/<org>/cairn-user-service:v1.0.0
 ### 4. Update production deployment:
 
 ```bash
-cd infrastructure/docker
-# Update image tags in docker-compose.yml to v1.0.0
-docker-compose pull
-docker-compose up -d
+cd infrastructure/docker/prod
+# Update image tags in .env to v1.0.0
+docker compose pull
+docker compose up -d
 ```
 
 ## Troubleshooting
@@ -190,14 +189,14 @@ docker buildx build \
   .
 ```
 
-### Override image in docker-compose:
+### Override image in docker compose:
 
 ```bash
 # Pull specific version for one service
-docker-compose pull user-service
+docker compose pull user-service
 
 # Override for testing
-docker-compose up -d user-service
+docker compose up -d user-service
 ```
 
 ### Check image digest:
@@ -230,5 +229,5 @@ View build metrics:
 1. Push code to trigger first build
 2. Monitor workflow completion
 3. Make packages public (optional): https://github.com/users/<username>/packages
-4. Update docker-compose.yml to use published images
-5. Test deployment with `docker-compose pull && docker-compose up -d`
+4. Configure `infrastructure/docker/prod/.env` with your settings
+5. Test deployment with `docker compose pull && docker compose up -d`

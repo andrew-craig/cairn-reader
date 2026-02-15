@@ -156,7 +156,7 @@ WHERE created_at < NOW() - INTERVAL '120 days'  -- 90 + 30
 
 1. **Check service logs**:
 ```bash
-docker-compose logs recommender | grep cleanup
+docker compose logs recommender | grep cleanup
 ```
 
 Expected output:
@@ -222,7 +222,7 @@ cleanupInterval := 24 * time.Hour  // Change as needed
 
 Monitor cleanup activity:
 ```bash
-docker-compose logs -f recommender | grep cleanup
+docker compose logs -f recommender | grep cleanup
 ```
 
 ### Database Queries

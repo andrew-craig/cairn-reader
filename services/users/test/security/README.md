@@ -249,7 +249,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Start User Service
-        run: docker-compose up -d
+        run: docker compose up -d
       - name: Run Security Tests
         run: |
           cd services/users/test/security

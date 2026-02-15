@@ -110,7 +110,7 @@ Before running backend services with Docker, you need to configure environment v
 
 1. **Infrastructure Services** (User, Explore Fetcher, Explore Recommender):
    ```bash
-   cd infrastructure/docker
+   cd infrastructure/docker/dev
    cp .env.example .env
    # Edit .env with your configuration
    ```
@@ -194,7 +194,7 @@ npm run android
 #### Running All Services with Docker (Recommended)
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/dev
 docker compose up --build
 ```
 

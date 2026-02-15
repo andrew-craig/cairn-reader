@@ -22,23 +22,23 @@ Cairn is a read-it-later application consisting of:
 The easiest way to run all backend services is using the centralized Docker Compose setup:
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/dev
 
 # Copy and configure environment variables
 cp .env.example .env
 # Edit .env and set secure passwords
 
 # Start all services (Vault, databases, and all backend services)
-docker-compose up --build -d
+docker compose up --build -d
 
 # Check service status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop all services
-docker-compose down
+docker compose down
 ```
 
 This starts:
@@ -172,11 +172,11 @@ npm run lint                 # ESLint
 ### Testing Backend Changes
 ```bash
 # Start all services
-cd infrastructure/docker
-docker-compose up --build
+cd infrastructure/docker/dev
+docker compose up --build
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Run tests
 cd services/{service}
@@ -188,10 +188,9 @@ make test
 Migrations are automatically run when PostgreSQL containers start. To reset databases:
 
 ```bash
-cd services/{service}
-docker-compose down
-docker volume rm {volume-name}
-docker-compose up --build
+cd infrastructure/docker/dev
+docker compose down -v
+docker compose up --build
 ```
 
 Or use migration commands:
@@ -233,7 +232,7 @@ make migrate-status          # Check status
 
 **Development Setup:**
 
-The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml](infrastructure/docker/docker-compose.yml)) includes:
+The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.yml](infrastructure/docker/dev/docker-compose.yml)) includes:
 1. Vault container in dev mode (port 8200)
 2. Automated `vault-init` service that generates RSA keys
 3. All services configured to use shared Vault instance

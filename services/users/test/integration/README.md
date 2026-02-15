@@ -42,7 +42,7 @@ make test-all
 ```bash
 # 1. Start test environment
 cd test/integration
-docker-compose -f docker-compose.test.yml up -d
+docker compose -f docker-compose.test.yml up -d
 
 # 2. Wait for services to be ready (about 10 seconds)
 sleep 10
@@ -51,7 +51,7 @@ sleep 10
 go test -v -timeout 5m ./...
 
 # 4. Stop test environment
-docker-compose -f docker-compose.test.yml down -v
+docker compose -f docker-compose.test.yml down -v
 ```
 
 ## Test Environment
@@ -210,25 +210,25 @@ PASSWORD_REQUIRE_COMPLEXITY=true
 ### Tests fail with "database not available"
 ```bash
 # Check if database is running
-docker-compose -f docker-compose.test.yml ps
+docker compose -f docker-compose.test.yml ps
 
 # View database logs
-docker-compose -f docker-compose.test.yml logs test-db
+docker compose -f docker-compose.test.yml logs test-db
 
 # Restart database
-docker-compose -f docker-compose.test.yml restart test-db
+docker compose -f docker-compose.test.yml restart test-db
 ```
 
 ### Tests fail with "Vault not ready"
 ```bash
 # Check Vault status
-docker-compose -f docker-compose.test.yml ps
+docker compose -f docker-compose.test.yml ps
 
 # View Vault logs
-docker-compose -f docker-compose.test.yml logs test-vault test-vault-init
+docker compose -f docker-compose.test.yml logs test-vault test-vault-init
 
 # Restart Vault
-docker-compose -f docker-compose.test.yml restart test-vault
+docker compose -f docker-compose.test.yml restart test-vault
 ```
 
 ### Tests timeout
@@ -237,7 +237,7 @@ docker-compose -f docker-compose.test.yml restart test-vault
 go test -v -timeout 10m ./...
 
 # Or check if services are actually ready
-docker-compose -f docker-compose.test.yml ps
+docker compose -f docker-compose.test.yml ps
 ```
 
 ### Port conflicts
@@ -252,10 +252,10 @@ docker-compose -f docker-compose.test.yml ps
 ### Database migration issues
 ```bash
 # Check if migrations ran successfully
-docker-compose -f docker-compose.test.yml logs test-db
+docker compose -f docker-compose.test.yml logs test-db
 
 # Manually run migrations
-docker-compose -f docker-compose.test.yml exec test-db \
+docker compose -f docker-compose.test.yml exec test-db \
   psql -U cairn_test -d cairn_users_test -c "\dt"
 ```
 
@@ -267,10 +267,10 @@ make test-integration-down
 
 # Or manually
 cd test/integration
-docker-compose -f docker-compose.test.yml down -v
+docker compose -f docker-compose.test.yml down -v
 
 # Remove any orphaned containers
-docker-compose -f docker-compose.test.yml rm -f
+docker compose -f docker-compose.test.yml rm -f
 ```
 
 ## Best Practices

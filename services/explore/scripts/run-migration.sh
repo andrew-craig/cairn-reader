@@ -24,7 +24,7 @@ echo "Running migration: $MIGRATION_FILE"
 # Check if container is running
 if ! docker ps | grep -q "$DB_CONTAINER"; then
     echo "Error: PostgreSQL container is not running"
-    echo "Start services with: docker-compose up -d"
+    echo "Start services with: docker compose up -d"
     exit 1
 fi
 

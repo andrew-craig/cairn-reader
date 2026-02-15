@@ -27,10 +27,10 @@ This guide covers common issues, their causes, and solutions for Cairn Backend s
 **Diagnosis**:
 ```bash
 # Check container logs
-docker-compose logs content-service
+docker compose logs content-service
 
 # Check if database is ready
-docker-compose logs postgres-content
+docker compose logs postgres-content
 
 # Check port conflicts
 netstat -an | grep 8080
@@ -42,11 +42,11 @@ lsof -i :8080
 1. **Database not ready**
    ```bash
    # Wait for database health check
-   docker-compose ps postgres-content
+   docker compose ps postgres-content
 
    # Should show "healthy" status
    # If unhealthy, check database logs
-   docker-compose logs postgres-content
+   docker compose logs postgres-content
    ```
 
 2. **Port already in use**
@@ -62,7 +62,7 @@ lsof -i :8080
 3. **Database connection string invalid**
    ```bash
    # Check environment variable
-   docker-compose exec content-service env | grep DATABASE_URL
+   docker compose exec content-service env | grep DATABASE_URL
 
    # Should be: postgres://user:pass@host:port/db?sslmode=disable
    # Fix in docker-compose.yml or .env file
@@ -71,10 +71,10 @@ lsof -i :8080
 4. **Migration failure**
    ```bash
    # Check migration logs
-   docker-compose logs content-service | grep -i migration
+   docker compose logs content-service | grep -i migration
 
    # Manually run migrations
-   docker-compose exec postgres-content psql -U cairn -d content_service
+   docker compose exec postgres-content psql -U cairn -d content_service
    SELECT * FROM schema_migrations;
 
    # If stuck, see Migration Issues section
@@ -85,11 +85,11 @@ lsof -i :8080
 **Diagnosis**:
 ```bash
 # Check logs
-docker-compose logs rss-fetcher-service
+docker compose logs rss-fetcher-service
 
 # Check dependencies
-docker-compose ps content-service
-docker-compose ps postgres-fetcher
+docker compose ps content-service
+docker compose ps postgres-fetcher
 ```
 
 **Common Causes & Solutions**:
@@ -101,17 +101,17 @@ docker-compose ps postgres-fetcher
 
    # If not healthy, fix Content Service first
    # Then restart RSS Fetcher
-   docker-compose restart rss-fetcher-service
+   docker compose restart rss-fetcher-service
    ```
 
 2. **Circuit breaker open**
    ```bash
    # Check logs for circuit breaker messages
-   docker-compose logs rss-fetcher-service | grep -i "circuit"
+   docker compose logs rss-fetcher-service | grep -i "circuit"
 
    # Wait 30 seconds for half-open state
    # Or restart service
-   docker-compose restart rss-fetcher-service
+   docker compose restart rss-fetcher-service
    ```
 
 ## Database Issues
@@ -121,13 +121,13 @@ docker-compose ps postgres-fetcher
 **Diagnosis**:
 ```bash
 # Check if PostgreSQL is running
-docker-compose ps postgres-content
+docker compose ps postgres-content
 
 # Try to connect manually
-docker-compose exec postgres-content psql -U cairn -d content_service
+docker compose exec postgres-content psql -U cairn -d content_service
 
 # Check network connectivity
-docker-compose exec content-service ping postgres-content
+docker compose exec content-service ping postgres-content
 ```
 
 **Solutions**:
@@ -135,10 +135,10 @@ docker-compose exec content-service ping postgres-content
 1. **Database container not running**
    ```bash
    # Start database
-   docker-compose up -d postgres-content
+   docker compose up -d postgres-content
 
    # Wait for healthy status
-   docker-compose ps postgres-content
+   docker compose ps postgres-content
    ```
 
 2. **Wrong connection parameters**
@@ -156,8 +156,8 @@ docker-compose exec content-service ping postgres-content
 3. **Network issues**
    ```bash
    # Recreate network
-   docker-compose down
-   docker-compose up -d
+   docker compose down
+   docker compose up -d
    ```
 
 ### Issue: "too many connections"
@@ -169,11 +169,11 @@ docker-compose exec content-service ping postgres-content
 **Diagnosis**:
 ```bash
 # Check current connections
-docker-compose exec postgres-content psql -U cairn -d content_service -c \
+docker compose exec postgres-content psql -U cairn -d content_service -c \
   "SELECT count(*) FROM pg_stat_activity WHERE datname='content_service';"
 
 # Check max connections
-docker-compose exec postgres-content psql -U cairn -d content_service -c \
+docker compose exec postgres-content psql -U cairn -d content_service -c \
   "SHOW max_connections;"
 ```
 
@@ -186,7 +186,7 @@ docker-compose exec postgres-content psql -U cairn -d content_service -c \
    DB_MAX_IDLE_CONNS=2   # Reduce from 5
 
    # Restart service
-   docker-compose restart content-service
+   docker compose restart content-service
    ```
 
 2. **Increase PostgreSQL max_connections**
@@ -195,13 +195,13 @@ docker-compose exec postgres-content psql -U cairn -d content_service -c \
    command: postgres -c max_connections=200
 
    # Restart database
-   docker-compose restart postgres-content
+   docker compose restart postgres-content
    ```
 
 3. **Kill idle connections**
    ```sql
    -- Connect to database
-   docker-compose exec postgres-content psql -U cairn -d content_service
+   docker compose exec postgres-content psql -U cairn -d content_service
 
    -- Kill idle connections
    SELECT pg_terminate_backend(pid)
@@ -278,7 +278,7 @@ WHERE schemaname = 'public'
 **Diagnosis**:
 ```bash
 # Check Content Service logs
-docker-compose logs content-service | grep -i error
+docker compose logs content-service | grep -i error
 
 # Test content creation manually
 curl -X POST http://localhost:8080/api/v1/contents \
@@ -312,7 +312,7 @@ curl -X POST http://localhost:8080/api/v1/contents \
 
    # The service will use RSS description if full fetch fails
    # Check logs for fallback messages
-   docker-compose logs rss-fetcher-service | grep -i fallback
+   docker compose logs rss-fetcher-service | grep -i fallback
    ```
 
 3. **Content too large**
@@ -324,7 +324,7 @@ curl -X POST http://localhost:8080/api/v1/contents \
    MAX_CONTENT_SIZE_MB=10
 
    # Restart service
-   docker-compose restart content-service
+   docker compose restart content-service
    ```
 
 ### Issue: Sanitization removes too much content
@@ -337,7 +337,7 @@ curl -X POST http://localhost:8080/api/v1/contents \
 **Diagnosis**:
 ```bash
 # Check sanitization settings
-docker-compose exec content-service env | grep SANITIZ
+docker compose exec content-service env | grep SANITIZ
 
 # Review bluemonday configuration in code:
 # services/content-service/internal/processor/sanitizer.go
@@ -368,10 +368,10 @@ docker-compose exec content-service env | grep SANITIZ
 **Diagnosis**:
 ```bash
 # Check worker logs
-docker-compose logs rss-fetcher-worker
+docker compose logs rss-fetcher-worker
 
 # Check feed status in database
-docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
+docker compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
   "SELECT id, feed_url, status, polling_tier, last_fetched_at, next_poll_at
    FROM feeds
    ORDER BY next_poll_at ASC
@@ -383,13 +383,13 @@ docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
 1. **Worker not running**
    ```bash
    # Check if worker container is running
-   docker-compose ps rss-fetcher-worker
+   docker compose ps rss-fetcher-worker
 
    # If not running, start it
-   docker-compose up -d rss-fetcher-worker
+   docker compose up -d rss-fetcher-worker
 
    # Check logs for errors
-   docker-compose logs rss-fetcher-worker
+   docker compose logs rss-fetcher-worker
    ```
 
 2. **Feeds are disabled**
@@ -469,7 +469,7 @@ ORDER BY consecutive_error_days DESC;
    FEED_FETCH_TIMEOUT_SECONDS=60
 
    # Restart worker
-   docker-compose restart rss-fetcher-worker
+   docker compose restart rss-fetcher-worker
    ```
 
 ### Issue: Duplicate content appearing
@@ -526,7 +526,7 @@ HAVING COUNT(*) > 1;
 docker stats
 
 # Check service logs for OOM
-docker-compose logs | grep -i "out of memory"
+docker compose logs | grep -i "out of memory"
 
 # Check Go heap profile (if metrics enabled)
 curl http://localhost:8080/debug/pprof/heap > heap.prof
@@ -540,7 +540,7 @@ go tool pprof heap.prof
    WORKER_CONCURRENCY=3  # Reduce from 5
    CONTENT_EXTRACTION_BATCH_SIZE=10  # Reduce from 20
 
-   docker-compose restart rss-fetcher-worker
+   docker compose restart rss-fetcher-worker
    ```
 
 2. **Reduce database connection pool**
@@ -548,14 +548,14 @@ go tool pprof heap.prof
    DB_MAX_OPEN_CONNS=10  # Reduce from 25
    DB_MAX_IDLE_CONNS=2   # Reduce from 5
 
-   docker-compose restart content-service rss-fetcher-service
+   docker compose restart content-service rss-fetcher-service
    ```
 
 3. **Limit content size**
    ```bash
    MAX_CONTENT_SIZE_MB=3  # Reduce from 5
 
-   docker-compose restart content-service
+   docker compose restart content-service
    ```
 
 4. **Add memory limits**
@@ -647,10 +647,10 @@ time curl http://localhost:8080/api/v1/users/USER_ID/contents
 curl -v http://localhost:8080/api/v1/contents/CONTENT_ID
 
 # Check service is running
-docker-compose ps content-service
+docker compose ps content-service
 
 # Check routing
-docker-compose logs content-service | grep -i "route not found"
+docker compose logs content-service | grep -i "route not found"
 ```
 
 **Solutions**:
@@ -667,7 +667,7 @@ docker-compose logs content-service | grep -i "route not found"
 2. **Verify resource exists**
    ```bash
    # Check if content ID exists in database
-   docker-compose exec postgres-content psql -U cairn -d content_service -c \
+   docker compose exec postgres-content psql -U cairn -d content_service -c \
      "SELECT id, title FROM contents WHERE id = 'CONTENT_ID';"
    ```
 
@@ -676,10 +676,10 @@ docker-compose logs content-service | grep -i "route not found"
 **Diagnosis**:
 ```bash
 # Check service logs
-docker-compose logs content-service | tail -50
+docker compose logs content-service | tail -50
 
 # Look for stack traces
-docker-compose logs content-service | grep -A 20 "panic\|FATAL\|ERROR"
+docker compose logs content-service | grep -A 20 "panic\|FATAL\|ERROR"
 ```
 
 **Solutions**:
@@ -706,7 +706,7 @@ curl -v --max-time 60 http://localhost:8080/api/v1/contents/CONTENT_ID
    HTTP_READ_TIMEOUT_SECONDS=60  # From 30
    HTTP_WRITE_TIMEOUT_SECONDS=60  # From 30
 
-   docker-compose restart content-service
+   docker compose restart content-service
    ```
 
 2. **Optimize query** - see Performance Issues
@@ -723,16 +723,16 @@ curl -v --max-time 60 http://localhost:8080/api/v1/contents/CONTENT_ID
 **Diagnosis**:
 ```bash
 # Check outbox worker logs
-docker-compose logs rss-fetcher-worker | grep -i outbox
+docker compose logs rss-fetcher-worker | grep -i outbox
 
 # Check outbox status
-docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
+docker compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
   "SELECT delivery_status, COUNT(*)
    FROM content_outbox
    GROUP BY delivery_status;"
 
 # Check failed entries
-docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
+docker compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
   "SELECT id, delivery_status, retry_count, created_at
    FROM content_outbox
    WHERE delivery_status = 'failed'
@@ -754,11 +754,11 @@ docker-compose exec postgres-fetcher psql -U cairn -d rss_fetcher_service -c \
 2. **Circuit breaker is open**
    ```bash
    # Check logs for circuit breaker
-   docker-compose logs rss-fetcher-worker | grep -i circuit
+   docker compose logs rss-fetcher-worker | grep -i circuit
 
    # Wait for half-open state (30s)
    # Or restart worker to reset
-   docker-compose restart rss-fetcher-worker
+   docker compose restart rss-fetcher-worker
    ```
 
 3. **Max retries exceeded**
@@ -863,7 +863,7 @@ SELECT version, dirty FROM schema_migrations;
 1. **Migration marked as dirty**
    ```bash
    # Manually fix migration state
-   docker-compose exec postgres-content psql -U cairn -d content_service -c \
+   docker compose exec postgres-content psql -U cairn -d content_service -c \
      "UPDATE schema_migrations SET dirty = false WHERE version = XXX;"
 
    # Then retry migration
@@ -882,7 +882,7 @@ SELECT version, dirty FROM schema_migrations;
 3. **Manual intervention required**
    ```sql
    -- Connect to database
-   docker-compose exec postgres-content psql -U cairn -d content_service
+   docker compose exec postgres-content psql -U cairn -d content_service
 
    -- Check what's wrong
    \dt  -- List tables
@@ -901,41 +901,41 @@ SELECT version, dirty FROM schema_migrations;
 LOG_LEVEL=debug
 
 # Restart services
-docker-compose restart content-service rss-fetcher-service
+docker compose restart content-service rss-fetcher-service
 ```
 
 ### View Real-Time Logs
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f content-service
+docker compose logs -f content-service
 
 # Filter logs
-docker-compose logs -f | grep ERROR
-docker-compose logs -f content-service | grep "user_id=USER_ID"
+docker compose logs -f | grep ERROR
+docker compose logs -f content-service | grep "user_id=USER_ID"
 ```
 
 ### Execute Commands in Containers
 
 ```bash
 # Get shell in container
-docker-compose exec content-service sh
+docker compose exec content-service sh
 
 # Run Go binary directly (for debugging)
-docker-compose exec content-service /app/content-service
+docker compose exec content-service /app/content-service
 
 # Check environment
-docker-compose exec content-service env
+docker compose exec content-service env
 ```
 
 ### Database Debugging
 
 ```sql
 -- Connect to database
-docker-compose exec postgres-content psql -U cairn -d content_service
+docker compose exec postgres-content psql -U cairn -d content_service
 
 -- List all tables
 \dt
@@ -960,14 +960,14 @@ SELECT pg_terminate_backend(PID);
 
 ```bash
 # Test connectivity between containers
-docker-compose exec content-service ping postgres-content
-docker-compose exec rss-fetcher-service ping content-service
+docker compose exec content-service ping postgres-content
+docker compose exec rss-fetcher-service ping content-service
 
 # Check DNS resolution
-docker-compose exec content-service nslookup postgres-content
+docker compose exec content-service nslookup postgres-content
 
 # Test HTTP connectivity
-docker-compose exec rss-fetcher-service wget -O- http://content-service:8080/health/live
+docker compose exec rss-fetcher-service wget -O- http://content-service:8080/health/live
 ```
 
 ### Resource Monitoring
@@ -980,7 +980,7 @@ docker stats
 docker inspect content-service
 
 # Check container processes
-docker-compose top content-service
+docker compose top content-service
 ```
 
 ## Getting Help

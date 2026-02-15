@@ -92,7 +92,7 @@ cd cairn/services/read
 ### 2. Start Services with Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This will start:
@@ -299,16 +299,16 @@ For detailed deployment instructions, see [../../docs/DEPLOYMENT.md](../../docs/
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes (WARNING: deletes data)
-docker-compose down -v
+docker compose down -v
 ```
 
 ### Health Checks
@@ -387,24 +387,24 @@ curl http://localhost:8081/health/ready
 
 ```bash
 # View all logs
-docker-compose logs -f
+docker compose logs -f
 
 # View specific service logs
-docker-compose logs -f content-service
-docker-compose logs -f ingest-rss
+docker compose logs -f content-service
+docker compose logs -f ingest-rss
 
 # Filter logs by level
-docker-compose logs -f | grep ERROR
+docker compose logs -f | grep ERROR
 ```
 
 ### Database Access
 
 ```bash
 # Connect to Content Service database
-docker-compose exec postgres-content psql -U cairn -d content_service
+docker compose exec postgres-content psql -U cairn -d content_service
 
 # Connect to Ingest RSS database
-docker-compose exec postgres-fetcher psql -U cairn -d ingest_rss
+docker compose exec postgres-fetcher psql -U cairn -d ingest_rss
 ```
 
 ## Troubleshooting

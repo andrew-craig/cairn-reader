@@ -49,19 +49,19 @@ test: test-all ## Run all tests (alias)
 
 # Docker targets
 up: ## Start all services with docker-compose
-	docker-compose up -d
+	docker compose up -d
 
 down: ## Stop all services
-	docker-compose down
+	docker compose down
 
 logs: ## Show logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 clean: ## Clean build artifacts
 	rm -rf bin/
 	rm -rf content/bin/
 	rm -rf fetcher/bin/
-	docker-compose down -v
+	docker compose down -v
 
 # Content Service migrations
 migrate-up-content: ## Apply all pending migrations for content-service

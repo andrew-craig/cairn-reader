@@ -49,18 +49,18 @@ test-unit: test
 test-integration:
 	@echo "Running integration tests..."
 	@echo "Starting test environment..."
-	cd test/integration && docker-compose -f docker-compose.test.yml up -d
+	cd test/integration && docker compose -f docker-compose.test.yml up -d
 	@echo "Waiting for services to be ready..."
 	@sleep 10
 	@echo "Running integration tests..."
 	cd test/integration && go test -v -timeout 5m ./...
 	@echo "Stopping test environment..."
-	cd test/integration && docker-compose -f docker-compose.test.yml down
+	cd test/integration && docker compose -f docker-compose.test.yml down
 
 # Start integration test environment
 test-integration-up:
 	@echo "Starting integration test environment..."
-	cd test/integration && docker-compose -f docker-compose.test.yml up -d
+	cd test/integration && docker compose -f docker-compose.test.yml up -d
 	@echo "Waiting for services to be ready..."
 	@sleep 10
 	@echo "Test environment ready!"
@@ -70,7 +70,7 @@ test-integration-up:
 # Stop integration test environment
 test-integration-down:
 	@echo "Stopping integration test environment..."
-	cd test/integration && docker-compose -f docker-compose.test.yml down -v
+	cd test/integration && docker compose -f docker-compose.test.yml down -v
 	@echo "Test environment stopped and cleaned up"
 
 # Run all tests (unit + integration)

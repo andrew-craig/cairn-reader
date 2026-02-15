@@ -41,14 +41,14 @@ Quick reference guide with:
 
 ### 3. Deployment Files
 
-#### [infrastructure/docker/docker-compose.prod.yml](infrastructure/docker/docker-compose.prod.yml)
+#### [infrastructure/docker/prod/docker-compose.yml](infrastructure/docker/prod/docker-compose.yml)
 Production-ready compose file that:
 - Uses pre-built images from ghcr.io
 - Supports environment-based image selection
 - Configurable via GITHUB_ORG and IMAGE_TAG env vars
 - Same service configuration as development
 
-#### [infrastructure/docker/.env.prod.example](infrastructure/docker/.env.prod.example)
+#### [infrastructure/docker/prod/.env.example](infrastructure/docker/prod/.env.example)
 Example production environment file with:
 - GitHub org configuration
 - Image tag selection
@@ -84,7 +84,7 @@ All 7 microservices are built automatically:
 Push this code to GitHub to trigger the first build:
 
 ```bash
-git add .github/ infrastructure/docker/docker-compose.prod.yml infrastructure/docker/.env.prod.example .dockerignore
+git add .github/ infrastructure/docker/prod/docker-compose.yml infrastructure/docker/prod/.env.example .dockerignore
 git commit -m "Add GitHub Actions CI/CD for Docker builds"
 git push origin main
 ```
@@ -111,18 +111,18 @@ By default, packages are private. To make them public:
 Once images are built, test deployment:
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/prod
 
 # Copy and configure production env
-cp .env.prod.example .env.prod
-# Edit .env.prod - set GITHUB_ORG to your GitHub username
+cp .env.example .env
+# Edit .env - set GITHUB_ORG to your GitHub username
 
 # Pull and run
-docker-compose -f docker-compose.prod.yml --env-file .env.prod pull
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose pull
+docker compose up -d
 
 # Check services
-docker-compose -f docker-compose.prod.yml ps
+docker compose ps
 ```
 
 ### 5. Create First Release
@@ -144,12 +144,12 @@ This creates versioned images:
 Update production to use specific version:
 
 ```bash
-# Edit .env.prod
+# Edit .env (in infrastructure/docker/prod)
 IMAGE_TAG=v1.0.0
 
 # Deploy
-docker-compose -f docker-compose.prod.yml --env-file .env.prod pull
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose pull
+docker compose up -d
 ```
 
 ## Key Features
@@ -231,8 +231,12 @@ Or make packages public (see step 3 above).
 └── SETUP_SUMMARY.md               # This file
 
 infrastructure/docker/
-├── docker-compose.prod.yml        # Production deployment
-└── .env.prod.example              # Production env template
+├── dev/
+│   ├── docker-compose.yml         # Development deployment
+│   └── .env.example               # Dev env template
+└── prod/
+    ├── docker-compose.yml         # Production deployment
+    └── .env.example               # Production env template
 
 .dockerignore                      # Build optimization
 ```

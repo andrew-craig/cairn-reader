@@ -83,7 +83,7 @@ docker pull ghcr.io/<org>/cairn-user-service:v1.0.0
 docker pull ghcr.io/<org>/cairn-user-service:main-abc123
 ```
 
-#### Update docker-compose.yml to use published images:
+#### Update prod/docker-compose.yml to use published images:
 
 ```yaml
 services:

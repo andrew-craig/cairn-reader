@@ -5,7 +5,7 @@ set -e
 # It creates all the logical databases and their dedicated users so each
 # service still connects to its own database with its own credentials.
 #
-# Environment variables are passed from docker-compose.yml.
+# Environment variables are passed from the docker compose configuration.
 
 echo "=== Cairn Database Initialization ==="
 echo "Creating databases and users for all services..."

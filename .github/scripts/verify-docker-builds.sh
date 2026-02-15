@@ -98,7 +98,7 @@ else
     echo -e "${GREEN}✅ All builds passed! Ready to push to GitHub.${NC}"
     echo ""
     echo "Next steps:"
-    echo "  1. git add .github/ infrastructure/docker/docker-compose.prod.yml .dockerignore"
+    echo "  1. git add .github/ infrastructure/docker/prod/docker-compose.yml .dockerignore"
     echo "  2. git commit -m 'Add GitHub Actions CI/CD for Docker builds'"
     echo "  3. git push origin main"
     echo ""

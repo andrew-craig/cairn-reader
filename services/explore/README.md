@@ -27,7 +27,7 @@ This project consists of two microservices:
 
 ```bash
 # Start all services
-docker-compose up --build
+docker compose up --build
 
 # The services will be available at:
 # - Fetcher: http://localhost:8080

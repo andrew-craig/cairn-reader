@@ -148,7 +148,7 @@ Before testing with the mobile app, ensure:
 1. **Backend Services Running:**
    ```bash
    cd services/read
-   docker-compose up
+   docker compose up
    ```
 
 2. **User Authentication:**

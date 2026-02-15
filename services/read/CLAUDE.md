@@ -23,7 +23,7 @@ cd /home/user/cairn/services/read
 make docker-up
 
 # Or manually
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts:
@@ -937,23 +937,23 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 **View logs**:
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f content-service
-docker-compose logs -f ingest-rss
+docker compose logs -f content-service
+docker compose logs -f ingest-rss
 
 # Filter by level
-docker-compose logs -f | grep ERROR
+docker compose logs -f | grep ERROR
 ```
 
 **Access database**:
 ```bash
 # Content Service database
-docker-compose exec postgres-content psql -U cairn -d content_service
+docker compose exec postgres-content psql -U cairn -d content_service
 
 # Ingest RSS database
-docker-compose exec postgres-fetcher psql -U cairn -d ingest_rss
+docker compose exec postgres-fetcher psql -U cairn -d ingest_rss
 ```
 
 **Useful SQL queries**:
@@ -1042,8 +1042,8 @@ When updating content:
 ## Getting Help
 
 For issues or questions:
-- Check logs: `docker-compose logs -f`
-- Check database state: `docker-compose exec postgres-content psql -U cairn -d content_service`
+- Check logs: `docker compose logs -f`
+- Check database state: `docker compose exec postgres-content psql -U cairn -d content_service`
 - Review tests for usage examples
 - Consult OpenAPI specifications for API details
 - See troubleshooting guide: `/services/read/README.md#troubleshooting`

@@ -77,10 +77,10 @@ To run cleanup in Docker:
 
 ```bash
 # Connect to running recommender container
-docker-compose exec recommender /root/recommender --cleanup
+docker compose exec recommender /root/recommender --cleanup
 
 # Or run the standalone utility
-docker-compose run --rm recommender sh -c "go run ./recommender/cmd/cleanup/main.go"
+docker compose run --rm recommender sh -c "go run ./recommender/cmd/cleanup/main.go"
 ```
 
 ## Implementation Details

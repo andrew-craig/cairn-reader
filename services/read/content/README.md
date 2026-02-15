@@ -111,13 +111,13 @@ From the repository root:
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f content-service
+docker compose logs -f content-service
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ### Database Migrations

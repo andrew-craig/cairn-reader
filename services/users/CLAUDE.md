@@ -38,16 +38,16 @@ cp .env.example .env
 # Edit .env and set secure passwords
 
 # Start all services (includes Vault, databases, all microservices)
-docker-compose up --build -d
+docker compose up --build -d
 
 # Check User Service health
 curl http://localhost:8082/health/ready
 
 # View User Service logs
-docker-compose logs -f user-service
+docker compose logs -f user-service
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ### Running User Service Locally
@@ -1056,10 +1056,10 @@ func TestMyMiddleware(t *testing.T) {
 make run
 
 # Docker Compose
-docker-compose logs -f user-service
+docker compose logs -f user-service
 
 # Follow last 100 lines
-docker-compose logs --tail=100 user-service
+docker compose logs --tail=100 user-service
 ```
 
 **Test JWT validation**:
@@ -1123,7 +1123,7 @@ curl -H "X-Vault-Token: dev-root-token" \
 
 **Development Setup:**
 
-The centralized Docker Compose setup ([infrastructure/docker/docker-compose.yml](../../infrastructure/docker/docker-compose.yml)) includes:
+The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.yml](../../infrastructure/docker/dev/docker-compose.yml)) includes:
 1. Vault container running in dev mode (port 8200)
 2. Automated `vault-init` service that generates RSA keys and stores them in Vault
 3. All services configured to use the shared Vault instance
@@ -1372,7 +1372,7 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 ## Getting Help
 
 For issues or questions:
-- **Check service logs**: `docker-compose logs -f user-service`
+- **Check service logs**: `docker compose logs -f user-service`
 - **Review test cases**: Look at `*_test.go` files for usage examples
 - **Consult OpenAPI spec**: [api/openapi.yaml](api/openapi.yaml) for API reference
 - **Check database state**: `psql -U cairn_user -d cairn_users`

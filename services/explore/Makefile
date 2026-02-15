@@ -40,16 +40,16 @@ clean: ## Clean build artifacts
 	@echo "Clean complete!"
 
 docker-build: ## Build Docker images
-	@docker-compose build
+	@docker compose build
 
 docker-up: ## Start all services with Docker Compose
-	@docker-compose up -d
+	@docker compose up -d
 
 docker-down: ## Stop all services
-	@docker-compose down
+	@docker compose down
 
 docker-logs: ## Show logs from all services
-	@docker-compose logs -f
+	@docker compose logs -f
 
 docker-restart: docker-down docker-up ## Restart all services
 

@@ -73,10 +73,10 @@ Start all databases using the centralized Docker Compose setup:
 
 ```bash
 cd infrastructure/docker
-docker-compose up -d
+docker compose up -d
 
 # Or start specific databases
-docker-compose up -d content-db rss-db explore-fetcher-db explore-recommender-db users-db
+docker compose up -d content-db rss-db explore-fetcher-db explore-recommender-db users-db
 ```
 
 This starts:
@@ -169,7 +169,7 @@ Integration tests are marked with the `integration` build tag and require databa
 ```bash
 # Start databases
 cd infrastructure/docker
-docker-compose up -d content-db rss-db users-db
+docker compose up -d content-db rss-db users-db
 
 # Run integration tests for a service
 cd services/{service-name}
@@ -226,11 +226,11 @@ E2E tests validate complete workflows across multiple services.
 cd services/explore
 
 # Clean slate
-docker-compose down
+docker compose down
 docker volume rm cairn-explore_postgres_data cairn-explore_fetcher_postgres_data
 
 # Start services
-docker-compose up --build -d
+docker compose up --build -d
 
 # Wait for initialization
 sleep 30
@@ -247,7 +247,7 @@ Follow the test scenarios in the [E2E Test Plan](#explore-service-e2e-test-plan)
 **Cleanup**:
 
 ```bash
-docker-compose down
+docker compose down
 docker volume rm cairn-explore_postgres_data cairn-explore_fetcher_postgres_data
 ```
 
@@ -772,7 +772,7 @@ Tests feed polling logic.
 ```bash
 # Start databases
 cd infrastructure/docker
-docker-compose up -d content-db rss-db
+docker compose up -d content-db rss-db
 
 # Content Service integration tests
 cd services/read/content-service
@@ -816,7 +816,7 @@ make test
 
 # Integration tests (requires Vault and database)
 cd infrastructure/docker
-docker-compose up -d vault users-db
+docker compose up -d vault users-db
 
 cd services/users
 go test -tags=integration -v ./...
@@ -1023,7 +1023,7 @@ jobs:
       - name: Start Services
         run: |
           cd infrastructure/docker
-          docker-compose up -d
+          docker compose up -d
 
       - name: Wait for Services
         run: |
@@ -1039,7 +1039,7 @@ jobs:
         if: always()
         run: |
           cd infrastructure/docker
-          docker-compose logs > e2e-test-logs.txt
+          docker compose logs > e2e-test-logs.txt
 
       - name: Upload Logs
         if: always()
@@ -1052,7 +1052,7 @@ jobs:
         if: always()
         run: |
           cd infrastructure/docker
-          docker-compose down
+          docker compose down
 ```
 
 ---
@@ -1067,13 +1067,13 @@ jobs:
 
 1. Ensure PostgreSQL is running:
    ```bash
-   docker-compose ps
+   docker compose ps
    ```
 
 2. Check database logs:
    ```bash
-   docker-compose logs content-db
-   docker-compose logs rss-db
+   docker compose logs content-db
+   docker compose logs rss-db
    ```
 
 3. Verify connection parameters in test output
@@ -1118,7 +1118,7 @@ jobs:
 
 2. Stop conflicting services:
    ```bash
-   docker-compose down
+   docker compose down
    ```
 
 3. Use different ports via environment variables:
@@ -1172,7 +1172,7 @@ jobs:
 1. Ensure Vault is running:
    ```bash
    cd infrastructure/docker
-   docker-compose up -d vault
+   docker compose up -d vault
    ```
 
 2. Wait for Vault initialization:
@@ -1198,18 +1198,18 @@ jobs:
 
 1. Check service logs:
    ```bash
-   docker-compose logs -f <service-name>
+   docker compose logs -f <service-name>
    ```
 
 2. Rebuild containers:
    ```bash
-   docker-compose down
-   docker-compose up --build
+   docker compose down
+   docker compose up --build
    ```
 
 3. Clean volumes:
    ```bash
-   docker-compose down -v
+   docker compose down -v
    ```
 
 4. Check resource limits:
@@ -1328,7 +1328,7 @@ go test -tags=integration -v ./...
 
 # E2E tests
 cd services/explore
-docker-compose up --build -d
+docker compose up --build -d
 # Follow E2E test plan
 
 # Coverage report

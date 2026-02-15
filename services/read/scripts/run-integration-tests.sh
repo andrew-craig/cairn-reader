@@ -13,9 +13,9 @@ NC='\033[0m' # No Color
 
 echo -e "${GREEN}=== Cairn Integration Test Runner ===${NC}\n"
 
-# Check if docker-compose is available
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}Error: docker-compose is not installed${NC}"
+# Check if docker compose is available
+if ! command -v docker compose &> /dev/null; then
+    echo -e "${RED}Error: docker compose is not installed${NC}"
     exit 1
 fi
 
@@ -45,12 +45,12 @@ wait_for_db() {
 echo -e "${YELLOW}Checking database containers...${NC}"
 if ! docker ps | grep -q cairn-content-db; then
     echo -e "${YELLOW}Starting content database...${NC}"
-    docker-compose up -d content-db
+    docker compose up -d content-db
 fi
 
 if ! docker ps | grep -q cairn-rss-db; then
     echo -e "${YELLOW}Starting RSS database...${NC}"
-    docker-compose up -d rss-db
+    docker compose up -d rss-db
 fi
 
 # Wait for databases to be ready

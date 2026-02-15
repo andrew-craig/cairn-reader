@@ -79,7 +79,7 @@ jwt_validation_duration_seconds
 - All service main files - add metrics initialization
 - HTTP middleware - record request metrics
 - Database operations - record query metrics
-- `infrastructure/docker/docker-compose.yml` - add Prometheus and Grafana
+- `infrastructure/docker/dev/docker-compose.yml` - add Prometheus and Grafana
 - Create Prometheus configuration
 
 ## Testing

@@ -49,7 +49,7 @@ Implement comprehensive alerting system:
 
 ## Files to Modify
 
-- `infrastructure/docker/docker-compose.yml` - add monitoring stack (Prometheus, Alertmanager)
+- `infrastructure/docker/dev/docker-compose.yml` - add monitoring stack (Prometheus, Alertmanager)
 - Service configuration - expose metrics endpoints
 - Create alerting rules files
 - Documentation for alert handling

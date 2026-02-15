@@ -209,7 +209,7 @@ go test -v -tags=integration ./recommender/internal/db -run TestIntegration_Crea
 ```
 
 ### Prerequisites
-- Docker Compose running (`docker-compose up -d`)
+- Docker Compose running (`docker compose up -d`)
 - PostgreSQL accessible on localhost:5432
 - Database migrations applied (001, 002, 003, 004)
 

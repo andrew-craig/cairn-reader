@@ -134,7 +134,7 @@ For the Read Service, you can deploy it independently:
 
 ```bash
 cd services/read
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts:
@@ -261,17 +261,17 @@ git clone https://github.com/cairn-app/cairn-reader.git
 cd cairn
 
 # Create production environment file
-cd infrastructure/docker
-cp .env.example .env.production
+cd infrastructure/docker/prod
+cp .env.example .env
 
-# Edit .env.production
+# Edit .env
 # - Change default passwords
 # - Set LOG_LEVEL=info
 # - Disable auto-migrations (run manually)
-nano .env.production
+nano .env
 
 # Start services
-docker compose -f docker-compose.yml --env-file .env.production up -d
+docker compose up -d
 
 # Verify services are running
 docker compose ps
@@ -381,7 +381,7 @@ sudo certbot renew --dry-run
 
 ### Production Docker Compose Configuration
 
-Create a production-specific `docker-compose.prod.yml` or use environment variables to override defaults.
+Use the production compose file at `infrastructure/docker/prod/docker-compose.yml` or use environment variables to override defaults.
 
 **Key production settings**:
 

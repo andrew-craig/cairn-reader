@@ -38,9 +38,9 @@ psql -h localhost -p 5433 -U fetcher -d fetcher_db
 To start fresh and re-run all migrations:
 
 ```bash
-docker-compose down
+docker compose down
 docker volume rm cairn-explore_fetcher_postgres_data
-docker-compose up --build
+docker compose up --build
 ```
 
 ## Schema Overview

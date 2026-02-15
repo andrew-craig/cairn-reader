@@ -89,16 +89,16 @@ The easiest way to run all Cairn backend services (including Explore) is using t
 cd infrastructure/docker
 
 # Start all services (includes Vault, databases, all microservices)
-docker-compose up --build -d
+docker compose up --build -d
 
 # Check service status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore_fetcher explore_recommender
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ### Running Explore Services Locally
@@ -109,16 +109,16 @@ For development focused on the Explore service:
 cd services/explore
 
 # Start both services with databases
-docker-compose up --build
+docker compose up --build
 
 # Or start in detached mode
-docker-compose up --build -d
+docker compose up --build -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ### Makefile Commands
@@ -499,11 +499,11 @@ make test-integration
 ```bash
 # Option A: Use centralized Docker Compose (recommended)
 cd infrastructure/docker
-docker-compose up --build
+docker compose up --build
 
 # Option B: Use local Docker Compose
 cd services/explore
-docker-compose up --build
+docker compose up --build
 ```
 
 **2. Trigger feed fetch:**
@@ -533,7 +533,7 @@ curl -X POST \
 
 **6. View logs:**
 ```bash
-docker-compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore_fetcher explore_recommender
 ```
 
 ### Database Operations
@@ -542,15 +542,15 @@ docker-compose logs -f explore_fetcher explore_recommender
 ```bash
 # Local Docker Compose
 cd services/explore
-docker-compose down
+docker compose down
 docker volume rm cairn-explore_postgres_data cairn-explore_fetcher_postgres_data
-docker-compose up --build
+docker compose up --build
 
 # Centralized Docker Compose
 cd infrastructure/docker
-docker-compose down
+docker compose down
 docker volume rm docker_postgres_data docker_fetcher_postgres_data
-docker-compose up --build
+docker compose up --build
 ```
 
 **Access database directly:**
@@ -799,9 +799,9 @@ migrations := []string{
 
 **3. Test migration:**
 ```bash
-docker-compose down
+docker compose down
 docker volume rm cairn-explore_fetcher_postgres_data
-docker-compose up --build
+docker compose up --build
 ```
 
 **For Recommender Database:**
@@ -813,16 +813,16 @@ Follow the same pattern but update `recommender/cmd/recommender/main.go` and `re
 **View service logs:**
 ```bash
 # All logs
-docker-compose logs -f
+docker compose logs -f
 
 # Fetcher only
-docker-compose logs -f explore_fetcher
+docker compose logs -f explore_fetcher
 
 # Recommender only
-docker-compose logs -f explore_recommender
+docker compose logs -f explore_recommender
 
 # Tail last 100 lines
-docker-compose logs --tail=100 explore_fetcher
+docker compose logs --tail=100 explore_fetcher
 ```
 
 **Check database state:**
@@ -869,7 +869,7 @@ go test -race ./...
 - All user-specific endpoints require valid JWT
 
 **Development Setup:**
-- Centralized Docker Compose ([infrastructure/docker](/infrastructure/docker)) includes Vault container
+- Centralized Docker Compose ([infrastructure/docker/dev](/infrastructure/docker/dev)) includes Vault container
 - Automated `vault-init` service generates RSA keys
 - All services configured to use shared Vault instance
 
@@ -1045,7 +1045,7 @@ The implementation follows these principles while adding:
 
 ## Getting Help
 
-- **Check service logs**: `docker-compose logs -f`
+- **Check service logs**: `docker compose logs -f`
 - **Review test cases**: Look at `*_test.go` files for usage examples
 - **Consult OpenAPI spec**: [api/openapi.yaml](api/openapi.yaml) for API reference
 - **Read implementation plan**: [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) for feature status

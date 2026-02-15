@@ -1,43 +1,27 @@
-name: cairn-prod
-# Production docker-compose file using published images from GitHub Container Registry
-# This file demonstrates how to deploy using pre-built images instead of building locally
-
+name: cairn
 services:
-  # HashiCorp Vault - Secrets Management
-  # NOTE: Port 8200 is NOT exposed to host in production for security
-  # Access Vault only through the Docker network
+  # HashiCorp Vault - Secrets management
   vault:
     image: hashicorp/vault:latest
-    # Port intentionally NOT exposed to host - access only via Docker network
-    # Uncomment below ONLY for debugging (not recommended in production)
-    # ports:
-    #   - "8200:8200"
+    ports:
+      - "8200:8200"
     environment:
-      - VAULT_ADDR=http://0.0.0.0:8200
-      - VAULT_API_ADDR=http://vault:8200
-      - SKIP_SETCAP=true
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_DEV_ROOT_TOKEN_ID}
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+      - VAULT_ADDR=http://127.0.0.1:8200
     cap_add:
       - IPC_LOCK
-    volumes:
-      - vault-data:/vault/data
-      - ./vault-config:/vault/config
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        chown -R vault:vault /vault/data
-        exec /usr/local/bin/docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
+    command: server -dev
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8200/v1/sys/health?standbyok=true&uninitcode=200&sealedcode=200"]
+      test: ["CMD", "vault", "status"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 5
     restart: unless-stopped
     networks:
       - cairn-network
 
-  # Vault Initializer - Sets up AppRoles and JWT keys on startup
-  # This runs once and creates scoped credentials for each service
+  # Vault Initializer - Populates Vault with JWT keys on startup
   vault-init:
     image: hashicorp/vault:latest
     depends_on:
@@ -45,12 +29,11 @@ services:
         condition: service_healthy
     environment:
       - VAULT_ADDR=http://vault:8200
-      - VAULT_SKIP_VERIFY=true
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
     volumes:
-      - ./scripts/init-vault-prod.sh:/init-vault-prod.sh:ro
-      - ./vault-config/policies:/vault/policies:ro
+      - ../scripts/init-vault.sh:/init-vault.sh
       - vault-keys:/vault-keys
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl grep && /bin/sh /init-vault-prod.sh"]
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
     restart: "no"
     networks:
       - cairn-network
@@ -60,9 +43,11 @@ services:
   cairn-db:
     image: postgres:18-alpine
     environment:
+      # Superuser for the container (used by init script)
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-cairn_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-cairn_admin_pass}
       POSTGRES_DB: postgres
+      # Passed to init-databases.sh to create per-service DBs and users
       POSTGRES_USER_USERS: ${POSTGRES_USER_USERS}
       POSTGRES_PASSWORD_USERS: ${POSTGRES_PASSWORD_USERS}
       POSTGRES_DB_USERS: ${POSTGRES_DB_USERS}
@@ -82,7 +67,7 @@ services:
       - "5432:5432"
     volumes:
       - cairn_db_data:/var/lib/postgresql/data
-      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+      - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-cairn_admin}"]
       interval: 5s
@@ -94,10 +79,10 @@ services:
       - cairn-network
 
   # User Service - Authentication and account management
-  # Using published image from GitHub Container Registry
-  # Authenticates to Vault using AppRole (not root token)
   user-service:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-user-service:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/users/Dockerfile
     ports:
       - "8082:8080"
     environment:
@@ -107,16 +92,11 @@ services:
       - DB_USER=${POSTGRES_USER_USERS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_USERS}
       - DB_NAME=${POSTGRES_DB_USERS}
-      # Vault AppRole authentication (scoped to user-service policy)
       - VAULT_ADDR=http://vault:8200
-      - VAULT_ROLE_ID=${USER_SERVICE_ROLE_ID}
-      - VAULT_SECRET_ID=${USER_SERVICE_SECRET_ID}
-      - VAULT_AUTH_PATH=approle
-      - JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
-      - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_ACCESS_TOKEN_EXPIRY=15m
       - JWT_REFRESH_TOKEN_EXPIRY=7d
-      - ENVIRONMENT=production
+      - SERVER_ENVIRONMENT=development
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -132,10 +112,10 @@ services:
       - cairn-network
 
   # Explore Recommender Service - Article storage and recommendations
-  # Using published image from GitHub Container Registry
-  # Authenticates to Vault using AppRole (read-only public key access)
   explore-recommender:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-recommender:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/explore/recommender/Dockerfile
     ports:
       - "8087:8081"
     environment:
@@ -147,11 +127,8 @@ services:
       - DB_NAME=${POSTGRES_DB_RECOMMENDER}
       - DB_SSLMODE=disable
       - ARTICLE_RETENTION_DAYS=90
-      # Vault AppRole authentication (scoped to explore-recommender policy - public key only)
       - VAULT_ADDR=http://vault:8200
-      - VAULT_ROLE_ID=${EXPLORE_RECOMMENDER_ROLE_ID}
-      - VAULT_SECRET_ID=${EXPLORE_RECOMMENDER_SECRET_ID}
-      - VAULT_AUTH_PATH=approle
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
       cairn-db:
@@ -168,9 +145,10 @@ services:
       - cairn-network
 
   # Explore Fetcher Service - RSS feed fetching for discovery
-  # Using published image from GitHub Container Registry
   explore-fetcher:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-fetcher:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/explore/fetcher/Dockerfile
     ports:
       - "8088:8080"
     environment:
@@ -201,9 +179,10 @@ services:
       - cairn-network
 
   # Content Service - Article content storage and management
-  # Using published image from GitHub Container Registry
   content-service:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-service:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/read/content/Dockerfile
     ports:
       - "8083:8080"
     environment:
@@ -213,20 +192,13 @@ services:
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSLMODE=disable
+      - DB_SSL_MODE=disable
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
-      # Vault AppRole authentication (scoped to content-service policy)
-      - VAULT_ADDR=http://vault:8200
-      - VAULT_ROLE_ID=${CONTENT_SERVICE_ROLE_ID}
-      - VAULT_SECRET_ID=${CONTENT_SERVICE_SECRET_ID}
-      - VAULT_AUTH_PATH=approle
     depends_on:
       cairn-db:
         condition: service_healthy
       ingest-rss:
         condition: service_healthy
-      vault-init:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s
@@ -237,16 +209,17 @@ services:
       - cairn-network
 
   # Content Service Worker - Background jobs for content cleanup
-  # Using published image from GitHub Container Registry
   content-worker:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-worker:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/read/content/Dockerfile.worker
     environment:
       - DB_HOST=cairn-db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSLMODE=disable
+      - DB_SSL_MODE=disable
       - CLEANUP_CRON=0 2 * * *
       - HEALTH_PORT=8084
     ports:
@@ -265,9 +238,10 @@ services:
       - cairn-network
 
   # Ingest RSS Service - Feed subscription and polling
-  # Using published image from GitHub Container Registry
   ingest-rss:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/read/fetcher/Dockerfile
     ports:
       - "8085:8081"
     environment:
@@ -277,7 +251,7 @@ services:
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSLMODE=disable
+      - DB_SSL_MODE=disable
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -291,16 +265,17 @@ services:
       - cairn-network
 
   # Ingest RSS Worker - Background jobs for feed polling and processing
-  # Using published image from GitHub Container Registry
   ingest-rss-worker:
-    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss-worker:${IMAGE_TAG:-latest}
+    build:
+      context: ../../..
+      dockerfile: services/read/fetcher/Dockerfile.worker
     environment:
       - DB_HOST=cairn-db
       - DB_PORT=5432
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSLMODE=disable
+      - DB_SSL_MODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
       - HEALTH_PORT=8086
       - OUTBOX_CLEANUP_CRON=0 3 * * *
@@ -325,7 +300,6 @@ services:
 volumes:
   cairn_db_data:
   vault-keys:
-  vault-data:
 
 networks:
   cairn-network:

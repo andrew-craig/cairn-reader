@@ -1,19 +1,46 @@
 # Cairn Docker Deployment
 
-This directory contains the complete Docker setup for all Cairn backend services.
+This directory contains the complete Docker setup for all Cairn backend services, organized into separate `dev/` and `prod/` configurations.
+
+## Directory Structure
+
+```
+infrastructure/docker/
+├── dev/
+│   ├── docker-compose.yml    # Development setup (builds from source)
+│   ├── .env.example          # Development environment template
+│   └── .env                  # Local dev environment (git-ignored)
+├── prod/
+│   ├── docker-compose.yml    # Production setup (pre-built images)
+│   ├── .env.example          # Production environment template
+│   └── .env                  # Local prod environment (git-ignored)
+├── scripts/                  # Shared initialization scripts
+│   ├── init-vault.sh         # Dev Vault setup
+│   ├── init-vault-prod.sh    # Prod Vault setup (AppRole)
+│   ├── init-databases.sh     # PostgreSQL database creation
+│   └── init-postgres.sh      # Legacy PostgreSQL init
+├── vault-config/             # Shared Vault configuration
+│   ├── vault.hcl             # Vault server config (prod)
+│   └── policies/             # Vault ACL policies
+└── README.md
+```
 
 ## Quick Start
 
 **For local development (build from source):**
 ```bash
-docker-compose up --build -d
+cd infrastructure/docker/dev
+cp .env.example .env
+# Edit .env with your settings
+docker compose up --build -d
 ```
 
 **For production/staging (use pre-built images):**
 ```bash
-cp .env.prod.example .env.prod
-# Edit .env.prod with your settings
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+cd infrastructure/docker/prod
+cp .env.example .env
+# Edit .env with your settings
+docker compose up -d
 ```
 
 ## Services
@@ -69,7 +96,7 @@ Background Workers:
 └── Ingest RSS Worker (:8086) - Feed polling
 ```
 
-## Quick Start
+## Development Setup
 
 ### Prerequisites
 
@@ -78,10 +105,8 @@ Background Workers:
 
 ### Starting All Services
 
-From the project root:
-
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/dev
 docker compose up --build
 ```
 
@@ -177,6 +202,7 @@ Each service connects to the same host (`cairn-db:5432`) but authenticates with 
 To reset all databases and re-run migrations:
 
 ```bash
+# From infrastructure/docker/dev or infrastructure/docker/prod
 # Stop services and remove volumes
 docker compose down -v
 
@@ -186,7 +212,7 @@ docker compose up --build
 
 ## Environment Variables
 
-All environment variables are configured in [docker-compose.yml](docker-compose.yml).
+All environment variables are configured in the respective `docker-compose.yml` files ([dev](dev/docker-compose.yml) | [prod](prod/docker-compose.yml)).
 
 Key configurations:
 
@@ -381,7 +407,7 @@ docker compose exec cairn-db psql -U cairn_admin -l
 
 ### Port conflicts
 
-If ports are already in use, you can modify them in [docker-compose.yml](docker-compose.yml):
+If ports are already in use, you can modify them in the respective `docker-compose.yml`:
 
 ```yaml
 ports:
@@ -390,7 +416,7 @@ ports:
 
 ## Production Deployment
 
-The production deployment uses `docker-compose.prod.yml` with significant security improvements over the development setup.
+The production deployment uses `prod/docker-compose.yml` with significant security improvements over the development setup.
 
 ### Key Security Features
 
@@ -404,34 +430,34 @@ The production deployment uses `docker-compose.prod.yml` with significant securi
 ### First-Time Production Setup
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/prod
 
 # 1. Copy and configure environment
-cp .env.prod.example .env.prod
-# Edit .env.prod with secure database passwords
+cp .env.example .env
+# Edit .env with secure database passwords
 
 # 2. Start services (first run initializes Vault)
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose up -d
 
 # 3. Wait for vault-init to complete
-docker-compose -f docker-compose.prod.yml logs -f vault-init
+docker compose logs -f vault-init
 
 # 4. Retrieve AppRole credentials from the vault-keys volume
-docker-compose -f docker-compose.prod.yml exec vault cat /vault-keys/approle-credentials.env
+docker compose exec vault cat /vault-keys/approle-credentials.env
 
-# 5. Update .env.prod with the AppRole credentials
+# 5. Update .env with the AppRole credentials
 # USER_SERVICE_ROLE_ID=<from step 4>
 # USER_SERVICE_SECRET_ID=<from step 4>
 # EXPLORE_RECOMMENDER_ROLE_ID=<from step 4>
 # EXPLORE_RECOMMENDER_SECRET_ID=<from step 4>
 
 # 6. Restart services to use AppRole auth
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+docker compose up -d
 
 # 7. IMPORTANT: Secure the unseal keys
-docker-compose -f docker-compose.prod.yml exec vault cat /vault-keys/UNSEAL_KEYS.txt
+docker compose exec vault cat /vault-keys/UNSEAL_KEYS.txt
 # Copy these keys to a secure location and delete the file:
-docker-compose -f docker-compose.prod.yml exec vault rm /vault-keys/UNSEAL_KEYS.txt
+docker compose exec vault rm /vault-keys/UNSEAL_KEYS.txt
 ```
 
 ### Vault Security Architecture
@@ -460,8 +486,8 @@ docker-compose -f docker-compose.prod.yml exec vault rm /vault-keys/UNSEAL_KEYS.
 If Vault restarts, it will be sealed. To unseal:
 
 ```bash
-# Connect to the vault container
-docker-compose -f docker-compose.prod.yml exec vault sh
+# Connect to the vault container (from infrastructure/docker/prod)
+docker compose exec vault sh
 
 # Unseal with 3 of the 5 keys (from your secure storage)
 vault operator unseal <key1>
@@ -493,9 +519,9 @@ vault operator unseal <key3>
 
 5. **Rotate AppRole Secret IDs periodically**:
    ```bash
-   # Generate new secret ID for a service
-   docker-compose exec vault vault write -f auth/approle/role/user-service/secret-id
-   # Update .env.prod and restart the service
+   # Generate new secret ID for a service (from infrastructure/docker/prod)
+   docker compose exec vault vault write -f auth/approle/role/user-service/secret-id
+   # Update .env and restart the service
    ```
 
 ## Scripts
@@ -507,7 +533,7 @@ Automatically runs on first startup in development mode to:
 - Store keys in Vault
 - Verify key storage
 
-Located at: `infrastructure/docker/scripts/init-vault.sh`
+Located at: `scripts/init-vault.sh`
 
 ### init-vault-prod.sh (Production)
 
@@ -525,7 +551,7 @@ Runs on first production startup to securely initialize Vault:
 - Each service gets its own AppRole with minimal permissions
 - Unseal keys are written to a file that should be retrieved and deleted
 
-Located at: `infrastructure/docker/scripts/init-vault-prod.sh`
+Located at: `scripts/init-vault-prod.sh`
 
 ### init-databases.sh
 
@@ -533,7 +559,7 @@ Automatically runs on PostgreSQL first startup to:
 - Create all five service databases with dedicated users
 - Each service gets its own logical database within the single PostgreSQL instance
 
-Located at: `infrastructure/docker/scripts/init-databases.sh`
+Located at: `scripts/init-databases.sh`
 
 ## Volumes
 

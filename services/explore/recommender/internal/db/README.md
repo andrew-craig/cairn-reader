@@ -40,7 +40,7 @@ go test -v -tags=integration ./recommender/internal/db -run TestIntegration_Crea
 ### Prerequisites
 1. Docker Compose running:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 2. Database migrations applied (migrations 001-004):

@@ -532,7 +532,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 - **Audit:** All secret access is logged
 
 **Files:**
-- `infrastructure/docker/docker-compose.yml` (multi-service orchestration)
+- `infrastructure/docker/dev/docker-compose.yml` (multi-service orchestration)
 - `services/explore/docker-compose.yml` (service-specific development)
 
 ---
@@ -923,7 +923,7 @@ export const API_CONFIG = {
 
 **Files:**
 - `services/users/internal/config/config.go` (structured config example)
-- `infrastructure/docker/docker-compose.yml` (environment variable definitions)
+- `infrastructure/docker/dev/docker-compose.yml` (environment variable definitions)
 
 ---
 

@@ -67,10 +67,10 @@ make test-integration-down
 make test-integration-up
 
 # Check status
-docker-compose -f test/integration/docker-compose.test.yml ps
+docker compose -f test/integration/docker-compose.test.yml ps
 
 # View logs
-docker-compose -f test/integration/docker-compose.test.yml logs
+docker compose -f test/integration/docker-compose.test.yml logs
 
 # Test database connection
 psql -h localhost -p 5433 -U cairn_test -d cairn_users_test
@@ -104,22 +104,22 @@ lsof -i :8201  # Vault
 ### Database connection refused
 ```bash
 # Check if database is running
-docker-compose -f test/integration/docker-compose.test.yml ps
+docker compose -f test/integration/docker-compose.test.yml ps
 
 # Restart database
-docker-compose -f test/integration/docker-compose.test.yml restart test-db
+docker compose -f test/integration/docker-compose.test.yml restart test-db
 
 # View database logs
-docker-compose -f test/integration/docker-compose.test.yml logs test-db
+docker compose -f test/integration/docker-compose.test.yml logs test-db
 ```
 
 ### Vault not ready
 ```bash
 # View Vault logs
-docker-compose -f test/integration/docker-compose.test.yml logs test-vault test-vault-init
+docker compose -f test/integration/docker-compose.test.yml logs test-vault test-vault-init
 
 # Restart Vault
-docker-compose -f test/integration/docker-compose.test.yml restart test-vault
+docker compose -f test/integration/docker-compose.test.yml restart test-vault
 ```
 
 ### Clean start

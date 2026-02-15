@@ -17,7 +17,7 @@ When starting the PostgreSQL container for the first time, all migrations in thi
 
 ```bash
 # Fresh start - migrations run automatically
-docker-compose up --build
+docker compose up --build
 ```
 
 ### Manual (for existing databases)
@@ -40,13 +40,13 @@ docker exec -i cairn-explore-postgres-1 psql -U cairn -d cairn_db -f /tmp/migrat
 
 ```bash
 # Stop services
-docker-compose down
+docker compose down
 
 # Remove database volume
 docker volume rm cairn-explore_postgres_data
 
 # Start services (migrations run automatically on fresh database)
-docker-compose up --build
+docker compose up --build
 ```
 
 ## Migration Guidelines
