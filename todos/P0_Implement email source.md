@@ -1,9 +1,9 @@
-# Error Messages May Leak Information
+# Implement email source
 
-Issue: Detailed error messages returned to clients (gin_adapter.go:71-89):
+[DRAFT] THIS ISSUE IS NOT READY FOR IMPLEMENTATION
 
-"error": "token has expired"
-"error": "invalid token signature"
-"error": "invalid token issuer"
+Cloudflare worker
 
-Recommendation: Return generic "unauthorized" message; log specific errors server-side.
+Handle
+- Create email association
+- Add to worker? Can the worker just forward all?
