@@ -1,9 +1,243 @@
-// Package repository provides database access layer for the email ingest service.
 package repository
 
-// RawEmailRepository provides CRUD operations for raw emails.
-// Responsibilities:
-// - Create raw email records
-// - Query pending emails for processing
-// - Update processing status
-// - Track retry counts and errors
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/models"
+	"github.com/google/uuid"
+)
+
+// RawEmailRepository defines the interface for raw email data operations
+type RawEmailRepository interface {
+	// Create creates a new raw email record
+	Create(ctx context.Context, email *models.RawEmail) error
+
+	// GetByID retrieves a raw email by ID
+	GetByID(ctx context.Context, id uuid.UUID) (*models.RawEmail, error)
+
+	// GetPendingEmails retrieves raw emails with pending status for processing
+	GetPendingEmails(ctx context.Context, limit int) ([]*models.RawEmail, error)
+
+	// UpdateStatus updates the processing status of a raw email
+	UpdateStatus(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, processedAt *time.Time) error
+
+	// UpdateError updates the error information for a failed email
+	UpdateError(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
+
+	// DeleteProcessed deletes processed emails older than the given duration
+	DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error)
+}
+
+// rawEmailRepository is the concrete implementation of RawEmailRepository
+type rawEmailRepository struct {
+	db *sql.DB
+}
+
+// NewRawEmailRepository creates a new RawEmailRepository
+func NewRawEmailRepository(db *sql.DB) RawEmailRepository {
+	return &rawEmailRepository{db: db}
+}
+
+// Create creates a new raw email record
+func (r *rawEmailRepository) Create(ctx context.Context, email *models.RawEmail) error {
+	query := `
+		INSERT INTO raw_emails (
+			id, user_id, sender_id,
+			recipient, sender_email, sender_name, subject, html_body, text_body, received_at,
+			processing_status, content_hash, retry_count, last_error,
+			created_at, processed_at
+		) VALUES (
+			$1, $2, $3,
+			$4, $5, $6, $7, $8, $9, $10,
+			$11, $12, $13, $14,
+			$15, $16
+		)
+	`
+
+	if email.ID == uuid.Nil {
+		email.ID = uuid.New()
+	}
+	if email.CreatedAt.IsZero() {
+		email.CreatedAt = time.Now()
+	}
+
+	_, err := r.db.ExecContext(ctx, query,
+		email.ID,
+		email.UserID,
+		email.SenderID,
+		email.Recipient,
+		email.SenderEmail,
+		email.SenderName,
+		email.Subject,
+		email.HTMLBody,
+		email.TextBody,
+		email.ReceivedAt,
+		email.ProcessingStatus,
+		email.ContentHash,
+		email.RetryCount,
+		email.LastError,
+		email.CreatedAt,
+		email.ProcessedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create raw email: %w", err)
+	}
+
+	return nil
+}
+
+// GetByID retrieves a raw email by ID
+func (r *rawEmailRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.RawEmail, error) {
+	query := `
+		SELECT id, user_id, sender_id,
+		       recipient, sender_email, sender_name, subject, html_body, text_body, received_at,
+		       processing_status, content_hash, retry_count, last_error,
+		       created_at, processed_at
+		FROM raw_emails
+		WHERE id = $1
+	`
+
+	var email models.RawEmail
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&email.ID,
+		&email.UserID,
+		&email.SenderID,
+		&email.Recipient,
+		&email.SenderEmail,
+		&email.SenderName,
+		&email.Subject,
+		&email.HTMLBody,
+		&email.TextBody,
+		&email.ReceivedAt,
+		&email.ProcessingStatus,
+		&email.ContentHash,
+		&email.RetryCount,
+		&email.LastError,
+		&email.CreatedAt,
+		&email.ProcessedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get raw email by ID: %w", err)
+	}
+
+	return &email, nil
+}
+
+// GetPendingEmails retrieves raw emails with pending status for processing
+func (r *rawEmailRepository) GetPendingEmails(ctx context.Context, limit int) ([]*models.RawEmail, error) {
+	query := `
+		SELECT id, user_id, sender_id,
+		       recipient, sender_email, sender_name, subject, html_body, text_body, received_at,
+		       processing_status, content_hash, retry_count, last_error,
+		       created_at, processed_at
+		FROM raw_emails
+		WHERE processing_status = $1 AND retry_count < 5
+		ORDER BY created_at ASC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, models.ProcessingStatusPending, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pending emails: %w", err)
+	}
+	defer rows.Close()
+
+	var emails []*models.RawEmail
+	for rows.Next() {
+		var email models.RawEmail
+		err := rows.Scan(
+			&email.ID,
+			&email.UserID,
+			&email.SenderID,
+			&email.Recipient,
+			&email.SenderEmail,
+			&email.SenderName,
+			&email.Subject,
+			&email.HTMLBody,
+			&email.TextBody,
+			&email.ReceivedAt,
+			&email.ProcessingStatus,
+			&email.ContentHash,
+			&email.RetryCount,
+			&email.LastError,
+			&email.CreatedAt,
+			&email.ProcessedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan raw email: %w", err)
+		}
+		emails = append(emails, &email)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating raw email rows: %w", err)
+	}
+
+	return emails, nil
+}
+
+// UpdateStatus updates the processing status of a raw email
+func (r *rawEmailRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, processedAt *time.Time) error {
+	query := `
+		UPDATE raw_emails
+		SET processing_status = $1,
+		    processed_at = $2
+		WHERE id = $3
+	`
+
+	_, err := r.db.ExecContext(ctx, query, status, processedAt, id)
+	if err != nil {
+		return fmt.Errorf("failed to update raw email status: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateError updates the error information for a failed email
+func (r *rawEmailRepository) UpdateError(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error {
+	query := `
+		UPDATE raw_emails
+		SET retry_count = $1,
+		    last_error = $2,
+		    processing_status = CASE
+		        WHEN $1 >= 5 THEN $3::VARCHAR(20)
+		        ELSE processing_status
+		    END
+		WHERE id = $4
+	`
+
+	_, err := r.db.ExecContext(ctx, query, retryCount, errorMsg, models.ProcessingStatusFailed, id)
+	if err != nil {
+		return fmt.Errorf("failed to update raw email error: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteProcessed deletes processed emails older than the given duration
+func (r *rawEmailRepository) DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error) {
+	query := `
+		DELETE FROM raw_emails
+		WHERE processing_status = $1
+		  AND processed_at < $2
+	`
+
+	cutoff := time.Now().Add(-olderThan)
+	result, err := r.db.ExecContext(ctx, query, models.ProcessingStatusCompleted, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete processed emails: %w", err)
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return count, nil
+}
