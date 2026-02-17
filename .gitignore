@@ -84,6 +84,4 @@ services/explore/recommender/explore_recommender
 
 # Gas Town (added by gt)
 .runtime/
-.claude/
-.beads/
 .logs/
