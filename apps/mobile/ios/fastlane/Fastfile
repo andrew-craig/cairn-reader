@@ -10,22 +10,22 @@ platform :ios do
     match(
       type: "appstore",
       readonly: is_ci,
-      app_identifier: "com.readitlater.app"
+      app_identifier: "com.cairnapp.cairnreader"
     )
 
     # Increment build number
     increment_build_number(
-      xcodeproj: "ReadItLater.xcodeproj"
+      xcodeproj: "cairnreader.xcodeproj"
     )
 
     # Build the app
     build_app(
-      workspace: "ReadItLater.xcworkspace",
-      scheme: "ReadItLater",
+      workspace: "cairnreader.xcworkspace",
+      scheme: "cairnreader",
       export_method: "app-store",
       export_options: {
         provisioningProfiles: {
-          "com.readitlater.app" => "match AppStore com.readitlater.app"
+          "com.cairnapp.cairnreader" => "match AppStore com.cairnapp.cairnreader"
         }
       }
     )
@@ -41,7 +41,7 @@ platform :ios do
   lane :certificates do
     match(
       type: "appstore",
-      app_identifier: "com.readitlater.app"
+      app_identifier: "com.cairnapp.cairnreader"
     )
   end
 
@@ -52,16 +52,16 @@ platform :ios do
     match(
       type: "appstore",
       readonly: is_ci,
-      app_identifier: "com.readitlater.app"
+      app_identifier: "com.cairnapp.cairnreader"
     )
 
     increment_build_number(
-      xcodeproj: "ReadItLater.xcodeproj"
+      xcodeproj: "cairnreader.xcodeproj"
     )
 
     build_app(
-      workspace: "ReadItLater.xcworkspace",
-      scheme: "ReadItLater",
+      workspace: "cairnreader.xcworkspace",
+      scheme: "cairnreader",
       export_method: "app-store"
     )
   end

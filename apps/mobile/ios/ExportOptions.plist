@@ -16,8 +16,8 @@
 	<string>manual</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>com.readitlater.app</key>
-		<string>match AppStore com.readitlater.app</string>
+		<key>com.cairnapp.cairnreader</key>
+		<string>match AppStore com.cairnapp.cairnreader</string>
 	</dict>
 </dict>
 </plist>

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Article } from '../types';
 
-const ARTICLES_KEY = '@readitlater:articles';
+const ARTICLES_KEY = '@cairnreader:articles';
 
 export const StorageService = {
   async getArticles(): Promise<Article[]> {

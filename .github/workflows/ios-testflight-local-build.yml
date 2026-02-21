@@ -90,17 +90,17 @@ jobs:
       - name: Build iOS app
         working-directory: apps/mobile/ios
         run: |
-          xcodebuild -workspace readitlater.xcworkspace \
-            -scheme readitlater \
+          xcodebuild -workspace cairnreader.xcworkspace \
+            -scheme cairnreader \
             -configuration Release \
-            -archivePath $RUNNER_TEMP/readitlater.xcarchive \
+            -archivePath $RUNNER_TEMP/cairnreader.xcarchive \
             archive
 
       - name: Export IPA
         working-directory: apps/mobile/ios
         run: |
           xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/readitlater.xcarchive \
+            -archivePath $RUNNER_TEMP/cairnreader.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath $RUNNER_TEMP/build
 
@@ -109,7 +109,7 @@ jobs:
         run: |
           xcrun altool --upload-app \
             --type ios \
-            --file $RUNNER_TEMP/build/readitlater.ipa \
+            --file $RUNNER_TEMP/build/cairnreader.ipa \
             --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
             --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
 

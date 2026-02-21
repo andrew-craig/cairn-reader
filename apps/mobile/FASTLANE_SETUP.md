@@ -12,7 +12,7 @@ This guide walks you through setting up Fastlane for automated iOS builds and Te
 ## Prerequisites
 
 1. **Apple Developer Account** - Active membership ($99/year)
-2. **App Created in App Store Connect** with bundle ID: `com.readitlater.app`
+2. **App Created in App Store Connect** with bundle ID: `com.cairnapp.cairnreader`
 3. **GitHub Account** with this repository
 4. **Xcode** installed on your Mac (for local testing)
 
@@ -142,7 +142,7 @@ The file is already configured to use environment variables, but verify these va
 
 ```ruby
 git_url(ENV["MATCH_GIT_URL"] || "https://github.com/your-org/certificates")
-app_identifier(["com.readitlater.app"])
+app_identifier(["com.cairnapp.cairnreader"])
 username(ENV["FASTLANE_APPLE_ID"] || "your-apple-id@example.com")
 ```
 
@@ -241,7 +241,7 @@ Here's what happens when you run the workflow:
 ### "Could not find or download matching profile"
 
 - Run `fastlane match appstore` again to regenerate profiles
-- Check that bundle identifier matches: `com.readitlater.app`
+- Check that bundle identifier matches: `com.cairnapp.cairnreader`
 - Verify the app exists in App Store Connect
 
 ### "Build failed" with Xcode errors

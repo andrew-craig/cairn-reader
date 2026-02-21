@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ReadItLater",
-    "slug": "readitlater",
+    "name": "Cairn Reader",
+    "slug": "cairnreader",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.readitlater.app",
+      "bundleIdentifier": "com.cairnapp.cairnreader",
       "buildNumber": "1"
     },
     "android": {
@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.readitlater.app"
+      "package": "com.cairnapp.cairnreader"
     },
     "androidStatusBar": {
       "translucent": true,

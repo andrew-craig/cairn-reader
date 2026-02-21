@@ -85,3 +85,4 @@ services/explore/recommender/explore_recommender
 # Gas Town (added by gt)
 .runtime/
 .logs/
+apps/mobile/ios/fastlane/api_key.json

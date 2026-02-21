@@ -294,7 +294,7 @@ StorageService.clearAllArticles(): Promise<void>
 ```
 
 **Storage Key:**
-- Articles: `@readitlater:articles`
+- Articles: `@cairnreader:articles`
 
 ### AuthService (`src/services/auth.ts`)
 Authentication and token management.
@@ -880,18 +880,18 @@ App configuration in `app.json`:
 ```json
 {
   "expo": {
-    "name": "ReadItLater",
-    "slug": "readitlater",
+    "name": "Cairn Reader",
+    "slug": "cairnreader",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.readitlater.app"
+      "bundleIdentifier": "com.cairnapp.cairnreader"
     },
     "android": {
-      "package": "com.readitlater.app"
+      "package": "com.cairnapp.cairnreader"
     }
   }
 }
