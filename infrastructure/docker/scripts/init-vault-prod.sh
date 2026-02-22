@@ -17,7 +17,7 @@ echo "Waiting for Vault to be ready..."
 max_attempts=30
 attempt=0
 while [ $attempt -lt $max_attempts ]; do
-    if wget -q --spider http://vault:8200/v1/sys/health?standbyok=true&uninitcode=200&sealedcode=200 2>/dev/null; then
+    if wget -q --spider "http://vault:8200/v1/sys/health?standbyok=true&uninitcode=200&sealedcode=200" 2>/dev/null; then
         echo "Vault is available"
         break
     fi
