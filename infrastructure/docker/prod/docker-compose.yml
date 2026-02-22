@@ -27,22 +27,26 @@ services:
         chown -R vault:vault /vault/data
         exec /usr/local/bin/docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8200/v1/sys/health?standbyok=true&uninitcode=200&sealedcode=200"]
+      # vault status exits 0 when unsealed (healthy), 2 when sealed (unhealthy).
+      # This ensures dependent services only start once Vault is fully unsealed.
+      test: ["CMD", "vault", "status"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 30
       start_period: 30s
     restart: unless-stopped
     networks:
       - cairn-network
 
   # Vault Initializer - Sets up AppRoles and JWT keys on startup
-  # This runs once and creates scoped credentials for each service
+  # This runs once and creates scoped credentials for each service.
+  # Uses service_started (not service_healthy) because vault-init is responsible
+  # for the initial unseal - it cannot wait for Vault to be healthy first.
   vault-init:
     image: hashicorp/vault:latest
     depends_on:
       vault:
-        condition: service_healthy
+        condition: service_started
     environment:
       - VAULT_ADDR=http://vault:8200
       - VAULT_SKIP_VERIFY=true
@@ -52,6 +56,31 @@ services:
       - vault-keys:/vault-keys
     entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl grep && /bin/sh /init-vault-prod.sh"]
     restart: "no"
+    networks:
+      - cairn-network
+
+  # Vault Unseal Watchdog - Automatically unseals Vault after every restart/reboot
+  # vault-init (restart: "no") only runs once. This service handles unsealing
+  # on all subsequent reboots using keys written to the vault-keys volume.
+  # Stays running as a watchdog to detect and recover from unexpected seal events.
+  #
+  # Security note: Unseal keys are stored in plaintext in the vault-keys volume.
+  # For higher security, consider Vault Transit auto-unseal or a cloud KMS.
+  vault-unseal:
+    image: hashicorp/vault:latest
+    depends_on:
+      vault:
+        condition: service_started
+      vault-init:
+        condition: service_completed_successfully
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_SKIP_VERIFY=true
+    volumes:
+      - ../scripts/unseal-vault.sh:/unseal-vault.sh:ro
+      - vault-keys:/vault-keys:ro
+    entrypoint: ["/bin/sh", "/unseal-vault.sh"]
+    restart: unless-stopped
     networks:
       - cairn-network
 
@@ -120,6 +149,8 @@ services:
     depends_on:
       cairn-db:
         condition: service_healthy
+      vault:
+        condition: service_healthy
       vault-init:
         condition: service_completed_successfully
     healthcheck:
@@ -155,6 +186,8 @@ services:
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
       cairn-db:
+        condition: service_healthy
+      vault:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
@@ -224,6 +257,8 @@ services:
       cairn-db:
         condition: service_healthy
       ingest-rss:
+        condition: service_healthy
+      vault:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
