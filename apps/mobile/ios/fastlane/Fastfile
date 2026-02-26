@@ -3,6 +3,14 @@ default_platform(:ios)
 platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do
+    # Authenticate with App Store Connect API
+    app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      in_house: false
+    )
+
     # Automatically manage code signing with match
     setup_ci if ENV['CI']
 
@@ -32,7 +40,6 @@ platform :ios do
 
     # Upload to TestFlight
     upload_to_testflight(
-      api_key_path: ENV["APP_STORE_CONNECT_API_KEY_PATH"],
       skip_waiting_for_build_processing: true
     )
   end
