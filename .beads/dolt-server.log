@@ -1107,3 +1107,74 @@ time="2026-03-01T22:32:12+11:00" level=info msg=NewConnection DisableClientMulti
 time="2026-03-01T22:32:12+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=245
 time="2026-03-01T22:32:12+11:00" level=info msg=ConnectionClosed connectionID=244
 time="2026-03-01T22:32:12+11:00" level=info msg=ConnectionClosed connectionID=245
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=246
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=246
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=247
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=248
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=247
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=248
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=249
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=249
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=250
+time="2026-03-01T22:32:14+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=251
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=250
+time="2026-03-01T22:32:14+11:00" level=info msg=ConnectionClosed connectionID=251
+time="2026-03-01T23:27:03+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=252
+time="2026-03-01T23:27:03+11:00" level=info msg=ConnectionClosed connectionID=252
+time="2026-03-01T23:27:03+11:00" level=info msg="Server closing listener. No longer accepting connections."
+time="2026-03-01T23:27:03+11:00" level=info msg="stats stopped: context canceled"
+Starting server with Config HP="127.0.0.1:57487"|T="28800000"|R="false"|L="info"
+time="2026-03-15T15:18:25+11:00" level=info msg="Server ready. Accepting connections."
+time="2026-03-15T15:18:25+11:00" level=warning msg="secure_file_priv is set to \"\", which is insecure."
+time="2026-03-15T15:18:25+11:00" level=warning msg="Any user with GRANT FILE privileges will be able to read any file which the sql-server process can read."
+time="2026-03-15T15:18:25+11:00" level=warning msg="Please consider restarting the server with secure_file_priv set to a safe (or non-existent) directory."
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=1
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=2
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=1
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=2
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=3
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=4
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=3
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=5
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=5
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=6
+time="2026-03-15T15:18:25+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:25.320004 +1100 AEDT m=+0.202425751" connectionDb=beads_cairn connectionID=4 error="nothing to commit" queryTime="2026-03-15 15:18:25.334257 +1100 AEDT m=+0.216678959"
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=7
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=6
+time="2026-03-15T15:18:25+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:25.33469 +1100 AEDT m=+0.217111251" connectionDb=beads_cairn connectionID=7 error="nothing to commit" queryTime="2026-03-15 15:18:25.339948 +1100 AEDT m=+0.222369001"
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=8
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=8
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=9
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=10
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=9
+time="2026-03-15T15:18:25+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:25.357461 +1100 AEDT m=+0.239882043" connectionDb=beads_cairn connectionID=10 error="nothing to commit" queryTime="2026-03-15 15:18:25.383695 +1100 AEDT m=+0.266116709"
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=11
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=11
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=12
+time="2026-03-15T15:18:25+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=13
+time="2026-03-15T15:18:25+11:00" level=info msg=ConnectionClosed connectionID=12
+time="2026-03-15T15:18:25+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:25.386981 +1100 AEDT m=+0.269402084" connectionDb=beads_cairn connectionID=13 error="nothing to commit" queryTime="2026-03-15 15:18:25.408159 +1100 AEDT m=+0.290580293"
+Starting server with Config HP="127.0.0.1:57487"|T="28800000"|R="false"|L="info"
+time="2026-03-15T15:18:28+11:00" level=info msg="Server ready. Accepting connections."
+time="2026-03-15T15:18:28+11:00" level=warning msg="secure_file_priv is set to \"\", which is insecure."
+time="2026-03-15T15:18:28+11:00" level=warning msg="Any user with GRANT FILE privileges will be able to read any file which the sql-server process can read."
+time="2026-03-15T15:18:28+11:00" level=warning msg="Please consider restarting the server with secure_file_priv set to a safe (or non-existent) directory."
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=1
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=1
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=2
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=2
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=3
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=4
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=3
+time="2026-03-15T15:18:28+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:28.26629 +1100 AEDT m=+0.198190668" connectionDb=beads_cairn connectionID=4 error="nothing to commit" queryTime="2026-03-15 15:18:28.272578 +1100 AEDT m=+0.204479126"
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=5
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=5
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=6
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=7
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=6
+time="2026-03-15T15:18:28+11:00" level=warning msg="error running query" connectTime="2026-03-15 15:18:28.291105 +1100 AEDT m=+0.223006001" connectionDb=beads_cairn connectionID=7 error="nothing to commit" queryTime="2026-03-15 15:18:28.297093 +1100 AEDT m=+0.228993543"
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=8
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=8
+time="2026-03-15T15:18:28+11:00" level=info msg=NewConnection DisableClientMultiStatements=false connectionID=9
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=9
+time="2026-03-15T15:18:28+11:00" level=info msg=ConnectionClosed connectionID=4
