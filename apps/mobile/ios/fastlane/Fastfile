@@ -21,15 +21,25 @@ platform :ios do
       app_identifier: "com.cairnapp.cairnreader"
     )
 
+    # Set code signing settings on the Xcode project (needed after expo prebuild --clean)
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "CairnReader.xcodeproj",
+      team_id: ENV["TEAM_ID"],
+      bundle_identifier: "com.cairnapp.cairnreader",
+      code_sign_identity: "iPhone Distribution",
+      profile_name: ENV["sigh_com.cairnapp.cairnreader_appstore_profile-name"]
+    )
+
     # Increment build number
     increment_build_number(
-      xcodeproj: "cairnreader.xcodeproj"
+      xcodeproj: "CairnReader.xcodeproj"
     )
 
     # Build the app
     build_app(
-      workspace: "cairnreader.xcworkspace",
-      scheme: "cairnreader",
+      workspace: "CairnReader.xcworkspace",
+      scheme: "CairnReader",
       export_method: "app-store",
       export_options: {
         provisioningProfiles: {
@@ -62,13 +72,23 @@ platform :ios do
       app_identifier: "com.cairnapp.cairnreader"
     )
 
+    # Set code signing settings on the Xcode project (needed after expo prebuild --clean)
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "CairnReader.xcodeproj",
+      team_id: ENV["TEAM_ID"],
+      bundle_identifier: "com.cairnapp.cairnreader",
+      code_sign_identity: "iPhone Distribution",
+      profile_name: ENV["sigh_com.cairnapp.cairnreader_appstore_profile-name"]
+    )
+
     increment_build_number(
-      xcodeproj: "cairnreader.xcodeproj"
+      xcodeproj: "CairnReader.xcodeproj"
     )
 
     build_app(
-      workspace: "cairnreader.xcworkspace",
-      scheme: "cairnreader",
+      workspace: "CairnReader.xcworkspace",
+      scheme: "CairnReader",
       export_method: "app-store"
     )
   end
