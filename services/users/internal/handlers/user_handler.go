@@ -31,6 +31,12 @@ type UpdateUserRequest struct {
 	Email *string `json:"email"`
 }
 
+// ChangePasswordRequest represents the request body for changing a password
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
 // UpgradeAccountRequest represents the request body for upgrading an account
 type UpgradeAccountRequest struct {
 	Email    string `json:"email"`
@@ -217,6 +223,73 @@ func (h *UserHandler) UpgradeAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.WriteSuccess(w, http.StatusOK, user, "v1")
+}
+
+// ChangePassword handles PUT /api/v1/user/{user_id}/password
+// Changes the authenticated user's password
+func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	// Get authenticated user ID from context
+	requestingUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
+		return
+	}
+
+	// Parse target user ID from URL parameter
+	targetUserIDStr := chi.URLParam(r, "user_id")
+	targetUserID, err := uuid.Parse(targetUserIDStr)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid user ID format", nil, "v1")
+		return
+	}
+
+	// Parse request body
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	// Validate required fields
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "current_password and new_password are required", nil, "v1")
+		return
+	}
+
+	// Change password (service layer handles authorization and validation)
+	err = h.userService.ChangePassword(r.Context(), requestingUserID, targetUserID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		if errors.Is(err, services.ErrUnauthorized) {
+			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only change your own password", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrIncorrectPassword) {
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "current password is incorrect", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrNoPassword) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "account does not have a password", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrWeakPassword) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+			return
+		}
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrInvalidInput) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to change password", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "password changed successfully",
+	}, "v1")
 }
 
 // DeleteUser handles DELETE /api/v1/user/{user_id}

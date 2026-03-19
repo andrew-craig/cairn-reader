@@ -19,6 +19,12 @@ var (
 
 	// ErrNotMobileAccount is returned when attempting to upgrade a non-mobile account
 	ErrNotMobileAccount = errors.New("account is not a mobile-only account")
+
+	// ErrIncorrectPassword is returned when the current password doesn't match
+	ErrIncorrectPassword = errors.New("incorrect password")
+
+	// ErrNoPassword is returned when attempting to change password on an account without one
+	ErrNoPassword = errors.New("account does not have a password")
 )
 
 // UserService defines the interface for user management operations
@@ -34,6 +40,10 @@ type UserService interface {
 	// UpgradeAccount upgrades a mobile-only account to a hybrid account
 	// The requestingUserID must match the target ID
 	UpgradeAccount(ctx context.Context, requestingUserID, targetUserID uuid.UUID, email, password string) (*models.User, error)
+
+	// ChangePassword changes a user's password after verifying the current password
+	// The requestingUserID must match the target ID
+	ChangePassword(ctx context.Context, requestingUserID, targetUserID uuid.UUID, currentPassword, newPassword string) error
 
 	// DeleteUser deletes a user account with authorization check
 	// The requestingUserID must match the target ID
@@ -172,6 +182,59 @@ func (s *userService) UpgradeAccount(ctx context.Context, requestingUserID, targ
 	}
 
 	return upgradedUser, nil
+}
+
+// ChangePassword changes a user's password after verifying the current password
+func (s *userService) ChangePassword(ctx context.Context, requestingUserID, targetUserID uuid.UUID, currentPassword, newPassword string) error {
+	// Authorization check: user can only change their own password
+	if requestingUserID != targetUserID {
+		return ErrUnauthorized
+	}
+
+	// Validate input
+	if currentPassword == "" || newPassword == "" {
+		return ErrInvalidInput
+	}
+
+	// Validate new password strength
+	if err := auth.ValidatePasswordStrength(newPassword, s.passwordMinLength, s.requireComplexity); err != nil {
+		return fmt.Errorf("%w: %v", ErrWeakPassword, err)
+	}
+
+	// Retrieve user
+	user, err := s.userRepo.GetUserByID(ctx, targetUserID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		return fmt.Errorf("failed to retrieve user: %w", err)
+	}
+
+	// Verify account has a password
+	if !user.CanLoginWithEmail() {
+		return ErrNoPassword
+	}
+
+	// Verify current password
+	if err := s.passwordHasher.ComparePassword(*user.PasswordHash, currentPassword); err != nil {
+		return ErrIncorrectPassword
+	}
+
+	// Hash new password
+	passwordHash, err := s.passwordHasher.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password
+	if _, err := s.userRepo.UpdatePasswordHash(ctx, targetUserID, passwordHash); err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return apperrors.ErrUserNotFound
+		}
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	return nil
 }
 
 // DeleteUser deletes a user account with authorization check

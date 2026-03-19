@@ -36,6 +36,9 @@ type UserRepository interface {
 	// UpgradeAccount adds email and password to a mobile-only account
 	UpgradeAccount(ctx context.Context, id uuid.UUID, email, passwordHash string) (*models.User, error)
 
+	// UpdatePasswordHash updates a user's password hash
+	UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) (*models.User, error)
+
 	// DeleteUser deletes a user account
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 
@@ -362,6 +365,48 @@ func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email
 			return nil, apperrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("failed to upgrade account: %w", err)
+	}
+
+	return user, nil
+}
+
+// UpdatePasswordHash updates a user's password hash
+func (r *userRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) (*models.User, error) {
+	if passwordHash == "" {
+		return nil, apperrors.ErrInvalidUserData
+	}
+
+	now := time.Now().UTC()
+
+	query := `
+		UPDATE users
+		SET password_hash = $1, updated_at = $2
+		WHERE id = $3
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+	`
+
+	user := &models.User{}
+	err := r.db.Pool.QueryRow(
+		ctx,
+		query,
+		passwordHash,
+		now,
+		id,
+	).Scan(
+		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
+		&user.ExpoDeviceID,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.LastLoginAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.ErrUserNotFound
+		}
+		return nil, fmt.Errorf("failed to update password: %w", err)
 	}
 
 	return user, nil

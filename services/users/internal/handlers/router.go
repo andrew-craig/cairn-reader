@@ -100,6 +100,7 @@ func Router(config RouterConfig) http.Handler {
 			r.Get("/{user_id}", userHandler.GetUser)                 // Get user profile
 			r.Patch("/{user_id}", userHandler.UpdateUser)            // Update user email
 			r.Post("/{user_id}/upgrade", userHandler.UpgradeAccount) // Add email/password to mobile-only account
+			r.Put("/{user_id}/password", userHandler.ChangePassword) // Change user password
 			r.Delete("/{user_id}", userHandler.DeleteUser)           // Delete user account and all associated data
 		})
 	})
