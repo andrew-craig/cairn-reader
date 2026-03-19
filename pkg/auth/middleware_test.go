@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -446,6 +447,66 @@ func TestMiddleware_ErrorResponse(t *testing.T) {
 	if body == "" {
 		t.Error("Expected error response body")
 	}
+}
+
+func TestRequireAuth_DoesNotLeakErrorDetails(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	middleware := NewMiddleware(validator)
+	userID := uuid.New()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Handler should not be called")
+	})
+	protectedHandler := middleware.RequireAuth(handler)
+
+	// Errors that should NOT appear in responses
+	leakyStrings := []string{
+		"token has expired",
+		"invalid token signature",
+		"invalid token issuer",
+		"invalid token audience",
+		"missing authorization token",
+		"invalid authorization header format",
+	}
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{"expired token", "Bearer " + generateTestToken(t, privateKey, userID, "cairn-user-service", "cairn-api", -1*time.Hour)},
+		{"wrong issuer", "Bearer " + generateTestToken(t, privateKey, userID, "wrong-issuer", "cairn-api", 1*time.Hour)},
+		{"no auth header", ""},
+		{"invalid format", "NotBearer token"},
+		{"malformed token", "Bearer not.a.valid.token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/protected", nil)
+			if tt.header != "" {
+				req.Header.Set("Authorization", tt.header)
+			}
+			w := httptest.NewRecorder()
+
+			protectedHandler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusUnauthorized {
+				t.Errorf("Expected status 401, got %d", w.Code)
+			}
+
+			body := w.Body.String()
+			for _, s := range leakyStrings {
+				if containsString(body, s) {
+					t.Errorf("Response body leaks JWT detail %q: %s", s, body)
+				}
+			}
+		})
+	}
+}
+
+func containsString(haystack, needle string) bool {
+	return strings.Contains(haystack, needle)
 }
 
 func BenchmarkRequireAuth_ValidToken(b *testing.B) {

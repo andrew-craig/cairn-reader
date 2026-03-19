@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -49,14 +50,16 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 		authHeader := r.Header.Get("Authorization")
 		token, err := ExtractTokenFromHeader(authHeader)
 		if err != nil {
-			m.sendError(w, http.StatusUnauthorized, "unauthorized", err.Error())
+			slog.Debug("auth: token extraction failed", "error", err.Error())
+			m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
 			return
 		}
 
 		// Validate token
 		claims, err := m.validator.ValidateToken(token)
 		if err != nil {
-			m.sendError(w, http.StatusUnauthorized, "unauthorized", err.Error())
+			slog.Debug("auth: token validation failed", "error", err.Error())
+			m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
 			return
 		}
 
