@@ -22,15 +22,14 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -41,7 +40,7 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		oldAccessToken := loginResponse.AccessToken
@@ -51,7 +50,7 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Refresh tokens
-		refreshResponse, err := authService.RefreshAccessToken(ctx, oldRefreshToken, nil, nil)
+		refreshResponse, err := authService.RefreshAccessToken(ctx, oldRefreshToken, "", "")
 		require.NoError(t, err)
 		assert.NotNil(t, refreshResponse)
 
@@ -65,20 +64,20 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		assert.Equal(t, userID.String(), claims.Subject)
 
 		// Verify old refresh token cannot be reused (token rotation)
-		_, err = authService.RefreshAccessToken(ctx, oldRefreshToken, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, oldRefreshToken, "", "")
 		assert.Error(t, err) // Should fail due to token reuse detection or not found
 	})
 
 	t.Run("Refresh with invalid token", func(t *testing.T) {
 		invalidToken := "invalid_refresh_token_12345"
 
-		response, err := authService.RefreshAccessToken(ctx, invalidToken, nil, nil)
+		response, err := authService.RefreshAccessToken(ctx, invalidToken, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
 	t.Run("Refresh with empty token", func(t *testing.T) {
-		response, err := authService.RefreshAccessToken(ctx, "", nil, nil)
+		response, err := authService.RefreshAccessToken(ctx, "", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
@@ -90,7 +89,7 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		currentRefreshToken := loginResponse.RefreshToken
@@ -99,7 +98,7 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			time.Sleep(100 * time.Millisecond)
 
-			response, err := authService.RefreshAccessToken(ctx, currentRefreshToken, nil, nil)
+			response, err := authService.RefreshAccessToken(ctx, currentRefreshToken, "", "")
 			require.NoError(t, err, "Refresh cycle %d failed", i+1)
 
 			// Verify new tokens
@@ -119,14 +118,14 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		deviceInfo := "iPhone 15 Pro"
 		ipAddress := "203.0.113.100"
 
 		// Refresh with device info
-		response, err := authService.RefreshAccessToken(ctx, loginResponse.RefreshToken, &deviceInfo, &ipAddress)
+		response, err := authService.RefreshAccessToken(ctx, loginResponse.RefreshToken, deviceInfo, ipAddress)
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 	})
@@ -138,26 +137,26 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		refreshToken := loginResponse.RefreshToken
 
 		// First refresh - should succeed
-		response1, err := authService.RefreshAccessToken(ctx, refreshToken, nil, nil)
+		response1, err := authService.RefreshAccessToken(ctx, refreshToken, "", "")
 		require.NoError(t, err)
 
 		// Wait to ensure we're outside grace period
 		time.Sleep(6 * time.Second)
 
 		// Second refresh with same old token - should detect reuse
-		response2, err := authService.RefreshAccessToken(ctx, refreshToken, nil, nil)
+		response2, err := authService.RefreshAccessToken(ctx, refreshToken, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response2)
 
 		// Verify token family was revoked
 		// New refresh token should also not work
-		_, err = authService.RefreshAccessToken(ctx, response1.RefreshToken, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, response1.RefreshToken, "", "")
 		assert.Error(t, err) // Should be revoked due to reuse detection
 	})
 }
@@ -173,15 +172,14 @@ func TestAuthService_Logout_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -192,7 +190,7 @@ func TestAuthService_Logout_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		refreshToken := loginResponse.RefreshToken
@@ -202,7 +200,7 @@ func TestAuthService_Logout_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to use refresh token after logout
-		_, err = authService.RefreshAccessToken(ctx, refreshToken, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, refreshToken, "", "")
 		assert.Error(t, err) // Should fail - token revoked
 	})
 
@@ -224,7 +222,7 @@ func TestAuthService_Logout_Integration(t *testing.T) {
 		userID, _ := env.CreateTestUser(t, email, password)
 		defer env.CleanupTestUser(t, userID)
 
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		refreshToken := loginResponse.RefreshToken
@@ -250,15 +248,14 @@ func TestAuthService_LogoutAll_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -272,7 +269,7 @@ func TestAuthService_LogoutAll_Integration(t *testing.T) {
 		// Login from 3 different devices
 		var refreshTokens []string
 		for i := 0; i < 3; i++ {
-			response, err := authService.Login(ctx, email, password)
+			response, err := authService.Login(ctx, email, password, "", "")
 			require.NoError(t, err)
 			refreshTokens = append(refreshTokens, response.RefreshToken)
 		}
@@ -283,7 +280,7 @@ func TestAuthService_LogoutAll_Integration(t *testing.T) {
 
 		// Verify all refresh tokens are invalid
 		for i, token := range refreshTokens {
-			_, err := authService.RefreshAccessToken(ctx, token, nil, nil)
+			_, err := authService.RefreshAccessToken(ctx, token, "", "")
 			assert.Error(t, err, "Token %d should be revoked", i)
 		}
 	})
@@ -308,10 +305,10 @@ func TestAuthService_LogoutAll_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, userID)
 
 		// Login twice
-		response1, err := authService.Login(ctx, email, password)
+		response1, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
-		response2, err := authService.Login(ctx, email, password)
+		response2, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		// Logout first session
@@ -323,10 +320,10 @@ func TestAuthService_LogoutAll_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Both tokens should be invalid
-		_, err = authService.RefreshAccessToken(ctx, response1.RefreshToken, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, response1.RefreshToken, "", "")
 		assert.Error(t, err)
 
-		_, err = authService.RefreshAccessToken(ctx, response2.RefreshToken, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, response2.RefreshToken, "", "")
 		assert.Error(t, err)
 	})
 }
@@ -342,15 +339,14 @@ func TestAuthService_TokenLifecycle_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -367,18 +363,18 @@ func TestAuthService_TokenLifecycle_Integration(t *testing.T) {
 
 		// Step 2: Refresh token
 		time.Sleep(100 * time.Millisecond)
-		refreshResponse1, err := authService.RefreshAccessToken(ctx, token1, nil, nil)
+		refreshResponse1, err := authService.RefreshAccessToken(ctx, token1, "", "")
 		require.NoError(t, err)
 		token2 := refreshResponse1.RefreshToken
 
 		// Step 3: Refresh again
 		time.Sleep(100 * time.Millisecond)
-		refreshResponse2, err := authService.RefreshAccessToken(ctx, token2, nil, nil)
+		refreshResponse2, err := authService.RefreshAccessToken(ctx, token2, "", "")
 		require.NoError(t, err)
 		token3 := refreshResponse2.RefreshToken
 
 		// Step 4: Login again (new session)
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		token4 := loginResponse.RefreshToken
 
@@ -388,11 +384,11 @@ func TestAuthService_TokenLifecycle_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// token3 should be invalid
-		_, err = authService.RefreshAccessToken(ctx, token3, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, token3, "", "")
 		assert.Error(t, err)
 
 		// token4 should still work
-		_, err = authService.RefreshAccessToken(ctx, token4, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, token4, "", "")
 		assert.NoError(t, err)
 	})
 
@@ -404,28 +400,28 @@ func TestAuthService_TokenLifecycle_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, userID)
 
 		// Device 1: Login
-		device1Response, err := authService.Login(ctx, email, password)
+		device1Response, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		device1Token := device1Response.RefreshToken
 
 		// Device 2: Login
-		device2Response, err := authService.Login(ctx, email, password)
+		device2Response, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		device2Token := device2Response.RefreshToken
 
 		// Device 3: Login
-		device3Response, err := authService.Login(ctx, email, password)
+		device3Response, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		device3Token := device3Response.RefreshToken
 
 		// All devices should have valid tokens
-		_, err = authService.RefreshAccessToken(ctx, device1Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device1Token, "", "")
 		assert.NoError(t, err)
 
-		_, err = authService.RefreshAccessToken(ctx, device2Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device2Token, "", "")
 		assert.NoError(t, err)
 
-		_, err = authService.RefreshAccessToken(ctx, device3Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device3Token, "", "")
 		assert.NoError(t, err)
 
 		// Logout all devices
@@ -433,13 +429,13 @@ func TestAuthService_TokenLifecycle_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// All tokens should be invalid
-		_, err = authService.RefreshAccessToken(ctx, device1Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device1Token, "", "")
 		assert.Error(t, err)
 
-		_, err = authService.RefreshAccessToken(ctx, device2Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device2Token, "", "")
 		assert.Error(t, err)
 
-		_, err = authService.RefreshAccessToken(ctx, device3Token, nil, nil)
+		_, err = authService.RefreshAccessToken(ctx, device3Token, "", "")
 		assert.Error(t, err)
 	})
 }

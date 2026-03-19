@@ -22,15 +22,14 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -42,7 +41,7 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, userID)
 
 		// Login
-		response, err := authService.Login(ctx, email, password)
+		response, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 
@@ -71,7 +70,7 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, userID)
 
 		// Try to login with wrong password
-		response, err := authService.Login(ctx, email, "WrongPassword123!")
+		response, err := authService.Login(ctx, email, "WrongPassword123!", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 		assert.Equal(t, services.ErrInvalidCredentials, err)
@@ -79,21 +78,21 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 
 	t.Run("Login with non-existent email", func(t *testing.T) {
 		email := testutil.RandomEmail()
-		response, err := authService.Login(ctx, email, "TestPass123!")
+		response, err := authService.Login(ctx, email, "TestPass123!", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 		assert.Equal(t, services.ErrInvalidCredentials, err)
 	})
 
 	t.Run("Login with empty email", func(t *testing.T) {
-		response, err := authService.Login(ctx, "", "TestPass123!")
+		response, err := authService.Login(ctx, "", "TestPass123!", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
 
 	t.Run("Login with empty password", func(t *testing.T) {
 		email := testutil.RandomEmail()
-		response, err := authService.Login(ctx, email, "")
+		response, err := authService.Login(ctx, email, "", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
@@ -105,7 +104,7 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, userID)
 
 		// Mobile-only users don't have email
-		response, err := authService.Login(ctx, "nonexistent@example.com", "password")
+		response, err := authService.Login(ctx, "nonexistent@example.com", "password", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 		assert.Equal(t, services.ErrInvalidCredentials, err)
@@ -120,7 +119,7 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 
 		// Login multiple times
 		for i := 0; i < 3; i++ {
-			response, err := authService.Login(ctx, email, password)
+			response, err := authService.Login(ctx, email, password, "", "")
 			require.NoError(t, err)
 			assert.NotEmpty(t, response.AccessToken)
 			assert.NotEmpty(t, response.RefreshToken)
@@ -149,15 +148,14 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -171,7 +169,7 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 		ipAddress := "192.168.1.50"
 
 		// Login
-		response, err := authService.LoginMobile(ctx, deviceID, &deviceInfo, &ipAddress)
+		response, err := authService.LoginMobile(ctx, deviceID, deviceInfo, ipAddress)
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 
@@ -194,14 +192,14 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 
 	t.Run("Login with non-existent device ID", func(t *testing.T) {
 		deviceID := testutil.RandomDeviceID()
-		response, err := authService.LoginMobile(ctx, deviceID, nil, nil)
+		response, err := authService.LoginMobile(ctx, deviceID, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 		assert.Equal(t, services.ErrInvalidCredentials, err)
 	})
 
 	t.Run("Login with empty device ID", func(t *testing.T) {
-		response, err := authService.LoginMobile(ctx, "", nil, nil)
+		response, err := authService.LoginMobile(ctx, "", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
@@ -222,7 +220,7 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Try to login with device ID (should fail for hybrid accounts)
-		response, err := authService.LoginMobile(ctx, deviceID, nil, nil)
+		response, err := authService.LoginMobile(ctx, deviceID, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 		assert.Equal(t, services.ErrHybridAccountDeviceLogin, err)
@@ -238,14 +236,14 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 		ipAddress1 := "192.168.1.10"
 
 		// First login
-		response1, err := authService.LoginMobile(ctx, deviceID, &deviceInfo1, &ipAddress1)
+		response1, err := authService.LoginMobile(ctx, deviceID, deviceInfo1, ipAddress1)
 		require.NoError(t, err)
 
 		// Second login from different device info
 		deviceInfo2 := "iPhone 14 Pro"
 		ipAddress2 := "10.0.0.5"
 
-		response2, err := authService.LoginMobile(ctx, deviceID, &deviceInfo2, &ipAddress2)
+		response2, err := authService.LoginMobile(ctx, deviceID, deviceInfo2, ipAddress2)
 		require.NoError(t, err)
 
 		// Both should succeed with different tokens
@@ -265,15 +263,14 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -289,7 +286,7 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 		firstAccessToken := registerResponse.AccessToken
 
 		// Step 2: Login (simulating app restart)
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		// Step 3: Verify login returns new tokens
@@ -310,12 +307,12 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 		deviceID := testutil.RandomDeviceID()
 
 		// Step 1: Register mobile user
-		registerResponse, err := authService.RegisterMobile(ctx, deviceID, nil, nil)
+		registerResponse, err := authService.RegisterMobile(ctx, deviceID, "", "")
 		require.NoError(t, err)
 		defer env.CleanupTestUser(t, registerResponse.User.ID)
 
 		// Step 2: Login with same device ID
-		loginResponse, err := authService.LoginMobile(ctx, deviceID, nil, nil)
+		loginResponse, err := authService.LoginMobile(ctx, deviceID, "", "")
 		require.NoError(t, err)
 
 		// Step 3: Verify user ID is the same
@@ -336,7 +333,7 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 		defer env.CleanupTestUser(t, registerResponse.User.ID)
 
 		// Try to login with lowercase email
-		loginResponse, err := authService.Login(ctx, "test.user@example.com", password)
+		loginResponse, err := authService.Login(ctx, "test.user@example.com", password, "", "")
 
 		// Should succeed (email comparison should be case-insensitive)
 		// Note: This depends on database collation settings
@@ -358,7 +355,7 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 		done := make(chan bool, 3)
 		for i := 0; i < 3; i++ {
 			go func() {
-				response, err := authService.Login(ctx, email, password)
+				response, err := authService.Login(ctx, email, password, "", "")
 				assert.NoError(t, err)
 				assert.NotNil(t, response)
 				done <- true

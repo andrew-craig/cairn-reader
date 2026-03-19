@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,21 +104,21 @@ func TestUserRepository_CreateUser(t *testing.T) {
 		user2, err := repo.CreateUser(ctx, email, "different_hash")
 		assert.Error(t, err)
 		assert.Nil(t, user2)
-		assert.ErrorIs(t, err, ErrUserAlreadyExists)
+		assert.ErrorIs(t, err, apperrors.ErrUserAlreadyExists)
 	})
 
 	t.Run("empty email", func(t *testing.T) {
 		user, err := repo.CreateUser(ctx, "", "hashed_password")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 
 	t.Run("empty password hash", func(t *testing.T) {
 		user, err := repo.CreateUser(ctx, "test@example.com", "")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 }
 
@@ -161,14 +162,14 @@ func TestUserRepository_CreateMobileUser(t *testing.T) {
 		user2, err := repo.CreateMobileUser(ctx, deviceID)
 		assert.Error(t, err)
 		assert.Nil(t, user2)
-		assert.ErrorIs(t, err, ErrUserAlreadyExists)
+		assert.ErrorIs(t, err, apperrors.ErrUserAlreadyExists)
 	})
 
 	t.Run("empty device ID", func(t *testing.T) {
 		user, err := repo.CreateMobileUser(ctx, "")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 }
 
@@ -210,7 +211,7 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 		user, err := repo.GetUserByID(ctx, nonExistentID)
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 }
 
@@ -238,14 +239,14 @@ func TestUserRepository_GetUserByEmail(t *testing.T) {
 		user, err := repo.GetUserByEmail(ctx, "nonexistent@example.com")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("empty email", func(t *testing.T) {
 		user, err := repo.GetUserByEmail(ctx, "")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 }
 
@@ -273,14 +274,14 @@ func TestUserRepository_GetUserByExpoDeviceID(t *testing.T) {
 		user, err := repo.GetUserByExpoDeviceID(ctx, "nonexistent-device")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("empty device ID", func(t *testing.T) {
 		user, err := repo.GetUserByExpoDeviceID(ctx, "")
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 }
 
@@ -311,7 +312,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		updated, err := repo.UpdateUser(ctx, nonExistentID, &newEmail)
 		assert.Error(t, err)
 		assert.Nil(t, updated)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("duplicate email", func(t *testing.T) {
@@ -330,7 +331,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		updated, err := repo.UpdateUser(ctx, user2.ID, &email1)
 		assert.Error(t, err)
 		assert.Nil(t, updated)
-		assert.ErrorIs(t, err, ErrUserAlreadyExists)
+		assert.ErrorIs(t, err, apperrors.ErrUserAlreadyExists)
 	})
 }
 
@@ -379,7 +380,7 @@ func TestUserRepository_UpgradeAccount(t *testing.T) {
 		upgraded, err := repo.UpgradeAccount(ctx, nonExistentID, "test@example.com", "hash")
 		assert.Error(t, err)
 		assert.Nil(t, upgraded)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("empty email", func(t *testing.T) {
@@ -391,7 +392,7 @@ func TestUserRepository_UpgradeAccount(t *testing.T) {
 		upgraded, err := repo.UpgradeAccount(ctx, created.ID, "", "hash")
 		assert.Error(t, err)
 		assert.Nil(t, upgraded)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 
 	t.Run("empty password hash", func(t *testing.T) {
@@ -403,7 +404,7 @@ func TestUserRepository_UpgradeAccount(t *testing.T) {
 		upgraded, err := repo.UpgradeAccount(ctx, created.ID, "test@example.com", "")
 		assert.Error(t, err)
 		assert.Nil(t, upgraded)
-		assert.ErrorIs(t, err, ErrInvalidUserData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidUserData)
 	})
 
 	t.Run("duplicate email on upgrade", func(t *testing.T) {
@@ -420,7 +421,7 @@ func TestUserRepository_UpgradeAccount(t *testing.T) {
 		upgraded, err := repo.UpgradeAccount(ctx, mobileUser.ID, existingEmail, "hash2")
 		assert.Error(t, err)
 		assert.Nil(t, upgraded)
-		assert.ErrorIs(t, err, ErrUserAlreadyExists)
+		assert.ErrorIs(t, err, apperrors.ErrUserAlreadyExists)
 	})
 }
 
@@ -443,14 +444,14 @@ func TestUserRepository_DeleteUser(t *testing.T) {
 		retrieved, err := repo.GetUserByID(ctx, created.ID)
 		assert.Error(t, err)
 		assert.Nil(t, retrieved)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
 		nonExistentID := uuid.New()
 		err := repo.DeleteUser(ctx, nonExistentID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 }
 
@@ -483,7 +484,7 @@ func TestUserRepository_UpdateLastLoginAt(t *testing.T) {
 		nonExistentID := uuid.New()
 		err := repo.UpdateLastLoginAt(ctx, nonExistentID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 }
 

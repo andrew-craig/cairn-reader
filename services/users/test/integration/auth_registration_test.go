@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/cairn-app/cairn-reader/services/users/test/integration/testutil"
 	"github.com/google/uuid"
@@ -24,15 +24,14 @@ func TestAuthService_Registration_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,    // min password length
-		true, // require complexity
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -98,7 +97,7 @@ func TestAuthService_Registration_Integration(t *testing.T) {
 		// Verify user was not created
 		_, err = env.UserRepo.GetUserByEmail(ctx, email)
 		assert.Error(t, err)
-		assert.Equal(t, database.ErrUserNotFound, err)
+		assert.Equal(t, apperrors.ErrUserNotFound, err)
 	})
 
 	t.Run("Register with empty email", func(t *testing.T) {
@@ -126,15 +125,14 @@ func TestAuthService_MobileRegistration_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -144,7 +142,7 @@ func TestAuthService_MobileRegistration_Integration(t *testing.T) {
 		ipAddress := "192.168.1.100"
 
 		// Register mobile user
-		response, err := authService.RegisterMobile(ctx, deviceID, &deviceInfo, &ipAddress)
+		response, err := authService.RegisterMobile(ctx, deviceID, deviceInfo, ipAddress)
 		require.NoError(t, err)
 		assert.NotNil(t, response)
 		defer env.CleanupTestUser(t, response.User.ID)
@@ -174,19 +172,19 @@ func TestAuthService_MobileRegistration_Integration(t *testing.T) {
 		deviceID := testutil.RandomDeviceID()
 
 		// Register first user
-		response1, err := authService.RegisterMobile(ctx, deviceID, nil, nil)
+		response1, err := authService.RegisterMobile(ctx, deviceID, "", "")
 		require.NoError(t, err)
 		defer env.CleanupTestUser(t, response1.User.ID)
 
 		// Try to register with same device ID
-		response2, err := authService.RegisterMobile(ctx, deviceID, nil, nil)
+		response2, err := authService.RegisterMobile(ctx, deviceID, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response2)
 		assert.Equal(t, services.ErrAccountExists, err)
 	})
 
 	t.Run("Register with empty device ID", func(t *testing.T) {
-		response, err := authService.RegisterMobile(ctx, "", nil, nil)
+		response, err := authService.RegisterMobile(ctx, "", "", "")
 		assert.Error(t, err)
 		assert.Nil(t, response)
 	})
@@ -196,7 +194,7 @@ func TestAuthService_MobileRegistration_Integration(t *testing.T) {
 		deviceInfo := "Samsung Galaxy S23"
 		ipAddress := "10.0.0.5"
 
-		response, err := authService.RegisterMobile(ctx, deviceID, &deviceInfo, &ipAddress)
+		response, err := authService.RegisterMobile(ctx, deviceID, deviceInfo, ipAddress)
 		require.NoError(t, err)
 		defer env.CleanupTestUser(t, response.User.ID)
 
@@ -217,15 +215,14 @@ func TestAuthService_RegistrationEndToEnd_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize auth service
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -266,7 +263,7 @@ func TestAuthService_RegistrationEndToEnd_Integration(t *testing.T) {
 		ipAddress := "203.0.113.42"
 
 		// Step 1: Register mobile user
-		response, err := authService.RegisterMobile(ctx, deviceID, &deviceInfo, &ipAddress)
+		response, err := authService.RegisterMobile(ctx, deviceID, deviceInfo, ipAddress)
 		require.NoError(t, err)
 		defer env.CleanupTestUser(t, response.User.ID)
 

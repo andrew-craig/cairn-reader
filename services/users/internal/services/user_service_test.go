@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/google/uuid"
@@ -118,7 +119,7 @@ func TestUserService_GetUser(t *testing.T) {
 		user, err := service.GetUser(ctx, nonExistentID, nonExistentID)
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("user data returned correctly", func(t *testing.T) {
@@ -231,7 +232,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 		updatedUser, err := service.UpdateUser(ctx, nonExistentID, nonExistentID, &newEmail)
 		assert.Error(t, err)
 		assert.Nil(t, updatedUser)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("updated user returned", func(t *testing.T) {
@@ -445,7 +446,7 @@ func TestUserService_UpgradeAccount(t *testing.T) {
 		upgradedUser, err := service.UpgradeAccount(ctx, nonExistentID, nonExistentID, "email@example.com", "ValidPass123!")
 		assert.Error(t, err)
 		assert.Nil(t, upgradedUser)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 }
 
@@ -473,7 +474,7 @@ func TestUserService_DeleteUser(t *testing.T) {
 		deletedUser, err := userRepo.GetUserByID(ctx, user.ID)
 		assert.Error(t, err)
 		assert.Nil(t, deletedUser)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("unauthorized deletion", func(t *testing.T) {
@@ -542,7 +543,7 @@ func TestUserService_DeleteUser(t *testing.T) {
 
 		err := service.DeleteUser(ctx, nonExistentID, nonExistentID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 	})
 
 	t.Run("cleanup verification", func(t *testing.T) {
@@ -563,7 +564,7 @@ func TestUserService_DeleteUser(t *testing.T) {
 		deletedUser, err := userRepo.GetUserByID(ctx, userID)
 		assert.Error(t, err)
 		assert.Nil(t, deletedUser)
-		assert.ErrorIs(t, err, database.ErrUserNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrUserNotFound)
 
 		// Verify cannot access by email
 		deletedByEmail, err := userRepo.GetUserByEmail(ctx, email)

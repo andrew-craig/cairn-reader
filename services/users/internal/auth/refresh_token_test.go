@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -310,7 +310,7 @@ func TestValidateAndRotateToken(t *testing.T) {
 
 		token, hash, _ := service.GenerateToken()
 
-		repo.On("GetRefreshTokenByHash", ctx, hash).Return(nil, database.ErrTokenNotFound)
+		repo.On("GetRefreshTokenByHash", ctx, hash).Return(nil, apperrors.ErrTokenNotFound)
 
 		newToken, returnedUserID, err := service.ValidateAndRotateToken(ctx, token, &deviceInfo, &ipAddress)
 
@@ -350,7 +350,7 @@ func TestIsTokenReused(t *testing.T) {
 		now := time.Now().UTC()
 		token := &models.RefreshToken{
 			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-10 * time.Second), // Used 10 seconds ago
+			LastUsedAt: now.Add(-20 * time.Second), // Used 20 seconds ago (outside 15s grace period)
 		}
 
 		assert.False(t, service.isTokenReused(token))
@@ -387,7 +387,7 @@ func TestRevokeToken(t *testing.T) {
 
 		token, hash, _ := service.GenerateToken()
 
-		repo.On("GetRefreshTokenByHash", ctx, hash).Return(nil, database.ErrTokenNotFound)
+		repo.On("GetRefreshTokenByHash", ctx, hash).Return(nil, apperrors.ErrTokenNotFound)
 
 		err := service.RevokeToken(ctx, token)
 
@@ -476,7 +476,7 @@ func TestCreateRefreshToken_ErrorHandling(t *testing.T) {
 		service := NewRefreshTokenService(repo, DefaultRefreshTokenExpiry)
 
 		repo.On("CreateRefreshToken", ctx, userID, mock.AnythingOfType("string"), mock.AnythingOfType("time.Time"), &deviceInfo, &ipAddress, mock.AnythingOfType("*uuid.UUID")).
-			Return(nil, database.ErrUserNotFound)
+			Return(nil, apperrors.ErrUserNotFound)
 
 		token, tokenModel, err := service.CreateRefreshToken(ctx, userID, &deviceInfo, &ipAddress, nil)
 

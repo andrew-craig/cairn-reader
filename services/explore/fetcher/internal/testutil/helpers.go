@@ -2,36 +2,38 @@ package testutil
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // SetupTestDB creates a test database connection
-func SetupTestDB(t *testing.T) *sql.DB {
+func SetupTestDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
 	// Use test database connection
 	connStr := "host=localhost port=5433 user=fetcher password=fetcher_password dbname=fetcher_db sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		t.Fatalf("Failed to connect to test database: %v", err)
 	}
 
 	// Verify connection
-	if err := db.Ping(); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
 
-	return db
+	return pool
 }
 
 // CleanupTestDB cleans up test database tables
-func CleanupTestDB(t *testing.T, db *sql.DB) {
+func CleanupTestDB(t *testing.T, db *pgxpool.Pool) {
 	t.Helper()
+
+	ctx := context.Background()
 
 	// Delete in correct order due to foreign keys
 	queries := []string{
@@ -40,16 +42,17 @@ func CleanupTestDB(t *testing.T, db *sql.DB) {
 	}
 
 	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
+		if _, err := db.Exec(ctx, query); err != nil {
 			t.Logf("Cleanup warning: %v", err)
 		}
 	}
 }
 
 // CreateTestFeed inserts a test feed into the database
-func CreateTestFeed(t *testing.T, db *sql.DB, url string, enabled bool, lastFetched *time.Time, failures int) int {
+func CreateTestFeed(t *testing.T, db *pgxpool.Pool, url string, enabled bool, lastFetched *time.Time, failures int) int {
 	t.Helper()
 
+	ctx := context.Background()
 	query := `
 		INSERT INTO feeds (url, title, description, last_fetched_at, consecutive_failures, enabled)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -58,6 +61,7 @@ func CreateTestFeed(t *testing.T, db *sql.DB, url string, enabled bool, lastFetc
 
 	var feedID int
 	err := db.QueryRow(
+		ctx,
 		query,
 		url,
 		fmt.Sprintf("Test Feed: %s", url),
@@ -75,11 +79,12 @@ func CreateTestFeed(t *testing.T, db *sql.DB, url string, enabled bool, lastFetc
 }
 
 // GetFeedByID retrieves a feed by ID
-func GetFeedByID(t *testing.T, db *sql.DB, feedID int) (url string, enabled bool, failures int, lastFetched *time.Time) {
+func GetFeedByID(t *testing.T, db *pgxpool.Pool, feedID int) (url string, enabled bool, failures int, lastFetched *time.Time) {
 	t.Helper()
 
+	ctx := context.Background()
 	query := "SELECT url, enabled, consecutive_failures, last_fetched_at FROM feeds WHERE id = $1"
-	err := db.QueryRow(query, feedID).Scan(&url, &enabled, &failures, &lastFetched)
+	err := db.QueryRow(ctx, query, feedID).Scan(&url, &enabled, &failures, &lastFetched)
 	if err != nil {
 		t.Fatalf("Failed to get feed: %v", err)
 	}
@@ -88,11 +93,12 @@ func GetFeedByID(t *testing.T, db *sql.DB, feedID int) (url string, enabled bool
 }
 
 // CountFeeds returns the total number of feeds in the database
-func CountFeeds(t *testing.T, db *sql.DB) int {
+func CountFeeds(t *testing.T, db *pgxpool.Pool) int {
 	t.Helper()
 
+	ctx := context.Background()
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM feeds").Scan(&count)
+	err := db.QueryRow(ctx, "SELECT COUNT(*) FROM feeds").Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to count feeds: %v", err)
 	}
@@ -100,11 +106,12 @@ func CountFeeds(t *testing.T, db *sql.DB) int {
 }
 
 // CountFetchHistory returns the total number of fetch history records
-func CountFetchHistory(t *testing.T, db *sql.DB) int {
+func CountFetchHistory(t *testing.T, db *pgxpool.Pool) int {
 	t.Helper()
 
+	ctx := context.Background()
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM fetch_history").Scan(&count)
+	err := db.QueryRow(ctx, "SELECT COUNT(*) FROM fetch_history").Scan(&count)
 	if err != nil {
 		t.Fatalf("Failed to count fetch history: %v", err)
 	}

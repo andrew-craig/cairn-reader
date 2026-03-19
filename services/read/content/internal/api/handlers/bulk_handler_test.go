@@ -73,8 +73,9 @@ func TestBulkCreateContent_Success(t *testing.T) {
 	handler.BulkCreateContent(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var response map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&response)
+	var envelope map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&envelope)
+	response := envelope["data"].(map[string]interface{})
 	created := response["created"].([]interface{})
 	assert.Len(t, created, 2)
 	failed := response["failed"].([]interface{})
@@ -134,8 +135,9 @@ func TestBulkCreateContent_PartialFailure(t *testing.T) {
 	handler.BulkCreateContent(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var response map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&response)
+	var envelope map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&envelope)
+	response := envelope["data"].(map[string]interface{})
 	created := response["created"].([]interface{})
 	assert.Len(t, created, 1)
 	failed := response["failed"].([]interface{})
@@ -164,7 +166,7 @@ func TestBulkCreateContent_EmptyArray(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	assert.Contains(t, response["message"], "cannot be empty")
+	assert.Contains(t, response["message"], "contents")
 }
 
 // TestBulkCreateContent_ExceedsLimit tests max 100 items validation
@@ -198,7 +200,7 @@ func TestBulkCreateContent_ExceedsLimit(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	assert.Contains(t, response["message"], "Maximum 100 items")
+	assert.Contains(t, response["message"], "1-100")
 }
 
 // TestBulkCreateContent_MissingRequiredFields tests validation of required fields
@@ -228,7 +230,7 @@ func TestBulkCreateContent_MissingRequiredFields(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	assert.Contains(t, response["message"], "URL and HTML are required")
+	assert.Contains(t, response["message"], "HTML is required")
 }
 
 // TestBulkCreateContent_InvalidSourceType tests validation of source type
@@ -306,9 +308,10 @@ func TestCheckDuplicates_Success(t *testing.T) {
 	handler.CheckDuplicates(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var response map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&response)
-	results := response["results"].([]interface{})
+	var envelope map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&envelope)
+	data := envelope["data"].(map[string]interface{})
+	results := data["results"].([]interface{})
 	assert.Len(t, results, 2)
 
 	// First result should exist
@@ -378,7 +381,7 @@ func TestCheckDuplicates_ExceedsLimit(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	assert.Contains(t, response["message"], "Maximum 100 items")
+	assert.Contains(t, response["message"], "1-100")
 }
 
 // TestCheckDuplicates_ServiceError tests handling of service errors
@@ -411,7 +414,7 @@ func TestCheckDuplicates_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "check_failed", response["error"])
+	assert.Equal(t, "internal_error", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -449,15 +452,16 @@ func TestBulkAddToUsers_Success(t *testing.T) {
 		},
 	}
 	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/bulk/contents", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/internal/content/user/bulk", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.BulkAddToUsers(w, req)
+	handler.BulkAddToUsersInternal(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var response map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&response)
+	var envelope map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&envelope)
+	response := envelope["data"].(map[string]interface{})
 	succeeded := response["succeeded"].([]interface{})
 	assert.Len(t, succeeded, 2)
 	failed := response["failed"].([]interface{})
@@ -480,7 +484,7 @@ func TestBulkAddToUsers_EmptyArray(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.BulkAddToUsers(w, req)
+	handler.BulkAddToUsersInternal(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
@@ -511,13 +515,13 @@ func TestBulkAddToUsers_ExceedsLimit(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.BulkAddToUsers(w, req)
+	handler.BulkAddToUsersInternal(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	assert.Contains(t, response["message"], "Maximum 100 items")
+	assert.Contains(t, response["message"], "1-100")
 }
 
 // TestBulkAddToUsers_InvalidStatus tests validation of status
@@ -544,7 +548,7 @@ func TestBulkAddToUsers_InvalidStatus(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handler.BulkAddToUsers(w, req)
+	handler.BulkAddToUsersInternal(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}

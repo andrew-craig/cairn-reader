@@ -13,11 +13,7 @@ import (
 
 func TestSyncFeeds_Success(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -62,11 +58,7 @@ func TestSyncFeeds_Success(t *testing.T) {
 
 func TestSyncFeeds_SkipsComments(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -104,11 +96,7 @@ https://example.com/feed2.xml
 
 func TestSyncFeeds_PreservesExistingMetadata(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -158,11 +146,7 @@ https://example.com/feed2.xml`)); err != nil {
 
 func TestSyncFeeds_HTTPError(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -192,11 +176,7 @@ func TestSyncFeeds_HTTPError(t *testing.T) {
 
 func TestSyncFeeds_EmptyResponse(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -229,11 +209,7 @@ func TestSyncFeeds_EmptyResponse(t *testing.T) {
 
 func TestSyncFeeds_DuplicatesInList(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
 
 	repo := db.NewFeedRepository(database)
@@ -270,11 +246,7 @@ https://example.com/feed2.xml`)); err != nil {
 
 func TestNewFeedSyncer(t *testing.T) {
 	database := testutil.SetupTestDB(t)
-	defer func() {
-		if err := database.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer database.Close()
 
 	repo := db.NewFeedRepository(database)
 	url := "https://example.com/feeds.txt"

@@ -228,8 +228,9 @@ func TestListUserContents_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, float64(1), response["total_count"])
-	assert.Equal(t, float64(20), response["limit"])
+	pagination := response["pagination"].(map[string]interface{})
+	assert.Equal(t, float64(1), pagination["total"])
+	assert.Equal(t, float64(20), pagination["limit"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -278,6 +279,7 @@ func TestListUserContents_WithPagination(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -286,9 +288,10 @@ func TestListUserContents_WithPagination(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, float64(50), response["limit"])
-	assert.Equal(t, float64(10), response["offset"])
-	assert.NotNil(t, response["next_cursor"]) // Should have next cursor since 10+50 < 100
+	pagination := response["pagination"].(map[string]interface{})
+	assert.Equal(t, float64(50), pagination["limit"])
+	assert.Equal(t, float64(10), pagination["offset"])
+	assert.Equal(t, true, pagination["has_more"]) // Should have more since 10+50 < 100
 	mockUserContentRepo.AssertExpectations(t)
 }
 
@@ -298,10 +301,12 @@ func TestListUserContents_InvalidUserID(t *testing.T) {
 	mockContentRepo := new(MockContentRepository)
 	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
+	authUserID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/invalid-uuid/contents", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", "invalid-uuid")
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, authUserID)
 
 	w := httptest.NewRecorder()
 
@@ -310,7 +315,7 @@ func TestListUserContents_InvalidUserID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_user_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestListUserContents_InvalidStatus tests handling of invalid status filter
@@ -325,6 +330,7 @@ func TestListUserContents_InvalidStatus(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -333,7 +339,7 @@ func TestListUserContents_InvalidStatus(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_status", response["error"])
+	assert.Equal(t, "validation_error", response["error"])
 }
 
 // TestAddContentToUser_Success tests successfully adding content to user
@@ -382,8 +388,9 @@ func TestAddContentToUser_Success(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, userID.String(), response["user_id"])
-	assert.Equal(t, contentID.String(), response["content_id"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, userID.String(), data["user_id"])
+	assert.Equal(t, contentID.String(), data["content_id"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -430,7 +437,7 @@ func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "already_exists", response["error"])
+	assert.Equal(t, "conflict", response["error"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -466,7 +473,7 @@ func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "content_not_found", response["error"])
+	assert.Equal(t, "not_found", response["error"])
 	mockContentRepo.AssertExpectations(t)
 }
 
@@ -531,6 +538,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -539,9 +547,10 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "read", response["status"])
-	assert.Equal(t, float64(100), response["scroll_position"])
-	assert.Equal(t, true, response["is_favorite"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, "read", data["status"])
+	assert.Equal(t, float64(100), data["scroll_position"])
+	assert.Equal(t, true, data["is_favorite"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -568,6 +577,7 @@ func TestUpdateUserContent_NotFound(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -600,6 +610,7 @@ func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -608,7 +619,7 @@ func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_status", response["error"])
+	assert.Equal(t, "validation_error", response["error"])
 }
 
 // TestDeleteUserContent_Success tests successful content deletion
@@ -628,6 +639,7 @@ func TestDeleteUserContent_Success(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -654,6 +666,7 @@ func TestDeleteUserContent_Error(t *testing.T) {
 	rctx.URLParams.Add("user_id", userID.String())
 	rctx.URLParams.Add("content_id", contentID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -662,7 +675,7 @@ func TestDeleteUserContent_Error(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "delete_failed", response["error"])
+	assert.Equal(t, "internal_error", response["error"])
 	mockUserContentRepo.AssertExpectations(t)
 }
 
@@ -706,15 +719,17 @@ func TestSearchUserContents_Success(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
 	handler.SearchUserContents(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var response []map[string]interface{}
+	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Len(t, response, 1)
+	data := response["data"].([]interface{})
+	assert.Len(t, data, 1)
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -732,6 +747,7 @@ func TestSearchUserContents_MissingQuery(t *testing.T) {
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
 
@@ -740,7 +756,7 @@ func TestSearchUserContents_MissingQuery(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "missing_query", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // Helper function to add authenticated user ID to request context
@@ -769,7 +785,7 @@ func setupUserContentRequest(userID uuid.UUID, authUserID uuid.UUID, path string
 // Authentication and Authorization Tests
 // ============================================================================
 
-// TestListUserContents_MissingAuth tests that missing authentication returns 401
+// TestListUserContents_MissingAuth tests that missing authentication returns an error
 func TestListUserContents_MissingAuth(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
@@ -777,27 +793,22 @@ func TestListUserContents_MissingAuth(t *testing.T) {
 
 	userID := uuid.New()
 
-	// Request without auth context - this should trigger a panic from MustGetUserID
-	// In a real scenario, the middleware would prevent this from reaching the handler
-	// But for testing the authorization check, we mock what the middleware provides
+	// Request without auth context
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 	// NOTE: No auth context added - in production, middleware.RequireAuth would return 401
 
-	// NOTE: No auth context added - testing that handler panics without it
 	w := httptest.NewRecorder()
 
-	// This will panic because MustGetUserID requires auth context
-	// This is expected behavior - the middleware ensures context is set
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected MustGetUserID to panic when auth context missing")
-		}
-	}()
-
 	handler.ListUserContents(w, req)
+
+	// GetUserIDOrError returns error when auth context is missing
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "internal_error", response["error"])
 }
 
 // TestListUserContents_UnauthorizedUserAccess tests that user cannot access another user's content
@@ -871,7 +882,8 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, float64(1), response["total_count"])
+	pagination := response["pagination"].(map[string]interface{})
+	assert.Equal(t, float64(1), pagination["total"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }

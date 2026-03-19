@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
@@ -11,11 +10,7 @@ import (
 
 func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -51,11 +46,7 @@ func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {
 
 func TestGetNextFeed_PrioritizesOldestFetch(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -87,11 +78,7 @@ func TestGetNextFeed_PrioritizesOldestFetch(t *testing.T) {
 
 func TestGetNextFeed_SkipsDisabledFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -119,11 +106,7 @@ func TestGetNextFeed_SkipsDisabledFeeds(t *testing.T) {
 
 func TestGetNextFeed_NoEnabledFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -146,11 +129,7 @@ func TestGetNextFeed_NoEnabledFeeds(t *testing.T) {
 
 func TestUpdateFetchResult_Success(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -181,11 +160,7 @@ func TestUpdateFetchResult_Success(t *testing.T) {
 
 func TestUpdateFetchResult_Failure(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -214,11 +189,7 @@ func TestUpdateFetchResult_Failure(t *testing.T) {
 
 func TestUpdateFetchResult_DisablesAfter10Failures(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -247,11 +218,7 @@ func TestUpdateFetchResult_DisablesAfter10Failures(t *testing.T) {
 
 func TestImportFeeds_NewFeeds(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -278,11 +245,7 @@ func TestImportFeeds_NewFeeds(t *testing.T) {
 
 func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -325,11 +288,7 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 
 func TestRecordFetchHistory_Success(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -353,8 +312,8 @@ func TestRecordFetchHistory_Success(t *testing.T) {
 	// Verify record contents
 	var success bool
 	var articlesFound, articlesSent int
-	var errorMsg sql.NullString
-	err = db.QueryRow(`
+	var errorMsg *string
+	err = db.QueryRow(ctx, `
 		SELECT success, articles_found, articles_sent, error_message
 		FROM fetch_history
 		WHERE feed_id = $1
@@ -373,18 +332,14 @@ func TestRecordFetchHistory_Success(t *testing.T) {
 	if articlesSent != 8 {
 		t.Errorf("Expected articles_sent=8, got %d", articlesSent)
 	}
-	if errorMsg.Valid {
+	if errorMsg != nil {
 		t.Error("Expected no error message for successful fetch")
 	}
 }
 
 func TestRecordFetchHistory_Failure(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -407,8 +362,8 @@ func TestRecordFetchHistory_Failure(t *testing.T) {
 
 	// Verify record contents
 	var success bool
-	var errorMsg sql.NullString
-	err = db.QueryRow(`
+	var errorMsg *string
+	err = db.QueryRow(ctx, `
 		SELECT success, error_message
 		FROM fetch_history
 		WHERE feed_id = $1
@@ -421,18 +376,14 @@ func TestRecordFetchHistory_Failure(t *testing.T) {
 	if success {
 		t.Error("Expected success=false")
 	}
-	if !errorMsg.Valid || errorMsg.String != "HTTP timeout" {
+	if errorMsg == nil || *errorMsg != "HTTP timeout" {
 		t.Errorf("Expected error_message='HTTP timeout', got %v", errorMsg)
 	}
 }
 
 func TestListFeeds_All(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)
@@ -456,11 +407,7 @@ func TestListFeeds_All(t *testing.T) {
 
 func TestListFeeds_EnabledOnly(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Logf("error closing database: %v", err)
-		}
-	}()
+	defer db.Close()
 	defer testutil.CleanupTestDB(t, db)
 
 	repo := NewFeedRepository(db)

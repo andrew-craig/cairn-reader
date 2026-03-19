@@ -29,7 +29,7 @@ func TestRequireSameUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
 		req = withChiURLParams(req, map[string]string{"id": userID.String()})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -52,7 +52,7 @@ func TestRequireSameUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/"+requestedUserID.String(), nil)
 		req = withChiURLParams(req, map[string]string{"id": requestedUserID.String()})
-		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		ctx := auth.SetUserIDInContext(req.Context(), authenticatedUserID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -92,7 +92,7 @@ func TestRequireSameUser(t *testing.T) {
 		userID := uuid.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/users", nil)
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 		// No :id parameter
 
@@ -114,7 +114,7 @@ func TestRequireSameUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
 		req = withChiURLParams(req, map[string]string{"id": "invalid-uuid"})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -136,7 +136,7 @@ func TestRequireSameUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
 		req = withChiURLParams(req, map[string]string{"id": userID.String()})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -159,7 +159,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/profiles/"+userID.String(), nil)
 		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -181,7 +181,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/profiles/"+requestedUserID.String(), nil)
 		req = withChiURLParams(req, map[string]string{"user_id": requestedUserID.String()})
-		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		ctx := auth.SetUserIDInContext(req.Context(), authenticatedUserID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -200,7 +200,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 		userID := uuid.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/profiles", nil)
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -220,7 +220,7 @@ func TestRequireSameUserWithCustomParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/profiles/not-a-uuid", nil)
 		req = withChiURLParams(req, map[string]string{"user_id": "not-a-uuid"})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -270,7 +270,7 @@ func TestRequireOwnership(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
 		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -296,7 +296,7 @@ func TestRequireOwnership(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
 		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
-		ctx := auth.WithUserID(req.Context(), authenticatedUserID)
+		ctx := auth.SetUserIDInContext(req.Context(), authenticatedUserID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -320,7 +320,7 @@ func TestRequireOwnership(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
 		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -368,7 +368,7 @@ func TestRequireOwnership(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/resources/123", nil)
 		req = withChiURLParams(req, map[string]string{"resource_id": "123"})
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()

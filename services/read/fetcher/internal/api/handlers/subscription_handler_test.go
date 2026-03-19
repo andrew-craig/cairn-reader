@@ -104,11 +104,13 @@ func TestSubscribe_NewFeed(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, subscriptionID.String(), response["subscription_id"])
-	assert.Equal(t, feedID.String(), response["feed_id"])
-	assert.Equal(t, feedURL, response["feed_url"])
-	assert.Equal(t, feedTitle, response["feed_title"])
-	assert.Equal(t, true, response["is_new_feed"])
+	// Response is wrapped: {"data": {...}, "meta": {...}}
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, subscriptionID.String(), data["subscription_id"])
+	assert.Equal(t, feedID.String(), data["feed_id"])
+	assert.Equal(t, feedURL, data["feed_url"])
+	assert.Equal(t, feedTitle, data["feed_title"])
+	assert.Equal(t, true, data["is_new_feed"])
 	mockService.AssertExpectations(t)
 }
 
@@ -159,7 +161,8 @@ func TestSubscribe_ExistingFeed(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, false, response["is_new_feed"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, false, data["is_new_feed"])
 	mockService.AssertExpectations(t)
 }
 
@@ -186,7 +189,8 @@ func TestSubscribe_InvalidUserID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_user_id", response["error"])
+	// api.WriteError returns {"error": "bad_request", "message": "...", "meta": {...}}
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestSubscribe_InvalidJSON tests handling of invalid JSON
@@ -210,7 +214,7 @@ func TestSubscribe_InvalidJSON(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_request", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestSubscribe_EmptyFeedURL tests handling of empty feed URL
@@ -238,7 +242,7 @@ func TestSubscribe_EmptyFeedURL(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_feed_url", response["error"])
+	assert.Equal(t, "validation_error", response["error"])
 }
 
 // TestSubscribe_FeedLimitExceeded tests handling when user reaches 100 feed limit
@@ -270,7 +274,7 @@ func TestSubscribe_FeedLimitExceeded(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "feed_limit_reached", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -303,7 +307,7 @@ func TestSubscribe_AlreadySubscribed(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "already_subscribed", response["error"])
+	assert.Equal(t, "conflict", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -336,7 +340,7 @@ func TestSubscribe_InvalidFeedURL(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_feed", response["error"])
+	assert.Equal(t, "validation_error", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -364,8 +368,10 @@ func TestUnsubscribe_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, true, response["success"])
-	assert.Contains(t, response["message"], "Successfully unsubscribed")
+	// Response is wrapped: {"data": {"success": true, "message": "..."}, "meta": {...}}
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, true, data["success"])
+	assert.Contains(t, data["message"], "Successfully unsubscribed")
 	mockService.AssertExpectations(t)
 }
 
@@ -390,7 +396,7 @@ func TestUnsubscribe_InvalidUserID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_user_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestUnsubscribe_InvalidFeedID tests handling of invalid feed ID
@@ -414,7 +420,7 @@ func TestUnsubscribe_InvalidFeedID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_feed_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestUnsubscribe_NotSubscribed tests handling when subscription doesn't exist
@@ -442,7 +448,7 @@ func TestUnsubscribe_NotSubscribed(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "subscription_not_found", response["error"])
+	assert.Equal(t, "not_found", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -505,8 +511,10 @@ func TestListSubscriptions_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, float64(2), response["count"])
-	subs := response["subscriptions"].([]interface{})
+	// Response is wrapped: {"data": {"subscriptions": [...], "count": 2}, "meta": {...}}
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, float64(2), data["count"])
+	subs := data["subscriptions"].([]interface{})
 	assert.Len(t, subs, 2)
 	mockService.AssertExpectations(t)
 }
@@ -533,7 +541,8 @@ func TestListSubscriptions_Empty(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, float64(0), response["count"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, float64(0), data["count"])
 	mockService.AssertExpectations(t)
 }
 
@@ -555,7 +564,7 @@ func TestListSubscriptions_InvalidUserID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_user_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestEnableFeed_Success tests successfully re-enabling a disabled feed
@@ -580,8 +589,9 @@ func TestEnableFeed_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, true, response["success"])
-	assert.Contains(t, response["message"], "successfully enabled")
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, true, data["success"])
+	assert.Contains(t, data["message"], "successfully enabled")
 	mockService.AssertExpectations(t)
 }
 
@@ -603,7 +613,7 @@ func TestEnableFeed_InvalidFeedID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_feed_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestEnableFeed_NotFound tests handling when feed doesn't exist
@@ -629,7 +639,7 @@ func TestEnableFeed_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "feed_not_found", response["error"])
+	assert.Equal(t, "not_found", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -656,6 +666,6 @@ func TestEnableFeed_AlreadyActive(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "already_active", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 	mockService.AssertExpectations(t)
 }

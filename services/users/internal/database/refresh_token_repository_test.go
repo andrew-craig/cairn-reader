@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -106,7 +107,7 @@ func TestRefreshTokenRepository_CreateRefreshToken(t *testing.T) {
 		token, err := tokenRepo.CreateRefreshToken(ctx, uuid.Nil, tokenHash, expiresAt, nil, nil, nil)
 		assert.Error(t, err)
 		assert.Nil(t, token)
-		assert.ErrorIs(t, err, ErrInvalidTokenData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidTokenData)
 	})
 
 	t.Run("empty token hash", func(t *testing.T) {
@@ -115,7 +116,7 @@ func TestRefreshTokenRepository_CreateRefreshToken(t *testing.T) {
 		token, err := tokenRepo.CreateRefreshToken(ctx, user.ID, "", expiresAt, nil, nil, nil)
 		assert.Error(t, err)
 		assert.Nil(t, token)
-		assert.ErrorIs(t, err, ErrInvalidTokenData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidTokenData)
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -177,14 +178,14 @@ func TestRefreshTokenRepository_GetRefreshTokenByHash(t *testing.T) {
 		token, err := tokenRepo.GetRefreshTokenByHash(ctx, nonExistentHash)
 		assert.Error(t, err)
 		assert.Nil(t, token)
-		assert.ErrorIs(t, err, ErrTokenNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
 	})
 
 	t.Run("empty hash", func(t *testing.T) {
 		token, err := tokenRepo.GetRefreshTokenByHash(ctx, "")
 		assert.Error(t, err)
 		assert.Nil(t, token)
-		assert.ErrorIs(t, err, ErrInvalidTokenData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidTokenData)
 	})
 }
 
@@ -227,7 +228,7 @@ func TestRefreshTokenRepository_UpdateLastUsedAt(t *testing.T) {
 		nonExistentID := uuid.New()
 		err := tokenRepo.UpdateLastUsedAt(ctx, nonExistentID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrTokenNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
 	})
 }
 
@@ -258,14 +259,14 @@ func TestRefreshTokenRepository_RevokeToken(t *testing.T) {
 		retrieved, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash)
 		assert.Error(t, err)
 		assert.Nil(t, retrieved)
-		assert.ErrorIs(t, err, ErrTokenNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
 	})
 
 	t.Run("token not found", func(t *testing.T) {
 		nonExistentID := uuid.New()
 		err := tokenRepo.RevokeToken(ctx, nonExistentID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrTokenNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
 	})
 }
 
@@ -389,7 +390,7 @@ func TestRefreshTokenRepository_RevokeTokenFamily(t *testing.T) {
 	t.Run("empty family ID", func(t *testing.T) {
 		err := tokenRepo.RevokeTokenFamily(ctx, uuid.Nil)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrInvalidTokenData)
+		assert.ErrorIs(t, err, apperrors.ErrInvalidTokenData)
 	})
 
 	t.Run("success - non-existent family", func(t *testing.T) {
@@ -670,10 +671,10 @@ func TestRefreshTokenRepository_EdgeCases(t *testing.T) {
 		err = tokenRepo.RevokeToken(ctx, token.ID)
 		require.NoError(t, err)
 
-		// Second revoke should fail with ErrTokenNotFound
+		// Second revoke should fail with apperrors.ErrTokenNotFound
 		err = tokenRepo.RevokeToken(ctx, token.ID)
 		assert.Error(t, err)
-		assert.ErrorIs(t, err, ErrTokenNotFound)
+		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
 	})
 
 	t.Run("update last used on already used token", func(t *testing.T) {

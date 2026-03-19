@@ -22,13 +22,13 @@ func TestUserService_GetUser_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize user service
-	userService := services.NewUserService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.PasswordHash,
-		8,
-		true,
-	)
+	userService := services.NewUserService(services.UserServiceConfig{
+		UserRepo:          env.UserRepo,
+		RefreshTokenRepo:  env.TokenRepo,
+		PasswordHasher:    env.PasswordHash,
+		PasswordMinLength: 8,
+		RequireComplexity: true,
+	})
 
 	ctx := context.Background()
 
@@ -90,13 +90,13 @@ func TestUserService_UpdateUser_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize user service
-	userService := services.NewUserService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.PasswordHash,
-		8,
-		true,
-	)
+	userService := services.NewUserService(services.UserServiceConfig{
+		UserRepo:          env.UserRepo,
+		RefreshTokenRepo:  env.TokenRepo,
+		PasswordHasher:    env.PasswordHash,
+		PasswordMinLength: 8,
+		RequireComplexity: true,
+	})
 
 	ctx := context.Background()
 
@@ -187,13 +187,13 @@ func TestUserService_UpgradeAccount_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize user service
-	userService := services.NewUserService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.PasswordHash,
-		8,
-		true,
-	)
+	userService := services.NewUserService(services.UserServiceConfig{
+		UserRepo:          env.UserRepo,
+		RefreshTokenRepo:  env.TokenRepo,
+		PasswordHasher:    env.PasswordHash,
+		PasswordMinLength: 8,
+		RequireComplexity: true,
+	})
 
 	ctx := context.Background()
 
@@ -340,23 +340,22 @@ func TestUserService_DeleteUser_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize user service and auth service
-	userService := services.NewUserService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.PasswordHash,
-		8,
-		true,
-	)
+	userService := services.NewUserService(services.UserServiceConfig{
+		UserRepo:          env.UserRepo,
+		RefreshTokenRepo:  env.TokenRepo,
+		PasswordHasher:    env.PasswordHash,
+		PasswordMinLength: 8,
+		RequireComplexity: true,
+	})
 
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
@@ -407,10 +406,10 @@ func TestUserService_DeleteUser_Integration(t *testing.T) {
 		userID := registerResponse.User.ID
 
 		// Login from multiple devices
-		_, err = authService.Login(ctx, email, password)
+		_, err = authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
-		_, err = authService.Login(ctx, email, password)
+		_, err = authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 
 		// Delete user (should also delete all refresh tokens)
@@ -452,30 +451,29 @@ func TestUserService_EndToEnd_Integration(t *testing.T) {
 	defer env.CleanupAllTestData(t)
 
 	// Initialize services
-	userService := services.NewUserService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.PasswordHash,
-		8,
-		true,
-	)
+	userService := services.NewUserService(services.UserServiceConfig{
+		UserRepo:          env.UserRepo,
+		RefreshTokenRepo:  env.TokenRepo,
+		PasswordHasher:    env.PasswordHash,
+		PasswordMinLength: 8,
+		RequireComplexity: true,
+	})
 
-	authService := services.NewAuthService(
-		env.UserRepo,
-		env.TokenRepo,
-		env.JWTManager,
-		env.PasswordHash,
-		env.TokenService,
-		8,
-		true,
-	)
+	authService := services.NewAuthService(services.AuthServiceConfig{
+		UserRepo:            env.UserRepo,
+		RefreshTokenService: env.TokenService,
+		JWTManager:          env.JWTManager,
+		PasswordHasher:      env.PasswordHash,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+	})
 
 	ctx := context.Background()
 
 	t.Run("Complete mobile user lifecycle", func(t *testing.T) {
 		// Step 1: Register mobile user
 		deviceID := testutil.RandomDeviceID()
-		registerResponse, err := authService.RegisterMobile(ctx, deviceID, nil, nil)
+		registerResponse, err := authService.RegisterMobile(ctx, deviceID, "", "")
 		require.NoError(t, err)
 		userID := registerResponse.User.ID
 		defer env.CleanupTestUser(t, userID)
@@ -493,7 +491,7 @@ func TestUserService_EndToEnd_Integration(t *testing.T) {
 		assert.True(t, upgradedUser.IsHybrid())
 
 		// Step 4: Login with email
-		loginResponse, err := authService.Login(ctx, email, password)
+		loginResponse, err := authService.Login(ctx, email, password, "", "")
 		require.NoError(t, err)
 		assert.Equal(t, userID, loginResponse.User.ID)
 
@@ -533,7 +531,7 @@ func TestUserService_EndToEnd_Integration(t *testing.T) {
 		assert.Equal(t, newEmail, *updatedUser.Email)
 
 		// Step 4: Login with new email
-		loginResponse, err := authService.Login(ctx, newEmail, password)
+		loginResponse, err := authService.Login(ctx, newEmail, password, "", "")
 		require.NoError(t, err)
 		assert.Equal(t, userID, loginResponse.User.ID)
 

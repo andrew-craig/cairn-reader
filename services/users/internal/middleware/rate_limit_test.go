@@ -263,7 +263,7 @@ func TestRateLimitByUser(t *testing.T) {
 		// First 2 requests pass
 		for i := 0; i < 2; i++ {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			ctx := auth.WithUserID(req.Context(), userID)
+			ctx := auth.SetUserIDInContext(req.Context(), userID)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -273,7 +273,7 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// Third request is blocked
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -313,7 +313,7 @@ func TestRateLimitByUser(t *testing.T) {
 		// User 1 uses up their limit
 		for i := 0; i < 2; i++ {
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			ctx := auth.WithUserID(req.Context(), user1)
+			ctx := auth.SetUserIDInContext(req.Context(), user1)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -322,7 +322,7 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// User 1 is blocked
 		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx1 := auth.WithUserID(req1.Context(), user1)
+		ctx1 := auth.SetUserIDInContext(req1.Context(), user1)
 		req1 = req1.WithContext(ctx1)
 		w1 := httptest.NewRecorder()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -331,7 +331,7 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// User 2 can still make requests
 		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx2 := auth.WithUserID(req2.Context(), user2)
+		ctx2 := auth.SetUserIDInContext(req2.Context(), user2)
 		req2 = req2.WithContext(ctx2)
 		w2 := httptest.NewRecorder()
 		middleware(handler).ServeHTTP(w2, req2)
@@ -344,7 +344,7 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// Use up limit
 		req1 := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx1 := auth.WithUserID(req1.Context(), userID)
+		ctx1 := auth.SetUserIDInContext(req1.Context(), userID)
 		req1 = req1.WithContext(ctx1)
 		w1 := httptest.NewRecorder()
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
@@ -352,7 +352,7 @@ func TestRateLimitByUser(t *testing.T) {
 
 		// Second request
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := auth.WithUserID(req.Context(), userID)
+		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		middleware(handler).ServeHTTP(w, req)

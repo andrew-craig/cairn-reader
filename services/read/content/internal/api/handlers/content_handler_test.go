@@ -132,8 +132,9 @@ func TestCreateContent_Success(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, contentID.String(), response["id"])
-	assert.Equal(t, "Test Article", response["title"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, contentID.String(), data["id"])
+	assert.Equal(t, "Test Article", data["title"])
 	mockService.AssertExpectations(t)
 }
 
@@ -186,7 +187,7 @@ func TestCreateContent_InvalidJSON(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_request", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestCreateContent_MissingURL tests validation when URL is missing
@@ -257,7 +258,7 @@ func TestCreateContent_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "creation_failed", response["error"])
+	assert.Equal(t, "internal_error", response["error"])
 	mockService.AssertExpectations(t)
 }
 
@@ -301,7 +302,8 @@ func TestUpdateContent_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "Updated Article", response["title"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, "Updated Article", data["title"])
 	mockService.AssertExpectations(t)
 }
 
@@ -329,7 +331,7 @@ func TestUpdateContent_InvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestUpdateContent_NotFound tests handling when content is not found
@@ -423,8 +425,9 @@ func TestGetContent_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, contentID.String(), response["id"])
-	assert.Equal(t, "Test Article", response["title"])
+	data := response["data"].(map[string]interface{})
+	assert.Equal(t, contentID.String(), data["id"])
+	assert.Equal(t, "Test Article", data["title"])
 	mockService.AssertExpectations(t)
 }
 
@@ -445,7 +448,7 @@ func TestGetContent_InvalidID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
-	assert.Equal(t, "invalid_id", response["error"])
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestGetContent_NotFound tests handling when content is not found

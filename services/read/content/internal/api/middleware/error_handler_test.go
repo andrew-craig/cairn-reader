@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,11 +13,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// captureSlog sets the default slog logger to write to a buffer and returns
+// the buffer and a cleanup function to restore the previous logger.
+func captureSlog() (*bytes.Buffer, func()) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	return &buf, func() { slog.SetDefault(prev) }
+}
+
 func TestRecovery_NoPanic(t *testing.T) {
 	// Capture log output
-	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
-	defer log.SetOutput(io.Discard)
+	logBuffer, cleanup := captureSlog()
+	defer cleanup()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -37,13 +45,12 @@ func TestRecovery_NoPanic(t *testing.T) {
 
 	// Should not log any panic
 	logOutput := logBuffer.String()
-	assert.NotContains(t, logOutput, "PANIC")
+	assert.NotContains(t, logOutput, "panic recovered")
 }
 
 func TestRecovery_WithPanic(t *testing.T) {
-	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
-	defer log.SetOutput(io.Discard)
+	logBuffer, cleanup := captureSlog()
+	defer cleanup()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
@@ -70,14 +77,13 @@ func TestRecovery_WithPanic(t *testing.T) {
 
 	// Should log the panic
 	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "PANIC")
+	assert.Contains(t, logOutput, "panic recovered")
 	assert.Contains(t, logOutput, "test panic")
 }
 
 func TestRecovery_WithStringPanic(t *testing.T) {
-	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
-	defer log.SetOutput(io.Discard)
+	logBuffer, cleanup := captureSlog()
+	defer cleanup()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("string panic message")
@@ -97,9 +103,8 @@ func TestRecovery_WithStringPanic(t *testing.T) {
 }
 
 func TestRecovery_WithErrorPanic(t *testing.T) {
-	var logBuffer bytes.Buffer
-	log.SetOutput(&logBuffer)
-	defer log.SetOutput(io.Discard)
+	logBuffer, cleanup := captureSlog()
+	defer cleanup()
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic(io.EOF)
@@ -115,7 +120,7 @@ func TestRecovery_WithErrorPanic(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "PANIC")
+	assert.Contains(t, logOutput, "panic recovered")
 }
 
 func TestWriteError_BasicError(t *testing.T) {

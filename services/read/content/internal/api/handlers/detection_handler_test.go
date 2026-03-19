@@ -56,13 +56,15 @@ func TestDetectURL_Feed(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response dto.DetectURLResponse
-	err := json.NewDecoder(w.Body).Decode(&response)
+	var envelope struct {
+		Data dto.DetectURLResponse `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/feed.xml", response.URL)
-	assert.Equal(t, "feed", response.Type)
-	assert.NotNil(t, response.Title)
-	assert.Equal(t, "Example Blog", *response.Title)
+	assert.Equal(t, "https://example.com/feed.xml", envelope.Data.URL)
+	assert.Equal(t, "feed", envelope.Data.Type)
+	assert.NotNil(t, envelope.Data.Title)
+	assert.Equal(t, "Example Blog", *envelope.Data.Title)
 
 	mockDetector.AssertExpectations(t)
 }
@@ -96,13 +98,15 @@ func TestDetectURL_Page(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response dto.DetectURLResponse
-	err := json.NewDecoder(w.Body).Decode(&response)
+	var envelope struct {
+		Data dto.DetectURLResponse `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/article", response.URL)
-	assert.Equal(t, "page", response.Type)
-	assert.NotNil(t, response.Title)
-	assert.Equal(t, "Example Article", *response.Title)
+	assert.Equal(t, "https://example.com/article", envelope.Data.URL)
+	assert.Equal(t, "page", envelope.Data.Type)
+	assert.NotNil(t, envelope.Data.Title)
+	assert.Equal(t, "Example Article", *envelope.Data.Title)
 
 	mockDetector.AssertExpectations(t)
 }
@@ -135,12 +139,14 @@ func TestDetectURL_Unknown(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response dto.DetectURLResponse
-	err := json.NewDecoder(w.Body).Decode(&response)
+	var envelope struct {
+		Data dto.DetectURLResponse `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/timeout", response.URL)
-	assert.Equal(t, "unknown", response.Type)
-	assert.Nil(t, response.Title)
+	assert.Equal(t, "https://example.com/timeout", envelope.Data.URL)
+	assert.Equal(t, "unknown", envelope.Data.Type)
+	assert.Nil(t, envelope.Data.Title)
 
 	mockDetector.AssertExpectations(t)
 }
@@ -162,10 +168,10 @@ func TestDetectURL_InvalidRequest(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	var response dto.ErrorResponse
+	var response map[string]interface{}
 	err := json.NewDecoder(w.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Equal(t, "invalid_request", response.Error)
+	assert.Equal(t, "bad_request", response["error"])
 }
 
 // TestDetectURL_MissingURL tests missing URL validation
@@ -189,11 +195,11 @@ func TestDetectURL_MissingURL(t *testing.T) {
 	// Assert
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 
-	var response dto.ErrorResponse
+	var response map[string]interface{}
 	err := json.NewDecoder(w.Body).Decode(&response)
 	assert.NoError(t, err)
-	assert.Equal(t, "validation_error", response.Error)
-	assert.Contains(t, response.Message, "URL is required")
+	assert.Equal(t, "validation_error", response["error"])
+	assert.Contains(t, response["message"], "URL is required")
 }
 
 // TestDetectURL_DetectorError tests error handling when detector fails
@@ -220,12 +226,14 @@ func TestDetectURL_DetectorError(t *testing.T) {
 	// Assert - should return 200 with unknown type on error
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var response dto.DetectURLResponse
-	err := json.NewDecoder(w.Body).Decode(&response)
+	var envelope struct {
+		Data dto.DetectURLResponse `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
 	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com/error", response.URL)
-	assert.Equal(t, "unknown", response.Type)
-	assert.Nil(t, response.Title)
+	assert.Equal(t, "https://example.com/error", envelope.Data.URL)
+	assert.Equal(t, "unknown", envelope.Data.Type)
+	assert.Nil(t, envelope.Data.Title)
 
 	mockDetector.AssertExpectations(t)
 }

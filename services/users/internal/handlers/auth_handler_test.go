@@ -775,7 +775,7 @@ func TestLogoutAll(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
 		// Add user ID to context (simulating JWT middleware)
-		ctx := auth.WithUserID(req.Context(), registerResp.User.ID)
+		ctx := auth.SetUserIDInContext(req.Context(), registerResp.User.ID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()
@@ -801,7 +801,7 @@ func TestLogoutAll(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+registerResp.AccessToken)
 
 		// Add user ID to context (simulating JWT middleware)
-		ctx := auth.WithUserID(req.Context(), registerResp.User.ID)
+		ctx := auth.SetUserIDInContext(req.Context(), registerResp.User.ID)
 		req = req.WithContext(ctx)
 
 		w := httptest.NewRecorder()

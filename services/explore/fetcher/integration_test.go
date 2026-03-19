@@ -62,15 +62,15 @@ https://example.com/feed3.xml`))
 	defer rssServer3.Close()
 
 	// Update feed URLs in database to use test servers
-	_, err = database.Exec("UPDATE feeds SET url = $1 WHERE id = 1", rssServer1.URL)
+	_, err = database.Exec(ctx, "UPDATE feeds SET url = $1 WHERE id = 1", rssServer1.URL)
 	if err != nil {
 		t.Fatalf("Failed to update feed 1: %v", err)
 	}
-	_, err = database.Exec("UPDATE feeds SET url = $1 WHERE id = 2", rssServer2.URL)
+	_, err = database.Exec(ctx, "UPDATE feeds SET url = $1 WHERE id = 2", rssServer2.URL)
 	if err != nil {
 		t.Fatalf("Failed to update feed 2: %v", err)
 	}
-	_, err = database.Exec("UPDATE feeds SET url = $1 WHERE id = 3", rssServer3.URL)
+	_, err = database.Exec(ctx, "UPDATE feeds SET url = $1 WHERE id = 3", rssServer3.URL)
 	if err != nil {
 		t.Fatalf("Failed to update feed 3: %v", err)
 	}
