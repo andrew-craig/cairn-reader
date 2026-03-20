@@ -322,17 +322,176 @@ vault kv get -field=value secret/jwt/private-key | head -1
 
 ## Explore Service Configuration
 
-> **TODO**: Document Explore Service configuration
->
-> Topics to cover:
-> - Fetcher service configuration (fetch interval, timeouts)
-> - Recommender service configuration
-> - Database settings for both services
-> - Kagi feed URL configuration
-> - Article retention settings
-> - Example .env file
+The Explore Service consists of two microservices (Fetcher and Recommender), each with their own configuration.
 
-**Status**: Service is operational. See [services/explore/README.md](../services/explore/README.md) for current configuration details.
+### Fetcher Service Configuration
+
+The Fetcher service (port 8080) polls Kagi Small Web for RSS feeds and stores articles for recommendation.
+
+#### Required Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `RECOMMENDER_URL` | string | Yes | `http://localhost:8081` | Base URL of the Explore Recommender service |
+| `KAGI_FEED_URL` | string | Yes | `https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt` | URL to the Kagi Small Web feed list |
+
+#### Server Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PORT` | string | No | `8080` | HTTP server port |
+| `ENVIRONMENT` | string | No | `development` | Deployment environment: `development`, `staging`, or `production` |
+| `SHUTDOWN_TIMEOUT` | duration | No | `30s` | Graceful shutdown timeout (e.g. `30s`, `5m`) |
+
+#### Database Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DB_HOST` | string | No | `localhost` | PostgreSQL host |
+| `DB_PORT` | string | No | `5432` | PostgreSQL port |
+| `DB_USER` | string | No | `fetcher` | PostgreSQL user |
+| `DB_PASSWORD` | string | No | `fetcher_password` | PostgreSQL password |
+| `DB_NAME` | string | No | `fetcher_db` | PostgreSQL database name |
+| `DB_SSLMODE` | string | No | `require` | SSL mode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
+| `DB_MAX_OPEN_CONNS` | int | No | `25` | Maximum open database connections |
+| `DB_MAX_IDLE_CONNS` | int | No | `5` | Maximum idle database connections |
+| `DB_CONN_MAX_LIFETIME` | duration | No | `5m` | Maximum connection lifetime before recycling |
+
+#### Feed Fetch Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `FETCH_INTERVAL` | duration | No | `60s` | Time between individual feed fetches. Accepts Go duration string (`60s`, `1m`) or seconds as integer |
+
+#### Logging Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `LOG_LEVEL` | string | No | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `LOG_FORMAT` | string | No | `text` | Log format: `json` or `text` |
+
+#### Example `.env` File (Fetcher)
+
+```bash
+# Server
+PORT=8080
+ENVIRONMENT=development
+SHUTDOWN_TIMEOUT=30s
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=fetcher
+DB_PASSWORD=your_fetcher_password_here
+DB_NAME=fetcher_db
+DB_SSLMODE=disable
+
+# Feed Fetching
+KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
+RECOMMENDER_URL=http://localhost:8081
+FETCH_INTERVAL=60s
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=text
+```
+
+---
+
+### Recommender Service Configuration
+
+The Recommender service (port 8081) stores articles, tracks votes, and serves recommendations. It requires HashiCorp Vault for JWT public key retrieval.
+
+#### Server Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `PORT` | string | No | `8081` | HTTP server port |
+| `ENVIRONMENT` | string | No | `development` | Deployment environment: `development`, `staging`, or `production` |
+| `SHUTDOWN_TIMEOUT` | duration | No | `30s` | Graceful shutdown timeout (e.g. `30s`, `5m`) |
+
+#### Database Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DB_HOST` | string | No | `localhost` | PostgreSQL host |
+| `DB_PORT` | string | No | `5432` | PostgreSQL port |
+| `DB_USER` | string | No | `cairn` | PostgreSQL user |
+| `DB_PASSWORD` | string | No | `cairn_password` | PostgreSQL password |
+| `DB_NAME` | string | No | `cairn_db` | PostgreSQL database name |
+| `DB_SSLMODE` | string | No | `require` | SSL mode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
+| `DB_MAX_OPEN_CONNS` | int | No | `25` | Maximum open database connections |
+| `DB_MAX_IDLE_CONNS` | int | No | `5` | Maximum idle database connections |
+| `DB_CONN_MAX_LIFETIME` | duration | No | `5m` | Maximum connection lifetime before recycling |
+
+#### Vault Configuration
+
+The Recommender uses HashiCorp Vault to retrieve the JWT public key for validating tokens issued by the User Service. Either `VAULT_TOKEN` (development) or `VAULT_ROLE_ID` + `VAULT_SECRET_ID` (production) must be provided.
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `VAULT_ADDR` | string | Yes (production) | `http://localhost:8200` | HashiCorp Vault server address |
+| `VAULT_TOKEN` | string | Conditional | `` | Vault token for dev/testing. Use instead of AppRole credentials |
+| `VAULT_ROLE_ID` | string | Conditional | `` | Vault AppRole Role ID for production |
+| `VAULT_SECRET_ID` | string | Conditional | `` | Vault AppRole Secret ID (required when `VAULT_ROLE_ID` is set) |
+| `VAULT_AUTH_PATH` | string | No | `approle` | Vault AppRole authentication mount path |
+| `JWT_PUBLIC_KEY_PATH` | string | No | `secret/data/jwt/public-key` | Vault KV path to JWT public key |
+
+#### Article Retention Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ARTICLE_RETENTION_DAYS` | int | No | `90` | Days to retain articles before soft deletion. Must be > 0 |
+
+#### Logging Configuration
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `LOG_LEVEL` | string | No | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `LOG_FORMAT` | string | No | `text` | Log format: `json` or `text` |
+
+#### Example `.env` File (Recommender)
+
+```bash
+# Server
+PORT=8081
+ENVIRONMENT=development
+SHUTDOWN_TIMEOUT=30s
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=cairn
+DB_PASSWORD=your_recommender_password_here
+DB_NAME=cairn_db
+DB_SSLMODE=disable
+
+# Vault (development - use token)
+VAULT_ADDR=http://localhost:8200
+VAULT_TOKEN=your_vault_dev_token_here
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+
+# Vault (production - use AppRole instead of token)
+# VAULT_ROLE_ID=your_role_id
+# VAULT_SECRET_ID=your_secret_id
+
+# Article Retention
+ARTICLE_RETENTION_DAYS=90
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=text
+```
+
+### Service-Specific Notes
+
+**Kagi Small Web**: The Fetcher pulls its feed list from [Kagi Small Web](https://github.com/kagisearch/smallweb), a curated list of independent RSS feeds. The default URL points to the official feed list.
+
+**JWT Validation**: The Recommender validates JWT tokens using a public key fetched from Vault. The User Service must have already written the public key to `JWT_PUBLIC_KEY_PATH` before the Recommender can authenticate requests.
+
+**Article Retention**: Articles are soft-deleted after `ARTICLE_RETENTION_DAYS` days. Votes and read history are preserved even after article soft deletion.
+
+**Development SSL**: Use `DB_SSLMODE=disable` for local PostgreSQL. In production, use `require` or `verify-full`.
 
 ---
 
