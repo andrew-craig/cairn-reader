@@ -45,7 +45,7 @@ fi
 
 # Set up Dolt database from remote
 DOLT_REMOTE="http://github.com/cairn-app/cairn-reader.git"
-DOLT_DATA_DIR="${PROJECT_DIR}/.beads/dolt/beads_orcas"
+DOLT_DATA_DIR="${PROJECT_DIR}/.beads/dolt/beads_cairn"
 
 echo "Setting up Dolt database..."
 if [ ! -d "$DOLT_DATA_DIR" ]; then
