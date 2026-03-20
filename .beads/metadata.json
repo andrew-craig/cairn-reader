@@ -1,6 +1,7 @@
 {
   "database": "dolt",
   "backend": "dolt",
+  "dolt_mode": "server",
   "dolt_database": "beads_cairn",
   "project_id": "08db78de-549a-43d2-a7fe-cdc87415ea01"
 }
