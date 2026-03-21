@@ -27,13 +27,23 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates wget
 
-WORKDIR /root/
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/services/users/user-service .
 
 # Copy migrations (needed for runtime migration execution)
 COPY --from=builder /app/services/users/migrations ./migrations
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8080
 
