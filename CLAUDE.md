@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> 📖 **For detailed service-specific guidance:**
+> **Service-specific guidance:**
 > - [Mobile App](/apps/mobile/CLAUDE.md) - React Native/Expo mobile application
 > - [Explore Service](/services/explore/CLAUDE.md) - RSS feed fetching and content recommendation
 > - [Read Service](/services/read/CLAUDE.md) - Article storage and RSS feed management
@@ -17,324 +17,112 @@ Cairn is a read-it-later application consisting of:
   - **Read Service**: Article storage and user-specific metadata
   - **User Service**: Authentication and account management
 
-## Quick Start - Running All Backend Services
+## Approach to work
+### 1. Plan Node Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately - don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
 
-The easiest way to run all backend services is using the centralized Docker Compose setup:
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
 
-```bash
-cd infrastructure/docker/dev
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
 
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env and set secure passwords
+### 4. Verification Before Done
+- Never mark a task complete without proving it works
+- Diff behavior between main and your changes when relevant
+- Ask yourself: "Would a staff engineer approve this?"
+- Run tests, check logs, demonstrate correctness
 
-# Start all services (Vault, databases, and all backend services)
-docker compose up --build -d
+### 5. Demand Elegance (Balanced)
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes - don't over-engineer
+- Challenge your own work before presenting it
 
-# Check service status
-docker compose ps
+### 6. Autonomous Bug Fixing
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests - then resolve them
+- Zero context switching required from the user
+- Go fix failing CI tests without being told how
 
-# View logs
-docker compose logs -f
+## Core Principles
+- **Simplicity First**: Make every change as simple as possible. Impact minimal code
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards
 
-# Stop all services
-docker compose down
-```
+## Running Services
 
-This starts:
-- HashiCorp Vault (port 8200) with auto-initialization
-- Consolidated PostgreSQL database (port 5432) with all service databases
-- User Service (port 8082)
-- Explore Recommender Service (port 8081)
-- Explore Fetcher Service (port 8080)
-- Content Service (port 8083)
-- Ingest RSS Service (port 8085)
-- Background workers (ports 8084, 8086)
-
-See [infrastructure/docker/README.md](infrastructure/docker/README.md) for detailed documentation.
+See [infrastructure/docker/README.md](infrastructure/docker/README.md) for the Docker Compose setup that runs all backend services (Vault, PostgreSQL, and all microservices).
 
 ## Architecture
 
-> 📖 **For detailed architectural principles and rationale, see [Engineering Principles - Core Architectural Principles](/docs/ENGINEERING_PRINCIPLES.md#core-architectural-principles)**
-
-### System Architecture
-
-Cairn follows a microservices architecture where services communicate via REST APIs:
-
 ```
 Mobile App (React Native) → REST APIs → Backend Services
-                                        ├── User Service (Auth)
-                                        ├── Explore Service (RSS)
-                                        └── Read Service (Storage)
+                                        ├── User Service (Auth, port 8082)
+                                        ├── Explore Service (RSS, ports 8080/8081)
+                                        └── Read Service (Storage, ports 8083/8085)
                                                ↓
                                         PostgreSQL
 ```
 
-**Key Principles**:
-- Each service owns its own logical database (hosted in a single PostgreSQL instance)
-- Services communicate only via HTTP REST APIs
-- JWT-based authentication (stateless)
-- HashiCorp Vault for secrets management
+- Each service owns its own logical database (single PostgreSQL instance)
+- Services communicate only via HTTP REST APIs — **never** access another service's database
+- JWT-based stateless authentication (RS256, keys managed by HashiCorp Vault)
+- All user-specific endpoints require `Authorization: Bearer <token>` header
 
-### Service Overview
+For detailed architecture, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md). For per-service details, see the service CLAUDE.md files linked above.
 
-#### Mobile App (port: Expo dev server)
-- React Native with Expo for iOS and Android
-- Supports light/dark mode with theme system
-- Uses AsyncStorage for local persistence
-- Service layer for backend API communication
+## Cross-Service Notes
 
-See [apps/mobile/CLAUDE.md](/apps/mobile/CLAUDE.md) for details.
+**CRITICAL**: User Service and Explore Recommender require HashiCorp Vault for JWT authentication. The Docker Compose dev setup handles this automatically.
 
-#### User Service (port 8082)
-- JWT-based authentication with RS256 signing
-- Refresh token management with automatic rotation
-- Mobile device authentication via Expo device ID
-- Account upgrade from device-only to email/password
+**Authentication flow**: User Service generates JWT tokens signed with RSA private key from Vault. Other services validate tokens using the RSA public key. Services extract `user_id` from JWT claims for authorization.
 
-See [services/users/CLAUDE.md](/services/users/CLAUDE.md) for details.
+## Testing
 
-#### Explore Service (ports 8080, 8081)
-Two microservices with separate databases:
-- **Fetcher** (8080): RSS feed fetching from Kagi Small Web
-- **Recommender** (8081): Article recommendations with voting
+Run `make test` in any service directory. See each service's CLAUDE.md for service-specific test commands, and [docs/TESTING.md](/docs/TESTING.md) for testing standards.
 
-See [services/explore/CLAUDE.md](/services/explore/CLAUDE.md) for details.
+## Code Conventions
 
-#### Read Service (ports 8083, 8085)
-Two microservices with separate databases:
-- **Content Service** (8083): Article storage with readability extraction
-- **Ingest RSS** (8085): User feed subscriptions with tiered polling
+See [docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) for comprehensive coding standards, architectural principles, and style guides.
 
-See [services/read/CLAUDE.md](/services/read/CLAUDE.md) for details.
+## API Documentation
 
-## API Endpoints Summary
-
-> **Note:** All services use `/health/live` (liveness) and `/health/ready` (readiness) for health checks.
-
-### User Service (port 8082)
-```
-POST /api/v1/auth/register               → Create account
-POST /api/v1/auth/login                  → Login
-POST /api/v1/auth/refresh                → Refresh token
-GET  /api/v1/user/{user_id}              → Get user profile (requires auth)
-```
-
-### Explore Service
-**Fetcher (port 8080)**:
-```
-POST /api/v1/explore/feed/fetch          → Trigger feed fetch
-GET  /api/v1/explore/feed/stats          → Get feed statistics
-```
-
-**Recommender (port 8081)**:
-```
-GET  /api/v1/explore/recommendation/{user_id}       → Get recommendations (requires auth)
-GET  /api/v1/explore/user/{user_id}/votes           → Get user's voted articles (requires auth)
-POST /api/v1/explore/article/{id}/vote              → Vote on article (requires auth)
-POST /api/v1/explore/article/{id}/read              → Mark as read (requires auth)
-```
-
-### Read Service
-**Content Service (port 8083)**:
-```
-POST /api/v1/content/detect                         → Detect URL type (feed/page)
-POST /api/v1/content/user/{user_id}                 → Add URL to user's list
-GET  /api/v1/content/user/{user_id}                 → List user's contents
-GET  /api/v1/content/user/{user_id}/search          → Full-text search
-```
-
-**Ingest RSS (port 8085)**:
-```
-POST /api/v1/source/rss/user/{user_id}/subscription → Subscribe to feed
-GET  /api/v1/source/rss/user/{user_id}/subscription → List subscriptions
-```
-
-For complete API documentation, see:
+Each service has an OpenAPI spec and endpoint documentation in its CLAUDE.md:
 - [services/explore/api/openapi.yaml](/services/explore/api/openapi.yaml)
 - [services/users/api/openapi.yaml](/services/users/api/openapi.yaml)
 - [services/read/api/openapi.yaml](/services/read/api/openapi.yaml)
 
-## Testing and Development Workflow
+All services use `/health/live` (liveness) and `/health/ready` (readiness) for health checks.
 
-> 📖 **For comprehensive testing standards and patterns, see [Engineering Principles - Testing Philosophy](/docs/ENGINEERING_PRINCIPLES.md#testing-philosophy)**
+## Documentation
 
-### Testing Mobile App Changes
-```bash
-cd apps/mobile
-npm start                    # Start Expo dev server
-npm run ios                  # Run on iOS simulator
-npm run android              # Run on Android emulator
-npm run type-check           # TypeScript validation
-npm run lint                 # ESLint
-```
-
-### Testing Backend Changes
-```bash
-# Start all services
-cd infrastructure/docker/dev
-docker compose up --build
-
-# View logs
-docker compose logs -f
-
-# Run tests
-cd services/{service}
-make test
-```
-
-### Database Migrations
-
-Migrations are automatically run when PostgreSQL containers start. To reset databases:
-
-```bash
-cd infrastructure/docker/dev
-docker compose down -v
-docker compose up --build
-```
-
-Or use migration commands:
-```bash
-make migrate-up              # Apply migrations
-make migrate-down            # Rollback
-make migrate-status          # Check status
-```
-
-## Code Conventions
-
-> 📖 **For comprehensive coding standards and style guides, see [Engineering Principles - Development Standards](/docs/ENGINEERING_PRINCIPLES.md#development-standards)**
-
-### Go Code Style
-- Use `fmt.Errorf("context: %w", err)` for error wrapping
-- Return errors up the call stack; let handlers format HTTP responses
-- Use `context.Context` for all database calls
-- Prefer batch operations over loops
-- Use `ON CONFLICT` for upsert semantics
-- Always set timeouts on HTTP clients
-
-### TypeScript/React Native Code Style
-- Use functional components with hooks
-- Define types for all component props
-- Use TypeScript interfaces for data models
-- Keep styles close to components or use theme system
-- Handle loading and error states in all screens
-
-## Important Cross-Service Notes
-
-### HashiCorp Vault Dependency
-
-**CRITICAL**: User Service and Explore Recommender require HashiCorp Vault for JWT authentication.
-
-**What Vault is used for:**
-- User Service: Generates and stores RS256 JWT signing keys
-- Explore Recommender: Retrieves JWT public key for token verification
-- All services: Secret management in production
-
-**Development Setup:**
-
-The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.yml](infrastructure/docker/dev/docker-compose.yml)) includes:
-1. Vault container in dev mode (port 8200)
-2. Automated `vault-init` service that generates RSA keys
-3. All services configured to use shared Vault instance
-
-**Production:** Use properly configured Vault cluster with persistent storage, TLS, and proper authentication.
-
-### Authentication Flow
-
-1. **User Service** generates JWT tokens signed with RSA private key (from Vault)
-2. **Other services** validate JWT tokens using RSA public key (from Vault)
-3. All user-specific endpoints require valid JWT in `Authorization: Bearer <token>` header
-4. Services extract `user_id` from JWT claims for authorization
-
-### Service Communication
-
-- **ALWAYS** use REST APIs for inter-service communication
-- **NEVER** access another service's database directly
-- Each service owns its own logical database (shared PostgreSQL instance, separate DBs)
-- Use appropriate HTTP clients with timeouts and retry logic
-
-
-## Documentation References
-
-### Service-Specific Documentation
-- **Mobile App**: [apps/mobile/CLAUDE.md](/apps/mobile/CLAUDE.md) - React Native app details
-- **Explore Service**: [services/explore/CLAUDE.md](/services/explore/CLAUDE.md), [services/explore/README.md](/services/explore/README.md)
-- **Read Service**: [services/read/CLAUDE.md](/services/read/CLAUDE.md), [services/read/README.md](/services/read/README.md)
-- **User Service**: [services/users/CLAUDE.md](/services/users/CLAUDE.md), [services/users/README.md](/services/users/README.md)
-
-### Project-Wide Documentation
-- **Engineering Principles**: [docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) - Architectural principles, coding standards, testing philosophy
-- **Main README**: [README.md](/README.md) - Project overview and getting started
-- **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md) - Docker Compose setup
-
+- **Architecture**: [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md)
+- **Engineering Principles**: [docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md)
+- **Testing**: [docs/TESTING.md](/docs/TESTING.md)
+- **Deployment**: [docs/DEPLOYMENT.md](/docs/DEPLOYMENT.md)
+- **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
 
 ## Task Tracking
 
-This project uses **tsk** for task management. Tasks are stored as markdown files with YAML frontmatter in `tasks/`. Closed tasks move to `tasks/closed/`.
+This project uses the **task-manager** skill for task management. Invoke it via `/task-manager` to create, update, list, and close tasks. Tasks are stored as markdown files with YAML frontmatter in `tasks/`, closed tasks move to `tasks/closed/`.
 
-Run `bin/tsk help` to see all options.
+### Individual Task Tracking
+1. **Setup tracking**: If there is not an existing task, create one with `/task-manager`
+2. **Plan First**: Write plan to the task file with checkable items
+3. **Verify Plan**: Check in before starting implementation
+4. **Track Progress**: Mark items complete as you go
+5. **Explain Changes**: High-level summary at each step
+6. **Document Results**: Add review section to the task file
+7. **Capture Lessons**: Update `LEARNINGS.md` after corrections
 
-### Quick Reference
 
-```bash
-bin/tsk ready                                  # Find available work (open tasks by priority)
-bin/tsk show <id>                              # View task details
-bin/tsk update <id> --status=in_progress       # Claim work
-bin/tsk close <id>                             # Complete work
-bin/tsk list                                   # List all active tasks
-bin/tsk list --status=open --type=bug          # Filter tasks
-```
 
-### Creating Tasks
-
-```bash
-bin/tsk create "Task title"                    # Create with defaults (type=task, priority=2)
-bin/tsk create "Fix login bug" --type=bug --priority=1 --description="Steps to reproduce..."
-bin/tsk create "Sub-task" --parent=task_ed8f   # Link to parent
-bin/tsk create "Blocked task" --blocked_by=bug_a3f2,task_9c1d
-```
-
-### Task Fields
-
-| Field | Values |
-|---|---|
-| `type` | `task` `bug` `feature` `chore` `epic` `decision` |
-| `status` | `open` `in_progress` `blocked` `deferred` (closed via `tsk close`) |
-| `priority` | `0`=critical `1`=high `2`=medium `3`=low `4`=backlog |
-| `labels` | Comma-separated tags |
-| `blocked_by` | Comma-separated task IDs |
-| `parent` | Parent task ID |
-
-### File Format
-
-Tasks are stored as `tasks/<type>_<id>.md`, for example `tasks/bug_a3f2.md`:
-
-```markdown
----
-id: bug_a3f2
-title: Fix login error on mobile
-type: bug
-status: in_progress
-priority: 1
-labels: [auth, mobile]
-blocked_by: []
-parent: null
-created_at: 2026-03-21T10:00:00Z
-updated_at: 2026-03-21T11:30:00Z
----
-Optional description or notes go here.
-```
-
-### Agent Workflow
-
-```bash
-bin/tsk ready                                  # Find available work
-bin/tsk update <id> --status=in_progress       # Claim a task before starting
-# ... do work ...
-bin/tsk close <id>                             # Mark done when complete
-```
-
-When discovering new work during a task, create linked sub-tasks:
-```bash
-bin/tsk create "Discovered issue" --parent=<current-task-id>
-```
