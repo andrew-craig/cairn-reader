@@ -4,7 +4,8 @@
       "Bash(skills/tsk/scripts/tsk update:*)",
       "Bash(skills/tsk/scripts/tsk create:*)",
       "Bash(skills/tsk/scripts/tsk ready:*)",
-      "Bash(skills/tsk/scripts/tsk close:*)"
+      "Bash(skills/tsk/scripts/tsk close:*)",
+      "Bash(skills/tsk/scripts/tsk list:*)"
     ]
   },
   "hooks": {
