@@ -373,6 +373,37 @@ cmd_close() {
 
     echo "closed: $id"
     echo "moved to: $CLOSED_DIR/$filename"
+
+    # Auto-unblock: scan active tasks that list this id in blocked_by
+    while IFS= read -r -d '' dependent; do
+        local raw_blocked; raw_blocked=$(get_field "$dependent" "blocked_by")
+        # Skip if blocked_by is empty or []
+        [[ "$raw_blocked" == "[]" || -z "$raw_blocked" ]] && continue
+        # Check if this closed id appears in the list
+        if echo "$raw_blocked" | grep -qw "$id"; then
+            # Remove the closed id from the list
+            local new_blocked
+            # Use awk (not grep -v) so exit code is 0 even when all entries are removed
+            new_blocked=$(echo "$raw_blocked" | tr -d '[]' | tr ',' '\n' | \
+                awk -v id="$id" 'NF && $0 != id' | tr '\n' ',' | sed 's/^,//;s/,$//')
+            if [[ -z "$new_blocked" ]]; then
+                update_field "$dependent" "blocked_by" "[]"
+                # If task was blocked, flip it back to open
+                if [[ "$(get_field "$dependent" "status")" == "blocked" ]]; then
+                    update_field "$dependent" "status" "open"
+                    update_field "$dependent" "updated_at" "$now"
+                    echo "unblocked: $(basename "$dependent" .md) (status → open)"
+                else
+                    update_field "$dependent" "updated_at" "$now"
+                    echo "unblocked: $(basename "$dependent" .md)"
+                fi
+            else
+                update_field "$dependent" "blocked_by" "[$new_blocked]"
+                update_field "$dependent" "updated_at" "$now"
+                echo "unblocked: $(basename "$dependent" .md) (still blocked by: $new_blocked)"
+            fi
+        fi
+    done < <(find "$TASKS_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" -print0 2>/dev/null)
 }
 
 cmd_ready() {
