@@ -1,6 +1,6 @@
 ---
-name: tsk
-description: File-based task management. Use when the user wants you to pickup or manage (create, update, delete) tasks. CLI tool at scripts/tsk.
+name: task-manager
+description: File-based task management. Use for ALL task operations — listing, querying, creating, updating, closing, or picking up tasks. Always use this tool (never raw file reads or shell commands) when the user asks about tasks. CLI tool at scripts/tsk.
 ---
 
 All commands use: `${CLAUDE_SKILL_DIR}/scripts/tsk`
