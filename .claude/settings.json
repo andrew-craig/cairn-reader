@@ -1,15 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(skills/tsk/scripts/tsk update:*)",
-      "Bash(skills/tsk/scripts/tsk create:*)",
-      "Bash(skills/tsk/scripts/tsk ready:*)",
-      "Bash(skills/tsk/scripts/tsk close:*)",
-      "Bash(skills/tsk/scripts/tsk list:*)"
-    ]
-  },
-  "hooks": {
-    "SessionStart": [
+      "Bash(skills/task-manager/scripts/tsk update:*)",
+      "Bash(skills/task-manager/scripts/tsk create:*)",
+      "Bash(skills/task-manager/scripts/tsk ready:*)",
+      "Bash(skills/task-manager/scripts/tsk close:*)",
+      "Bash(skills/task-manager/scripts/tsk list:*)"
     ]
   }
 }
