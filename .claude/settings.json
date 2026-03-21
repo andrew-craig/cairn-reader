@@ -1,6 +1,6 @@
 {
   "env": {
-    "PATH": "/home/user/cairn-reader/.claude/skills/task-manager/scripts:$PATH"
+    "PATH": "/home/user/cairn-reader/.claude/skills/task-manager/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   },
   "permissions": {
     "allow": [
