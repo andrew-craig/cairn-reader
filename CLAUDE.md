@@ -270,14 +270,71 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 
 ## Task Tracking
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **tsk** for task management. Tasks are stored as markdown files with YAML frontmatter in `tasks/`. Closed tasks move to `tasks/closed/`.
+
+Run `bin/tsk help` to see all options.
 
 ### Quick Reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+bin/tsk ready                                  # Find available work (open tasks by priority)
+bin/tsk show <id>                              # View task details
+bin/tsk update <id> --status=in_progress       # Claim work
+bin/tsk close <id>                             # Complete work
+bin/tsk list                                   # List all active tasks
+bin/tsk list --status=open --type=bug          # Filter tasks
+```
+
+### Creating Tasks
+
+```bash
+bin/tsk create "Task title"                    # Create with defaults (type=task, priority=2)
+bin/tsk create "Fix login bug" --type=bug --priority=1 --description="Steps to reproduce..."
+bin/tsk create "Sub-task" --parent=task_ed8f   # Link to parent
+bin/tsk create "Blocked task" --blocked_by=bug_a3f2,task_9c1d
+```
+
+### Task Fields
+
+| Field | Values |
+|---|---|
+| `type` | `task` `bug` `feature` `chore` `epic` `decision` |
+| `status` | `open` `in_progress` `blocked` `deferred` (closed via `tsk close`) |
+| `priority` | `0`=critical `1`=high `2`=medium `3`=low `4`=backlog |
+| `labels` | Comma-separated tags |
+| `blocked_by` | Comma-separated task IDs |
+| `parent` | Parent task ID |
+
+### File Format
+
+Tasks are stored as `tasks/<type>_<id>.md`, for example `tasks/bug_a3f2.md`:
+
+```markdown
+---
+id: bug_a3f2
+title: Fix login error on mobile
+type: bug
+status: in_progress
+priority: 1
+labels: [auth, mobile]
+blocked_by: []
+parent: null
+created_at: 2026-03-21T10:00:00Z
+updated_at: 2026-03-21T11:30:00Z
+---
+Optional description or notes go here.
+```
+
+### Agent Workflow
+
+```bash
+bin/tsk ready                                  # Find available work
+bin/tsk update <id> --status=in_progress       # Claim a task before starting
+# ... do work ...
+bin/tsk close <id>                             # Mark done when complete
+```
+
+When discovering new work during a task, create linked sub-tasks:
+```bash
+bin/tsk create "Discovered issue" --parent=<current-task-id>
 ```
