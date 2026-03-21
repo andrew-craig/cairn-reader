@@ -1,6 +1,6 @@
 ---
-name: task-manager
-description: Manage and organize tasks and to-dos. Use when the user wants you to pickup or manage (create, update, delete) tasks.
+name: tsk
+description: File-based task management. Use when the user wants you to pickup or manage (create, update, delete) tasks. CLI tool at scripts/tsk.
 ---
 
 All commands use: `${CLAUDE_SKILL_DIR}/scripts/tsk`

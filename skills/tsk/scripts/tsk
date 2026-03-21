@@ -414,6 +414,8 @@ cmd_ready() {
     while IFS= read -r -d '' f; do
         local status; status=$(get_field "$f" "status")
         [[ "$status" == "open" ]] || continue
+        local blocked; blocked=$(get_field "$f" "blocked_by")
+        [[ -z "$blocked" || "$blocked" == "[]" ]] || continue
         local prio; prio=$(get_field "$f" "priority")
         pairs+=("${prio}:${f}")
     done < <(find "$TASKS_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" -print0 2>/dev/null)
