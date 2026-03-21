@@ -7,5 +7,17 @@
       "Bash(skills/task-manager/scripts/tsk close:*)",
       "Bash(skills/task-manager/scripts/tsk list:*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
   }
 }

@@ -82,3 +82,6 @@ services/*/recommender-service
 services/explore/explore_cleanup
 services/users/migrate
 services/explore/recommender/explore_recommender
+
+# Dolt database runtime files
+.beads/
