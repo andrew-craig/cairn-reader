@@ -113,10 +113,12 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-This project uses the task-manager skill for task management. **Always use the task-manager skill and its embedded `tsk` command for ANY task-related operation** — listing, querying, creating, updating, or closing tasks. Never read task files directly or use shell commands when `tsk` can do it. Invoke via `/task-manager`. Tasks are stored as markdown files with YAML frontmatter at `tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `tasks/closed/`.
+This project uses `tsk` for task management. **Always use `tsk` for ANY task-related operation** — listing, querying, creating, updating, or closing tasks. If it is not available directly, invoke using the `/task-manager` skill. Only read the file directory directly when neither of these options work.
+
+Tasks are stored as markdown files with YAML frontmatter at `tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `tasks/closed/`.
 
 ### Individual Task Tracking
-1. **Setup tracking**: If there is not an existing task, create one with `/task-manager`
+1. **Setup tracking**: If there is not an existing task, create one with `tsk create` or `/task-manager`
 2. **Plan First**: Write plan to the task file with checkable items
 3. **Verify Plan**: Check in before starting implementation
 4. **Track Progress**: Mark items complete as you go
