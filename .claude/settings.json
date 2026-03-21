@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PATH": "/home/user/cairn-reader/.claude/skills/task-manager/scripts:$PATH"
+  },
   "permissions": {
     "allow": [
       "Bash(skills/task-manager/scripts/tsk update:*)",
