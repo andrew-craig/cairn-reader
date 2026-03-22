@@ -44,8 +44,8 @@ services:
     image: postgres:18-alpine
     environment:
       # Superuser for the container (used by init script)
-      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-cairn_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-cairn_admin_pass}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
       POSTGRES_DB: postgres
       # Passed to init-databases.sh to create per-service DBs and users
       POSTGRES_USER_USERS: ${POSTGRES_USER_USERS}
@@ -69,7 +69,7 @@ services:
       - cairn_db_data:/var/lib/postgresql/data
       - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-cairn_admin} -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER} -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
