@@ -194,6 +194,7 @@ services:
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSL_MODE=disable
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -277,6 +278,7 @@ services:
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSL_MODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - HEALTH_PORT=8086
       - OUTBOX_CLEANUP_CRON=0 3 * * *
       - FEED_ITEMS_CLEANUP_CRON=0 4 * * *

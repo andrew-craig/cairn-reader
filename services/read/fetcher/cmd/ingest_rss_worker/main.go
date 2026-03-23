@@ -204,6 +204,7 @@ func loadConfig() Config {
 	contentServiceTimeout := getEnvAsDuration("CONTENT_SERVICE_TIMEOUT", 30*time.Second)
 	contentServiceMaxRetries := getEnvAsInt("CONTENT_SERVICE_MAX_RETRIES", 3)
 	contentServiceRetryDelay := getEnvAsDuration("CONTENT_SERVICE_RETRY_DELAY", 1*time.Second)
+	internalAPIKey := getEnv("INTERNAL_API_KEY", "")
 
 	// Feed worker configuration
 	feedWorkerCount := getEnvAsInt("FEED_WORKER_COUNT", 5)
@@ -231,10 +232,11 @@ func loadConfig() Config {
 			ConnMaxIdleTime: connMaxIdleTime,
 		},
 		ContentService: client.ContentServiceConfig{
-			BaseURL:    contentServiceURL,
-			Timeout:    contentServiceTimeout,
-			MaxRetries: contentServiceMaxRetries,
-			RetryDelay: contentServiceRetryDelay,
+			BaseURL:        contentServiceURL,
+			Timeout:        contentServiceTimeout,
+			MaxRetries:     contentServiceMaxRetries,
+			RetryDelay:     contentServiceRetryDelay,
+			InternalAPIKey: internalAPIKey,
 		},
 		FeedWorker: FeedWorkerConfig{
 			WorkerCount: feedWorkerCount,

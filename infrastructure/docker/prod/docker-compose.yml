@@ -248,6 +248,7 @@ services:
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSLMODE=disable
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       # Vault AppRole authentication (scoped to content-service policy)
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID=${CONTENT_SERVICE_ROLE_ID}
@@ -337,6 +338,7 @@ services:
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSLMODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - HEALTH_PORT=8086
       - OUTBOX_CLEANUP_CRON=0 3 * * *
       - FEED_ITEMS_CLEANUP_CRON=0 4 * * *
