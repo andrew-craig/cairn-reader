@@ -36,6 +36,7 @@ type Config struct {
 	Logging             sharedconfig.LoggingConfig
 	Vault               VaultConfig
 	IngestRSSServiceURL string
+	InternalAPIKey      string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -53,6 +54,7 @@ func Load() (*Config, error) {
 			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 		},
 		IngestRSSServiceURL: sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
+		InternalAPIKey:      sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -88,6 +90,10 @@ func (c *Config) Validate() error {
 
 	if c.Vault.PublicKeyPath == "" {
 		return fmt.Errorf("JWT_PUBLIC_KEY_PATH is required")
+	}
+
+	if c.InternalAPIKey == "" {
+		return fmt.Errorf("INTERNAL_API_KEY is required for service-to-service authentication")
 	}
 
 	return nil

@@ -16,7 +16,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth.Middleware) http.Handler {
+func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply global middleware
@@ -106,8 +106,9 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	})
 
 	// Internal API routes - used by internal services (Ingest RSS, etc.)
-	// These routes do NOT require authentication as they are internal-only
+	// Protected by API key-based service-to-service authentication
 	r.Route("/api/v1/internal", func(r chi.Router) {
+		r.Use(internalAuthMiddleware.RequireInternalAPIKey)
 		// Internal bulk operations for Ingest RSS Service
 		r.Post("/content/user/bulk", bulkHandler.BulkAddToUsersInternal)
 	})

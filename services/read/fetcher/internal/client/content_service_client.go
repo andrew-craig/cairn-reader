@@ -15,19 +15,21 @@ import (
 
 // ContentServiceClient is an HTTP client for the Content Service API
 type ContentServiceClient struct {
-	baseURL       string
-	httpClient    *http.Client
+	baseURL        string
+	httpClient     *http.Client
 	circuitBreaker *gobreaker.CircuitBreaker
-	maxRetries    int
-	retryDelay    time.Duration
+	maxRetries     int
+	retryDelay     time.Duration
+	internalAPIKey string
 }
 
 // ContentServiceConfig holds configuration for the Content Service client
 type ContentServiceConfig struct {
-	BaseURL    string
-	Timeout    time.Duration
-	MaxRetries int
-	RetryDelay time.Duration
+	BaseURL        string
+	Timeout        time.Duration
+	MaxRetries     int
+	RetryDelay     time.Duration
+	InternalAPIKey string
 }
 
 // CreateContentRequest represents the request body for creating content
@@ -180,6 +182,7 @@ func NewContentServiceClient(config ContentServiceConfig) *ContentServiceClient 
 		circuitBreaker: gobreaker.NewCircuitBreaker(cbSettings),
 		maxRetries:     config.MaxRetries,
 		retryDelay:     config.RetryDelay,
+		internalAPIKey: config.InternalAPIKey,
 	}
 }
 
@@ -260,7 +263,7 @@ func (c *ContentServiceClient) AddContentToUsers(ctx context.Context, items []Bu
 	}
 
 	var result BulkAddToUsersResponse
-	err := c.doWithRetry(ctx, "POST", "/api/v1/users/bulk/contents", req, &result)
+	err := c.doWithRetry(ctx, "POST", "/api/v1/internal/content/user/bulk", req, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add content to users: %w", err)
 	}
@@ -329,6 +332,9 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, method, path strin
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
+	if c.internalAPIKey != "" {
+		req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

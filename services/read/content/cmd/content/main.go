@@ -121,8 +121,11 @@ func main() {
 	jwtValidator := auth.NewValidator(publicKey)
 	authMiddleware := auth.NewMiddleware(jwtValidator)
 
+	// Create internal service-to-service auth middleware
+	internalAuthMiddleware := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
+
 	// Create router
-	router := api.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware)
+	router := api.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware, internalAuthMiddleware)
 
 	// Create HTTP server
 	server := &http.Server{

@@ -269,7 +269,7 @@ func TestAddContentToUsers_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/users/bulk/contents", r.URL.Path)
+		assert.Equal(t, "/api/v1/internal/content/user/bulk", r.URL.Path)
 
 		var req BulkAddToUsersRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
