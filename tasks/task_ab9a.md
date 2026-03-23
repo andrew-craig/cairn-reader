@@ -2,7 +2,7 @@
 id: task_ab9a
 title: Implement AddressService
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
@@ -29,3 +29,17 @@ Implement services/read/email/internal/service/address_service.go
 - Unit tests with mocked repository
 - Test collision retry logic
 - Test recipient parsing (extract local part from full email address)
+
+## Review
+Implementation complete. All 15 tests pass.
+
+### Files changed
+- `services/read/email/internal/service/address_service.go` — Full implementation
+- `services/read/email/internal/service/address_service_test.go` — 15 unit tests
+
+### Key decisions
+- Used `crypto/rand` for secure random local part generation
+- Collision detection via error message substring matching (`duplicate`/`unique`)
+- `extractLocalPart` strips everything after `@`, lowercases, handles edge cases
+- `generateLocal` field on struct allows test injection (though tests use mock repo instead)
+- `ErrRecipientNotFound` sentinel error for clean error handling by callers
