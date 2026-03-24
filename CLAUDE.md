@@ -113,9 +113,9 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-This project uses `tsk` for task management. **Always use `tsk` for ANY task-related operation** — listing, querying, creating, updating, or closing tasks. If it is not available directly, invoke using the `/task-manager` skill. Only read the file directory directly when neither of these options work.
+This project uses the chalk `task` command for task management. **Always use `task` for ANY task-related operation** — listing, querying, creating, updating, or closing tasks. If it is not available directly, invoke using the `.chalk/scrips/task`. Only read the file directory directly when neither of these options work.
 
-Tasks are stored as markdown files with YAML frontmatter at `tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `tasks/closed/`.
+Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.claude/tasks/closed/`.
 
 ### Individual Task Tracking
 1. **Setup tracking**: If there is not an existing task, create one with `tsk create` or `/task-manager`
