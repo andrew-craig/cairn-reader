@@ -14,5 +14,5 @@ else
   # Fallback: symlink into the global skills dir the harness already puts in PATH
   GLOBAL_SKILLS_DIR="/.claude/skills/task-manager/scripts"
   mkdir -p "$GLOBAL_SKILLS_DIR"
-  ln -sf "$TSK_DIR/tsk" "$GLOBAL_SKILLS_DIR/task"
+  ln -sf "$TSK_DIR/task" "$GLOBAL_SKILLS_DIR/task"
 fi
