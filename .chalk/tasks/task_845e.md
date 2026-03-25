@@ -5,10 +5,10 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_7047]
+blocked_by: []
 parent: epic_0c4d
 created_at: 2026-03-23T07:19:04Z
-updated_at: 2026-03-23T07:19:04Z
+updated_at: 2026-03-25T11:28:09Z
 ---
 Implement three components:
 

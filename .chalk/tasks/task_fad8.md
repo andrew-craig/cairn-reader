@@ -5,10 +5,10 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_8300,task_9276]
+blocked_by: []
 parent: epic_0c4d
 created_at: 2026-03-23T07:18:54Z
-updated_at: 2026-03-23T07:18:54Z
+updated_at: 2026-03-25T11:28:10Z
 ---
 Implement services/read/email/internal/worker/email_processor_worker.go
 
