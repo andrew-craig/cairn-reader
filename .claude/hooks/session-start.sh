@@ -8,7 +8,7 @@ TASK_DIR="$PROJECT_DIR/.chalk/scripts"
 
 # Add tsk script to PATH for this session
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-   Harness supports env file injection — write an absolute path (not $CLAUDE_PROJECT_DIR)
+  # Harness supports env file injection — write an absolute path (not $CLAUDE_PROJECT_DIR)
   echo "export PATH=\"$TASK_DIR:\$PATH\"" >> "$CLAUDE_ENV_FILE"
 else
   # Fallback: symlink into a directory already on PATH
