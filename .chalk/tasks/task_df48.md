@@ -2,13 +2,13 @@
 id: task_df48
 title: Implement API key and JWT auth middleware
 type: task
-status: open
+status: in_progress
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_0c4d
 created_at: 2026-03-23T07:18:10Z
-updated_at: 2026-03-23T07:18:10Z
+updated_at: 2026-03-25T07:04:40Z
 ---
 Implement both middleware files:
 - services/read/email/internal/api/middleware/apikey.go
