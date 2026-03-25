@@ -113,24 +113,24 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-**CRITICAL**: Use the `tsk` CLI tool (or `/task-manager` skill) for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `tsk` commands first.
+**CRITICAL**: Use the `task` CLI tool (or `/task-manager` skill) for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `task` commands first.
 
 ```bash
-tsk ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
-tsk ready --parent=epic_0c4d       # Find available work under a specific epic
-tsk show <id>                      # View full task details
-tsk list --status=open             # List tasks with filters
-tsk update <id> --status=in_progress  # Claim a task
-tsk close <id>                     # Mark done (auto-unblocks dependents)
-tsk create "Title" --parent=<id>   # Create sub-task
+task ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
+task ready --parent=epic_0c4d       # Find available work under a specific epic
+task show <id>                      # View full task details
+task list --status=open             # List tasks with filters
+task update <id> --status=in_progress  # Claim a task
+task close <id>                     # Mark done (auto-unblocks dependents)
+task create "Title" --parent=<id>   # Create sub-task
 ```
 
-If `tsk` is not on PATH, invoke via `.chalk/scripts/task`. Only fall back to raw file reads when both `tsk` and the script path fail.
+If `task` is not on PATH, invoke via `.chalk/scripts/task`. Only fall back to raw file reads when both `task` and the script path fail.
 
 Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
 
 ### Individual Task Tracking
-1. **Setup tracking**: If there is not an existing task, create one with `tsk create` or `/task-manager`
+1. **Setup tracking**: If there is not an existing task, create one with `task create` or `/task-manager`
 2. **Plan First**: Write plan to the task file with checkable items
 3. **Verify Plan**: Check in before starting implementation
 4. **Track Progress**: Mark items complete as you go
