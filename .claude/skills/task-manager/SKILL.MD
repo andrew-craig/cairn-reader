@@ -1,14 +1,17 @@
 ---
 name: task-manager
-description: File-based task management. Use for ALL task operations — listing, querying, creating, updating, closing, or picking up tasks. Always use this tool (never raw file reads or shell commands) when the user asks about tasks. CLI tool at scripts/tsk.
+description: "File-based task management. Use for ALL task operations — listing, querying, creating, updating, closing, or picking up tasks. ALWAYS use this skill (never raw file reads via Glob/Read/Grep) to browse or query tasks. When asked to 'pick up a task' or 'find work', start with `tsk ready`. CLI tool at scripts/tsk."
 ---
+
+**IMPORTANT**: Always use `tsk` commands below — never manually read task files with Glob/Read/Grep to browse tasks. Use `tsk ready` as the **first command** when looking for available work.
 
 All commands use: `${CLAUDE_SKILL_DIR}/scripts/tsk`
 
 ### Quick Reference
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/tsk ready                                  # Find available work (open tasks by priority)
+${CLAUDE_SKILL_DIR}/scripts/tsk ready                                  # FIRST COMMAND — find available work (unblocked, sorted by priority)
+${CLAUDE_SKILL_DIR}/scripts/tsk ready --parent=<epic_id>               # Find available work under a specific epic
 ${CLAUDE_SKILL_DIR}/scripts/tsk show <id>                              # View task details
 ${CLAUDE_SKILL_DIR}/scripts/tsk update <id> --status=in_progress       # Claim work
 ${CLAUDE_SKILL_DIR}/scripts/tsk close <id>                             # Complete work
