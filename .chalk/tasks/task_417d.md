@@ -5,10 +5,10 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_838f,task_fad8]
+blocked_by: [task_838f]
 parent: epic_0c4d
 created_at: 2026-03-23T07:19:09Z
-updated_at: 2026-03-23T07:19:09Z
+updated_at: 2026-03-27T18:42:05Z
 ---
 Complete the wiring in both entry points:
 
