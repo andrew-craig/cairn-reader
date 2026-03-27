@@ -9,12 +9,13 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Email    EmailConfig
-	Auth     AuthConfig
-	Worker   WorkerConfig
-	Logging  LoggingConfig
+	Server         ServerConfig
+	Database       DatabaseConfig
+	Email          EmailConfig
+	Auth           AuthConfig
+	Worker         WorkerConfig
+	ContentService ContentServiceConfig
+	Logging        LoggingConfig
 }
 
 // ServerConfig holds server-related configuration
@@ -45,6 +46,12 @@ type AuthConfig struct {
 	VaultToken        string
 	JWTPublicKeyPath  string
 	VaultAuthPath     string
+}
+
+// ContentServiceConfig holds configuration for the Content Service HTTP client.
+type ContentServiceConfig struct {
+	URL     string
+	Timeout time.Duration
 }
 
 // WorkerConfig holds worker-related settings
@@ -99,6 +106,10 @@ func Load() (*Config, error) {
 			RawEmailCleanupCron:      getEnv("RAW_EMAIL_CLEANUP_CRON", "0 5 * * *"),
 			RawEmailRetentionDays:    getEnvInt("RAW_EMAIL_RETENTION_DAYS", 7),
 			OutboxCleanupCron:        getEnv("OUTBOX_CLEANUP_CRON", "0 6 * * *"),
+		},
+		ContentService: ContentServiceConfig{
+			URL:     getEnv("CONTENT_SERVICE_URL", "http://localhost:8083"),
+			Timeout: getEnvDuration("CONTENT_SERVICE_TIMEOUT", 30*time.Second),
 		},
 		Logging: LoggingConfig{
 			Level:  getEnv("LOG_LEVEL", "info"),

@@ -16,8 +16,14 @@ import (
 	"syscall"
 
 	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/client"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/config"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/jobs"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/processor"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/service"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/worker"
 	"github.com/joho/godotenv"
 )
 
@@ -75,27 +81,96 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
-
 	slog.Info("component initialized", slog.String("component", "database"))
 
-	// TODO: Initialize workers
-	// - Email processor worker
-	// - Outbox delivery worker
-	// - Cleanup jobs
+	// Initialize repositories
+	rawEmailRepo := repository.NewRawEmailRepository(db.DB)
+	outboxRepo := repository.NewOutboxRepository(db.DB)
+	senderRepo := repository.NewSenderRepository(db.DB)
+
+	// Initialize services and processors
+	senderService := service.NewSenderService(senderRepo)
+	emailCleaner := processor.NewEmailCleaner()
+	contentExtractor := processor.NewContentExtractor()
+
+	// Initialize content service client
+	contentClient := client.NewContentServiceClient(client.ContentServiceConfig{
+		BaseURL: cfg.ContentService.URL,
+		Timeout: cfg.ContentService.Timeout,
+	})
+
+	// Initialize workers
+	emailProcessor := worker.NewEmailProcessorWorker(
+		senderService,
+		emailCleaner,
+		contentExtractor,
+		rawEmailRepo,
+		outboxRepo,
+		worker.EmailProcessorConfig{
+			BatchSize:    20,
+			WorkerCount:  cfg.Worker.EmailProcessWorkers,
+			PollInterval: cfg.Worker.EmailProcessPollInterval,
+		},
+	)
+
+	outboxWorker := worker.NewOutboxWorker(
+		outboxRepo,
+		contentClient,
+		worker.OutboxWorkerConfig{
+			BatchSize:    10,
+			PollInterval: cfg.Worker.OutboxPollInterval,
+			MaxRetries:   cfg.Worker.OutboxMaxRetries,
+		},
+	)
+
+	// Initialize cleanup jobs
+	rawEmailCleanupJob, err := jobs.NewRawEmailCleanupJob(
+		rawEmailRepo,
+		cfg.Worker.RawEmailCleanupCron,
+		cfg.Worker.RawEmailRetentionDays,
+	)
+	if err != nil {
+		slog.Error("failed to create raw email cleanup job", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	outboxCleanupJob, err := jobs.NewOutboxCleanupJob(
+		outboxRepo,
+		cfg.Worker.OutboxCleanupCron,
+		cfg.Worker.RawEmailRetentionDays,
+	)
+	if err != nil {
+		slog.Error("failed to create outbox cleanup job", slog.Any("error", err))
+		os.Exit(1)
+	}
 
 	slog.Info("worker ready")
+	slog.Info("- email processor worker")
+	slog.Info("- outbox delivery worker")
+	slog.Info("- raw email cleanup job", slog.String("schedule", cfg.Worker.RawEmailCleanupCron))
+	slog.Info("- outbox cleanup job", slog.String("schedule", cfg.Worker.OutboxCleanupCron))
 
-	// Wait for interrupt signal for graceful shutdown
+	// Context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start all workers
+	go emailProcessor.Start(ctx)
+	go outboxWorker.Start(ctx)
+	go rawEmailCleanupJob.Start(ctx)
+	go outboxCleanupJob.Start(ctx)
+
+	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	slog.Info("shutting down worker")
+	cancel()
 
-	// TODO: Gracefully stop all workers with context timeout
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
-	defer cancel()
-	_ = ctx
+	// Give workers time to finish their current batch
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+	defer shutdownCancel()
+	<-shutdownCtx.Done()
 
 	slog.Info("worker exited gracefully")
 }
