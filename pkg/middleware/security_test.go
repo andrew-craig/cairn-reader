@@ -35,6 +35,40 @@ func TestRequireHTTPS(t *testing.T) {
 	})
 }
 
+func TestRequireHTTPSWithRedirect(t *testing.T) {
+	handler := RequireHTTPSWithRedirect(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	t.Run("allows X-Forwarded-Proto https", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("redirects plain HTTP to HTTPS", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Host = "example.com"
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusMovedPermanently {
+			t.Errorf("expected 301, got %d", w.Code)
+		}
+		location := w.Header().Get("Location")
+		if location != "https://example.com/test" {
+			t.Errorf("expected redirect to https, got %s", location)
+		}
+	})
+}
+
 func TestSecureHeaders(t *testing.T) {
 	handler := SecureHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

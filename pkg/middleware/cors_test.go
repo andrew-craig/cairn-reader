@@ -85,3 +85,138 @@ func TestCORS(t *testing.T) {
 		}
 	})
 }
+
+func TestCORSForOrigins(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := CORSForOrigins("http://allowed.com", "http://other.com")
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Origin", "http://allowed.com")
+	w := httptest.NewRecorder()
+
+	mw(handler).ServeHTTP(w, req)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://allowed.com" {
+		t.Error("expected specific origin for CORSForOrigins")
+	}
+}
+
+func TestDevelopmentCORS(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("sets wildcard for any origin", func(t *testing.T) {
+		mw := DevelopmentCORS()
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://anything.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "*" {
+			t.Error("expected wildcard origin")
+		}
+	})
+
+	t.Run("handles preflight", func(t *testing.T) {
+		mw := DevelopmentCORS()
+		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Code != http.StatusNoContent {
+			t.Errorf("expected 204 for preflight, got %d", w.Code)
+		}
+	})
+}
+
+func TestProductionCORS(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mw := ProductionCORS([]string{"http://prod.example.com"})
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Origin", "http://prod.example.com")
+	w := httptest.NewRecorder()
+
+	mw(handler).ServeHTTP(w, req)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://prod.example.com" {
+		t.Error("expected production origin")
+	}
+}
+
+func TestCORSWithWildcard(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	t.Run("matches wildcard subdomain", func(t *testing.T) {
+		mw := CORSWithWildcard([]string{"*.example.com"})
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://app.example.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "http://app.example.com" {
+			t.Error("expected wildcard subdomain match")
+		}
+	})
+
+	t.Run("blocks non-matching origin", func(t *testing.T) {
+		mw := CORSWithWildcard([]string{"*.example.com"})
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://evil.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Error("should not set origin for non-matching domain")
+		}
+	})
+
+	t.Run("handles preflight for wildcard", func(t *testing.T) {
+		mw := CORSWithWildcard([]string{"*.example.com"})
+		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
+		req.Header.Set("Origin", "http://app.example.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Code != http.StatusNoContent {
+			t.Errorf("expected 204, got %d", w.Code)
+		}
+		if w.Header().Get("Access-Control-Allow-Methods") == "" {
+			t.Error("expected Allow-Methods on preflight")
+		}
+	})
+}
+
+func TestIsOriginAllowed(t *testing.T) {
+	tests := []struct {
+		name     string
+		origin   string
+		allowed  []string
+		expected bool
+	}{
+		{"exact match", "http://example.com", []string{"http://example.com"}, true},
+		{"wildcard", "http://anything.com", []string{"*"}, true},
+		{"wildcard subdomain", "http://app.example.com", []string{"*.example.com"}, true},
+		{"no match", "http://evil.com", []string{"http://example.com"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isOriginAllowed(tt.origin, tt.allowed); got != tt.expected {
+				t.Errorf("isOriginAllowed(%q, %v) = %v, want %v", tt.origin, tt.allowed, got, tt.expected)
+			}
+		})
+	}
+}

@@ -5,10 +5,10 @@ type: task
 status: open
 priority: 3
 labels: [middleware, security]
-blocked_by: [task_6995]
+blocked_by: []
 parent: task_d23e
 created_at: 2026-03-28T01:54:21Z
-updated_at: 2026-03-28T01:54:21Z
+updated_at: 2026-03-28T07:25:37Z
 ---
 
 ## Description

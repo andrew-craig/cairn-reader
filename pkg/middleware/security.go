@@ -29,6 +29,25 @@ func RequireHTTPS(next http.Handler) http.Handler {
 	})
 }
 
+// RequireHTTPSWithRedirect enforces HTTPS by redirecting HTTP requests to HTTPS.
+// Useful in staging environments; use RequireHTTPS for strict enforcement in production.
+func RequireHTTPSWithRedirect(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.TLS != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if r.Header.Get("X-Forwarded-Proto") == "https" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		httpsURL := "https://" + r.Host + r.RequestURI
+		http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+	})
+}
+
 // SecureHeaders adds comprehensive security headers including
 // X-Frame-Options, X-Content-Type-Options, HSTS, CSP, Referrer-Policy,
 // and Permissions-Policy.
