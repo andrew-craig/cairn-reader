@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/go-chi/chi/v5"
@@ -42,7 +44,8 @@ func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
-	r.Use(s.loggingMiddleware)
+	r.Use(sharedmw.Recovery)
+	r.Use(logging.ChiRequestLogger(s.logger))
 
 	// Health check endpoints (Kubernetes-compatible) - public
 	// Support both GET and HEAD methods for health checks (HEAD used by Docker/wget --spider)
