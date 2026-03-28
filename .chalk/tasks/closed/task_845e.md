@@ -2,13 +2,13 @@
 id: task_845e
 title: Implement OutboxWorker and cleanup jobs
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_0c4d
 created_at: 2026-03-23T07:19:04Z
-updated_at: 2026-03-25T11:28:09Z
+updated_at: 2026-03-27T18:42:06Z
 ---
 Implement three components:
 
