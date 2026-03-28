@@ -1,7 +1,6 @@
 ---
 name: chalk-task-manager
-description: "File-based task management. Use for ALL task operations — listing, querying, creating, updating, closing, or picking up tasks. ALWAYS use this skill (never raw file reads via Glob/Read/Grep) to browse or query tasks. When asked to 'pick up a task' or 'find work', start with `task ready` (or skill-bundled `tsk ready`). Primary CLI: `.chalk/scripts/task`; skill-bundled: scripts/tsk."
----
+description: "File-based task management. Use for task operations IF task is not available on PATH."
 
 **IMPORTANT**: Always use `task`  — never manually read task files with Glob/Read/Grep to browse tasks. Use `task ready` as the **first command** when looking for available work.
 
