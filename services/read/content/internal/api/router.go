@@ -7,6 +7,7 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/handlers"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
@@ -22,6 +23,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	// Apply global middleware
 	r.Use(middleware.Recovery)
 	r.Use(logging.ChiRequestLogger(slog.Default()))
+	r.Use(sharedmw.SecureHeadersRelaxed)
 	r.Use(middleware.ValidateJSON)
 
 	// Initialize repositories

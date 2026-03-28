@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/logging"
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
@@ -23,6 +24,7 @@ func NewRouter(db *database.DB) http.Handler {
 	// Apply global middleware
 	r.Use(middleware.Recovery)
 	r.Use(logging.ChiRequestLogger(slog.Default()))
+	r.Use(sharedmw.SecureHeadersRelaxed)
 	r.Use(chimiddleware.Timeout(60 * time.Second))
 
 	// Initialize repositories
