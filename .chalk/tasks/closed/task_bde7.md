@@ -2,13 +2,13 @@
 id: task_bde7
 title: Apply security headers to all services (CORS not needed)
 type: task
-status: in_progress
+status: closed
 priority: 3
 labels: [middleware, security]
 blocked_by: []
 parent: task_d23e
 created_at: 2026-03-28T01:54:21Z
-updated_at: 2026-03-28T18:56:56Z
+updated_at: 2026-03-28T19:01:55Z
 ---
 
 ## Description
