@@ -79,8 +79,9 @@ const (
 
 // SourceType constants
 const (
-	SourceTypeRSS = "rss"
-	SourceTypeWeb = "web"
+	SourceTypeRSS   = "rss"
+	SourceTypeWeb   = "web"
+	SourceTypeEmail = "email"
 )
 
 // ValidateStatus checks if the given status is valid

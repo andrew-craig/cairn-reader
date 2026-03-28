@@ -48,5 +48,5 @@ func ValidateStatus(status string) bool {
 
 // ValidateSourceType validates that a source type string is valid
 func ValidateSourceType(sourceType string) bool {
-	return sourceType == models.SourceTypeRSS || sourceType == models.SourceTypeWeb
+	return sourceType == models.SourceTypeRSS || sourceType == models.SourceTypeWeb || sourceType == models.SourceTypeEmail
 }
