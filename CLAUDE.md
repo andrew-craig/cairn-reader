@@ -113,7 +113,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-**CRITICAL**: Use the `task` CLI tool (or `/task-manager` skill) for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `task` commands first.
+**CRITICAL**: Use the `task` CLI tool for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `task` commands first.
 
 ```bash
 task ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
@@ -125,7 +125,7 @@ task close <id>                     # Mark done (auto-unblocks dependents)
 task create "Title" --parent=<id>   # Create sub-task
 ```
 
-If `task` is not on PATH, invoke via `.chalk/scripts/task`. Only fall back to raw file reads when both `task` and the script path fail.
+If you have attempted to use `task` and it is not on PATH, invoke via the task-manager skill. Only fall back to raw file reads when both `task` and the script path fail.
 
 Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
 
