@@ -31,8 +31,8 @@ func (b BulkContentItem) Validate() error {
 		),
 		validation.Field(&b.SourceType,
 			validation.Required.Error("source_type is required"),
-			validation.In(models.SourceTypeRSS, models.SourceTypeWeb).
-				Error("Invalid source_type. Must be 'rss' or 'web'"),
+			validation.In(models.SourceTypeRSS, models.SourceTypeWeb, models.SourceTypeEmail).
+				Error("Invalid source_type. Must be 'rss', 'web', or 'email'"),
 		),
 	)
 }

@@ -17,10 +17,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/config"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/service"
 	"github.com/joho/godotenv"
 )
 
@@ -80,11 +85,61 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
-
 	slog.Info("component initialized", slog.String("component", "database"))
 
+	// Initialize Vault client and fetch JWT public key for authentication
+	slog.Info("connecting to vault",
+		slog.String("address", cfg.Auth.VaultAddr),
+	)
+	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
+		Address:  cfg.Auth.VaultAddr,
+		Token:    cfg.Auth.VaultToken,
+		AuthPath: cfg.Auth.VaultAuthPath,
+	})
+	if err != nil {
+		slog.Error("failed to create vault client", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	slog.Info("fetching JWT public key from vault",
+		slog.String("path", cfg.Auth.JWTPublicKeyPath),
+	)
+	publicKey, err := vaultClient.GetPublicKey(cfg.Auth.JWTPublicKeyPath)
+	if err != nil {
+		slog.Error("failed to get JWT public key from vault", slog.Any("error", err))
+		os.Exit(1)
+	}
+	slog.Info("component initialized", slog.String("component", "vault"))
+
+	// Initialize repositories
+	addressRepo := repository.NewAddressRepository(db.DB)
+	rawEmailRepo := repository.NewRawEmailRepository(db.DB)
+	senderRepo := repository.NewSenderRepository(db.DB)
+	apiKeyRepo := repository.NewAPIKeyRepository(db.DB)
+
+	// Initialize services
+	addressService := service.NewAddressService(addressRepo)
+	senderService := service.NewSenderService(senderRepo)
+	emailService := service.NewEmailService(addressService, rawEmailRepo)
+
+	// Initialize middleware
+	apiKeyAuth := middleware.NewAPIKeyAuth(apiKeyRepo)
+	jwtAuth := middleware.NewJWTAuth(publicKey)
+
+	// Initialize handlers
+	ingestHandler := handlers.NewIngestHandler(emailService)
+	addressHandler := handlers.NewAddressHandler(addressService, cfg.Email)
+	senderHandler := handlers.NewSenderHandler(senderService)
+
 	// Create router
-	router := api.NewRouter(db)
+	router := api.NewRouter(api.RouterDeps{
+		DB:             db,
+		IngestHandler:  ingestHandler,
+		AddressHandler: addressHandler,
+		SenderHandler:  senderHandler,
+		APIKeyAuth:     apiKeyAuth,
+		JWTAuth:        jwtAuth,
+	})
 
 	// Create HTTP server
 	server := &http.Server{

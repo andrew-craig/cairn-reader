@@ -4,37 +4,53 @@ package api
 import (
 	"net/http"
 
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/database"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
+// RouterDeps holds all dependencies for the HTTP router.
+type RouterDeps struct {
+	DB             *database.DB
+	IngestHandler  *handlers.IngestHandler
+	AddressHandler *handlers.AddressHandler
+	SenderHandler  *handlers.SenderHandler
+	APIKeyAuth     *middleware.APIKeyAuth
+	JWTAuth        *middleware.JWTAuth
+}
+
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *database.DB) http.Handler {
+func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	// Middleware
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
 
 	// Health checks
 	r.Get("/health/live", handleLiveness)
-	r.Get("/health/ready", handleReadiness(db))
+	r.Get("/health/ready", handleReadiness(deps.DB))
 
-	// API routes (to be implemented)
+	// API routes
 	r.Route("/api/v1/source/email", func(r chi.Router) {
-		// Email address management (JWT protected)
-		// POST   /user/{user_id}/address
-		// GET    /user/{user_id}/address
-		// DELETE /user/{user_id}/address
-
 		// Email ingestion (API key protected)
-		// POST /ingest
+		r.With(deps.APIKeyAuth.RequireAPIKey).Post("/ingest", deps.IngestHandler.IngestEmail)
 
-		// Sender management (JWT protected)
-		// GET /user/{user_id}/senders
+		// User-facing endpoints (JWT protected)
+		r.Group(func(r chi.Router) {
+			r.Use(deps.JWTAuth.RequireAuth)
+
+			// Email address management
+			r.Post("/user/{user_id}/address", deps.AddressHandler.GetOrCreate)
+			r.Get("/user/{user_id}/address", deps.AddressHandler.Get)
+
+			// Sender management
+			r.Get("/user/{user_id}/senders", deps.SenderHandler.ListSenders)
+		})
 	})
 
 	return r
