@@ -1,6 +1,6 @@
 ---
 id: task_bde7
-title: Apply CORS and security headers to public-facing services
+title: Apply security headers to all services (CORS not needed)
 type: task
 status: open
 priority: 3
@@ -13,22 +13,19 @@ updated_at: 2026-03-28T01:54:21Z
 
 ## Description
 
-Only the User Service currently applies CORS and security headers. Public-facing services (Read Content, Explore Recommender) that serve browser clients need these too. Internal-only services (Explore Fetcher, Read Fetcher) likely don't need CORS but should still have security headers.
+~~Apply CORS middleware to public-facing services.~~
+
+**Update**: The only client is a React Native mobile app, which uses native HTTP clients — not browser fetch. CORS is a browser-only security mechanism and is **not needed**. The existing CORS middleware in User Service can remain for potential future web clients, but no other service needs it.
+
+**Remaining work**: Apply security headers (`SecureHeadersRelaxed`) to all services. These headers (X-Content-Type-Options, X-Frame-Options, etc.) are defense-in-depth and worth having regardless of client type.
 
 ## Requirements
 
-- Apply CORS middleware to Read Content and Explore Recommender (they serve browser clients via the mobile app's API calls)
-- Apply security headers (`SecureHeadersRelaxed`) to all services
-- Make CORS origins configurable per service via environment variables
-- Internal-only services should skip CORS but still use security headers
-
-## Open Questions
-
-- Does the mobile app make direct API calls to Read/Explore, or does it go through a gateway? This determines which services need CORS.
-- Are there any browser-based admin tools that need CORS access?
+- Apply `SecureHeadersRelaxed` middleware to Read Content, Explore Recommender, and Explore Fetcher
+- Do NOT add CORS middleware to services that don't already have it (not needed for native mobile clients)
+- Keep User Service CORS as-is (no change)
 
 ## Acceptance Criteria
 
-- [ ] Public-facing services have CORS middleware
-- [ ] All services have security headers
-- [ ] CORS origins are configurable
+- [ ] All services have security headers middleware
+- [ ] No unnecessary CORS middleware added

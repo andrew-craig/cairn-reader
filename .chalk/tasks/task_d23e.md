@@ -85,9 +85,12 @@ pkg/logging/            # Already shared — no changes needed
 └── ...                 # ChiRequestLogger
 ```
 
+## CORS Analysis (Resolved)
+
+The mobile app (React Native) is the **only client**. All services sit behind the same domain (`cairn.seatrain.net`) with path-based routing via a reverse proxy. Since React Native uses native HTTP clients (not browser fetch), **CORS is not needed** — it's purely a browser security mechanism. The existing CORS middleware in User Service can stay for future web client support, but there's no urgency to add it to other services.
+
 ## Risks & Considerations
 
 - **Explore Fetcher chi migration**: Low risk, but need to preserve all existing routes and behavior
 - **Shared middleware extraction**: Must not break User Service when moving code out
-- **CORS/Security headers for internal services**: Some services (Fetcher, Read Fetcher) are internal-only and may not need CORS — need per-service configuration
 - **Rate limiting scope**: Only auth endpoints need rate limiting currently, but the middleware should be available for all services
