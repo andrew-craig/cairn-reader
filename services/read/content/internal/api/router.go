@@ -21,7 +21,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	r := chi.NewRouter()
 
 	// Apply global middleware
-	r.Use(middleware.Recovery)
+	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(slog.Default()))
 	r.Use(sharedmw.SecureHeadersRelaxed)
 	r.Use(middleware.ValidateJSON)

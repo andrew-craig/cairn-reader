@@ -1,10 +1,7 @@
 package middleware
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,116 +9,6 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
 	"github.com/stretchr/testify/assert"
 )
-
-// captureSlog sets the default slog logger to write to a buffer and returns
-// the buffer and a cleanup function to restore the previous logger.
-func captureSlog() (*bytes.Buffer, func()) {
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
-	return &buf, func() { slog.SetDefault(prev) }
-}
-
-func TestRecovery_NoPanic(t *testing.T) {
-	// Capture log output
-	logBuffer, cleanup := captureSlog()
-	defer cleanup()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
-	})
-
-	middleware := Recovery(nextHandler)
-
-	req := httptest.NewRequest("GET", "/api/v1/test", nil)
-	w := httptest.NewRecorder()
-
-	middleware.ServeHTTP(w, req)
-
-	// Should complete successfully
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "success", w.Body.String())
-
-	// Should not log any panic
-	logOutput := logBuffer.String()
-	assert.NotContains(t, logOutput, "panic recovered")
-}
-
-func TestRecovery_WithPanic(t *testing.T) {
-	logBuffer, cleanup := captureSlog()
-	defer cleanup()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic("test panic")
-	})
-
-	middleware := Recovery(nextHandler)
-
-	req := httptest.NewRequest("GET", "/api/v1/test", nil)
-	w := httptest.NewRecorder()
-
-	middleware.ServeHTTP(w, req)
-
-	// Should return 500
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-
-	// Should return JSON error response
-	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
-
-	var response dto.ErrorResponse
-	err := json.NewDecoder(w.Body).Decode(&response)
-	assert.NoError(t, err)
-	assert.Equal(t, "internal_server_error", response.Error)
-	assert.Equal(t, "An internal server error occurred", response.Message)
-
-	// Should log the panic
-	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "panic recovered")
-	assert.Contains(t, logOutput, "test panic")
-}
-
-func TestRecovery_WithStringPanic(t *testing.T) {
-	logBuffer, cleanup := captureSlog()
-	defer cleanup()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic("string panic message")
-	})
-
-	middleware := Recovery(nextHandler)
-
-	req := httptest.NewRequest("POST", "/api/v1/test", nil)
-	w := httptest.NewRecorder()
-
-	middleware.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-
-	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "string panic message")
-}
-
-func TestRecovery_WithErrorPanic(t *testing.T) {
-	logBuffer, cleanup := captureSlog()
-	defer cleanup()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic(io.EOF)
-	})
-
-	middleware := Recovery(nextHandler)
-
-	req := httptest.NewRequest("PUT", "/api/v1/test", nil)
-	w := httptest.NewRecorder()
-
-	middleware.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-
-	logOutput := logBuffer.String()
-	assert.Contains(t, logOutput, "panic recovered")
-}
 
 func TestWriteError_BasicError(t *testing.T) {
 	w := httptest.NewRecorder()
