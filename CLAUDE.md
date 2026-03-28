@@ -125,7 +125,7 @@ task close <id>                     # Mark done (auto-unblocks dependents)
 task create "Title" --parent=<id>   # Create sub-task
 ```
 
-If you have attempted to use `task` and it is not on PATH, invoke via the task-manager skill. Only fall back to raw file reads when both `task` and the script path fail.
+If you have attempted to use `task` and it is not on PATH, invoke via the chalk-task-manager skill. Only fall back to raw file reads when both `task` and the script path fail.
 
 Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
 
