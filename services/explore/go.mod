@@ -7,7 +7,9 @@ require (
 	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
 	github.com/cairn-app/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
 	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0-00010101000000-000000000000
+	github.com/cairn-app/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
 	github.com/cairn-app/cairn-reader/pkg/models v0.0.0-00010101000000-000000000000
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.8.0
@@ -42,7 +44,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.11.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.3 // indirect
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -141,3 +143,5 @@ replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging
 replace github.com/cairn-app/cairn-reader/pkg/models => ../../pkg/models
 
 replace github.com/cairn-app/cairn-reader/pkg/config => ../../pkg/config
+
+replace github.com/cairn-app/cairn-reader/pkg/middleware => ../../pkg/middleware

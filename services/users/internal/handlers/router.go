@@ -9,9 +9,9 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	localAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/cairn-app/cairn-reader/services/users/internal/middleware"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/go-chi/chi/v5"
 )
@@ -41,7 +41,7 @@ func Router(config RouterConfig) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply only recovery and logging globally (needed for all routes including health checks)
-	r.Use(middleware.Recovery)
+	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(config.Logger))
 
 	// Initialize handlers
@@ -72,14 +72,14 @@ func Router(config RouterConfig) http.Handler {
 
 	// API v1 routes with security middleware
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(middleware.CORS(middleware.DefaultCORSConfig()))
-		r.Use(middleware.RequireHTTPS)
-		r.Use(middleware.SecureHeadersRelaxed)
+		r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
+		r.Use(sharedmw.RequireHTTPS)
+		r.Use(sharedmw.SecureHeadersRelaxed)
 
 		// Authentication endpoints - public routes with rate limiting to prevent brute force attacks
 		// Rate limiting is applied per IP address to mitigate credential stuffing and enumeration attacks
 		r.Route("/auth", func(r chi.Router) {
-			r.Use(middleware.RateLimitAuth(authRateLimit, authRateLimitWindow))
+			r.Use(sharedmw.RateLimit(authRateLimit, authRateLimitWindow))
 
 			r.Post("/register", authHandler.Register)              // Create account with email/password
 			r.Post("/register/mobile", authHandler.RegisterMobile) // Create mobile-only account with device ID

@@ -19,11 +19,13 @@ import (
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/config"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -113,59 +115,61 @@ func main() {
 	}()
 
 	// Setup HTTP server for health checks and manual triggers
-	// Routes (v1 API):
-	//   GET  /health/live                      - Liveness check (simple)
-	//   GET  /health/ready                     - Readiness check (includes DB)
-	//   POST /api/v1/explore/feed/fetch        - Triggers a single feed fetch (async)
-	//   GET  /api/v1/explore/feed/stats        - Returns feed statistics (total, enabled, disabled, never_fetched)
-	//   POST /api/v1/explore/feed/sync         - Triggers feed list sync from Kagi (async)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health/live", livenessHandler)
-	mux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+	r := chi.NewRouter()
+
+	// Global middleware
+	r.Use(sharedmw.Recovery)
+	r.Use(logging.ChiRequestLogger(logger))
+
+	// Health check endpoints
+	r.Get("/health/live", livenessHandler)
+	r.Head("/health/live", livenessHandler)
+	r.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		readinessHandler(w, r, database)
 	})
-	mux.HandleFunc("/api/v1/explore/feed/fetch", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			api.WriteError(w, http.StatusMethodNotAllowed, api.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-			return
-		}
-		go func() {
-			if err := feedFetcher.FetchSingleFeed(bgCtx); err != nil {
-				slog.Error("error in fetch goroutine", slog.Any("error", err))
-			}
-		}()
-		api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "fetch triggered"}, "v1")
+	r.Head("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		readinessHandler(w, r, database)
 	})
-	mux.HandleFunc("/api/v1/explore/feed/stats", func(w http.ResponseWriter, r *http.Request) {
-		total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(r.Context())
-		if err != nil {
-			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to retrieve feed statistics", nil, "v1")
-			return
-		}
-		stats := map[string]int{
-			"total":         total,
-			"enabled":       enabled,
-			"disabled":      disabled,
-			"never_fetched": neverFetched,
-		}
-		api.WriteSuccess(w, http.StatusOK, stats, "v1")
-	})
-	mux.HandleFunc("/api/v1/explore/feed/sync", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			api.WriteError(w, http.StatusMethodNotAllowed, api.ErrCodeMethodNotAllowed, "Method not allowed", nil, "v1")
-			return
-		}
-		go func() {
-			if err := feedSyncer.SyncOnce(bgCtx); err != nil {
-				slog.Error("error in sync goroutine", slog.Any("error", err))
+
+	// API v1 routes
+	r.Route("/api/v1/explore/feed", func(r chi.Router) {
+		r.Post("/fetch", func(w http.ResponseWriter, r *http.Request) {
+			go func() {
+				if err := feedFetcher.FetchSingleFeed(bgCtx); err != nil {
+					slog.Error("error in fetch goroutine", slog.Any("error", err))
+				}
+			}()
+			api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "fetch triggered"}, "v1")
+		})
+
+		r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
+			total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(r.Context())
+			if err != nil {
+				api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to retrieve feed statistics", nil, "v1")
+				return
 			}
-		}()
-		api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "sync triggered"}, "v1")
+			stats := map[string]int{
+				"total":         total,
+				"enabled":       enabled,
+				"disabled":      disabled,
+				"never_fetched": neverFetched,
+			}
+			api.WriteSuccess(w, http.StatusOK, stats, "v1")
+		})
+
+		r.Post("/sync", func(w http.ResponseWriter, r *http.Request) {
+			go func() {
+				if err := feedSyncer.SyncOnce(bgCtx); err != nil {
+					slog.Error("error in sync goroutine", slog.Any("error", err))
+				}
+			}()
+			api.WriteSuccess(w, http.StatusAccepted, map[string]string{"status": "sync triggered"}, "v1")
+		})
 	})
 
 	server := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
-		Handler:      mux,
+		Handler:      r,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
