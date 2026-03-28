@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
@@ -29,8 +29,8 @@ import (
 func setupTestRouter(subscriptionHandler *handlers.SubscriptionHandler) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Recovery)
-	r.Use(middleware.Logger)
+	r.Use(sharedmw.Recovery)
+	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Timeout(60 * time.Second))

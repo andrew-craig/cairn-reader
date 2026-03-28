@@ -30,7 +30,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Logger)
-	r.Use(chimw.Recoverer)
+	r.Use(sharedmw.Recovery)
 	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health checks
