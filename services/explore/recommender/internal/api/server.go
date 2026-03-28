@@ -46,6 +46,7 @@ func (s *Server) Routes() http.Handler {
 	// Global middleware
 	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(s.logger))
+	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health check endpoints (Kubernetes-compatible) - public
 	// Support both GET and HEAD methods for health checks (HEAD used by Docker/wget --spider)

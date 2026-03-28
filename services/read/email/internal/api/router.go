@@ -4,6 +4,7 @@ package api
 import (
 	"net/http"
 
+	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/database"
@@ -30,6 +31,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health checks
 	r.Get("/health/live", handleLiveness)

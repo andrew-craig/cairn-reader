@@ -120,6 +120,7 @@ func main() {
 	// Global middleware
 	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(logger))
+	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health check endpoints
 	r.Get("/health/live", livenessHandler)
