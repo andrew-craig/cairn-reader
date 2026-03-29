@@ -2,13 +2,13 @@
 id: task_417d
 title: Wire worker main and server dependency injection
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
-blocked_by: [task_838f]
+blocked_by: []
 parent: epic_0c4d
 created_at: 2026-03-23T07:19:09Z
-updated_at: 2026-03-27T18:42:05Z
+updated_at: 2026-03-29T02:40:47Z
 ---
 Complete the wiring in both entry points:
 
