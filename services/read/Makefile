@@ -1,7 +1,7 @@
 # Cairn Read Service - Makefile
 
-.PHONY: help build build-all build-content build-content-worker build-fetcher build-fetcher-worker
-.PHONY: test test-all test-content test-fetcher
+.PHONY: help build build-all build-content build-content-worker build-fetcher build-fetcher-worker build-email build-email-worker
+.PHONY: test test-all test-content test-fetcher test-email
 .PHONY: up down logs clean
 .PHONY: migrate-up migrate-down migrate-create migrate-status
 
@@ -28,7 +28,15 @@ build-fetcher-worker: ## Build ingest_rss worker
 	@echo "Building ingest_rss worker..."
 	cd fetcher && go build -o ../bin/ingest_rss_worker ./cmd/ingest_rss_worker
 
-build-all: build-content build-content-worker build-fetcher build-fetcher-worker ## Build all services
+build-email: ## Build email ingest service
+	@echo "Building email ingest service..."
+	cd email && go build -o ../bin/email_ingest ./cmd/email_ingest
+
+build-email-worker: ## Build email ingest worker
+	@echo "Building email ingest worker..."
+	cd email && go build -o ../bin/email_ingest_worker ./cmd/email_ingest_worker
+
+build-all: build-content build-content-worker build-fetcher build-fetcher-worker build-email build-email-worker ## Build all services
 	@echo "All services built successfully!"
 
 build: build-all ## Build all services (alias)
@@ -42,7 +50,11 @@ test-fetcher: ## Run fetcher service tests
 	@echo "Running fetcher service tests..."
 	cd fetcher && go test ./...
 
-test-all: test-content test-fetcher ## Run all tests
+test-email: ## Run email ingest service tests
+	@echo "Running email ingest service tests..."
+	cd email && go test ./...
+
+test-all: test-content test-fetcher test-email ## Run all tests
 	@echo "All tests complete!"
 
 test: test-all ## Run all tests (alias)
@@ -61,6 +73,7 @@ clean: ## Clean build artifacts
 	rm -rf bin/
 	rm -rf content/bin/
 	rm -rf fetcher/bin/
+	rm -rf email/bin/
 	docker compose down -v
 
 # Content Service migrations
@@ -113,12 +126,16 @@ fmt: ## Format code
 	cd content && go fmt ./...
 	@echo "Formatting fetcher service..."
 	cd fetcher && go fmt ./...
+	@echo "Formatting email service..."
+	cd email && go fmt ./...
 
 vet: ## Run go vet
 	@echo "Vetting content service..."
 	cd content && go vet ./...
 	@echo "Vetting fetcher service..."
 	cd fetcher && go vet ./...
+	@echo "Vetting email service..."
+	cd email && go vet ./...
 
 tidy: ## Tidy go modules
 	go mod tidy

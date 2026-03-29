@@ -2,13 +2,13 @@
 id: task_838f
 title: Implement HTTP handlers and wire router
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: [task_ab9a,task_899b,task_535a]
 parent: epic_0c4d
 created_at: 2026-03-23T07:18:18Z
-updated_at: 2026-03-23T07:18:18Z
+updated_at: 2026-03-29T02:40:13Z
 ---
 Implement all three handlers and wire them into the router:
 
