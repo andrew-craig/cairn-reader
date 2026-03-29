@@ -1,0 +1,425 @@
+openapi: 3.0.3
+info:
+  title: Cairn Email Ingest Service API
+  version: 0.1.0
+  description: |
+    Email ingestion service for Cairn. Accepts forwarded emails from a
+    Cloudflare Email Worker, processes them, and delivers sanitised content
+    to the Content Service via an outbox pattern.
+
+    ## Authentication
+    - **Ingest endpoint**: API key via `X-API-Key` header
+    - **User-facing endpoints**: JWT Bearer token (RS256, key from Vault)
+
+    ## Email Flow
+    1. Cloudflare Worker forwards email JSON to `POST /api/v1/source/email/ingest`
+    2. Service resolves recipient address to a user
+    3. Raw email is stored for background processing
+    4. Worker cleans HTML (tracking pixels, footers), sanitises, and delivers to Content Service
+  contact:
+    name: Cairn API Support
+    url: https://github.com/cairn-app/cairn-reader
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8089
+    description: Email Ingest Service (local development, host-mapped port)
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Ingest
+    description: Email ingestion (API key protected)
+  - name: Address
+    description: User email address management (JWT protected)
+  - name: Senders
+    description: Sender listing (JWT protected)
+
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: liveness
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Returns 200 when the service and its database are ready.
+      operationId: readiness
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+        '503':
+          description: Database not ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Database not ready
+
+  /api/v1/source/email/ingest:
+    post:
+      tags: [Ingest]
+      summary: Ingest a forwarded email
+      description: |
+        Accepts an email forwarded by the Cloudflare Email Worker. The
+        recipient address is resolved to a user; if no user owns the address
+        the email is silently rejected (`accepted: false`).
+      operationId: ingestEmail
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestEmailRequest'
+      responses:
+        '202':
+          description: Email accepted (or rejected if recipient unknown)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse_IngestEmailResponse'
+        '400':
+          description: Invalid request body or missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/source/email/user/{user_id}/address:
+    post:
+      tags: [Address]
+      summary: Get or create email address
+      description: |
+        Returns the user's unique ingest email address, creating one if it
+        does not yet exist. Each user gets exactly one address (8-char
+        alphanumeric local part).
+      operationId: getOrCreateAddress
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200':
+          description: Email address returned (created or existing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse_AddressData'
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User can only access their own resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Address]
+      summary: Get email address
+      description: Returns the user's existing ingest email address, or 404 if none exists.
+      operationId: getAddress
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200':
+          description: Email address found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse_AddressData'
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User can only access their own resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No email address found for user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/source/email/user/{user_id}/senders:
+    get:
+      tags: [Senders]
+      summary: List senders
+      description: |
+        Returns a paginated list of senders who have emailed the user,
+        ordered by most recently received first.
+      operationId: listSenders
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of senders to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of senders to skip
+      responses:
+        '200':
+          description: List of senders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse_SenderList'
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: User can only access their own resources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for the Cloudflare Email Worker
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 JWT token issued by the User Service
+
+  parameters:
+    UserID:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: User UUID (must match the authenticated JWT user_id)
+
+  schemas:
+    # --- Request schemas ---
+
+    IngestEmailRequest:
+      type: object
+      required: [recipient, sender, received_at]
+      properties:
+        recipient:
+          type: string
+          format: email
+          example: k7m2x9pq@read.cairnapp.com
+          description: The ingest email address the email was sent to
+        sender:
+          type: string
+          format: email
+          example: newsletter@example.com
+          description: Sender email address
+        sender_name:
+          type: string
+          example: Example Newsletter
+          description: Display name of the sender (optional)
+        subject:
+          type: string
+          example: "Weekly Digest #42"
+          description: Email subject line (optional)
+        html_body:
+          type: string
+          description: HTML body of the email
+        text_body:
+          type: string
+          description: Plain-text body of the email
+        received_at:
+          type: string
+          format: date-time
+          example: "2026-03-29T12:00:00Z"
+          description: When the email was received (RFC 3339)
+
+    # --- Response data schemas ---
+
+    IngestEmailResponse:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+          description: Whether the email was accepted for processing
+
+    AddressData:
+      type: object
+      properties:
+        email_address:
+          type: string
+          format: email
+          example: k7m2x9pq@read.cairnapp.com
+          description: Full ingest email address
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-29T12:00:00Z"
+
+    SenderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_email:
+          type: string
+          format: email
+        sender_name:
+          type: string
+          description: Display name (omitted if not known)
+        email_count:
+          type: integer
+          description: Number of emails received from this sender
+        last_received_at:
+          type: string
+          format: date-time
+          description: Timestamp of the most recent email (omitted if none processed yet)
+
+    # --- Envelope wrappers ---
+
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: v1
+
+    SuccessResponse_IngestEmailResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/IngestEmailResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    SuccessResponse_AddressData:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AddressData'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    SuccessResponse_SenderList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SenderResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: bad_request
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Optional additional error details
+        meta:
+          $ref: '#/components/schemas/Meta'
