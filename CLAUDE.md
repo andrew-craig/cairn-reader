@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > - [Explore Service](/services/explore/CLAUDE.md) - RSS feed fetching and content recommendation
 > - [Read Service](/services/read/CLAUDE.md) - Article storage and RSS feed management
 > - [User Service](/services/users/CLAUDE.md) - Authentication and user management
+> - [Email Ingest Service](/services/read/email/CLAUDE.md) - Email-to-article ingestion
 
 ## Project Overview
 
@@ -16,6 +17,7 @@ Cairn is a read-it-later application consisting of:
   - **Explore Service**: RSS feed fetching and content recommendation
   - **Read Service**: Article storage and user-specific metadata
   - **User Service**: Authentication and account management
+  - **Email Ingest Service**: Email-to-article ingestion pipeline
 
 ## Approach to work
 ### 1. Plan Node Default
@@ -68,7 +70,8 @@ See [infrastructure/docker/README.md](infrastructure/docker/README.md) for the D
 Mobile App (React Native) → REST APIs → Backend Services
                                         ├── User Service (Auth, port 8082)
                                         ├── Explore Service (RSS, ports 8080/8081)
-                                        └── Read Service (Storage, ports 8083/8085)
+                                        ├── Read Service (Storage, ports 8083/8085)
+                                        └── Email Ingest Service (port 8087)
                                                ↓
                                         PostgreSQL
 ```
@@ -100,6 +103,7 @@ Each service has an OpenAPI spec and endpoint documentation in its CLAUDE.md:
 - [services/explore/api/openapi.yaml](/services/explore/api/openapi.yaml)
 - [services/users/api/openapi.yaml](/services/users/api/openapi.yaml)
 - [services/read/api/openapi.yaml](/services/read/api/openapi.yaml)
+- [services/read/email/api/openapi.yaml](/services/read/email/api/openapi.yaml)
 
 All services use `/health/live` (liveness) and `/health/ready` (readiness) for health checks.
 
