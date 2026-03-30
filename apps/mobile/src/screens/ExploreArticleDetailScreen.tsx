@@ -3,11 +3,12 @@ import {
   View,
   StyleSheet,
   useColorScheme,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { Colors } from '../constants';
-import { ExploreService } from '../services';
+import { ExploreService, ReadService } from '../services';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 
 type ExploreArticleDetailRouteProp = RouteProp<RootStackParamList, 'ExploreArticleDetail'>;
@@ -20,6 +21,8 @@ export const ExploreArticleDetailScreen: React.FC = () => {
   const article = route.params.article;
 
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedContentId, setSavedContentId] = useState<string | null>(null);
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [hasDownvoted, setHasDownvoted] = useState(false);
 
@@ -28,12 +31,35 @@ export const ExploreArticleDetailScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
     try {
-      // TODO: Implement save to Read list functionality
-      setIsSaved(!isSaved);
-      console.log('Save article:', article.id);
+      if (isSaved && savedContentId) {
+        // Remove from Read list
+        await ReadService.deleteUserContent(savedContentId);
+        setIsSaved(false);
+        setSavedContentId(null);
+      } else {
+        // Save to Read list
+        const response = await ReadService.addContentToUser({
+          url: article.url,
+          source_type: 'web',
+        });
+        setIsSaved(true);
+        setSavedContentId(response.content_id);
+      }
     } catch (error) {
-      console.error('Failed to save article:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      if (message.includes('409') || message.toLowerCase().includes('already')) {
+        // Already saved — just reflect the state
+        setIsSaved(true);
+      } else {
+        Alert.alert('Error', isSaved ? 'Failed to remove article.' : 'Failed to save article.');
+      }
+      console.error('Failed to save/unsave article:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
