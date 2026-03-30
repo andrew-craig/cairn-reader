@@ -12,6 +12,7 @@ infrastructure/docker/
 │   └── .env                  # Local dev environment (git-ignored)
 ├── prod/
 │   ├── docker-compose.yml    # Production setup (pre-built images)
+│   ├── Caddyfile             # Reverse proxy routing & TLS config
 │   ├── .env.example          # Production environment template
 │   └── .env                  # Local prod environment (git-ignored)
 ├── scripts/                  # Shared initialization scripts
@@ -48,14 +49,17 @@ docker compose up -d
 The Docker Compose configuration includes:
 
 ### Core Infrastructure
+- **Caddy**: Reverse proxy with automatic Let's Encrypt TLS (ports 80, 443) — production only
 - **Vault**: HashiCorp Vault for secrets management (dev mode, port 8200)
 
 ### Backend Services
-- **User Service**: Authentication and account management (port 8082)
-- **Explore Recommender**: Article storage and recommendations (port 8087)
-- **Explore Fetcher**: RSS feed fetching for Explore (port 8088)
-- **Content Service**: Article content storage for Read (port 8083)
-- **Ingest RSS**: Feed subscription management (port 8085)
+In production, all services are internal-only (no host ports). Traffic is routed through Caddy.
+
+- **User Service**: Authentication and account management (dev port 8082)
+- **Explore Recommender**: Article storage and recommendations (dev port 8087)
+- **Explore Fetcher**: RSS feed fetching for Explore (dev port 8088)
+- **Content Service**: Article content storage for Read (dev port 8083)
+- **Ingest RSS**: Feed subscription management (dev port 8085)
 
 ### Background Workers
 - **Content Worker**: Article cleanup jobs (health port 8084)

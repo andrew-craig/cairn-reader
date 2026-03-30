@@ -282,102 +282,46 @@ docker compose ps
 ```bash
 # As root user
 sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # HTTP
+sudo ufw allow 80/tcp    # HTTP (redirects to HTTPS)
 sudo ufw allow 443/tcp   # HTTPS
+sudo ufw allow 443/udp   # HTTP/3 (QUIC)
 sudo ufw enable
 
-# Note: Services run internally on 8080/8081/8082
-# Use a reverse proxy (nginx) to expose on 80/443
+# Note: All backend services are internal-only (no host ports exposed).
+# Caddy reverse proxy handles TLS and routes traffic to services.
 ```
 
-#### 5. Set Up Reverse Proxy (Nginx)
+#### 5. Configure Domain and TLS
+
+The production Docker Compose includes a **Caddy** reverse proxy that automatically obtains and renews TLS certificates via Let's Encrypt. No separate nginx or certbot installation is needed.
+
+Set your domain in `.env`:
 
 ```bash
-# Install nginx
-sudo apt-get install nginx -y
-
-# Create nginx config
-sudo nano /etc/nginx/sites-available/cairn
+# Set to your production domain
+DOMAIN=api.yourdomain.com
 ```
 
-Add configuration:
+Caddy will:
+- Automatically obtain a Let's Encrypt TLS certificate on first request
+- Redirect HTTP to HTTPS
+- Renew certificates automatically before expiry
+- Support HTTP/3 (QUIC) out of the box
 
-```nginx
-upstream user_service {
-    server localhost:8082;
-}
+The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 
-upstream recommender_service {
-    server localhost:8081;
-}
+| Path | Routed To | Notes |
+|------|-----------|-------|
+| `/api/v1/auth/*` | User Service | Authentication |
+| `/api/v1/user/*` | User Service | Account management |
+| `/api/v1/explore/*` | Explore Recommender | Recommendations & voting |
+| `/api/v1/content/*` | Content Service | Article storage |
+| `/api/v1/source/email/*` | Email Ingest | Email ingestion |
+| `/health/*` | User Service | Health checks |
 
-upstream fetcher_service {
-    server localhost:8080;
-}
+Internal endpoints (`/api/v1/internal/*`, `/api/v1/explore/feed/*`, `/api/v1/source/rss/*`) are blocked from public access.
 
-server {
-    listen 80;
-    server_name api.yourdomain.com;
-
-    # User Service
-    location /api/v1/auth {
-        proxy_pass http://user_service;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location /api/v1/users {
-        proxy_pass http://user_service;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Explore Service (Recommender)
-    location /api/v1/explore {
-        proxy_pass http://recommender_service;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Health checks
-    location /health {
-        proxy_pass http://user_service;
-    }
-}
-```
-
-Enable site:
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/cairn /etc/nginx/sites-enabled/
-
-# Test configuration
-sudo nginx -t
-
-# Reload nginx
-sudo systemctl reload nginx
-```
-
-#### 6. Configure SSL with Let's Encrypt
-
-```bash
-# Install certbot
-sudo apt-get install certbot python3-certbot-nginx -y
-
-# Obtain SSL certificate
-sudo certbot --nginx -d api.yourdomain.com
-
-# Auto-renewal is configured automatically
-# Test renewal:
-sudo certbot renew --dry-run
-```
+For local testing without TLS, set `DOMAIN=localhost` in `.env`.
 
 ### Production Docker Compose Configuration
 
