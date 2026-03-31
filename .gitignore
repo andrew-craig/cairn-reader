@@ -41,6 +41,9 @@ npm-debug.log
 yarn-error.log
 package-lock.json
 
+# Test coverage
+coverage/
+
 # Bundle artifacts
 *.jsbundle
 
