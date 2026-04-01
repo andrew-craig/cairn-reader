@@ -1,13 +1,12 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": ["App.tsx"],
   "project": ["**/*.{ts,tsx}"],
-  "ignore": ["**/*.test.{ts,tsx}", "**/__tests__/**"],
   "ignoreDependencies": [
-    "expo",
     "expo-updates",
     "expo-system-ui",
     "@babel/core",
-    "babel-preset-expo"
+    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/parser"
   ]
 }

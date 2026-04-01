@@ -4,13 +4,13 @@ import { API_CONFIG } from '../config/api';
 
 const RECOMMENDER_BASE_URL = API_CONFIG.RECOMMENDER_SERVICE_URL;
 
-export interface RecommendationsResponse {
+interface RecommendationsResponse {
   user_id: string;
   recommendations: BackendArticle[];
   count: number;
 }
 
-export interface BackendArticle {
+interface BackendArticle {
   id: string;
   title: string;
   link: string;
@@ -29,16 +29,16 @@ export interface BackendArticle {
   updated_at: string;
 }
 
-export interface VoteRequest {
+interface VoteRequest {
   vote_type: 'upvote' | 'downvote';
 }
 
-export interface VotedArticle {
+interface VotedArticle {
   article: BackendArticle;
   vote_type: 'upvote' | 'downvote';
 }
 
-export interface UserVotesResponse {
+interface UserVotesResponse {
   user_id: string;
   votes: VotedArticle[];
   count: number;
