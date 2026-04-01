@@ -2,13 +2,13 @@
 id: task_793a
 title: Create go-checks.yml workflow with go vet matrix job
 type: task
-status: open
+status: closed
 priority: 1
 labels: [ci,backend]
 blocked_by: []
 parent: epic_d014
 created_at: 2026-04-01T03:36:17Z
-updated_at: 2026-04-01T03:36:17Z
+updated_at: 2026-04-01T17:44:19Z
 ---
 Create .github/workflows/go-checks.yml following the mobile-checks.yml pattern. Start with a go vet job using a matrix strategy for all 4 Go modules:
 - services/explore/ (go.mod)
