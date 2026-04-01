@@ -1,3 +1,5 @@
+//go:build integration
+
 package recommender_test
 
 import (
