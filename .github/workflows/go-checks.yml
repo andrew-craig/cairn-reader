@@ -30,3 +30,64 @@ jobs:
       - name: Run go vet
         working-directory: ${{ matrix.module }}
         run: go vet ./...
+
+  build:
+    name: go build (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: services/explore
+            build-cmd: |
+              go build ./fetcher/cmd/explore_fetcher
+              go build ./recommender/cmd/explore_recommender
+              go build ./recommender/cmd/explore_cleanup
+          - module: services/read
+            build-cmd: |
+              cd content && go build ./cmd/content && go build ./cmd/worker
+              cd ../fetcher && go build ./cmd/ingest_rss && go build ./cmd/ingest_rss_worker
+          - module: services/read/email
+            build-cmd: |
+              go build ./cmd/email_ingest
+              go build ./cmd/email_ingest_worker
+          - module: services/users
+            build-cmd: |
+              go build -o /dev/null ./cmd/user-service
+              go build -o /dev/null ./cmd/migrate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      - name: Build binaries
+        working-directory: ${{ matrix.module }}
+        run: ${{ matrix.build-cmd }}
+
+  test:
+    name: go test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: services/explore
+            test-cmd: go test -race -count=1 -timeout 5m ./...
+          - module: services/read
+            test-cmd: |
+              cd content && go test -race -count=1 -timeout 5m ./...
+              cd ../fetcher && go test -race -count=1 -timeout 5m ./...
+          - module: services/read/email
+            test-cmd: go test -race -count=1 -timeout 5m ./...
+          - module: services/users
+            test-cmd: go test -race -count=1 -timeout 5m ./internal/...
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      - name: Run tests
+        working-directory: ${{ matrix.module }}
+        run: ${{ matrix.test-cmd }}

@@ -2,13 +2,13 @@
 id: task_cde9
 title: Add go build verification job to go-checks.yml
 type: task
-status: open
+status: closed
 priority: 1
 labels: [ci,backend]
 blocked_by: []
 parent: epic_d014
 created_at: 2026-04-01T03:36:21Z
-updated_at: 2026-04-01T03:36:21Z
+updated_at: 2026-04-01T19:04:45Z
 ---
 Add a go build job to go-checks.yml that verifies all service binaries compile successfully. Use matrix strategy matching the go vet job. Build commands per service:
 - explore: go build ./fetcher/cmd/explore_fetcher && go build ./recommender/cmd/explore_recommender
