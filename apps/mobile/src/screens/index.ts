@@ -4,8 +4,6 @@ export * from './ReadScreen';
 export * from './YouScreen';
 export * from './AddArticleScreen';
 export * from './ReadArticleDetailScreen';
-export * from './FavoritesScreen';
-export * from './ArchiveScreen';
 export * from './LoginScreen';
 export * from './BookmarksScreen';
 export * from './VotesScreen';

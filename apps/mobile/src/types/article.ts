@@ -16,14 +16,3 @@ export interface Article {
   notes?: string;
 }
 
-export interface ArticleMetadata {
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  author?: string;
-  publishedDate?: string;
-  readingTime?: number;
-}
-
-export type SortOption = 'recent' | 'oldest' | 'title' | 'unread';
-export type FilterOption = 'all' | 'unread' | 'read' | 'favorites';
