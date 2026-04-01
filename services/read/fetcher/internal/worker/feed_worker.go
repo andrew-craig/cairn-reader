@@ -81,6 +81,17 @@ func (fw *FeedWorker) Stop() {
 
 // Submit submits a feed for processing
 func (fw *FeedWorker) Submit(feed *models.Feed) {
+	// Check if stopped first to avoid sending on closed channel.
+	// stopCh is closed before feedQueue in Stop(), so checking it
+	// first prevents the race where select picks the send case
+	// on an already-closed feedQueue.
+	select {
+	case <-fw.stopCh:
+		slog.Warn("Worker pool is stopping, skipping feed", "feed_id", feed.ID)
+		return
+	default:
+	}
+
 	select {
 	case fw.feedQueue <- feed:
 		// Feed submitted successfully
