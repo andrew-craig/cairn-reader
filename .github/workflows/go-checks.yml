@@ -29,6 +29,29 @@ jobs:
             exit 1
           fi
 
+  lint:
+    name: golangci-lint (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - services/explore
+          - services/read
+          - services/read/email
+          - services/users
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ${{ matrix.module }}
+          args: --timeout=5m
+
   vet:
     name: go vet (${{ matrix.module }})
     runs-on: ubuntu-latest

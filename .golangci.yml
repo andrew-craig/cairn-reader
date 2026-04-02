@@ -1,0 +1,21 @@
+version: "2"
+
+# golangci-lint v2 configuration for Cairn backend services.
+# Uses the default linter set (errcheck, govet, staticcheck, unused, ineffassign).
+# Expand incrementally as needed.
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Test files can have unchecked errors.
+    - path: _test\.go
+      linters:
+        - errcheck
