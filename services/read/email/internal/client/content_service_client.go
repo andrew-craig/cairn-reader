@@ -39,9 +39,9 @@ type EmailContentItem struct {
 
 // deliverResponse is the shape returned by the internal bulk endpoint.
 type deliverResponse struct {
-	Created  []createdItem  `json:"created"`
-	Existing []createdItem  `json:"existing"`
-	Failed   []failedItem   `json:"failed"`
+	Created  []createdItem `json:"created"`
+	Existing []createdItem `json:"existing"`
+	Failed   []failedItem  `json:"failed"`
 }
 
 type createdItem struct {

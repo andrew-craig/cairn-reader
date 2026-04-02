@@ -10,6 +10,25 @@ on:
       - '.github/workflows/go-checks.yml'
 
 jobs:
+  fmt:
+    name: gofmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l services/ pkg/)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not formatted:"
+            echo "$unformatted"
+            echo ""
+            echo "Run 'gofmt -w' on the above files to fix."
+            exit 1
+          fi
+
   vet:
     name: go vet (${{ matrix.module }})
     runs-on: ubuntu-latest

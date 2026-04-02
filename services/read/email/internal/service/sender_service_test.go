@@ -14,11 +14,11 @@ import (
 
 // mockSenderRepository is a test mock for repository.SenderRepository.
 type mockSenderRepository struct {
-	createFunc             func(ctx context.Context, sender *models.EmailSender) error
-	getByIDFunc            func(ctx context.Context, id uuid.UUID) (*models.EmailSender, error)
-	getByUserAndEmailFunc  func(ctx context.Context, userID uuid.UUID, senderEmail string) (*models.EmailSender, error)
-	upsertFunc             func(ctx context.Context, sender *models.EmailSender) error
-	listByUserFunc         func(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*models.EmailSender, error)
+	createFunc              func(ctx context.Context, sender *models.EmailSender) error
+	getByIDFunc             func(ctx context.Context, id uuid.UUID) (*models.EmailSender, error)
+	getByUserAndEmailFunc   func(ctx context.Context, userID uuid.UUID, senderEmail string) (*models.EmailSender, error)
+	upsertFunc              func(ctx context.Context, sender *models.EmailSender) error
+	listByUserFunc          func(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*models.EmailSender, error)
 	incrementEmailCountFunc func(ctx context.Context, id uuid.UUID, receivedAt time.Time) error
 }
 

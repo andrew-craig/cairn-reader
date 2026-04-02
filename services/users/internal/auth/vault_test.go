@@ -196,7 +196,7 @@ func TestKeyRotationConfig(t *testing.T) {
 		PublicKeyPath:        "secret/data/jwt/public-key",
 		RotationInterval:     24 * time.Hour,
 		TokenRenewalInterval: 1 * time.Hour,
-		OnRotation:          callback,
+		OnRotation:           callback,
 	}
 
 	assert.Equal(t, "secret/data/jwt/private-key", cfg.PrivateKeyPath)

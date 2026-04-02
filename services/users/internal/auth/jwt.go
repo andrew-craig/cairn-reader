@@ -28,7 +28,7 @@ var (
 
 // JWTManager handles JWT token operations
 type JWTManager struct {
-	mu         sync.RWMutex    // Protects key fields during rotation
+	mu         sync.RWMutex // Protects key fields during rotation
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
 	keyID      string // Key ID (kid) for JWT header - identifies which key signed the token

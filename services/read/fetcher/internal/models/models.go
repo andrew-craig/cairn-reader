@@ -54,16 +54,16 @@ type Feed struct {
 	SiteURL     *string `json:"site_url,omitempty"`
 
 	// Polling management
-	PollingTier      PollingTier `json:"polling_tier"`
-	LastFetchedAt    *time.Time  `json:"last_fetched_at,omitempty"`
-	LastPublishedAt  *time.Time  `json:"last_published_at,omitempty"`
-	NextPollAt       time.Time   `json:"next_poll_at"`
+	PollingTier     PollingTier `json:"polling_tier"`
+	LastFetchedAt   *time.Time  `json:"last_fetched_at,omitempty"`
+	LastPublishedAt *time.Time  `json:"last_published_at,omitempty"`
+	NextPollAt      time.Time   `json:"next_poll_at"`
 
 	// Status and error tracking
-	Status                FeedStatus `json:"status"`
-	ConsecutiveErrorDays  int        `json:"consecutive_error_days"`
-	LastErrorAt           *time.Time `json:"last_error_at,omitempty"`
-	LastErrorMessage      *string    `json:"last_error_message,omitempty"`
+	Status               FeedStatus `json:"status"`
+	ConsecutiveErrorDays int        `json:"consecutive_error_days"`
+	LastErrorAt          *time.Time `json:"last_error_at,omitempty"`
+	LastErrorMessage     *string    `json:"last_error_message,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time `json:"created_at"`

@@ -278,24 +278,24 @@ func (v *VaultClient) Health() error {
 
 // KeyRotationManager handles automatic key rotation and token renewal
 type KeyRotationManager struct {
-	vaultClient       *VaultClient
-	privateKeyPath    string
-	publicKeyPath     string
-	rotationInterval  time.Duration
+	vaultClient          *VaultClient
+	privateKeyPath       string
+	publicKeyPath        string
+	rotationInterval     time.Duration
 	tokenRenewalInterval time.Duration
-	currentKeyPair    *JWTKeyPair
-	mu                sync.RWMutex
-	stopCh            chan struct{}
-	onRotation        func(*JWTKeyPair) error // Callback when keys are rotated
+	currentKeyPair       *JWTKeyPair
+	mu                   sync.RWMutex
+	stopCh               chan struct{}
+	onRotation           func(*JWTKeyPair) error // Callback when keys are rotated
 }
 
 // KeyRotationConfig holds configuration for key rotation
 type KeyRotationConfig struct {
 	PrivateKeyPath       string
 	PublicKeyPath        string
-	RotationInterval     time.Duration        // How often to check for new keys (0 to disable)
-	TokenRenewalInterval time.Duration        // How often to renew Vault token (0 to disable)
-	OnRotation          func(*JWTKeyPair) error // Optional callback when keys rotate
+	RotationInterval     time.Duration           // How often to check for new keys (0 to disable)
+	TokenRenewalInterval time.Duration           // How often to renew Vault token (0 to disable)
+	OnRotation           func(*JWTKeyPair) error // Optional callback when keys rotate
 }
 
 // NewKeyRotationManager creates a new key rotation manager

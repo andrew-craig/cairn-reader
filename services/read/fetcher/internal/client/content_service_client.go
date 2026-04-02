@@ -108,9 +108,9 @@ type CheckDuplicatesRequest struct {
 
 // DuplicateCheckResult represents the result of a duplicate check
 type DuplicateCheckResult struct {
-	ContentHash string          `json:"content_hash"`
-	Exists      bool            `json:"exists"`
-	ContentID   *uuid.UUID      `json:"content_id,omitempty"`
+	ContentHash string           `json:"content_hash"`
+	Exists      bool             `json:"exists"`
+	ContentID   *uuid.UUID       `json:"content_id,omitempty"`
 	Content     *ContentResponse `json:"content,omitempty"`
 }
 

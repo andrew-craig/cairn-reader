@@ -50,11 +50,11 @@ func TestRawEmailRepository_Create(t *testing.T) {
 			nil, // text_body
 			now,
 			models.ProcessingStatusPending,
-			nil, // content_hash
-			0,   // retry_count
-			nil, // last_error
+			nil,              // content_hash
+			0,                // retry_count
+			nil,              // last_error
 			sqlmock.AnyArg(), // created_at
-			nil, // processed_at
+			nil,              // processed_at
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 

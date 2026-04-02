@@ -53,10 +53,10 @@ func TestOutboxRepository_Create(t *testing.T) {
 			0, // retry_count
 			6, // max_retries
 			now,
-			nil, // last_error
-			nil, // content_service_id
+			nil,              // last_error
+			nil,              // content_service_id
 			sqlmock.AnyArg(), // created_at
-			nil, // delivered_at
+			nil,              // delivered_at
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
