@@ -203,7 +203,7 @@ func (r *senderRepository) ListByUser(ctx context.Context, userID uuid.UUID, lim
 	if err != nil {
 		return nil, fmt.Errorf("failed to list senders: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var senders []*models.EmailSender
 	for rows.Next() {

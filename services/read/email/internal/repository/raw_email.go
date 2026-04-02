@@ -146,7 +146,7 @@ func (r *rawEmailRepository) GetPendingEmails(ctx context.Context, limit int) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending emails: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var emails []*models.RawEmail
 	for rows.Next() {

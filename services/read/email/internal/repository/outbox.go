@@ -164,7 +164,7 @@ func (r *outboxRepository) GetPendingEntries(ctx context.Context, limit int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending outbox entries: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []*models.ContentOutbox
 	for rows.Next() {
