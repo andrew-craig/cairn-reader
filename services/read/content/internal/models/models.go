@@ -11,34 +11,34 @@ import (
 
 // Content represents a unique content item (shared across users)
 type Content struct {
-	ID           uuid.UUID       `json:"id"`
-	ContentHash  string          `json:"content_hash"`
-	CleanedHTML  string          `json:"cleaned_html"`
-	OriginalURL  string          `json:"original_url"`
-	CanonicalURL *string         `json:"canonical_url,omitempty"`
-	Title        string          `json:"title"`
-	Author       *string         `json:"author,omitempty"`
-	PublishedAt  *time.Time      `json:"published_at,omitempty"`
-	Description  *string         `json:"description,omitempty"`
-	ImageURLs    pq.StringArray  `json:"image_urls,omitempty"`
-	SourceType   string          `json:"source_type"`
-	SourceFeedID *uuid.UUID      `json:"source_feed_id,omitempty"`
-	Metadata     JSONB           `json:"metadata,omitempty"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
-	OrphanedAt   *time.Time      `json:"orphaned_at,omitempty"`
+	ID           uuid.UUID      `json:"id"`
+	ContentHash  string         `json:"content_hash"`
+	CleanedHTML  string         `json:"cleaned_html"`
+	OriginalURL  string         `json:"original_url"`
+	CanonicalURL *string        `json:"canonical_url,omitempty"`
+	Title        string         `json:"title"`
+	Author       *string        `json:"author,omitempty"`
+	PublishedAt  *time.Time     `json:"published_at,omitempty"`
+	Description  *string        `json:"description,omitempty"`
+	ImageURLs    pq.StringArray `json:"image_urls,omitempty"`
+	SourceType   string         `json:"source_type"`
+	SourceFeedID *uuid.UUID     `json:"source_feed_id,omitempty"`
+	Metadata     JSONB          `json:"metadata,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	OrphanedAt   *time.Time     `json:"orphaned_at,omitempty"`
 }
 
 // UserContent represents the junction table mapping users to content with user-specific metadata
 type UserContent struct {
-	ID             uuid.UUID  `json:"id"`
-	UserID         uuid.UUID  `json:"user_id"`
-	ContentID      uuid.UUID  `json:"content_id"`
-	Status         string     `json:"status"`
-	ScrollPosition int        `json:"scroll_position"`
-	IsFavorite     bool       `json:"is_favorite"`
-	AddedAt        time.Time  `json:"added_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	ContentID      uuid.UUID `json:"content_id"`
+	Status         string    `json:"status"`
+	ScrollPosition int       `json:"scroll_position"`
+	IsFavorite     bool      `json:"is_favorite"`
+	AddedAt        time.Time `json:"added_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // JSONB is a custom type for handling PostgreSQL JSONB columns

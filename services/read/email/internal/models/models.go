@@ -56,12 +56,12 @@ type RawEmail struct {
 	SenderID *uuid.UUID `json:"sender_id,omitempty"`
 
 	// Raw email data from Cloudflare worker
-	Recipient   string  `json:"recipient"`
-	SenderEmail string  `json:"sender_email"`
-	SenderName  *string `json:"sender_name,omitempty"`
-	Subject     *string `json:"subject,omitempty"`
-	HTMLBody    *string `json:"html_body,omitempty"`
-	TextBody    *string `json:"text_body,omitempty"`
+	Recipient   string    `json:"recipient"`
+	SenderEmail string    `json:"sender_email"`
+	SenderName  *string   `json:"sender_name,omitempty"`
+	Subject     *string   `json:"subject,omitempty"`
+	HTMLBody    *string   `json:"html_body,omitempty"`
+	TextBody    *string   `json:"text_body,omitempty"`
 	ReceivedAt  time.Time `json:"received_at"`
 
 	// Processing status

@@ -40,11 +40,11 @@ type ErrorResponse struct {
 
 // PaginationInfo contains pagination metadata
 type PaginationInfo struct {
-	Cursor  string `json:"cursor,omitempty"`  // Base64-encoded cursor for next page
-	HasMore bool   `json:"has_more"`          // Whether more results are available
-	Limit   int    `json:"limit"`             // Number of items per page
-	Offset  int    `json:"offset,omitempty"`  // Offset for offset-based pagination
-	Total   int    `json:"total,omitempty"`   // Total count (if available)
+	Cursor  string `json:"cursor,omitempty"` // Base64-encoded cursor for next page
+	HasMore bool   `json:"has_more"`         // Whether more results are available
+	Limit   int    `json:"limit"`            // Number of items per page
+	Offset  int    `json:"offset,omitempty"` // Offset for offset-based pagination
+	Total   int    `json:"total,omitempty"`  // Total count (if available)
 }
 
 // PaginatedResponse represents a paginated API response

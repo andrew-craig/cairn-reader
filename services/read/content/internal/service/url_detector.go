@@ -22,9 +22,9 @@ const (
 
 // URLDetectionResult contains the result of URL detection
 type URLDetectionResult struct {
-	URL   string   `json:"url"`
-	Type  URLType  `json:"type"`
-	Title *string  `json:"title"`
+	URL   string  `json:"url"`
+	Type  URLType `json:"type"`
+	Title *string `json:"title"`
 }
 
 // URLDetector defines the interface for URL detection

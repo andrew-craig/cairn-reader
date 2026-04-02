@@ -71,7 +71,7 @@ func sendAPIKeyError(w http.ResponseWriter, statusCode int, errCode string, mess
 
 // MockAPIKeyRepository is a mock for testing
 type MockAPIKeyRepository struct {
-	ValidateKeyFn     func(ctx context.Context, apiKey string) (bool, error)
+	ValidateKeyFn      func(ctx context.Context, apiKey string) (bool, error)
 	GetKeyHashByNameFn func(ctx context.Context, keyName string) (string, error)
 }
 

@@ -13,10 +13,10 @@ import (
 
 // mockAddressRepository is a test mock for repository.AddressRepository.
 type mockAddressRepository struct {
-	createFunc        func(ctx context.Context, address *models.EmailAddress) error
-	getByUserIDFunc   func(ctx context.Context, userID uuid.UUID) (*models.EmailAddress, error)
+	createFunc         func(ctx context.Context, address *models.EmailAddress) error
+	getByUserIDFunc    func(ctx context.Context, userID uuid.UUID) (*models.EmailAddress, error)
 	getByLocalPartFunc func(ctx context.Context, localPart string) (*models.EmailAddress, error)
-	deleteFunc        func(ctx context.Context, userID uuid.UUID) error
+	deleteFunc         func(ctx context.Context, userID uuid.UUID) error
 }
 
 func (m *mockAddressRepository) Create(ctx context.Context, address *models.EmailAddress) error {

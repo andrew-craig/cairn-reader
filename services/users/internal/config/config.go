@@ -57,20 +57,20 @@ type VaultConfig struct {
 
 // JWTConfig contains JWT token configuration
 type JWTConfig struct {
-	PrivateKeyPath     string
-	PublicKeyPath      string
-	AccessTokenExpiry  time.Duration
-	RefreshTokenExpiry time.Duration
+	PrivateKeyPath      string
+	PublicKeyPath       string
+	AccessTokenExpiry   time.Duration
+	RefreshTokenExpiry  time.Duration
 	KeyRotationInterval time.Duration // How often to check for new keys
 }
 
 // SecurityConfig contains security-related configuration
 type SecurityConfig struct {
-	BcryptCost              int
-	MinPasswordLength       int
+	BcryptCost                int
+	MinPasswordLength         int
 	RequirePasswordComplexity bool
-	RateLimitRequests       int
-	RateLimitWindow         time.Duration
+	RateLimitRequests         int
+	RateLimitWindow           time.Duration
 }
 
 // Load reads configuration from environment variables
@@ -110,11 +110,11 @@ func Load() (*Config, error) {
 			KeyRotationInterval: env.GetDuration("JWT_KEY_ROTATION_INTERVAL", 24*time.Hour),
 		},
 		Security: SecurityConfig{
-			BcryptCost:              env.GetInt("BCRYPT_COST", 12),
-			MinPasswordLength:       env.GetInt("MIN_PASSWORD_LENGTH", 8),
+			BcryptCost:                env.GetInt("BCRYPT_COST", 12),
+			MinPasswordLength:         env.GetInt("MIN_PASSWORD_LENGTH", 8),
 			RequirePasswordComplexity: env.GetBool("REQUIRE_PASSWORD_COMPLEXITY", true),
-			RateLimitRequests:       env.GetInt("RATE_LIMIT_REQUESTS", 100),
-			RateLimitWindow:         env.GetDuration("RATE_LIMIT_WINDOW", 1*time.Minute),
+			RateLimitRequests:         env.GetInt("RATE_LIMIT_REQUESTS", 100),
+			RateLimitWindow:           env.GetDuration("RATE_LIMIT_WINDOW", 1*time.Minute),
 		},
 		Logging: LoggingConfig{
 			Level:  env.GetString("LOG_LEVEL", "info"),

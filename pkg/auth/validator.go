@@ -35,7 +35,7 @@ type Claims struct {
 
 // Validator handles JWT token validation using RS256 public key
 type Validator struct {
-	mu        sync.RWMutex   // Protects key fields during rotation
+	mu        sync.RWMutex // Protects key fields during rotation
 	publicKey *rsa.PublicKey
 	keyID     string // Key ID (kid) for identifying which key to use for validation
 	issuer    string

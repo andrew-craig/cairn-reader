@@ -34,8 +34,8 @@ type AddressService interface {
 }
 
 type addressService struct {
-	addressRepo    repository.AddressRepository
-	generateLocal  func() (string, error)
+	addressRepo   repository.AddressRepository
+	generateLocal func() (string, error)
 }
 
 // NewAddressService creates a new AddressService.

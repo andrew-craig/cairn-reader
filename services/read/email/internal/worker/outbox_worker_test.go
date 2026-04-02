@@ -15,10 +15,10 @@ import (
 
 // mockFullOutboxRepo implements repository.OutboxRepository for outbox worker tests.
 type mockFullOutboxRepo struct {
-	getPendingFunc         func(ctx context.Context, limit int) ([]*models.ContentOutbox, error)
-	updateDeliveryFunc     func(ctx context.Context, id uuid.UUID, status models.DeliveryStatus, contentServiceID *uuid.UUID, deliveredAt *time.Time) error
-	updateRetryFunc        func(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
-	deleteDeliveredFunc    func(ctx context.Context, olderThan time.Duration) (int64, error)
+	getPendingFunc      func(ctx context.Context, limit int) ([]*models.ContentOutbox, error)
+	updateDeliveryFunc  func(ctx context.Context, id uuid.UUID, status models.DeliveryStatus, contentServiceID *uuid.UUID, deliveredAt *time.Time) error
+	updateRetryFunc     func(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
+	deleteDeliveredFunc func(ctx context.Context, olderThan time.Duration) (int64, error)
 }
 
 func (m *mockFullOutboxRepo) Create(ctx context.Context, outbox *models.ContentOutbox) error {

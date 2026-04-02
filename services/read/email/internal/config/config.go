@@ -41,11 +41,11 @@ type EmailConfig struct {
 
 // AuthConfig holds authentication settings
 type AuthConfig struct {
-	IngestAPIKey      string
-	VaultAddr         string
-	VaultToken        string
-	JWTPublicKeyPath  string
-	VaultAuthPath     string
+	IngestAPIKey     string
+	VaultAddr        string
+	VaultToken       string
+	JWTPublicKeyPath string
+	VaultAuthPath    string
 }
 
 // ContentServiceConfig holds configuration for the Content Service HTTP client.
@@ -56,14 +56,14 @@ type ContentServiceConfig struct {
 
 // WorkerConfig holds worker-related settings
 type WorkerConfig struct {
-	EmailProcessWorkers     int
+	EmailProcessWorkers      int
 	EmailProcessPollInterval time.Duration
-	OutboxWorkerCount       int
-	OutboxPollInterval      time.Duration
-	OutboxMaxRetries        int
-	RawEmailCleanupCron     string
-	RawEmailRetentionDays   int
-	OutboxCleanupCron       string
+	OutboxWorkerCount        int
+	OutboxPollInterval       time.Duration
+	OutboxMaxRetries         int
+	RawEmailCleanupCron      string
+	RawEmailRetentionDays    int
+	OutboxCleanupCron        string
 }
 
 // LoggingConfig holds logging configuration

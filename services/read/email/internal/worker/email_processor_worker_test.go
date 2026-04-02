@@ -40,9 +40,9 @@ func (m *mockSenderService) ListByUser(ctx context.Context, userID uuid.UUID, li
 var _ service.SenderService = (*mockSenderService)(nil)
 
 type mockRawEmailRepo struct {
-	getPendingFunc  func(ctx context.Context, limit int) ([]*models.RawEmail, error)
+	getPendingFunc   func(ctx context.Context, limit int) ([]*models.RawEmail, error)
 	updateStatusFunc func(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, processedAt *time.Time) error
-	updateErrorFunc func(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
+	updateErrorFunc  func(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
 }
 
 func (m *mockRawEmailRepo) Create(ctx context.Context, email *models.RawEmail) error { return nil }
