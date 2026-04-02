@@ -2,13 +2,13 @@
 id: task_f887
 title: Add test coverage reporting to go-checks.yml
 type: task
-status: open
+status: closed
 priority: 3
 labels: [ci,backend,testing]
 blocked_by: []
 parent: epic_d014
 created_at: 2026-04-01T03:38:21Z
-updated_at: 2026-04-01T03:38:21Z
+updated_at: 2026-04-02T18:14:51Z
 ---
 Add test coverage reporting to the unit test job. Generate coverage profiles and either:
 - Post coverage summary as a PR comment
