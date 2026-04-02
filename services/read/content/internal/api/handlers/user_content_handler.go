@@ -98,10 +98,11 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 	}
 
 	if isFavStr := r.URL.Query().Get("is_favorite"); isFavStr != "" {
-		if isFavStr == "true" {
+		switch isFavStr {
+		case "true":
 			fav := true
 			isFavorite = &fav
-		} else if isFavStr == "false" {
+		case "false":
 			fav := false
 			isFavorite = &fav
 		}
@@ -254,13 +255,14 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	if err != nil {
 		// Map errors to user-friendly messages
 		errMsg := err.Error()
-		if errMsg == "already subscribed to this feed" {
+		switch errMsg {
+		case "already subscribed to this feed":
 			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "Already subscribed to this feed", nil, "v1")
-		} else if errMsg == "feed limit reached (max 100 feeds per user)" {
+		case "feed limit reached (max 100 feeds per user)":
 			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Feed limit reached (max 100 feeds per user)", nil, "v1")
-		} else if errMsg == "invalid feed URL or not a valid RSS/Atom feed" {
+		case "invalid feed URL or not a valid RSS/Atom feed":
 			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid feed URL or not a valid RSS/Atom feed", nil, "v1")
-		} else {
+		default:
 			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed: "+err.Error(), nil, "v1")
 		}
 		return

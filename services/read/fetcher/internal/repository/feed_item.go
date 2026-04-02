@@ -451,7 +451,7 @@ func (r *feedItemRepository) queryFeedItems(ctx context.Context, query string, a
 	if err != nil {
 		return nil, fmt.Errorf("failed to query feed items: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	items := make([]*models.FeedItem, 0)
 	for rows.Next() {

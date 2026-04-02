@@ -304,7 +304,7 @@ func (r *outboxRepository) queryOutboxEntries(ctx context.Context, query string,
 	if err != nil {
 		return nil, fmt.Errorf("failed to query outbox entries: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	entries := make([]*models.ContentOutbox, 0)
 	for rows.Next() {

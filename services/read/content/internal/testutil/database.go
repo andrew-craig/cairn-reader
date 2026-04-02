@@ -68,7 +68,7 @@ func SetupTestDatabase(t *testing.T) *TestDatabase {
 
 	adminDB, err := sql.Open("postgres", postgresConnStr)
 	require.NoError(t, err, "Failed to connect to postgres database")
-	defer adminDB.Close()
+	defer func() { _ = adminDB.Close() }()
 
 	// Create test database
 	_, err = adminDB.Exec(fmt.Sprintf("CREATE DATABASE %s", testDBName))
@@ -161,7 +161,7 @@ func (td *TestDatabase) Cleanup() {
 
 	// Close the test database connection
 	if td.DB != nil {
-		td.DB.Close()
+		_ = td.DB.Close()
 	}
 
 	// Connect to postgres database to drop test database
@@ -175,7 +175,7 @@ func (td *TestDatabase) Cleanup() {
 		td.t.Logf("Warning: Failed to connect to postgres for cleanup: %v", err)
 		return
 	}
-	defer adminDB.Close()
+	defer func() { _ = adminDB.Close() }()
 
 	// Terminate existing connections
 	_, err = adminDB.Exec(fmt.Sprintf(

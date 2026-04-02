@@ -369,7 +369,7 @@ func (r *contentRepository) List(ctx context.Context, limit, offset int) ([]*mod
 	if err != nil {
 		return nil, fmt.Errorf("failed to list contents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var contents []*models.Content
 	for rows.Next() {
@@ -424,7 +424,7 @@ func (r *contentRepository) GetByContentHashesAndFeedID(ctx context.Context, con
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contents by hashes and feed ID: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]*models.Content)
 	for rows.Next() {
@@ -471,7 +471,7 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Prepare the insert statement
 	stmt, err := tx.PrepareContext(ctx, `
@@ -487,7 +487,7 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	now := time.Now()
 

@@ -307,7 +307,7 @@ func (r *feedRepository) GetFeedsDueForPolling(ctx context.Context, limit int) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to query feeds due for polling: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	feeds := make([]*models.Feed, 0)
 	for rows.Next() {
@@ -348,7 +348,7 @@ func (r *feedRepository) GetFeedsForTierUpdate(ctx context.Context) ([]*models.F
 	if err != nil {
 		return nil, fmt.Errorf("failed to query feeds for tier update: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	feeds := make([]*models.Feed, 0)
 	for rows.Next() {

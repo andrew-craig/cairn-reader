@@ -219,7 +219,7 @@ func (r *userContentRepository) ListByUser(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user contents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userContents []*models.UserContent
 	for rows.Next() {
@@ -277,7 +277,7 @@ func (r *userContentRepository) ListByUserWithFilter(ctx context.Context, userID
 	if err != nil {
 		return nil, fmt.Errorf("failed to list user contents with filter: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userContents []*models.UserContent
 	for rows.Next() {
@@ -501,7 +501,7 @@ func (r *userContentRepository) Search(ctx context.Context, userID uuid.UUID, qu
 	if err != nil {
 		return nil, fmt.Errorf("failed to search user contents: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var userContents []*models.UserContent
 	for rows.Next() {
@@ -540,7 +540,7 @@ func (r *userContentRepository) BulkCreate(ctx context.Context, userContents []*
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Prepare the insert statement
 	stmt, err := tx.PrepareContext(ctx, `
@@ -555,7 +555,7 @@ func (r *userContentRepository) BulkCreate(ctx context.Context, userContents []*
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	now := time.Now()
 

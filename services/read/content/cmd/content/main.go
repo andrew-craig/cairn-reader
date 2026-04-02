@@ -81,7 +81,7 @@ func main() {
 		slog.Error("failed to connect to database", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	slog.Info("component initialized", slog.String("component", "database"))
 

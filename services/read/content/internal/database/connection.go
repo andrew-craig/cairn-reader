@@ -94,7 +94,7 @@ func (db *DB) Close() error {
 
 // Ping checks if the database connection is alive
 func (db *DB) Ping(ctx context.Context) error {
-	return db.DB.PingContext(ctx)
+	return db.PingContext(ctx)
 }
 
 // BeginTx starts a new transaction with the given options

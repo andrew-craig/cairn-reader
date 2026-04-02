@@ -41,7 +41,7 @@ func NewRouter(db *database.DB) http.Handler {
 	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy"}`)
 	})
 
 	// Readiness probe - indicates if the service is ready to accept traffic
@@ -52,20 +52,20 @@ func NewRouter(db *database.DB) http.Handler {
 		if err := db.Ping(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
+			_, _ = fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
 	})
 
 	// Root endpoint
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"service":"rss-fetcher-service","version":"0.1.0","status":"running"}`)
+		_, _ = fmt.Fprintf(w, `{"service":"rss-fetcher-service","version":"0.1.0","status":"running"}`)
 	})
 
 	// API v1 routes with /source/rss prefix

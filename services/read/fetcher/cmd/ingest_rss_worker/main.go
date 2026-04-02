@@ -46,7 +46,7 @@ func main() {
 		slog.Error("failed to connect to database", slog.Any("error", err))
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	slog.Info("component initialized", slog.String("component", "database"))
 
@@ -310,7 +310,7 @@ func setupHealthCheckServer(port string, db *sql.DB, logger *slog.Logger) *http.
 	mux.HandleFunc("/health/live", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status":  "ok",
 			"service": "rss-fetcher-service-worker",
 		})
@@ -327,7 +327,7 @@ func setupHealthCheckServer(port string, db *sql.DB, logger *slog.Logger) *http.
 		if err := db.PingContext(ctx); err != nil {
 			logger.Error("health check failed: database ping error", slog.Any("error", err))
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"status": "unavailable",
 				"error":  "database connection failed",
 			})
@@ -335,7 +335,7 @@ func setupHealthCheckServer(port string, db *sql.DB, logger *slog.Logger) *http.
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		_ = json.NewEncoder(w).Encode(map[string]string{
 			"status":  "ok",
 			"service": "rss-fetcher-service-worker",
 		})
