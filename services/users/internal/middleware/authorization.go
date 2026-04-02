@@ -20,7 +20,7 @@ func RequireSameUser() func(http.Handler) http.Handler {
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "authentication required",
 				})
 				return
@@ -31,7 +31,7 @@ func RequireSameUser() func(http.Handler) http.Handler {
 			if requestedUserIDStr == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "user ID parameter is required",
 				})
 				return
@@ -42,7 +42,7 @@ func RequireSameUser() func(http.Handler) http.Handler {
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "invalid user ID format",
 				})
 				return
@@ -52,7 +52,7 @@ func RequireSameUser() func(http.Handler) http.Handler {
 			if authenticatedUserID != requestedUserID {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "you can only access your own resources",
 				})
 				return
@@ -74,7 +74,7 @@ func RequireSameUserWithCustomParam(paramName string) func(http.Handler) http.Ha
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "authentication required",
 				})
 				return
@@ -85,7 +85,7 @@ func RequireSameUserWithCustomParam(paramName string) func(http.Handler) http.Ha
 			if requestedUserIDStr == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "user ID parameter is required",
 				})
 				return
@@ -96,7 +96,7 @@ func RequireSameUserWithCustomParam(paramName string) func(http.Handler) http.Ha
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "invalid user ID format",
 				})
 				return
@@ -106,7 +106,7 @@ func RequireSameUserWithCustomParam(paramName string) func(http.Handler) http.Ha
 			if authenticatedUserID != requestedUserID {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "you can only access your own resources",
 				})
 				return
@@ -132,7 +132,7 @@ func RequireOwnership(ownerCheckFunc OwnerCheckFunc) func(http.Handler) http.Han
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "authentication required",
 				})
 				return
@@ -143,7 +143,7 @@ func RequireOwnership(ownerCheckFunc OwnerCheckFunc) func(http.Handler) http.Han
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": err.Error(),
 				})
 				return
@@ -153,7 +153,7 @@ func RequireOwnership(ownerCheckFunc OwnerCheckFunc) func(http.Handler) http.Han
 			if authenticatedUserID != resourceOwnerID {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "you can only access your own resources",
 				})
 				return
@@ -174,7 +174,7 @@ func CheckUserIDParam(paramName string) func(http.Handler) http.Handler {
 			if userIDStr == "" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "user ID parameter is required",
 				})
 				return
@@ -184,7 +184,7 @@ func CheckUserIDParam(paramName string) func(http.Handler) http.Handler {
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "invalid user ID format",
 				})
 				return

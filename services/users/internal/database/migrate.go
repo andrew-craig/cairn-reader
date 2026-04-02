@@ -23,7 +23,7 @@ func RunMigrations(cfg *Config, migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create postgres driver instance
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
@@ -60,7 +60,7 @@ func RollbackMigration(cfg *Config, migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection for rollback: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -95,7 +95,7 @@ func GetMigrationVersion(cfg *Config, migrationsPath string) (uint, bool, error)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to open database connection: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

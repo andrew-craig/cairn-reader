@@ -442,8 +442,8 @@ func TestJWTKeyPair_Operations(t *testing.T) {
 		}
 
 		// Verify the public key matches the private key
-		assert.Equal(t, privateKey.PublicKey.N, keyPair.PublicKey.N)
-		assert.Equal(t, privateKey.PublicKey.E, keyPair.PublicKey.E)
+		assert.Equal(t, privateKey.N, keyPair.PublicKey.N)
+		assert.Equal(t, privateKey.E, keyPair.PublicKey.E)
 	})
 
 	t.Run("nil key pair", func(t *testing.T) {
