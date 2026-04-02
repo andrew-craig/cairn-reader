@@ -10,6 +10,34 @@ on:
       - '.github/workflows/go-checks.yml'
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      explore: ${{ steps.filter.outputs.explore == 'true' || steps.filter.outputs.pkg == 'true' }}
+      read: ${{ steps.filter.outputs.read == 'true' || steps.filter.outputs.pkg == 'true' }}
+      email: ${{ steps.filter.outputs.email == 'true' || steps.filter.outputs.pkg == 'true' }}
+      users: ${{ steps.filter.outputs.users == 'true' || steps.filter.outputs.pkg == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            explore:
+              - 'services/explore/**'
+            read:
+              - 'services/read/**'
+              - '!services/read/email/**'
+            email:
+              - 'services/read/email/**'
+            users:
+              - 'services/users/**'
+            pkg:
+              - 'pkg/**'
+
   fmt:
     name: gofmt
     runs-on: ubuntu-latest
@@ -29,117 +57,320 @@ jobs:
             exit 1
           fi
 
-  lint:
-    name: golangci-lint (${{ matrix.module }})
+  # ── Lint ──────────────────────────────────────────────────────────────
+
+  lint-explore:
+    name: golangci-lint (services/explore)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        module:
-          - services/explore
-          - services/read
-          - services/read/email
-          - services/users
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache-dependency-path: ${{ matrix.module }}/go.sum
+          cache-dependency-path: services/explore/go.sum
       - uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.4
-          working-directory: ${{ matrix.module }}
+          working-directory: services/explore
           args: --timeout=5m
 
-  vet:
-    name: go vet (${{ matrix.module }})
+  lint-read:
+    name: golangci-lint (services/read)
+    needs: [changes]
+    if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        module:
-          - services/explore
-          - services/read
-          - services/read/email
-          - services/users
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache-dependency-path: ${{ matrix.module }}/go.sum
+          cache-dependency-path: services/read/go.sum
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          working-directory: services/read
+          args: --timeout=5m
+
+  lint-email:
+    name: golangci-lint (services/read/email)
+    needs: [changes]
+    if: needs.changes.outputs.email == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/read/email/go.sum
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          working-directory: services/read/email
+          args: --timeout=5m
+
+  lint-users:
+    name: golangci-lint (services/users)
+    needs: [changes]
+    if: needs.changes.outputs.users == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/users/go.sum
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          working-directory: services/users
+          args: --timeout=5m
+
+  # ── Vet ───────────────────────────────────────────────────────────────
+
+  vet-explore:
+    name: go vet (services/explore)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/explore/go.sum
       - name: Run go vet
-        working-directory: ${{ matrix.module }}
+        working-directory: services/explore
         run: go vet ./...
 
-  build:
-    name: go build (${{ matrix.module }})
+  vet-read:
+    name: go vet (services/read)
+    needs: [changes]
+    if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - module: services/explore
-            build-cmd: |
-              go build ./fetcher/cmd/explore_fetcher
-              go build ./recommender/cmd/explore_recommender
-              go build ./recommender/cmd/explore_cleanup
-          - module: services/read
-            build-cmd: |
-              cd content && go build ./cmd/content && go build ./cmd/worker
-              cd ../fetcher && go build ./cmd/ingest_rss && go build ./cmd/ingest_rss_worker
-          - module: services/read/email
-            build-cmd: |
-              go build ./cmd/email_ingest
-              go build ./cmd/email_ingest_worker
-          - module: services/users
-            build-cmd: |
-              go build -o /dev/null ./cmd/user-service
-              go build -o /dev/null ./cmd/migrate
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache-dependency-path: ${{ matrix.module }}/go.sum
-      - name: Build binaries
-        working-directory: ${{ matrix.module }}
-        run: ${{ matrix.build-cmd }}
+          cache-dependency-path: services/read/go.sum
+      - name: Run go vet
+        working-directory: services/read
+        run: go vet ./...
 
-  test:
-    name: go test (${{ matrix.module }})
+  vet-email:
+    name: go vet (services/read/email)
+    needs: [changes]
+    if: needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - module: services/explore
-            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
-          - module: services/read
-            test-cmd: |
-              cd content && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
-              cd ../fetcher && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
-          - module: services/read/email
-            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
-          - module: services/users
-            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./internal/...
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-          cache-dependency-path: ${{ matrix.module }}/go.sum
+          cache-dependency-path: services/read/email/go.sum
+      - name: Run go vet
+        working-directory: services/read/email
+        run: go vet ./...
+
+  vet-users:
+    name: go vet (services/users)
+    needs: [changes]
+    if: needs.changes.outputs.users == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/users/go.sum
+      - name: Run go vet
+        working-directory: services/users
+        run: go vet ./...
+
+  # ── Build ─────────────────────────────────────────────────────────────
+
+  build-explore:
+    name: go build (services/explore)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/explore/go.sum
+      - name: Build binaries
+        working-directory: services/explore
+        run: |
+          go build ./fetcher/cmd/explore_fetcher
+          go build ./recommender/cmd/explore_recommender
+          go build ./recommender/cmd/explore_cleanup
+
+  build-read:
+    name: go build (services/read)
+    needs: [changes]
+    if: needs.changes.outputs.read == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/read/go.sum
+      - name: Build binaries
+        working-directory: services/read
+        run: |
+          cd content && go build ./cmd/content && go build ./cmd/worker
+          cd ../fetcher && go build ./cmd/ingest_rss && go build ./cmd/ingest_rss_worker
+
+  build-email:
+    name: go build (services/read/email)
+    needs: [changes]
+    if: needs.changes.outputs.email == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/read/email/go.sum
+      - name: Build binaries
+        working-directory: services/read/email
+        run: |
+          go build ./cmd/email_ingest
+          go build ./cmd/email_ingest_worker
+
+  build-users:
+    name: go build (services/users)
+    needs: [changes]
+    if: needs.changes.outputs.users == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/users/go.sum
+      - name: Build binaries
+        working-directory: services/users
+        run: |
+          go build -o /dev/null ./cmd/user-service
+          go build -o /dev/null ./cmd/migrate
+
+  # ── Test ──────────────────────────────────────────────────────────────
+
+  test-explore:
+    name: go test (services/explore)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/explore/go.sum
       - name: Run tests
-        working-directory: ${{ matrix.module }}
-        run: ${{ matrix.test-cmd }}
+        working-directory: services/explore
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
       - name: Coverage summary
         if: always() && !cancelled()
-        working-directory: ${{ matrix.module }}
+        working-directory: services/explore
         run: |
-          echo "## Coverage: ${{ matrix.module }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Coverage: services/explore" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          # Find all coverage.out files (read service has sub-dirs)
+          for f in $(find . -name coverage.out -type f); do
+            dir=$(dirname "$f")
+            if [ "$dir" != "." ]; then
+              echo "--- $dir ---" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test-read:
+    name: go test (services/read)
+    needs: [changes]
+    if: needs.changes.outputs.read == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/read/go.sum
+      - name: Run tests
+        working-directory: services/read
+        run: |
+          cd content && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+          cd ../fetcher && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: services/read
+        run: |
+          echo "## Coverage: services/read" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for f in $(find . -name coverage.out -type f); do
+            dir=$(dirname "$f")
+            if [ "$dir" != "." ]; then
+              echo "--- $dir ---" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test-email:
+    name: go test (services/read/email)
+    needs: [changes]
+    if: needs.changes.outputs.email == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/read/email/go.sum
+      - name: Run tests
+        working-directory: services/read/email
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: services/read/email
+        run: |
+          echo "## Coverage: services/read/email" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for f in $(find . -name coverage.out -type f); do
+            dir=$(dirname "$f")
+            if [ "$dir" != "." ]; then
+              echo "--- $dir ---" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test-users:
+    name: go test (services/users)
+    needs: [changes]
+    if: needs.changes.outputs.users == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: services/users/go.sum
+      - name: Run tests
+        working-directory: services/users
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./internal/...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: services/users
+        run: |
+          echo "## Coverage: services/users" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
           for f in $(find . -name coverage.out -type f); do
             dir=$(dirname "$f")
             if [ "$dir" != "." ]; then
