@@ -259,7 +259,7 @@ func (s *feedService) ValidateAndExtractFeedMetadata(ctx context.Context, feedUR
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch feed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("feed returned status %d", resp.StatusCode)

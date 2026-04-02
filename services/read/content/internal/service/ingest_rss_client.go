@@ -109,7 +109,7 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ingest RSS service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -163,7 +163,7 @@ func (c *IngestRSSClient) ListUserSubscriptions(ctx context.Context, userID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch subscriptions: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -143,7 +143,7 @@ func (r *feedSubscriptionRepository) GetByUserID(ctx context.Context, userID uui
 	if err != nil {
 		return nil, fmt.Errorf("failed to query subscriptions by user: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	subscriptions := make([]*models.FeedSubscription, 0)
 	for rows.Next() {
@@ -180,7 +180,7 @@ func (r *feedSubscriptionRepository) GetByFeedID(ctx context.Context, feedID uui
 	if err != nil {
 		return nil, fmt.Errorf("failed to query subscriptions by feed: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	subscriptions := make([]*models.FeedSubscription, 0)
 	for rows.Next() {
@@ -216,7 +216,7 @@ func (r *feedSubscriptionRepository) GetSubscriberIDs(ctx context.Context, feedI
 	if err != nil {
 		return nil, fmt.Errorf("failed to query subscriber IDs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	userIDs := make([]uuid.UUID, 0)
 	for rows.Next() {

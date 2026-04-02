@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -69,47 +68,6 @@ func (m *mockURLDetector) DetectURL(ctx context.Context, url string) (*service.U
 		URL:   url,
 		Type:  m.detectionType,
 		Title: &title,
-	}, nil
-}
-
-type mockIngestRSSClient struct {
-	shouldFail bool
-}
-
-func (m *mockIngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedURL string) (*service.FeedSubscriptionResponse, error) {
-	if m.shouldFail {
-		return nil, fmt.Errorf("already subscribed to this feed")
-	}
-	return &service.FeedSubscriptionResponse{
-		Subscription: struct {
-			ID           string    `json:"id"`
-			UserID       string    `json:"user_id"`
-			FeedID       string    `json:"feed_id"`
-			SubscribedAt time.Time `json:"subscribed_at"`
-		}{
-			ID:           uuid.NewString(),
-			UserID:       userID,
-			FeedID:       uuid.NewString(),
-			SubscribedAt: time.Now(),
-		},
-		Feed: struct {
-			ID          string    `json:"id"`
-			FeedURL     string    `json:"feed_url"`
-			Title       string    `json:"title"`
-			Description string    `json:"description"`
-			SiteURL     string    `json:"site_url"`
-			PollingTier string    `json:"polling_tier"`
-			Status      string    `json:"status"`
-			CreatedAt   time.Time `json:"created_at"`
-			UpdatedAt   time.Time `json:"updated_at"`
-		}{
-			ID:        uuid.NewString(),
-			FeedURL:   feedURL,
-			Title:     "Test Feed",
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		},
-		IsNewFeed: true,
 	}, nil
 }
 

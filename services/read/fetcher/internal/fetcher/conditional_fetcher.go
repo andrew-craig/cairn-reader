@@ -62,7 +62,7 @@ func (cf *ConditionalFetcher) FetchWithConditionals(
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	result := &ConditionalFetchResult{
 		StatusCode:  resp.StatusCode,

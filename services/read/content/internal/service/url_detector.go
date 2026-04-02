@@ -70,7 +70,7 @@ func (d *urlDetectorImpl) DetectURL(ctx context.Context, url string) (*URLDetect
 			Title: nil,
 		}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Get final URL after redirects
 	finalURL := resp.Request.URL.String()

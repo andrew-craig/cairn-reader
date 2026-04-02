@@ -47,7 +47,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy"}`)
 	})
 
 	// Readiness probe - indicates if the service is ready to accept traffic
@@ -58,20 +58,20 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 		if err := db.Ping(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
+			_, _ = fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
 	})
 
 	// Root endpoint
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"service":"content-service","version":"0.5.0","status":"Phase 2 - Router & Middleware Integration complete"}`)
+		_, _ = fmt.Fprintf(w, `{"service":"content-service","version":"0.5.0","status":"Phase 2 - Router & Middleware Integration complete"}`)
 	})
 
 	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
