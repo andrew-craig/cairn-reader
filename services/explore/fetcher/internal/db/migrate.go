@@ -28,7 +28,7 @@ func RunMigrations(migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create postgres driver instance
 	driver, err := postgres.WithInstance(db, &postgres.Config{})

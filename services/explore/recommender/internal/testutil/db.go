@@ -112,7 +112,7 @@ func runMigrations(connStr string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database connection for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Wait for database to be ready
 	for i := 0; i < 30; i++ {
