@@ -61,7 +61,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 // handleLiveness returns a simple liveness probe response
 func handleLiveness(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 
 // handleReadiness returns a readiness probe that checks database connectivity
@@ -72,6 +72,6 @@ func handleReadiness(db *database.DB) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}
 }

@@ -63,7 +63,7 @@ type errorResponse struct {
 func sendAPIKeyError(w http.ResponseWriter, statusCode int, errCode string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(errorResponse{
+	_ = json.NewEncoder(w).Encode(errorResponse{
 		Error:   errCode,
 		Message: message,
 	})

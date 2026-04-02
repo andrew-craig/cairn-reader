@@ -85,7 +85,7 @@ func NewConnection(cfg *Config) (*DB, error) {
 
 	// Test the connection
 	if err := sqlDB.Ping(); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -107,7 +107,7 @@ func NewConnectionFromURL(url string) (*sql.DB, error) {
 
 	// Test the connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
