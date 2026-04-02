@@ -115,15 +115,15 @@ jobs:
       matrix:
         include:
           - module: services/explore
-            test-cmd: go test -race -count=1 -timeout 5m ./...
+            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
           - module: services/read
             test-cmd: |
-              cd content && go test -race -count=1 -timeout 5m ./...
-              cd ../fetcher && go test -race -count=1 -timeout 5m ./...
+              cd content && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+              cd ../fetcher && go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
           - module: services/read/email
-            test-cmd: go test -race -count=1 -timeout 5m ./...
+            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
           - module: services/users
-            test-cmd: go test -race -count=1 -timeout 5m ./internal/...
+            test-cmd: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./internal/...
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -133,3 +133,18 @@ jobs:
       - name: Run tests
         working-directory: ${{ matrix.module }}
         run: ${{ matrix.test-cmd }}
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: ${{ matrix.module }}
+        run: |
+          echo "## Coverage: ${{ matrix.module }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Find all coverage.out files (read service has sub-dirs)
+          for f in $(find . -name coverage.out -type f); do
+            dir=$(dirname "$f")
+            if [ "$dir" != "." ]; then
+              echo "--- $dir ---" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
