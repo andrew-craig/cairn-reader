@@ -10,63 +10,225 @@ on:
       - '.github/workflows/docker-*.yml'
 
 jobs:
-  test-build:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      users: ${{ steps.filter.outputs.users == 'true' || steps.filter.outputs.infra == 'true' }}
+      explore: ${{ steps.filter.outputs.explore == 'true' || steps.filter.outputs.infra == 'true' }}
+      read-content: ${{ steps.filter.outputs.read-content == 'true' || steps.filter.outputs.infra == 'true' }}
+      read-fetcher: ${{ steps.filter.outputs.read-fetcher == 'true' || steps.filter.outputs.infra == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            users:
+              - 'services/users/**'
+            explore:
+              - 'services/explore/**'
+            read-content:
+              - 'services/read/content/**'
+              - 'services/read/internal/**'
+              - 'services/read/go.mod'
+              - 'services/read/go.sum'
+            read-fetcher:
+              - 'services/read/fetcher/**'
+              - 'services/read/internal/**'
+              - 'services/read/go.mod'
+              - 'services/read/go.sum'
+            infra:
+              - 'infrastructure/docker/**'
+
+  # ── User Service ──────────────────────────────────────────────────────
+
+  build-user-service:
+    name: Docker build (user-service)
+    needs: [changes]
+    if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: user-service
-            dockerfile: services/users/Dockerfile
-            context: .
-
-          - service: explore-recommender
-            dockerfile: services/explore/recommender/Dockerfile
-            context: .
-
-          - service: explore-fetcher
-            dockerfile: services/explore/fetcher/Dockerfile
-            context: .
-
-          - service: content-service
-            dockerfile: services/read/content/Dockerfile
-            context: .
-
-          - service: content-worker
-            dockerfile: services/read/content/Dockerfile.worker
-            context: .
-
-          - service: ingest-rss
-            dockerfile: services/read/fetcher/Dockerfile
-            context: .
-
-          - service: ingest-rss-worker
-            dockerfile: services/read/fetcher/Dockerfile.worker
-            context: .
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - name: Build Docker image (test only)
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          context: .
+          file: services/users/Dockerfile
           push: false
           load: true
-          tags: cairn-${{ matrix.service }}:test
+          tags: cairn-user-service:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
       - name: Test image can run
         run: |
-          docker run --rm cairn-${{ matrix.service }}:test --help || \
-          docker run --rm cairn-${{ matrix.service }}:test --version || \
+          docker run --rm cairn-user-service:test --help || \
+          docker run --rm cairn-user-service:test --version || \
+          echo "Image built successfully"
+
+  # ── Explore Services ──────────────────────────────────────────────────
+
+  build-explore-recommender:
+    name: Docker build (explore-recommender)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/explore/recommender/Dockerfile
+          push: false
+          load: true
+          tags: cairn-explore-recommender:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-explore-recommender:test --help || \
+          docker run --rm cairn-explore-recommender:test --version || \
+          echo "Image built successfully"
+
+  build-explore-fetcher:
+    name: Docker build (explore-fetcher)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/explore/fetcher/Dockerfile
+          push: false
+          load: true
+          tags: cairn-explore-fetcher:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-explore-fetcher:test --help || \
+          docker run --rm cairn-explore-fetcher:test --version || \
+          echo "Image built successfully"
+
+  # ── Content Services ──────────────────────────────────────────────────
+
+  build-content-service:
+    name: Docker build (content-service)
+    needs: [changes]
+    if: needs.changes.outputs.read-content == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/read/content/Dockerfile
+          push: false
+          load: true
+          tags: cairn-content-service:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-content-service:test --help || \
+          docker run --rm cairn-content-service:test --version || \
+          echo "Image built successfully"
+
+  build-content-worker:
+    name: Docker build (content-worker)
+    needs: [changes]
+    if: needs.changes.outputs.read-content == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/read/content/Dockerfile.worker
+          push: false
+          load: true
+          tags: cairn-content-worker:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-content-worker:test --help || \
+          docker run --rm cairn-content-worker:test --version || \
+          echo "Image built successfully"
+
+  # ── Ingest RSS Services ───────────────────────────────────────────────
+
+  build-ingest-rss:
+    name: Docker build (ingest-rss)
+    needs: [changes]
+    if: needs.changes.outputs.read-fetcher == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/read/fetcher/Dockerfile
+          push: false
+          load: true
+          tags: cairn-ingest-rss:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-ingest-rss:test --help || \
+          docker run --rm cairn-ingest-rss:test --version || \
+          echo "Image built successfully"
+
+  build-ingest-rss-worker:
+    name: Docker build (ingest-rss-worker)
+    needs: [changes]
+    if: needs.changes.outputs.read-fetcher == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: services/read/fetcher/Dockerfile.worker
+          push: false
+          load: true
+          tags: cairn-ingest-rss-worker:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image can run
+        run: |
+          docker run --rm cairn-ingest-rss-worker:test --help || \
+          docker run --rm cairn-ingest-rss-worker:test --version || \
           echo "Image built successfully"
