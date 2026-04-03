@@ -2,13 +2,13 @@
 id: epic_d014
 title: Go Backend CI Checks
 type: epic
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: null
 created_at: 2026-03-31T10:28:02Z
-updated_at: 2026-03-31T10:28:02Z
+updated_at: 2026-04-03T22:38:01Z
 ---
 Add GitHub Actions CI checks for the Go backend services (explore, read, users) to catch bugs and regressions on PRs. Currently backend PRs only verify Docker images build (docker-test.yml). The mobile app already has comprehensive PR checks (mobile-checks.yml). This epic covers adding go vet, gofmt verification, unit tests with race detection, go build verification, golangci-lint, and test coverage reporting as required PR checks for all Go backend services.
 
