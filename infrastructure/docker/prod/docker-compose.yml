@@ -3,6 +3,45 @@ name: cairn-prod
 # This file demonstrates how to deploy using pre-built images instead of building locally
 
 services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Caddy Reverse Proxy — TLS termination with automatic Let's Encrypt
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Caddy is the single public entry point. All backend services are reachable
+  # only through the internal Docker network.
+  #
+  # Set DOMAIN in .env to your production domain (e.g., api.cairnapp.com).
+  # Caddy will automatically obtain and renew TLS certificates via Let's Encrypt.
+  # For local testing without TLS, set DOMAIN=localhost.
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # TLS certificates
+      - caddy_config:/config   # Caddy runtime config
+    depends_on:
+      user-service:
+        condition: service_healthy
+      explore-recommender:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      email-ingest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2019/config/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
   # HashiCorp Vault - Secrets Management
   # NOTE: Port 8200 is NOT exposed to host in production for security
   # Access Vault only through the Docker network
@@ -110,8 +149,8 @@ services:
       POSTGRES_USER_EMAIL: ${POSTGRES_USER_EMAIL}
       POSTGRES_PASSWORD_EMAIL: ${POSTGRES_PASSWORD_EMAIL}
       POSTGRES_DB_EMAIL: ${POSTGRES_DB_EMAIL}
-    ports:
-      - "5432:5432"
+    # Port NOT exposed to host — access only via Docker network
+    # Uncomment below for debugging: ports: ["5432:5432"]
     volumes:
       - cairn_db_data:/var/lib/postgresql/data
       - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
@@ -130,8 +169,7 @@ services:
   # Authenticates to Vault using AppRole (not root token)
   user-service:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-user-service:${IMAGE_TAG:-latest}
-    ports:
-      - "8082:8080"
+    # No host port — traffic routed through Caddy reverse proxy
     environment:
       - PORT=8080
       - DB_HOST=cairn-db
@@ -170,8 +208,7 @@ services:
   # Authenticates to Vault using AppRole (read-only public key access)
   explore-recommender:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-recommender:${IMAGE_TAG:-latest}
-    ports:
-      - "8087:8081"
+    # No host port — traffic routed through Caddy reverse proxy
     environment:
       - PORT=8081
       - DB_HOST=cairn-db
@@ -207,8 +244,7 @@ services:
   # Using published image from GitHub Container Registry
   explore-fetcher:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-explore-fetcher:${IMAGE_TAG:-latest}
-    ports:
-      - "8088:8080"
+    # No host port — internal service only
     environment:
       - PORT=8080
       - RECOMMENDER_URL=http://explore-recommender:8081
@@ -240,8 +276,7 @@ services:
   # Using published image from GitHub Container Registry
   content-service:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-service:${IMAGE_TAG:-latest}
-    ports:
-      - "8083:8080"
+    # No host port — traffic routed through Caddy reverse proxy
     environment:
       - PORT=8080
       - DB_HOST=cairn-db
@@ -279,6 +314,7 @@ services:
   # Using published image from GitHub Container Registry
   content-worker:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-content-worker:${IMAGE_TAG:-latest}
+    # No host port — background worker, not publicly accessible
     environment:
       - DB_HOST=cairn-db
       - DB_PORT=5432
@@ -288,8 +324,6 @@ services:
       - DB_SSLMODE=disable
       - CLEANUP_CRON=0 2 * * *
       - HEALTH_PORT=8084
-    ports:
-      - "8084:8084"
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -307,8 +341,7 @@ services:
   # Using published image from GitHub Container Registry
   ingest-rss:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss:${IMAGE_TAG:-latest}
-    ports:
-      - "8085:8081"
+    # No host port — internal service only
     environment:
       - PORT=8081
       - DB_HOST=cairn-db
@@ -333,6 +366,7 @@ services:
   # Using published image from GitHub Container Registry
   ingest-rss-worker:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-rss-worker:${IMAGE_TAG:-latest}
+    # No host port — background worker, not publicly accessible
     environment:
       - DB_HOST=cairn-db
       - DB_PORT=5432
@@ -345,8 +379,6 @@ services:
       - HEALTH_PORT=8086
       - OUTBOX_CLEANUP_CRON=0 3 * * *
       - FEED_ITEMS_CLEANUP_CRON=0 4 * * *
-    ports:
-      - "8086:8086"
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -366,8 +398,7 @@ services:
   # Using published image from GitHub Container Registry
   email-ingest:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-email:${IMAGE_TAG:-latest}
-    ports:
-      - "8089:8087"
+    # No host port — traffic routed through Caddy reverse proxy
     environment:
       - PORT=8087
       - DB_HOST=cairn-db
@@ -404,6 +435,7 @@ services:
   # Using published image from GitHub Container Registry
   email-ingest-worker:
     image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-ingest-email-worker:${IMAGE_TAG:-latest}
+    # No host port — background worker, not publicly accessible
     environment:
       - DB_HOST=cairn-db
       - DB_PORT=5432
@@ -415,8 +447,6 @@ services:
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - EMAIL_DOMAIN=read.cairnapp.com
       - HEALTH_PORT=8090
-    ports:
-      - "8090:8090"
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -436,6 +466,8 @@ volumes:
   cairn_db_data:
   vault-keys:
   vault-data:
+  caddy_data:      # TLS certificates (Let's Encrypt)
+  caddy_config:    # Caddy runtime configuration
 
 networks:
   cairn-network:

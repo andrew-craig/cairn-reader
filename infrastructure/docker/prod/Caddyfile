@@ -1,0 +1,80 @@
+# Cairn Production Reverse Proxy Configuration
+# Caddy automatically obtains and renews Let's Encrypt TLS certificates.
+#
+# Set the DOMAIN environment variable to your production domain (e.g., api.cairnapp.com).
+# For local testing without TLS, set DOMAIN=localhost.
+
+{$DOMAIN:localhost} {
+	# ──────────────────────────────────────────────
+	# Security Headers
+	# ──────────────────────────────────────────────
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# ──────────────────────────────────────────────
+	# Block internal/admin endpoints from public access
+	# ──────────────────────────────────────────────
+	handle /api/v1/internal/* {
+		respond "Not Found" 404
+	}
+
+	# Explore Fetcher admin endpoints are internal-only
+	handle /api/v1/explore/feed/* {
+		respond "Not Found" 404
+	}
+
+	# RSS ingest is service-to-service only
+	handle /api/v1/source/rss/* {
+		respond "Not Found" 404
+	}
+
+	# ──────────────────────────────────────────────
+	# User Service — Authentication & account management
+	# ──────────────────────────────────────────────
+	handle /api/v1/auth/* {
+		reverse_proxy user-service:8080
+	}
+
+	handle /api/v1/user/* {
+		reverse_proxy user-service:8080
+	}
+
+	# ──────────────────────────────────────────────
+	# Explore Recommender — Recommendations & voting
+	# ──────────────────────────────────────────────
+	handle /api/v1/explore/* {
+		reverse_proxy explore-recommender:8081
+	}
+
+	# ──────────────────────────────────────────────
+	# Content Service — Article storage (user-facing)
+	# ──────────────────────────────────────────────
+	handle /api/v1/content/* {
+		reverse_proxy content-service:8080
+	}
+
+	# ──────────────────────────────────────────────
+	# Email Ingest — Email address management & webhook
+	# ──────────────────────────────────────────────
+	handle /api/v1/source/email/* {
+		reverse_proxy email-ingest:8087
+	}
+
+	# ──────────────────────────────────────────────
+	# Health check (aggregated via user-service)
+	# ──────────────────────────────────────────────
+	handle /health/* {
+		reverse_proxy user-service:8080
+	}
+
+	# ──────────────────────────────────────────────
+	# Default — reject unmatched paths
+	# ──────────────────────────────────────────────
+	handle {
+		respond "Not Found" 404
+	}
+}
