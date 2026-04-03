@@ -39,6 +39,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	// API routes
 	r.Route("/api/v1/source/email", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		// Email ingestion (API key protected)
 		r.With(deps.APIKeyAuth.RequireAPIKey).Post("/ingest", deps.IngestHandler.IngestEmail)
 

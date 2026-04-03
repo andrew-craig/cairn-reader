@@ -57,6 +57,7 @@ func (s *Server) Routes() http.Handler {
 
 	// API v1 routes
 	r.Route("/api/v1/explore", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		// Public API routes - no authentication required
 		r.Post("/article", s.handleArticles)
 

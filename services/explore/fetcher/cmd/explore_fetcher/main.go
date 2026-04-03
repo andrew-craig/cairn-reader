@@ -134,6 +134,7 @@ func main() {
 
 	// API v1 routes
 	r.Route("/api/v1/explore/feed", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		r.Post("/fetch", func(w http.ResponseWriter, r *http.Request) {
 			go func() {
 				if err := feedFetcher.FetchSingleFeed(bgCtx); err != nil {
