@@ -55,8 +55,10 @@ platform :ios do
     )
 
     # Upload to TestFlight
+    # verbose: true is required for Xcode 26 to detect silent altool failures
     upload_to_testflight(
-      skip_waiting_for_build_processing: true
+      skip_waiting_for_build_processing: true,
+      verbose: true
     )
   end
 
