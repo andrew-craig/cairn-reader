@@ -9,11 +9,14 @@ on:
 jobs:
   deploy:
     name: Deploy to TestFlight
-    runs-on: macos-latest
+    runs-on: macos-26
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,7 +45,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.2'
+          ruby-version: '3.3'
           bundler-cache: true
           working-directory: apps/mobile/ios
 
