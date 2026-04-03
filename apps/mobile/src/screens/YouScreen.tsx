@@ -106,8 +106,7 @@ export const YouScreen: React.FC = () => {
   };
 
   const handleFeedsPress = () => {
-    // TODO: Navigate to feeds management
-    console.log('Feeds pressed');
+    navigation.navigate('Feeds');
   };
 
   const handleBookmarksPress = () => {
