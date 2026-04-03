@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   useColorScheme,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, GlobalStyles, Layout, Spacing } from '../constants';
+import { Colors, GlobalStyles, Layout, Spacing, FontSizes, FontFamily } from '../constants';
 import { ArticleRow } from '../components/common/ArticleRow';
 import { IconButton } from '../components/common/IconButton';
+import { SearchModal } from '../components/SearchModal';
 import { RootStackParamList } from '../types';
 import { ExploreService, VotedArticleWithType } from '../services/explore';
 
@@ -32,6 +34,8 @@ export const VotesScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
 
@@ -90,26 +94,57 @@ export const VotesScreen: React.FC = () => {
   };
 
   const handleSearchPress = () => {
-    console.log('Search pressed');
+    setSearchVisible(true);
   };
 
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery(null);
+  };
+
+  const filteredArticles = useMemo(() => {
+    if (!searchQuery) return articles;
+    const q = searchQuery.toLowerCase();
+    return articles.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.description?.toLowerCase().includes(q) ||
+        a.author?.toLowerCase().includes(q)
+    );
+  }, [articles, searchQuery]);
+
   const renderHeader = () => (
-    <View
-      style={[
-        GlobalStyles.header,
-        {
-          backgroundColor: colors.background,
-          paddingTop: insets.top + Spacing.md,
-          height: undefined,
-        },
-      ]}
-    >
-      <View style={GlobalStyles.headerLeft}>
-        <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Votes</Text>
+    <View>
+      <View
+        style={[
+          GlobalStyles.header,
+          {
+            backgroundColor: colors.background,
+            paddingTop: insets.top + Spacing.md,
+            height: undefined,
+          },
+        ]}
+      >
+        <View style={GlobalStyles.headerLeft}>
+          <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Votes</Text>
+        </View>
+        <View style={GlobalStyles.headerRight}>
+          <IconButton icon="search-outline" onPress={handleSearchPress} />
+        </View>
       </View>
-      <View style={GlobalStyles.headerRight}>
-        <IconButton icon="search-outline" onPress={handleSearchPress} />
-      </View>
+      {searchQuery && (
+        <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
+          <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
+            Results for "{searchQuery}"
+          </Text>
+          <TouchableOpacity onPress={clearSearch} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -124,7 +159,7 @@ export const VotesScreen: React.FC = () => {
   const renderEmpty = () => (
     <View style={GlobalStyles.emptyContainer}>
       <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
-        No voted articles yet
+        {searchQuery ? 'No matching articles' : 'No voted articles yet'}
       </Text>
     </View>
   );
@@ -156,7 +191,7 @@ export const VotesScreen: React.FC = () => {
   return (
     <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={articles}
+        data={filteredArticles}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderHeader}
@@ -165,10 +200,34 @@ export const VotesScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         onRefresh={handleRefresh}
         refreshing={refreshing}
-        onEndReached={handleLoadMore}
+        onEndReached={searchQuery ? undefined : handleLoadMore}
         onEndReachedThreshold={0.5}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
       />
+      <SearchModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onSearch={handleSearch}
+      />
     </View>
   );
+};
+
+const searchBannerStyles = {
+  container: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 8,
+  },
+  text: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.defaultMedium,
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
 };

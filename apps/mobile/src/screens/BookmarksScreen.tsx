@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
+import { Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
+import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 
@@ -18,6 +20,8 @@ export const BookmarksScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   const loadBookmarks = useCallback(async (reset = false) => {
     try {
@@ -56,31 +60,70 @@ export const BookmarksScreen: React.FC = () => {
     }
   }, [offset]);
 
+  const searchArticles = async (query: string) => {
+    setSearchQuery(query);
+    setLoading(true);
+    setHasMore(false);
+
+    try {
+      const response = await ReadService.searchUserContents({
+        q: query,
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+
+      const transformedArticles = response.contents.map((content) =>
+        ReadService.transformToArticle(content)
+      );
+
+      setArticles(transformedArticles);
+      setOffset(transformedArticles.length);
+      setHasMore(response.contents.length === PAGE_SIZE);
+    } catch (error) {
+      console.error('Error searching articles:', error);
+      Alert.alert('Error', 'Failed to search articles. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery(null);
+    setArticles([]);
+    setOffset(0);
+    loadBookmarks(true);
+  };
+
   useFocusEffect(
     useCallback(() => {
-      loadBookmarks(true);
-    }, [])
+      if (!searchQuery) {
+        loadBookmarks(true);
+      }
+    }, [searchQuery])
   );
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadBookmarks(true);
-  }, []);
+    if (searchQuery) {
+      searchArticles(searchQuery);
+    } else {
+      loadBookmarks(true);
+    }
+  }, [searchQuery]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !loading) {
+    if (!loadingMore && hasMore && !loading && !searchQuery) {
       setLoadingMore(true);
       loadBookmarks(false);
     }
-  }, [loadingMore, hasMore, loading, loadBookmarks]);
+  }, [loadingMore, hasMore, loading, loadBookmarks, searchQuery]);
 
   const handleArticlePress = (article: Article) => {
     navigation.navigate('ArticleDetail', { article });
   };
 
   const handleSearchPress = () => {
-    // TODO: Navigate to search screen
-    console.log('Search pressed');
+    setSearchVisible(true);
   };
 
   const headerActions = (
@@ -88,17 +131,26 @@ export const BookmarksScreen: React.FC = () => {
   );
 
   return (
-    <ArticleListScreen
-      title="Bookmarks"
-      articles={articles}
-      loading={loading}
-      headerActions={headerActions}
-      onArticlePress={handleArticlePress}
-      onRefresh={handleRefresh}
-      refreshing={refreshing}
-      emptyMessage="No bookmarked articles yet"
-      onEndReached={handleLoadMore}
-      loadingMore={loadingMore}
-    />
+    <>
+      <ArticleListScreen
+        title="Bookmarks"
+        articles={articles}
+        loading={loading}
+        headerActions={headerActions}
+        onArticlePress={handleArticlePress}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        emptyMessage={searchQuery ? 'No matching articles' : 'No bookmarked articles yet'}
+        onEndReached={handleLoadMore}
+        loadingMore={loadingMore}
+        searchQuery={searchQuery ?? undefined}
+        onClearSearch={clearSearch}
+      />
+      <SearchModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onSearch={searchArticles}
+      />
+    </>
   );
 };
