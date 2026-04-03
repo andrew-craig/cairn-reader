@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Dimensions, ViewToken } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
+import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ExploreService } from '../services';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,6 +35,8 @@ export const ExploreScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const lastVisibleIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
   const articlesRef = useRef<Article[]>([]);
@@ -239,27 +242,54 @@ export const ExploreScreen: React.FC = () => {
   };
 
   const handleSearchPress = () => {
-    // TODO: Navigate to search screen
-    console.log('Search pressed');
+    setSearchVisible(true);
   };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery(null);
+  };
+
+  const filteredArticles = useMemo(() => {
+    if (!searchQuery) return articles;
+    const q = searchQuery.toLowerCase();
+    return articles.filter(
+      (a) =>
+        a.title.toLowerCase().includes(q) ||
+        a.description?.toLowerCase().includes(q) ||
+        a.author?.toLowerCase().includes(q)
+    );
+  }, [articles, searchQuery]);
 
   const headerActions = (
     <IconButton icon="search-outline" onPress={handleSearchPress} />
   );
 
   return (
-    <ArticleListScreen
-      title="Explore"
-      articles={articles}
-      loading={loading}
-      headerActions={headerActions}
-      onArticlePress={handleArticlePress}
-      onRefresh={handleRefresh}
-      refreshing={refreshing}
-      emptyMessage="No articles available"
-      onEndReached={handleEndReached}
-      onViewableItemsChanged={handleViewableItemsChanged}
-      loadingMore={loadingMore}
-    />
+    <>
+      <ArticleListScreen
+        title="Explore"
+        articles={filteredArticles}
+        loading={loading}
+        headerActions={headerActions}
+        onArticlePress={handleArticlePress}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+        emptyMessage={searchQuery ? 'No matching articles' : 'No articles available'}
+        onEndReached={searchQuery ? undefined : handleEndReached}
+        onViewableItemsChanged={searchQuery ? undefined : handleViewableItemsChanged}
+        loadingMore={searchQuery ? false : loadingMore}
+        searchQuery={searchQuery ?? undefined}
+        onClearSearch={clearSearch}
+      />
+      <SearchModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onSearch={handleSearch}
+      />
+    </>
   );
 };

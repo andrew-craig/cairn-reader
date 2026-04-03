@@ -5,6 +5,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { AddLinkModal } from '../components/AddLinkModal';
+import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 
@@ -21,6 +22,8 @@ export const ReadScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   useEffect(() => {
     loadReadArticles();
@@ -68,17 +71,55 @@ export const ReadScreen: React.FC = () => {
     }
   };
 
+  const searchArticles = async (query: string) => {
+    setSearchQuery(query);
+    setLoading(true);
+    setHasMore(false);
+
+    try {
+      const response = await ReadService.searchUserContents({
+        q: query,
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+
+      const transformedArticles = response.contents.map((content) =>
+        ReadService.transformToArticle(content)
+      );
+
+      setArticles(transformedArticles);
+      setOffset(transformedArticles.length);
+      setHasMore(response.contents.length === PAGE_SIZE);
+    } catch (error) {
+      console.error('Error searching articles:', error);
+      Alert.alert('Error', 'Failed to search articles. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery(null);
+    setArticles([]);
+    setOffset(0);
+    loadReadArticles(true);
+  };
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    loadReadArticles(true);
-  }, []);
+    if (searchQuery) {
+      searchArticles(searchQuery);
+    } else {
+      loadReadArticles(true);
+    }
+  }, [searchQuery]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !loading) {
+    if (!loadingMore && hasMore && !loading && !searchQuery) {
       setLoadingMore(true);
       loadReadArticles(false);
     }
-  }, [loadingMore, hasMore, loading, offset]);
+  }, [loadingMore, hasMore, loading, offset, searchQuery]);
 
   const handleArticlePress = (article: Article) => {
     navigation.navigate('ArticleDetail', { article });
@@ -94,8 +135,7 @@ export const ReadScreen: React.FC = () => {
   };
 
   const handleSearchPress = () => {
-    // TODO: Navigate to search screen
-    console.log('Search pressed');
+    setSearchVisible(true);
   };
 
   const headerActions = (
@@ -115,14 +155,21 @@ export const ReadScreen: React.FC = () => {
         onArticlePress={handleArticlePress}
         onRefresh={handleRefresh}
         refreshing={refreshing}
-        emptyMessage="No saved articles yet"
+        emptyMessage={searchQuery ? 'No matching articles' : 'No saved articles yet'}
         onEndReached={handleLoadMore}
         loadingMore={loadingMore}
+        searchQuery={searchQuery ?? undefined}
+        onClearSearch={clearSearch}
       />
       <AddLinkModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onSuccess={handleAddSuccess}
+      />
+      <SearchModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onSearch={searchArticles}
       />
     </>
   );

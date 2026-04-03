@@ -5,10 +5,12 @@ import {
   useColorScheme,
   FlatList,
   ActivityIndicator,
+  TouchableOpacity,
   ViewToken,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, GlobalStyles, Layout, Spacing } from '../constants';
+import { Colors, GlobalStyles, Layout, Spacing, FontSizes, FontFamily } from '../constants';
 import { ArticleRow } from './common/ArticleRow';
 import { Article } from '../types';
 
@@ -27,6 +29,8 @@ interface ArticleListScreenProps {
     changed: ViewToken[];
   }) => void;
   loadingMore?: boolean;
+  searchQuery?: string;
+  onClearSearch?: () => void;
 }
 
 export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
@@ -41,6 +45,8 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   onEndReached,
   onViewableItemsChanged,
   loadingMore = false,
+  searchQuery,
+  onClearSearch,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -55,21 +61,33 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   });
 
   const renderHeader = () => (
-    <View
-      style={[
-        GlobalStyles.header,
-        {
-          backgroundColor: colors.background,
-          paddingTop: insets.top + Spacing.md,
-          height: undefined, // Override fixed height to allow safe area padding
-        },
-      ]}
-    >
-      <View style={GlobalStyles.headerLeft}>
-        <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
+    <View>
+      <View
+        style={[
+          GlobalStyles.header,
+          {
+            backgroundColor: colors.background,
+            paddingTop: insets.top + Spacing.md,
+            height: undefined, // Override fixed height to allow safe area padding
+          },
+        ]}
+      >
+        <View style={GlobalStyles.headerLeft}>
+          <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
+        </View>
+        {headerActions && (
+          <View style={GlobalStyles.headerRight}>{headerActions}</View>
+        )}
       </View>
-      {headerActions && (
-        <View style={GlobalStyles.headerRight}>{headerActions}</View>
+      {searchQuery && onClearSearch && (
+        <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
+          <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
+            Results for "{searchQuery}"
+          </Text>
+          <TouchableOpacity onPress={onClearSearch} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -130,4 +148,23 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
       />
     </View>
   );
+};
+
+const searchBannerStyles = {
+  container: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: 8,
+  },
+  text: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.defaultMedium,
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
 };
