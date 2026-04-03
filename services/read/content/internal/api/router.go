@@ -76,6 +76,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 
 	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
 	r.Route("/api/v1/content", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		// URL detection endpoint (unprotected)
 		r.Post("/detect", detectionHandler.DetectURL)
 
@@ -110,6 +111,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	// Internal API routes - used by internal services (Ingest RSS, etc.)
 	// Protected by API key-based service-to-service authentication
 	r.Route("/api/v1/internal", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		r.Use(internalAuthMiddleware.RequireInternalAPIKey)
 		// Internal bulk operations for Ingest RSS Service
 		r.Post("/content/user/bulk", bulkHandler.BulkAddToUsersInternal)

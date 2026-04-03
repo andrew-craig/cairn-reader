@@ -71,6 +71,7 @@ func NewRouter(db *database.DB) http.Handler {
 	// API v1 routes with /source/rss prefix
 	// This service is internal-facing, accessed through Content Service gateway
 	r.Route("/api/v1/source/rss", func(r chi.Router) {
+		r.Use(sharedmw.RequireHTTPS)
 		// User feed subscription routes
 		r.Route("/user/{user_id}/subscription", func(r chi.Router) {
 			r.Post("/", subscriptionHandler.Subscribe)
