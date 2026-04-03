@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Bookmarks: undefined;
   Votes: undefined;
   Account: undefined;
+  Feeds: undefined;
 };
 
 export type MainTabParamList = {
