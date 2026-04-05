@@ -1,30 +1,31 @@
 ---
 name: chalk-task-manager
-description: "File-based task management. Use for task operations IF task is not available on PATH."
+description: "File-based task management. Use for ALL task operations — listing, querying, creating, updating, closing, or picking up tasks. ALWAYS use this skill (never raw file reads via Glob/Read/Grep) to browse or query tasks. When asked to 'pick up a task' or 'find work', start with `chalk ready` (or skill-bundled `chalk ready`). Primary CLI: `.chalk/scripts/chalk`; skill-bundled: scripts/chalk."
+---
 
-**IMPORTANT**: Always use `task`  — never manually read task files with Glob/Read/Grep to browse tasks. Use `task ready` as the **first command** when looking for available work.
+**IMPORTANT**: Always use `chalk` — never manually read task files with Glob/Read/Grep to browse tasks. Use `chalk ready` as the **first command** when looking for available work.
 
-If task is not available, refer to the [installation instructions](task_installation.md) to set it up.
+If chalk is not available, refer to the [installation instructions](task_installation.md) to set it up.
 
 ### Quick Reference
 
 ```bash
-task ready                                  # FIRST COMMAND — find available work (unblocked, sorted by priority)
-task ready --parent=<epic_id>               # Find available work under a specific epic
-task show <id>                              # View task details
-task update <id> --status=in_progress       # Claim work
-task close <id>                             # Complete work
-task list                                   # List all active tasks
-task list --status=open --type=bug          # Filter tasks
+chalk ready                                  # FIRST COMMAND — find available work (unblocked, sorted by priority)
+chalk ready --parent=<epic_id>               # Find available work under a specific epic
+chalk show <id>                              # View task details
+chalk update <id> --status=in_progress       # Claim work
+chalk close <id>                             # Complete work
+chalk list                                   # List all active tasks
+chalk list --status=open --type=bug          # Filter tasks
 ```
 
 ### Creating Tasks
 
 ```bash
-task create "Task title"                    # Create with defaults (type=task, priority=2)
-task create "Fix login bug" --type=bug --priority=1 --description="Steps to reproduce..."
-task create "Sub-task" --parent=task_ed8f   # Link to parent
-task create "Blocked task" --blocked_by=bug_a3f2,task_9c1d
+chalk create "Task title"                    # Create with defaults (type=task, priority=2)
+chalk create "Fix login bug" --type=bug --priority=1 --description="Steps to reproduce..."
+chalk create "Sub-task" --parent=task_ed8f   # Link to parent
+chalk create "Blocked task" --blocked_by=bug_a3f2,task_9c1d
 ```
 
 ### Task Fields
@@ -32,7 +33,7 @@ task create "Blocked task" --blocked_by=bug_a3f2,task_9c1d
 | Field | Values |
 |---|---|
 | `type` | `task` `bug` `feature` `chore` `epic` `decision` |
-| `status` | `open` `in_progress` `blocked` `deferred` (closed via `tsk close`) |
+| `status` | `open` `in_progress` `blocked` `deferred` (closed via `chalk close`) |
 | `priority` | `0`=critical `1`=high `2`=medium `3`=low `4`=backlog |
 | `labels` | Comma-separated tags |
 | `blocked_by` | Comma-separated task IDs |
@@ -61,13 +62,13 @@ Optional description or notes go here.
 ### Agent Workflow
 
 ```bash
-task ready                                  # Find available work
-task update <id> --status=in_progress       # Claim a task before starting
+chalk ready                                  # Find available work
+chalk update <id> --status=in_progress       # Claim a task before starting
 # ... do work ...
-task close <id>                             # Mark done when complete
+chalk close <id>                             # Mark done when complete
 ```
 
 When discovering new work during a task, create linked sub-tasks:
 ```bash
-task create "Discovered issue" --parent=<current-task-id>
+chalk create "Discovered issue" --parent=<current-task-id>
 ```

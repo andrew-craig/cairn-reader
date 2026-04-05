@@ -117,24 +117,24 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-**CRITICAL**: Use the `task` CLI tool for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `task` commands first.
+**CRITICAL**: Use the `chalk` CLI tool for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `chalk` commands first.
 
 ```bash
-task ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
-task ready --parent=epic_0c4d       # Find available work under a specific epic
-task show <id>                      # View full task details
-task list --status=open             # List tasks with filters
-task update <id> --status=in_progress  # Claim a task
-task close <id>                     # Mark done (auto-unblocks dependents)
-task create "Title" --parent=<id>   # Create sub-task
+chalk ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
+chalk ready --parent=epic_0c4d       # Find available work under a specific epic
+chalk show <id>                      # View full task details
+chalk list --status=open             # List tasks with filters
+chalk update <id> --status=in_progress  # Claim a task
+chalk close <id>                     # Mark done (auto-unblocks dependents)
+chalk create "Title" --parent=<id>   # Create sub-task
 ```
 
-If you have attempted to use `task` and it is not on PATH, invoke via the chalk-task-manager skill. Only fall back to raw file reads when both `task` and the script path fail.
+If you have attempted to use `chalk` and it is not on PATH, invoke via the chalk-task-manager skill. Only fall back to raw file reads when both `chalk` and the script path fail.
 
 Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
 
 ### Individual Task Tracking
-1. **Setup tracking**: If there is not an existing task, create one with `task create` or `/task-manager`
+1. **Setup tracking**: If there is not an existing task, create one with `chalk create`
 2. **Plan First**: Write plan to the task file with checkable items
 3. **Verify Plan**: Check in before starting implementation
 4. **Track Progress**: Mark items complete as you go
