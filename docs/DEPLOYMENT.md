@@ -126,22 +126,121 @@ docker compose logs -f fetcher
 
 You should see feeds being fetched every 60 seconds (1 feed per minute).
 
-### Individual Service Deployment (Read Service Example)
+### Individual Service Deployment
 
-> **TODO**: Add deployment instructions for individual services (User Service, Explore Service)
+Each service can be deployed independently using its own Dockerfile and Makefile. All services require PostgreSQL and most require HashiCorp Vault for JWT authentication.
 
-For the Read Service, you can deploy it independently:
+#### Shared Prerequisites
+
+Before deploying any individual service, ensure:
+
+1. **PostgreSQL** is running and accessible
+2. **HashiCorp Vault** is running with JWT RSA keys stored (required by User Service, Explore Recommender, Read Content, and Email Ingest)
+
+```bash
+# Verify Vault has JWT keys
+vault kv get secret/jwt/public-key
+vault kv get secret/jwt/private-key  # Only needed by User Service
+```
+
+#### User Service
+
+```bash
+cd services/users
+
+# Configure environment
+cp .env.example .env
+# Edit .env: set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, VAULT_ADDR, VAULT_TOKEN
+
+# Run database migrations
+make migrate-up
+
+# Option A: Run locally
+make run
+
+# Option B: Run with Docker
+make docker-build
+make docker-run
+```
+
+- **Port**: 8082
+- **Database**: `cairn_users`
+- **Vault**: Required (reads RSA private + public keys for JWT signing/verification)
+- **Health check**: `curl http://localhost:8082/health`
+
+#### Explore Service (Fetcher + Recommender)
+
+The Explore service consists of two microservices that should be deployed together:
+
+```bash
+cd services/explore
+
+# Configure environment
+cp .env.example .env
+cp fetcher/.env.example fetcher/.env
+cp recommender/.env.example recommender/.env
+# Edit each .env: set database credentials, Vault config, and service URLs
+
+# Option A: Run locally
+make run-recommender  # Terminal 1 (port 8081)
+make run-fetcher      # Terminal 2 (port 8080)
+
+# Option B: Run with Docker
+make docker-build
+make docker-up
+```
+
+- **Fetcher**: Port 8080, database `fetcher_db`, no Vault required
+- **Recommender**: Port 8081, database `cairn_db`, Vault required (JWT public key)
+- **Inter-service**: Fetcher pushes articles to Recommender via HTTP
+- **Health checks**:
+  ```bash
+  curl http://localhost:8080/health  # Fetcher
+  curl http://localhost:8081/health  # Recommender
+  ```
+
+#### Read Service (Content + Ingest RSS + Email Ingest)
+
+The Read service consists of three microservices, each with an API server and background worker:
 
 ```bash
 cd services/read
-docker compose up -d
+
+# Configure environment
+cp .env.example .env
+cp content/.env.example content/.env
+cp fetcher/.env.example fetcher/.env
+# Edit each .env: set database credentials, Vault config, and service URLs
+
+# Build all services
+make build-all
+
+# Run services (each in a separate terminal)
+./bin/content-service        # Content API (port 8083)
+./bin/content-worker         # Content background worker
+./bin/ingest-rss             # RSS Ingest API (port 8085)
+./bin/ingest-rss-worker      # RSS Ingest background worker
 ```
 
-This starts:
-- Content Service (port 8080)
-- RSS Fetcher Service (port 8081)
-- RSS Fetcher Worker (background)
-- PostgreSQL databases (content_service, rss_fetcher_service)
+- **Content Service**: Port 8083, database `cairn_content`, Vault required (JWT public key)
+- **Ingest RSS**: Port 8085, database `ingest_rss`, communicates with Content Service via HTTP
+- **Email Ingest**: Port 8087, database `email_ingest`, Vault required (JWT public key)
+- **Health checks**:
+  ```bash
+  curl http://localhost:8083/health/live  # Content Service
+  curl http://localhost:8085/health/live  # Ingest RSS
+  curl http://localhost:8087/health/live  # Email Ingest
+  ```
+
+#### Deployment Order
+
+When deploying services individually, start them in this order:
+
+1. **PostgreSQL** and **Vault** (infrastructure)
+2. **User Service** (authentication provider, generates JWT tokens)
+3. **Explore Recommender** and **Read Content Service** (core APIs)
+4. **Explore Fetcher** and **Read Ingest RSS** (feed ingestion, depend on step 3)
+5. **Email Ingest Service** (depends on Content Service)
 
 ### Running Services Locally (Without Docker)
 
