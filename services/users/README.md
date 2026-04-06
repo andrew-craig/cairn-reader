@@ -71,7 +71,14 @@ createdb cairn_users
 ### 5. Run database migrations
 
 ```bash
-# TODO: Add migration instructions once migration tool is set up
+# Apply all pending migrations
+make migrate-up
+
+# Check current migration version
+make migrate-version
+
+# Rollback the last migration (if needed)
+make migrate-down
 ```
 
 ### 6. Set up HashiCorp Vault (Development)
