@@ -4,11 +4,11 @@
   },
   "permissions": {
     "allow": [
-      "Bash(skills/task-manager/scripts/tsk update:*)",
-      "Bash(skills/task-manager/scripts/tsk create:*)",
-      "Bash(skills/task-manager/scripts/tsk ready:*)",
-      "Bash(skills/task-manager/scripts/tsk close:*)",
-      "Bash(skills/task-manager/scripts/tsk list:*)"
+      "Bash(chalk update:*)",
+      "Bash(chalk create:*)",
+      "Bash(chalk ready:*)",
+      "Bash(chalk close:*)",
+      "Bash(chalk list:*)"
     ]
   },
   "hooks": {
