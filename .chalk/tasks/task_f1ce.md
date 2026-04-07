@@ -6,7 +6,7 @@ status: open
 priority: 2
 labels: []
 blocked_by: []
-parent: null
+parent: epic_8461
 remote_task_url: null
 created_at: 2026-04-07T21:37:09Z
 updated_at: 2026-04-07T21:37:09Z
