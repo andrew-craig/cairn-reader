@@ -370,7 +370,7 @@ Cairn follows a microservices architecture:
 
 ### Mobile App
 - [ ] Offline reading mode
-- [ ] Reading progress sync
+- [x] Reading progress sync
 - [ ] Enhanced article reader with adjustable fonts
 - [ ] Dark mode scheduling
 - [ ] Export/import data
@@ -383,7 +383,7 @@ Cairn follows a microservices architecture:
 - [ ] Image hosting and optimization
 - [ ] Reading analytics and statistics
 - [ ] Social features (sharing, comments)
-- [ ] Recommendation engine (Read Service)
+- [x] Recommendation engine (implemented in Explore Service)
 - [ ] Import/export functionality (Read Service)
 - [ ] GraphQL API option (Read Service)
 
