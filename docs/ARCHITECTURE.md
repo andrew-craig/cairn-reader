@@ -1149,7 +1149,70 @@ ELSE
 - Foreign key constraints enforce referential integrity
 - Check constraints enforce valid enum values
 
-> **TODO**: Add security documentation for User Service and Explore Service
+### User Service Security
+
+**Password Security**:
+- Algorithm: bcrypt with cost factor 12 (minimum for production)
+- Minimum password length: 8 characters
+- Passwords and hashes are never logged
+
+**JWT Security**:
+- Algorithm: RS256 (asymmetric — private key signs, public key validates)
+- Access token lifetime: 15 minutes
+- Refresh token lifetime: 7 days
+- Private key stored in HashiCorp Vault; public key distributed to other services via Vault
+
+**Refresh Token Security**:
+- Tokens are SHA-256 hashed before database storage (raw token never persisted)
+- Rotated on each use — each refresh issues a new token
+- Tracks `device_info` and `ip_address` for anomaly detection
+- All tokens for a user can be revoked on suspected compromise
+
+**Authorization Middleware**:
+- Extracts `user_id` from validated JWT claims
+- Compares against `user_id` in URL path — returns 403 if mismatch
+- Ensures users can only access their own resources
+
+**Rate Limiting**:
+- Auth endpoints (`/auth/login`, `/auth/register`): 10 requests/minute per IP
+- User endpoints: 60 requests/minute per IP
+- Prevents brute-force attacks on authentication
+
+**Mobile Device Authentication**:
+- Expo device ID treated as a credential (HTTPS-only transmission)
+- App reinstall invalidates device ID; users must re-register
+- Mobile-only accounts can upgrade to email/password; after upgrade, device ID login is permanently disabled to enforce recoverable credentials
+
+**Security Headers** (applied globally):
+- `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `HSTS`
+
+### Explore Service Security
+
+**JWT Authentication** (Recommender service only):
+- Retrieves JWT public key from HashiCorp Vault on startup
+- Validates RS256-signed tokens on every protected request
+- Extracts `user_id` from JWT claims for authorization
+
+**Endpoint Access Control**:
+
+| Endpoint | Auth Required |
+|---|---|
+| `GET /health/live`, `GET /health/ready` | No |
+| `POST /api/v1/explore/article` | No |
+| `GET /api/v1/explore/recommendation/:user_id` | Yes |
+| `GET /api/v1/explore/user/:user_id/votes` | Yes |
+| `POST/DELETE /api/v1/explore/article/:id/vote` | Yes |
+| `POST /api/v1/explore/article/:id/read` | Yes |
+
+**Input Validation**:
+- Feed URL format validated before storage
+- 100 feed limit per user enforced by database trigger
+- UUID validation for all resource IDs
+
+**RSS Feed Fetching**:
+- Fetch timeout enforced to prevent hanging connections
+- Feed error counter tracks unreachable feeds; repeated failures reduce polling priority
+- External feed content is sanitized before storage (via Read Service HTML sanitization pipeline)
 
 ---
 
