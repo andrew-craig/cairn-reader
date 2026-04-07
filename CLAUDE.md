@@ -117,10 +117,10 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 
 ## Task Tracking
 
-**CRITICAL**: Use the `chalk` CLI tool for ALL task operations. **NEVER** manually read task files with Glob/Read/Grep to browse or query tasks — always use `chalk` commands first.
+Use the `chalk` CLI tool for ALL task operations.
 
 ```bash
-chalk ready                          # FIRST COMMAND when picking up work — shows unblocked tasks by priority
+chalk ready                          # First command when picking up work — shows unblocked tasks by priority
 chalk ready --parent=epic_0c4d       # Find available work under a specific epic
 chalk show <id>                      # View full task details
 chalk list --status=open             # List tasks with filters
@@ -129,9 +129,7 @@ chalk close <id>                     # Mark done (auto-unblocks dependents)
 chalk create "Title" --parent=<id>   # Create sub-task
 ```
 
-If you have attempted to use `chalk` and it is not on PATH, invoke via the chalk-task-manager skill. Only fall back to raw file reads when both `chalk` and the script path fail.
-
-Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
+If you have attempted to use `chalk` and it is not available, tasks can be read manually. Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
 
 ### Individual Task Tracking
 1. **Setup tracking**: If there is not an existing task, create one with `chalk create`
