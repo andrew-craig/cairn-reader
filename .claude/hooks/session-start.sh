@@ -1,18 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-# Derive paths from script location, independent of env vars
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-TASK_DIR="$PROJECT_DIR/.chalk/scripts"
+# Only run in remote Claude environments (e.g. Claude Code Web).
+# CLAUDE_ENV_FILE is set by the remote harness; if absent we're running locally
+# where chalk is already installed globally — nothing to do.
+if [ -z "${CLAUDE_ENV_FILE:-}" ]; then
+  exit 0
+fi
 
-# Add tsk script to PATH for this session
-if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  # Harness supports env file injection — write an absolute path (not $CLAUDE_PROJECT_DIR)
-  echo "export PATH=\"$TASK_DIR:\$PATH\"" >> "$CLAUDE_ENV_FILE"
-else
-  # Fallback: symlink into a directory already on PATH
-  LOCAL_BIN="$HOME/.local/bin"
-  mkdir -p "$LOCAL_BIN"
-  ln -sf "$TASK_DIR/task" "$LOCAL_BIN/task"
-fi  
+curl -fsSL https://raw.githubusercontent.com/andrew-craig/chalk/main/install.sh | bash
+
+echo "export PATH=\"${CHALK_INSTALL_DIR:-$HOME/.local/bin}:\$PATH\"" >> "$CLAUDE_ENV_FILE"
