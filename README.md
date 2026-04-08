@@ -366,19 +366,6 @@ Cairn follows a microservices architecture:
 - Shared data models in PostgreSQL
 - JWT-based authentication across services
 
-## Future Enhancements
-
-### Mobile App
-- [ ] Offline reading mode
-- [ ] Enhanced article reader with adjustable fonts
-- [ ] Export/import subscription list and likes
-
-### Backend Services
-- [ ] Image hosting and optimization
-- [ ] Reading analytics and statistics
-- [ ] sharing of articles (links)
-- [ ] Import/export functionality
-
 ## Development
 
 ### Mobile App Development
