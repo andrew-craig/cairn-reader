@@ -405,14 +405,15 @@ ctx := context.Background()
 **Objective**: Verify all services start correctly and are healthy
 
 - [ ] Start Docker Compose stack (postgres DBs, fetcher, recommender)
-- [ ] Verify fetcher health endpoint (`GET /health`)
-- [ ] Verify recommender health endpoint (`GET /health`)
+- [ ] Verify fetcher health endpoints (`GET /health/live`, `GET /health/ready`)
+- [ ] Verify recommender health endpoints (`GET /health/live`, `GET /health/ready`)
 - [ ] Check database connectivity for both services
 - [ ] Verify Docker containers are running without errors
 
 **Expected Results**:
 - All containers running and healthy
-- Health endpoints return `{"status":"healthy"}`
+- Liveness endpoints return `{"status":"healthy"}`
+- Readiness endpoints return `{"status":"healthy","checks":{"database":"ok"}}` (or `unhealthy` with 503 if DB unreachable)
 - No connection errors in logs
 
 ##### 2. Feed Management Tests
@@ -441,7 +442,7 @@ SELECT url, COUNT(*) FROM feeds GROUP BY url HAVING COUNT(*) > 1;
 
 **Objective**: Validate one-feed-per-minute fetching logic
 
-- [ ] Trigger manual fetch (`POST /fetch` or wait for automatic fetch)
+- [ ] Trigger manual fetch (`POST /api/v1/explore/feed/fetch` or wait for automatic fetch)
 - [ ] Verify only 1 feed fetched per minute
 - [ ] Confirm feed prioritization (never-fetched first, then oldest last_fetched_at)
 - [ ] Verify last_fetched_at timestamp updated
@@ -464,7 +465,7 @@ SELECT * FROM fetch_history ORDER BY fetched_at DESC LIMIT 10;
 
 **Objective**: Verify articles are sent from Fetcher to Recommender
 
-- [ ] Verify fetcher submits articles via `POST /api/v1/articles`
+- [ ] Verify fetcher submits articles via `POST /api/v1/explore/article`
 - [ ] Check article deduplication (SHA256 hash IDs)
 - [ ] Verify article metadata stored (title, link, content, published_at, categories)
 - [ ] Confirm feed_id reference set correctly
@@ -487,11 +488,12 @@ SELECT COUNT(*) as article_count, feed_id FROM articles GROUP BY feed_id;
 
 **Objective**: Validate recommendation algorithm and user tracking
 
-- [ ] Request recommendations for new user (`GET /api/v1/recommendations/{userID}`)
+- [ ] Request recommendations for new user (`GET /api/v1/explore/recommendation/{user_id}`, requires JWT)
 - [ ] Verify 5 articles returned
-- [ ] Check recommendation scoring (recency, length, title, randomization)
+- [ ] Check recommendation scoring (quality score: `(upvotes + (downvotes * 3)) / recommends`)
+- [ ] Verify algorithm selects 4 high-quality articles + 1 low-exposure article
 - [ ] Request recommendations for same user again
-- [ ] Verify different articles recommended (randomization working)
+- [ ] Verify different articles recommended (already-recommended articles excluded)
 
 **Expected Results**:
 - Exactly 5 articles per request
@@ -500,15 +502,17 @@ SELECT COUNT(*) as article_count, feed_id FROM articles GROUP BY feed_id;
 
 **Test Commands**:
 ```bash
-curl http://localhost:8081/api/v1/recommendations/test-user-001
-curl http://localhost:8081/api/v1/recommendations/test-user-002
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/test-user-001
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/test-user-002
 ```
 
 ##### 6. User Interaction Tests
 
 **Objective**: Test read status tracking and filtering
 
-- [ ] Mark article as read (`POST /api/v1/articles/read`)
+- [ ] Mark article as read (`POST /api/v1/explore/article/{article_id}/read`, requires JWT)
 - [ ] Verify user_articles table entry created
 - [ ] Request recommendations for same user
 - [ ] Confirm read article NOT in recommendations
@@ -522,17 +526,19 @@ curl http://localhost:8081/api/v1/recommendations/test-user-002
 
 **Test Commands**:
 ```bash
-# Get recommendations
-RECS=$(curl -s http://localhost:8081/api/v1/recommendations/test-user-001)
+# Get recommendations (requires JWT)
+RECS=$(curl -s -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/test-user-001)
 ARTICLE_ID=$(echo $RECS | jq -r '.articles[0].id')
 
-# Mark as read
-curl -X POST http://localhost:8081/api/v1/articles/read \
-  -H "Content-Type: application/json" \
-  -d "{\"user_id\":\"test-user-001\",\"article_id\":\"$ARTICLE_ID\"}"
+# Mark as read (requires JWT)
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/article/$ARTICLE_ID/read
 
 # Verify filtered out
-curl http://localhost:8081/api/v1/recommendations/test-user-001 | jq
+curl -s -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation/test-user-001 | jq
 ```
 
 **Validation SQL**:
@@ -628,16 +634,14 @@ All tests must pass with:
 - ✅ No critical errors in logs
 - ✅ Response times acceptable (< 100ms for recommendations)
 
-#### Known Limitations
+#### Implementation Status
 
-Based on current implementation, the following features are **NOT YET IMPLEMENTED**:
-- ❌ Voting system (upvote/downvote endpoints)
-- ❌ Quality score algorithm: `(upvotes + (downvotes * 3)) / recommends`
-- ❌ Enhanced recommendation algorithm (4 high-quality + 1 low-exposure)
-- ❌ Article cleanup (90-day retention)
-- ❌ Votes and recommendations tables
-
-These will be tested after implementation.
+All previously planned features are now implemented:
+- ✅ Voting system (`POST/DELETE/GET /api/v1/explore/article/{article_id}/vote`)
+- ✅ Quality score algorithm: `(upvotes + (downvotes * 3)) / recommends`
+- ✅ Enhanced recommendation algorithm (4 high-quality + 1 low-exposure)
+- ✅ Article cleanup (90-day retention with two-phase soft/hard delete)
+- ✅ Votes and recommendations tables (in recommender database)
 
 ---
 
@@ -770,16 +774,16 @@ Tests feed polling logic.
 #### Running Read Service Integration Tests
 
 ```bash
-# Start databases
-cd infrastructure/docker
-docker compose up -d content-db rss-db
+# Start database (single PostgreSQL instance for all services)
+cd infrastructure/docker/dev
+docker compose up -d cairn-db
 
 # Content Service integration tests
-cd services/read/content-service
+cd services/read/content
 go test -tags=integration -v ./...
 
 # RSS Fetcher Service integration tests
-cd services/read/rss-fetcher-service
+cd services/read/fetcher
 go test -tags=integration -v ./...
 
 # Run with coverage
@@ -815,8 +819,8 @@ cd services/users
 make test
 
 # Integration tests (requires Vault and database)
-cd infrastructure/docker
-docker compose up -d vault users-db
+cd infrastructure/docker/dev
+docker compose up -d vault cairn-db
 
 cd services/users
 go test -tags=integration -v ./...
@@ -831,21 +835,21 @@ make test-coverage
 
 ### Database Test Helpers
 
-Both Content Service and RSS Fetcher Service include a `testhelpers` package with utilities for integration tests.
+Both Content Service and RSS Fetcher Service include a `testutil` package (`internal/testutil/`) with utilities for integration tests.
 
 #### SetupTestDatabase
 
 Creates a unique test database for each test run.
 
 ```go
-func SetupTestDatabase(t *testing.T) *TestDB
+func SetupTestDatabase(t *testing.T) *TestDatabase
 ```
 
 **Process**:
 1. Connects to the main PostgreSQL instance
 2. Creates a temporary database with timestamp suffix (e.g., `cairn_content_test_1234567890`)
 3. Runs all migrations to set up the schema
-4. Returns a `TestDB` instance for use in tests
+4. Returns a `TestDatabase` instance for use in tests
 
 **Benefits**:
 - Complete isolation between test runs
@@ -857,12 +861,12 @@ func SetupTestDatabase(t *testing.T) *TestDB
 Drops the temporary test database.
 
 ```go
-func (db *TestDB) Cleanup()
+func (td *TestDatabase) Cleanup()
 ```
 
 **Usage**:
 ```go
-testDB := testhelpers.SetupTestDatabase(t)
+testDB := testutil.SetupTestDatabase(t)
 defer testDB.Cleanup()
 ```
 
@@ -871,7 +875,7 @@ defer testDB.Cleanup()
 Clears all tables in the database (faster than recreation for sequential tests).
 
 ```go
-func (db *TestDB) TruncateAll() error
+func (td *TestDatabase) TruncateAll()
 ```
 
 ### Example Test Structure
@@ -883,7 +887,7 @@ func TestContentCreationIntegration(t *testing.T) {
     }
 
     // Setup
-    testDB := testhelpers.SetupTestDatabase(t)
+    testDB := testutil.SetupTestDatabase(t)
     defer testDB.Cleanup()
 
     // Create test server
