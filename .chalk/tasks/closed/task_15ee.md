@@ -2,14 +2,14 @@
 id: task_15ee
 title: Content Service: Add BulkAddToUsers auth tests
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_8461
 remote_task_url: null
 created_at: 2026-04-07T21:37:09Z
-updated_at: 2026-04-07T21:37:09Z
+updated_at: 2026-04-07T22:45:39Z
 ---
 
 ## Context

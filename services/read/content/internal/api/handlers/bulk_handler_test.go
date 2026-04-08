@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBulkCreateContent_Success tests successful bulk content creation
@@ -555,4 +556,138 @@ func TestBulkAddToUsers_InvalidStatus(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
 	assert.Contains(t, response["message"], "Invalid status")
+}
+
+// ============================================================================
+// BulkAddToUsers Authentication and Authorization Tests
+// ============================================================================
+
+// TestBulkAddToUsers_Authenticated_Success tests that an authenticated user
+// can bulk add content to their own account via the protected endpoint.
+func TestBulkAddToUsers_Authenticated_Success(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	authenticatedUserID := uuid.New()
+	contentID1 := uuid.New()
+	contentID2 := uuid.New()
+
+	mockUserContentRepo.On("BulkCreate", mock.Anything, mock.MatchedBy(func(ucs []*models.UserContent) bool {
+		return len(ucs) == 2 &&
+			ucs[0].UserID == authenticatedUserID &&
+			ucs[1].UserID == authenticatedUserID &&
+			ucs[0].ContentID == contentID1 &&
+			ucs[1].ContentID == contentID2
+	})).Return(nil)
+
+	reqBody := map[string]interface{}{
+		"items": []map[string]interface{}{
+			{
+				"user_id":    authenticatedUserID.String(),
+				"content_id": contentID1.String(),
+				"status":     "unread",
+			},
+			{
+				"user_id":    authenticatedUserID.String(),
+				"content_id": contentID2.String(),
+				"status":     "unread",
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/user/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = addAuthContextToRequest(req, authenticatedUserID)
+	w := httptest.NewRecorder()
+
+	handler.BulkAddToUsers(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var envelope map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
+	require.NoError(t, err)
+	response := envelope["data"].(map[string]interface{})
+	succeeded := response["succeeded"].([]interface{})
+	assert.Len(t, succeeded, 2)
+	failed := response["failed"].([]interface{})
+	assert.Len(t, failed, 0)
+	mockUserContentRepo.AssertExpectations(t)
+}
+
+// TestBulkAddToUsers_Forbidden tests that an authenticated user cannot
+// bulk add content to a different user's account.
+func TestBulkAddToUsers_Forbidden(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	authenticatedUserID := uuid.New()
+	otherUserID := uuid.New()
+	contentID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"items": []map[string]interface{}{
+			{
+				"user_id":    otherUserID.String(),
+				"content_id": contentID.String(),
+				"status":     "unread",
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/user/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = addAuthContextToRequest(req, authenticatedUserID)
+	w := httptest.NewRecorder()
+
+	handler.BulkAddToUsers(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	var response map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&response)
+	require.NoError(t, err)
+	assert.Equal(t, "forbidden", response["error"])
+	assert.Contains(t, response["message"], "own account")
+	// Repository should not be called for unauthorized requests
+	mockUserContentRepo.AssertNotCalled(t, "BulkCreate")
+}
+
+// TestBulkAddToUsers_MissingAuthContext tests the error path when the auth
+// context is missing (e.g., middleware not applied).
+func TestBulkAddToUsers_MissingAuthContext(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	userID := uuid.New()
+	contentID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"items": []map[string]interface{}{
+			{
+				"user_id":    userID.String(),
+				"content_id": contentID.String(),
+				"status":     "unread",
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	// No auth context added - simulates missing middleware
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/user/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.BulkAddToUsers(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	var response map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&response)
+	require.NoError(t, err)
+	assert.Equal(t, "internal_error", response["error"])
+	// Repository should not be called when auth context is missing
+	mockUserContentRepo.AssertNotCalled(t, "BulkCreate")
 }
