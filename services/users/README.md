@@ -216,11 +216,11 @@ air
 
 ## Deployment
 
-See [requirements.md](requirements.md) for detailed deployment requirements and considerations.
+See [requirements](/docs/detailed_requirements/users_service_requirements.md) for detailed deployment requirements and considerations.
 
 ## Documentation
 
-- [Requirements](requirements.md) - Detailed service requirements
+- [Requirements](/docs/detailed_requirements/users_service_requirements.md) - Detailed service requirements
 - [Implementation Plan](todo.md) - Phased implementation checklist
 
 ## License

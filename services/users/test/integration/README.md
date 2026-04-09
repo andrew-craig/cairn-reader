@@ -325,4 +325,4 @@ After integration tests pass, proceed to:
 For issues or questions:
 - Check the [main README](../../README.md)
 - Review [implementation plan](../../todo.md)
-- See [requirements](../../requirements.md)
+- See [requirements](/docs/detailed_requirements/users_service_requirements.md)

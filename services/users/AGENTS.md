@@ -211,7 +211,6 @@ services/users/
 ├── Dockerfile              # Multi-stage Docker build
 ├── Makefile                # Build and development commands
 ├── README.md               # Service documentation
-├── requirements.md         # Detailed requirements
 └── CLAUDE.md              # This file
 ```
 
@@ -1364,7 +1363,7 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 - **Main Project CLAUDE.md**: [/CLAUDE.md](/CLAUDE.md) - Project-wide context and conventions
 - **Engineering Principles**: [/docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) - Standards and best practices
 - **Service README**: [README.md](README.md) - Comprehensive service documentation
-- **Requirements**: [requirements.md](requirements.md) - Detailed requirements and specifications
+- **Requirements**: [requirements.md](/docs/detailed_requirements/users_service_requirements.md) - Detailed requirements and specifications
 - **OpenAPI Spec**: [api/openapi.yaml](api/openapi.yaml) - Formal API specification
 - **Implementation Plan**: [todo.md](todo.md) - Phased implementation checklist
 - **Security Assessment**: [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) - Security analysis
