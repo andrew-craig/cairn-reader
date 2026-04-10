@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_59f7]
+blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:08:06Z
-updated_at: 2026-04-10T08:08:27Z
+updated_at: 2026-04-10T08:45:16Z
 ---
 Add a new unprotected endpoint to the Content Service for feed discovery.
 

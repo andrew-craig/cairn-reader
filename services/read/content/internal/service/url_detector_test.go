@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -374,4 +375,226 @@ func TestExtractHTMLTitle(t *testing.T) {
 // Helper function to create string pointer
 func stringPtr(s string) *string {
 	return &s
+}
+
+func TestDiscoverFeeds_HTMLWithLinkTags(t *testing.T) {
+	// Server that serves HTML with <link rel="alternate"> feed tags
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Serve feeds at /feed.rss and /atom.xml
+		if r.URL.Path == "/feed.rss" {
+			w.Header().Set("Content-Type", "application/rss+xml")
+			w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>RSS Feed</title>
+		<link>https://example.com</link>
+	</channel>
+</rss>`))
+			return
+		}
+		if r.URL.Path == "/atom.xml" {
+			w.Header().Set("Content-Type", "application/atom+xml")
+			w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+	<title>Atom Feed</title>
+	<link href="https://example.com"/>
+</feed>`))
+			return
+		}
+
+		// Default: serve HTML with links to feeds
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Example</title>
+	<link rel="alternate" type="application/rss+xml" href="/feed.rss" title="RSS Feed">
+	<link rel="alternate" type="application/atom+xml" href="/atom.xml" title="Atom Feed">
+</head>
+<body>
+	<h1>Example Blog</h1>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	detector := NewURLDetector()
+	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+
+	if err != nil {
+		t.Fatalf("DiscoverFeeds() error = %v", err)
+	}
+
+	if len(feeds) != 2 {
+		t.Errorf("expected 2 feeds, got %d", len(feeds))
+	}
+
+	// Check that both feeds are present (order may vary)
+	foundRSS := false
+	foundAtom := false
+	for _, feed := range feeds {
+		if strings.Contains(feed.URL, "/feed.rss") && feed.Title == "RSS Feed" {
+			foundRSS = true
+		}
+		if strings.Contains(feed.URL, "/atom.xml") && feed.Title == "Atom Feed" {
+			foundAtom = true
+		}
+	}
+
+	if !foundRSS {
+		t.Error("expected RSS feed in results")
+	}
+	if !foundAtom {
+		t.Error("expected Atom feed in results")
+	}
+}
+
+func TestDiscoverFeeds_NoFeeds(t *testing.T) {
+	// Server that serves plain HTML with no feed links and no feeds at common paths
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Example</title>
+</head>
+<body>
+	<h1>Example Page</h1>
+	<p>No feeds here.</p>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	detector := NewURLDetector()
+	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+
+	if err != nil {
+		t.Fatalf("DiscoverFeeds() error = %v", err)
+	}
+
+	if len(feeds) != 0 {
+		t.Errorf("expected 0 feeds, got %d", len(feeds))
+	}
+}
+
+func TestDiscoverFeeds_DirectFeed(t *testing.T) {
+	// Server that serves a feed directly
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Direct Feed</title>
+		<link>https://example.com</link>
+	</channel>
+</rss>`))
+	}))
+	defer server.Close()
+
+	detector := NewURLDetector()
+	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+
+	if err != nil {
+		t.Fatalf("DiscoverFeeds() error = %v", err)
+	}
+
+	if len(feeds) != 1 {
+		t.Errorf("expected 1 feed, got %d", len(feeds))
+	}
+
+	if len(feeds) > 0 && feeds[0].Title != "Direct Feed" {
+		t.Errorf("expected title 'Direct Feed', got '%s'", feeds[0].Title)
+	}
+}
+
+func TestDiscoverFeeds_CommonPathFallback(t *testing.T) {
+	// Server that has no HTML link tags but serves a feed at /feed
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/feed" {
+			w.Header().Set("Content-Type", "application/rss+xml")
+			w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Feed from /feed</title>
+		<link>https://example.com</link>
+	</channel>
+</rss>`))
+			return
+		}
+
+		// Default: serve plain HTML
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Example</title>
+</head>
+<body>
+	<h1>Example Page</h1>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	detector := NewURLDetector()
+	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+
+	if err != nil {
+		t.Fatalf("DiscoverFeeds() error = %v", err)
+	}
+
+	if len(feeds) != 1 {
+		t.Errorf("expected 1 feed, got %d", len(feeds))
+	}
+
+	if len(feeds) > 0 && feeds[0].Title != "Feed from /feed" {
+		t.Errorf("expected title 'Feed from /feed', got '%s'", feeds[0].Title)
+	}
+}
+
+func TestDiscoverFeeds_Deduplication(t *testing.T) {
+	// Server where HTML points to /feed and /feed is also a common probe path
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/feed" {
+			w.Header().Set("Content-Type", "application/rss+xml")
+			w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Dedup Feed</title>
+		<link>https://example.com</link>
+	</channel>
+</rss>`))
+			return
+		}
+
+		// Default: serve HTML with link to /feed
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Example</title>
+	<link rel="alternate" type="application/rss+xml" href="/feed">
+</head>
+<body>
+	<h1>Example Page</h1>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	detector := NewURLDetector()
+	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+
+	if err != nil {
+		t.Fatalf("DiscoverFeeds() error = %v", err)
+	}
+
+	if len(feeds) != 1 {
+		t.Errorf("expected 1 feed (deduplicated), got %d", len(feeds))
+	}
+
+	if len(feeds) > 0 && feeds[0].Title != "Dedup Feed" {
+		t.Errorf("expected title 'Dedup Feed', got '%s'", feeds[0].Title)
+	}
 }

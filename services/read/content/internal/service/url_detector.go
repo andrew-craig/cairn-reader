@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mmcdole/gofeed"
@@ -27,9 +29,16 @@ type URLDetectionResult struct {
 	Title *string `json:"title"`
 }
 
+// DiscoveredFeed represents a discovered feed from feed discovery
+type DiscoveredFeed struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
 // URLDetector defines the interface for URL detection
 type URLDetector interface {
 	DetectURL(ctx context.Context, url string) (*URLDetectionResult, error)
+	DiscoverFeeds(ctx context.Context, pageURL string) ([]DiscoveredFeed, error)
 }
 
 // urlDetectorImpl implements URLDetector
@@ -46,6 +55,224 @@ func NewURLDetector() URLDetector {
 		},
 		feedParser: gofeed.NewParser(),
 	}
+}
+
+// DiscoverFeeds discovers feeds from a page URL using multiple strategies
+func (d *urlDetectorImpl) DiscoverFeeds(ctx context.Context, pageURL string) ([]DiscoveredFeed, error) {
+	// Use 15s timeout for total discovery time
+	discoveryCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	// Step 1: Try parsing the URL directly as a feed
+	if feed := d.tryParseFeed(discoveryCtx, pageURL); feed != nil {
+		return []DiscoveredFeed{*feed}, nil
+	}
+
+	// Step 2: Fetch the page
+	req, err := http.NewRequestWithContext(discoveryCtx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return []DiscoveredFeed{}, nil
+	}
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return []DiscoveredFeed{}, nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Get final URL after redirects
+	finalURL := resp.Request.URL.String()
+
+	// Read response body (limit to 10MB)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+	if err != nil {
+		return []DiscoveredFeed{}, nil
+	}
+
+	// Step 3: Extract feed links from HTML <link rel="alternate"> tags
+	feeds := d.extractFeedLinks(string(body), finalURL)
+
+	// Step 4: Probe common paths concurrently
+	baseURL, err := url.Parse(finalURL)
+	if err != nil {
+		// Return what we found from HTML
+		return feeds, nil
+	}
+
+	commonPaths := []string{
+		"/feed",
+		"/rss",
+		"/rss.xml",
+		"/atom.xml",
+		"/feed.xml",
+		"/index.xml",
+		"/feed/rss",
+		"/feed/atom",
+	}
+
+	// Also try appending .rss to the path
+	if baseURL.Path != "" {
+		commonPaths = append(commonPaths, baseURL.Path+".rss")
+	}
+
+	// Worker pool for concurrent probing
+	const maxWorkers = 8
+	semaphore := make(chan struct{}, maxWorkers)
+	var wg sync.WaitGroup
+	feedsChan := make(chan *DiscoveredFeed, len(commonPaths))
+
+	for _, path := range commonPaths {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			semaphore <- struct{}{}        // acquire
+			defer func() { <-semaphore }() // release
+
+			// Resolve path against base URL
+			var probeURL string
+			if strings.HasPrefix(p, "http://") || strings.HasPrefix(p, "https://") {
+				probeURL = p
+			} else if strings.HasPrefix(p, "/") {
+				// Absolute path
+				u := *baseURL
+				u.Path = p
+				probeURL = u.String()
+			} else {
+				// Relative path
+				u := *baseURL
+				u.Path = p
+				probeURL = u.String()
+			}
+
+			if feed := d.tryParseFeed(discoveryCtx, probeURL); feed != nil {
+				feedsChan <- feed
+			}
+		}(path)
+	}
+
+	// Close channel when all goroutines finish
+	go func() {
+		wg.Wait()
+		close(feedsChan)
+	}()
+
+	// Collect and deduplicate results, preferring feeds with actual titles
+	feedsByURL := make(map[string]*DiscoveredFeed)
+
+	// Add feeds from HTML first
+	for _, feed := range feeds {
+		feedsByURL[feed.URL] = &feed
+	}
+
+	// Add/update probed feeds, preferring those with actual titles
+	for feed := range feedsChan {
+		existing, found := feedsByURL[feed.URL]
+		if !found || existing.Title == "" {
+			feedsByURL[feed.URL] = feed
+		}
+	}
+
+	// Convert map to slice
+	results := make([]DiscoveredFeed, 0, len(feedsByURL))
+	for _, feed := range feedsByURL {
+		results = append(results, *feed)
+	}
+
+	return results, nil
+}
+
+// tryParseFeed attempts to fetch and parse a URL as a feed
+func (d *urlDetectorImpl) tryParseFeed(ctx context.Context, feedURL string) *DiscoveredFeed {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
+	if err != nil {
+		return nil
+	}
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Get final URL after redirects
+	finalURL := resp.Request.URL.String()
+
+	// Read response body (limit to 10MB)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+	if err != nil {
+		return nil
+	}
+
+	// Try to parse as feed
+	feed, err := d.feedParser.ParseString(string(body))
+	if err != nil || feed == nil {
+		return nil
+	}
+
+	return &DiscoveredFeed{
+		URL:   finalURL,
+		Title: feed.Title,
+	}
+}
+
+// extractFeedLinks extracts feed links from HTML <link rel="alternate"> tags
+func (d *urlDetectorImpl) extractFeedLinks(htmlContent, baseURL string) []DiscoveredFeed {
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return []DiscoveredFeed{}
+	}
+
+	baseURLParsed, err := url.Parse(baseURL)
+	if err != nil {
+		return []DiscoveredFeed{}
+	}
+
+	var feeds []DiscoveredFeed
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "link" {
+			var rel, linkType, href, title string
+
+			// Extract attributes
+			for _, attr := range n.Attr {
+				switch attr.Key {
+				case "rel":
+					rel = attr.Val
+				case "type":
+					linkType = attr.Val
+				case "href":
+					href = attr.Val
+				case "title":
+					title = attr.Val
+				}
+			}
+
+			// Check if this is an alternate feed link
+			if strings.Contains(rel, "alternate") &&
+				(linkType == "application/rss+xml" || linkType == "application/atom+xml") &&
+				href != "" {
+
+				// Resolve relative href against base URL
+				linkURL, err := url.Parse(href)
+				if err != nil {
+					return
+				}
+				resolvedURL := baseURLParsed.ResolveReference(linkURL).String()
+
+				feeds = append(feeds, DiscoveredFeed{
+					URL:   resolvedURL,
+					Title: title,
+				})
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			traverse(c)
+		}
+	}
+
+	traverse(doc)
+	return feeds
 }
 
 // DetectURL attempts to determine if a URL is a feed or a page

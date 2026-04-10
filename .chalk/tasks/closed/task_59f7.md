@@ -2,14 +2,14 @@
 id: task_59f7
 title: Backend: Add feed discovery service to url_detector.go
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:07:54Z
-updated_at: 2026-04-10T08:07:54Z
+updated_at: 2026-04-10T08:45:16Z
 ---
 Add a `DiscoverFeeds` method to the `URLDetector` interface in `services/read/content/internal/service/url_detector.go`.
 
