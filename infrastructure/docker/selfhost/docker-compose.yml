@@ -1,0 +1,59 @@
+name: cairn-selfhost
+
+services:
+  cairn:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/selfhost/Dockerfile
+    environment:
+      - PORT=8080
+      - DB_HOST=cairn-db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-cairn}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_SSLMODE=disable
+      - DB_NAME_USERS=cairn_users
+      - DB_NAME_RECOMMENDER=cairn_recommender
+      - DB_NAME_FETCHER=cairn_fetcher
+      - DB_NAME_CONTENT=content_service
+      - DB_NAME_RSS=rss_fetcher_service
+      - DB_NAME_EMAIL=ingest_email
+      - JWT_PRIVATE_KEY_FILE=/data/keys/private.pem
+      - JWT_PUBLIC_KEY_FILE=/data/keys/public.pem
+      - JWT_AUTO_GENERATE=true
+      - EMAIL_DOMAIN=${EMAIL_DOMAIN:-read.cairnapp.com}
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - cairn_data:/data
+    depends_on:
+      cairn-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  cairn-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-cairn}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - cairn_db_data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cairn} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  cairn_data:
+  cairn_db_data:

@@ -19,6 +19,20 @@ This guide covers deploying all Cairn backend services to various environments, 
 
 ## Quick Start
 
+### Self-Hosted Deployment (Simplest)
+
+Run everything in two containers (app + PostgreSQL) — no Vault, no multi-container orchestration:
+
+```bash
+cd infrastructure/docker/selfhost
+cp .env.example .env
+# Edit .env and set DB_PASSWORD
+docker compose up -d --build
+curl http://localhost:8080/health/ready
+```
+
+All 6 API services and all background workers run in a single binary. JWT keys are auto-generated. See [infrastructure/docker/selfhost/README.md](../infrastructure/docker/selfhost/README.md) for full details.
+
 ### Development Deployment (Recommended)
 
 Use the unified Docker Compose setup for all services:
