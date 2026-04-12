@@ -2,14 +2,14 @@
 id: task_370d
 title: Backend: Add POST /api/v1/content/discover-feed endpoint
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:08:06Z
-updated_at: 2026-04-12T22:32:35Z
+updated_at: 2026-04-12T22:36:12Z
 ---
 Add a new unprotected endpoint to the Content Service for feed discovery.
 

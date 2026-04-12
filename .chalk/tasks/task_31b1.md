@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_370d]
+blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:08:35Z
-updated_at: 2026-04-10T08:08:35Z
+updated_at: 2026-04-12T22:36:12Z
 ---
 Add the mobile service method and TypeScript types for calling the new discover-feed backend endpoint.
 
