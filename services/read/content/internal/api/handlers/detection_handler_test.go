@@ -245,3 +245,134 @@ func TestDetectURL_DetectorError(t *testing.T) {
 
 	mockDetector.AssertExpectations(t)
 }
+
+// TestDiscoverFeed_Success tests successful feed discovery
+func TestDiscoverFeed_Success(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	mockDetector.On("DiscoverFeeds", mock.Anything, "https://example.com").
+		Return([]service.DiscoveredFeed{
+			{URL: "https://example.com/feed.xml", Title: "Example Blog"},
+			{URL: "https://example.com/atom.xml", Title: "Example Atom"},
+		}, nil)
+
+	reqBody := dto.DiscoverFeedRequest{URL: "https://example.com"}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var envelope struct {
+		Data dto.DiscoverFeedResponse `json:"data"`
+	}
+	err := json.NewDecoder(w.Body).Decode(&envelope)
+	assert.NoError(t, err)
+	assert.Len(t, envelope.Data.Feeds, 2)
+	assert.Equal(t, "https://example.com/feed.xml", envelope.Data.Feeds[0].URL)
+	assert.Equal(t, "Example Blog", envelope.Data.Feeds[0].Title)
+	assert.Equal(t, "https://example.com/atom.xml", envelope.Data.Feeds[1].URL)
+	assert.Equal(t, "Example Atom", envelope.Data.Feeds[1].Title)
+
+	mockDetector.AssertExpectations(t)
+}
+
+// TestDiscoverFeed_NoFeedsFound tests discovery with no feeds returns empty array
+func TestDiscoverFeed_NoFeedsFound(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	mockDetector.On("DiscoverFeeds", mock.Anything, "https://example.com").
+		Return([]service.DiscoveredFeed{}, nil)
+
+	reqBody := dto.DiscoverFeedRequest{URL: "https://example.com"}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify the raw JSON contains an empty array (not null)
+	assert.Contains(t, w.Body.String(), `"feeds":[]`)
+
+	var envelope struct {
+		Data dto.DiscoverFeedResponse `json:"data"`
+	}
+	err := json.NewDecoder(bytes.NewReader(w.Body.Bytes())).Decode(&envelope)
+	assert.NoError(t, err)
+	assert.NotNil(t, envelope.Data.Feeds)
+	assert.Len(t, envelope.Data.Feeds, 0)
+
+	mockDetector.AssertExpectations(t)
+}
+
+// TestDiscoverFeed_MissingURL tests missing URL validation
+func TestDiscoverFeed_MissingURL(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	reqBody := dto.DiscoverFeedRequest{URL: ""}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&response)
+	assert.NoError(t, err)
+	assert.Equal(t, "validation_error", response["error"])
+	assert.Contains(t, response["message"], "URL is required")
+}
+
+// TestDiscoverFeed_InvalidJSON tests invalid JSON returns 400
+func TestDiscoverFeed_InvalidJSON(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&response)
+	assert.NoError(t, err)
+	assert.Equal(t, "bad_request", response["error"])
+}
+
+// TestDiscoverFeed_DiscoveryError tests error handling when DiscoverFeeds returns an error
+func TestDiscoverFeed_DiscoveryError(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	mockDetector.On("DiscoverFeeds", mock.Anything, "https://example.com").
+		Return(nil, assert.AnError)
+
+	reqBody := dto.DiscoverFeedRequest{URL: "https://example.com"}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	// Assert - errors are never surfaced to the client, should return empty feeds
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"feeds":[]`)
+
+	mockDetector.AssertExpectations(t)
+}

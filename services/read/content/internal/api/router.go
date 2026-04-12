@@ -79,6 +79,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 		r.Use(sharedmw.RequireHTTPS)
 		// URL detection endpoint (unprotected)
 		r.Post("/detect", detectionHandler.DetectURL)
+		r.Post("/discover-feed", detectionHandler.DiscoverFeed)
 
 		// Content management routes (unprotected - used by internal services)
 		r.Post("/", contentHandler.CreateContent)
