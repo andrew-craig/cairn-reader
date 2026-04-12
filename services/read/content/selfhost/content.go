@@ -73,7 +73,7 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
 	_, err = scheduler.AddFunc("0 2 * * *", cleanupJob.Run)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("content cleanup schedule: %w", err)
 	}
 	scheduler.Start()
@@ -81,6 +81,6 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 	return db.DB, func() {
 		cronCtx := scheduler.Stop()
 		<-cronCtx.Done()
-		db.Close()
+		_ = db.Close()
 	}, nil
 }

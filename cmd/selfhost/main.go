@@ -191,4 +191,3 @@ func runAllMigrations(cfg *Config) error {
 	}
 	return nil
 }
-

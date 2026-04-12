@@ -71,6 +71,10 @@ func (m *mockURLDetector) DetectURL(ctx context.Context, url string) (*service.U
 	}, nil
 }
 
+func (m *mockURLDetector) DiscoverFeeds(ctx context.Context, pageURL string) ([]service.DiscoveredFeed, error) {
+	return nil, nil
+}
+
 type mockUserContentRepo struct{}
 
 func (m *mockUserContentRepo) Create(ctx context.Context, uc *models.UserContent) error {

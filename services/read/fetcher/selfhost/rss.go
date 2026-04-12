@@ -137,6 +137,6 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 		tierManager.Stop()
 		pollScheduler.Stop()
 		feedWorker.Stop()
-		db.Close()
+		_ = db.Close()
 	}, nil
 }

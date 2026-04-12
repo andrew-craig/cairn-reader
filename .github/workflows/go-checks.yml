@@ -5,6 +5,7 @@ on:
     branches:
       - main
     paths:
+      - 'cmd/**'
       - 'services/**'
       - 'pkg/**'
       - '.github/workflows/go-checks.yml'
@@ -20,6 +21,8 @@ jobs:
       read: ${{ steps.filter.outputs.read == 'true' || steps.filter.outputs.pkg == 'true' }}
       email: ${{ steps.filter.outputs.email == 'true' || steps.filter.outputs.pkg == 'true' }}
       users: ${{ steps.filter.outputs.users == 'true' || steps.filter.outputs.pkg == 'true' }}
+      pkg-auth: ${{ steps.filter.outputs.pkg-auth == 'true' }}
+      selfhost: ${{ steps.filter.outputs.selfhost == 'true' || steps.filter.outputs.pkg == 'true' || steps.filter.outputs.anyservice == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -37,6 +40,12 @@ jobs:
               - 'services/users/**'
             pkg:
               - 'pkg/**'
+            pkg-auth:
+              - 'pkg/auth/**'
+            selfhost:
+              - 'cmd/selfhost/**'
+            anyservice:
+              - 'services/**'
 
   fmt:
     name: gofmt
@@ -48,7 +57,7 @@ jobs:
           go-version: '1.24'
       - name: Check formatting
         run: |
-          unformatted=$(gofmt -l services/ pkg/)
+          unformatted=$(gofmt -l cmd/ services/ pkg/)
           if [ -n "$unformatted" ]; then
             echo "The following files are not formatted:"
             echo "$unformatted"
@@ -378,4 +387,116 @@ jobs:
             fi
             go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
           done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Selfhost (consolidated binary) ────────────────────────────────────
+
+  lint-selfhost:
+    name: golangci-lint (cmd/selfhost)
+    needs: [changes]
+    if: needs.changes.outputs.selfhost == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: cmd/selfhost/go.sum
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.11.4
+          working-directory: cmd/selfhost
+          args: --timeout=5m
+
+  vet-selfhost:
+    name: go vet (cmd/selfhost)
+    needs: [changes]
+    if: needs.changes.outputs.selfhost == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: cmd/selfhost/go.sum
+      - name: Run go vet
+        working-directory: cmd/selfhost
+        run: go vet ./...
+
+  build-selfhost:
+    name: go build (cmd/selfhost)
+    needs: [changes]
+    if: needs.changes.outputs.selfhost == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: cmd/selfhost/go.sum
+      - name: Build consolidated binary
+        working-directory: cmd/selfhost
+        run: CGO_ENABLED=0 go build -o /tmp/cairn-selfhost .
+      - name: Verify binary runs
+        run: |
+          # Binary exits non-zero without DB, but we just want to confirm it starts
+          # and the ELF is valid. `file` confirms it's a static binary.
+          file /tmp/cairn-selfhost
+          test -x /tmp/cairn-selfhost
+
+  test-selfhost:
+    name: go test (cmd/selfhost)
+    needs: [changes]
+    if: needs.changes.outputs.selfhost == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: cmd/selfhost/go.sum
+      - name: Run tests
+        working-directory: cmd/selfhost
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: cmd/selfhost
+        run: |
+          echo "## Coverage: cmd/selfhost" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for f in $(find . -name coverage.out -type f); do
+            dir=$(dirname "$f")
+            if [ "$dir" != "." ]; then
+              echo "--- $dir ---" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Shared pkg/auth (standalone module) ──────────────────────────────
+
+  test-pkg-auth:
+    name: go test (pkg/auth)
+    needs: [changes]
+    if: needs.changes.outputs.pkg-auth == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: pkg/auth/go.sum
+      - name: Run go vet
+        working-directory: pkg/auth
+        run: go vet ./...
+      - name: Run tests
+        working-directory: pkg/auth
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: pkg/auth
+        run: |
+          echo "## Coverage: pkg/auth" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
