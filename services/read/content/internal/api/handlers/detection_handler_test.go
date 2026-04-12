@@ -27,6 +27,14 @@ func (m *MockURLDetector) DetectURL(ctx context.Context, url string) (*service.U
 	return args.Get(0).(*service.URLDetectionResult), args.Error(1)
 }
 
+func (m *MockURLDetector) DiscoverFeeds(ctx context.Context, pageURL string) ([]service.DiscoveredFeed, error) {
+	args := m.Called(ctx, pageURL)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]service.DiscoveredFeed), args.Error(1)
+}
+
 // TestDetectURL_Feed tests successful feed detection
 func TestDetectURL_Feed(t *testing.T) {
 	// Setup mock
