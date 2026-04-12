@@ -61,3 +61,44 @@ func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
 
 	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
+
+// DiscoverFeed handles POST /api/v1/content/discover-feed
+func (h *DetectionHandler) DiscoverFeed(w http.ResponseWriter, r *http.Request) {
+	var req dto.DiscoverFeedRequest
+	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
+		return
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+		return
+	}
+
+	// Create context with 20s timeout (slightly above the 15s discovery timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	// Discover feeds from the given URL
+	discovered, err := h.urlDetector.DiscoverFeeds(ctx, req.URL)
+	if err != nil {
+		// Never surface errors to the client; return empty list instead
+		discovered = nil
+	}
+
+	// Convert to response DTOs (ensure non-nil slice for JSON)
+	feeds := make([]dto.DiscoveredFeedDTO, 0, len(discovered))
+	for _, f := range discovered {
+		feeds = append(feeds, dto.DiscoveredFeedDTO{
+			URL:   f.URL,
+			Title: f.Title,
+		})
+	}
+
+	response := &dto.DiscoverFeedResponse{
+		Feeds: feeds,
+	}
+
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
+}

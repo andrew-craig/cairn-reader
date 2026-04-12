@@ -26,3 +26,29 @@ type DetectURLResponse struct {
 	Type  string  `json:"type"`
 	Title *string `json:"title"`
 }
+
+// DiscoverFeedRequest represents the request body for feed discovery
+type DiscoverFeedRequest struct {
+	URL string `json:"url"`
+}
+
+// Validate validates the DiscoverFeedRequest
+func (d DiscoverFeedRequest) Validate() error {
+	return validation.ValidateStruct(&d,
+		validation.Field(&d.URL,
+			validation.Required.Error("URL is required"),
+			is.URL.Error("URL must be a valid URL"),
+		),
+	)
+}
+
+// DiscoveredFeedDTO represents a single discovered feed in the response
+type DiscoveredFeedDTO struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// DiscoverFeedResponse represents the response for feed discovery
+type DiscoverFeedResponse struct {
+	Feeds []DiscoveredFeedDTO `json:"feeds"`
+}

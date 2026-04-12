@@ -131,6 +131,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/discover-feed:
+    post:
+      tags:
+        - URL Detection
+      summary: Discover feeds for a page URL
+      description: |
+        Discovers RSS/Atom feeds associated with a given page URL. Used by mobile apps to
+        power the "Find feed" button: given a website URL, scan the page for feed links
+        and probe common feed locations.
+
+        The discovery strategy is:
+        1. Try parsing the URL directly as a feed (it may already be one)
+        2. Fetch the page HTML and parse `<link rel="alternate">` tags for RSS/Atom feeds
+        3. Probe common feed paths (e.g. `/feed`, `/rss.xml`, `/atom.xml`) in parallel
+        4. Deduplicate results by final URL (after redirects)
+
+        This endpoint always returns 200 with a (possibly empty) list of feeds — errors
+        from upstream (network timeouts, parsing failures) are swallowed and presented
+        as an empty result.
+      operationId: discoverFeed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscoverFeedRequest'
+            example:
+              url: "https://example.com"
+      responses:
+        '200':
+          description: Feed discovery completed (may return an empty list if no feeds found)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoverFeedResponse'
+              examples:
+                feedsDiscovered:
+                  summary: One or more feeds discovered
+                  value:
+                    feeds:
+                      - url: "https://example.com/feed.xml"
+                        title: "Example Blog"
+                noFeedsFound:
+                  summary: No feeds found for the given URL
+                  value:
+                    feeds: []
+        '400':
+          description: Bad request - invalid URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content:
     post:
       tags:
@@ -1025,6 +1078,41 @@ components:
           type: string
           nullable: true
           description: Feed or page title if detected, null otherwise
+
+    DiscoverFeedRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Page URL to scan for RSS/Atom feeds
+
+    DiscoveredFeed:
+      type: object
+      required:
+        - url
+        - title
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL of the discovered feed (after redirects)
+        title:
+          type: string
+          description: Title of the feed (may be empty if not available)
+
+    DiscoverFeedResponse:
+      type: object
+      required:
+        - feeds
+      properties:
+        feeds:
+          type: array
+          description: List of feeds discovered for the given URL (empty if none found)
+          items:
+            $ref: '#/components/schemas/DiscoveredFeed'
 
     AddContentToUserRequest:
       type: object
