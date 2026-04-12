@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	usersSelfhost "github.com/cairn-app/cairn-reader/services/users/selfhost"
 	userMigrations "github.com/cairn-app/cairn-reader/services/users/migrations"
+	usersSelfhost "github.com/cairn-app/cairn-reader/services/users/selfhost"
 )
 
 func runUsersMigrations(cfg *Config) error {
@@ -33,7 +33,7 @@ func mountUserService(ctx context.Context, cfg *Config, r chi.Router, privateKey
 		DBName:           cfg.DBNameUsers,
 		DBSSLMode:        cfg.DB.SSLMode,
 		PrivateKey:       privateKey,
-		PublicKey:         publicKey,
+		PublicKey:        publicKey,
 		JWTAccessExpiry:  cfg.JWTAccessExpiry,
 		JWTRefreshExpiry: cfg.JWTRefreshExpiry,
 		BcryptCost:       cfg.BcryptCost,
