@@ -51,6 +51,16 @@ export interface DetectURLResponse {
   title: string | null;
 }
 
+// Feed Discovery Types
+export interface DiscoveredFeed {
+  url: string;
+  title: string;
+}
+
+export interface DiscoverFeedResponse {
+  feeds: DiscoveredFeed[];
+}
+
 export interface AddURLRequest {
   url: string;
   type?: URLType;

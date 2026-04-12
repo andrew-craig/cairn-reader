@@ -2,14 +2,14 @@
 id: task_31b1
 title: Mobile: Add discoverFeed service method and types
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:08:35Z
-updated_at: 2026-04-12T22:36:12Z
+updated_at: 2026-04-12T22:58:43Z
 ---
 Add the mobile service method and TypeScript types for calling the new discover-feed backend endpoint.
 

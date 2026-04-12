@@ -8,6 +8,7 @@ import {
   SearchParams,
   ListContentsParams,
   DetectURLResponse,
+  DiscoverFeedResponse,
   AddURLRequest,
   AddURLResponse,
   ListFeedSubscriptionsResponse,
@@ -291,6 +292,45 @@ export class ReadService {
         type: 'unknown',
         title: null,
       };
+    }
+  }
+
+  /**
+   * Discover RSS/Atom feeds associated with a page URL.
+   * Returns an array of discovered feeds (may be empty).
+   *
+   * No authentication required (matches `/detect` pattern).
+   * Uses a 15s timeout matching the backend discovery timeout.
+   * On error, returns { feeds: [] } rather than throwing.
+   */
+  static async discoverFeed(url: string): Promise<DiscoverFeedResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+    try {
+      const response = await fetch(
+        `${READ_SERVICE_BASE_URL}/api/v1/content/discover-feed`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+          signal: controller.signal,
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { feeds: [] };
+      }
+
+      return result.data ?? { feeds: [] };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      // On timeout or network error, return empty feeds
+      return { feeds: [] };
     }
   }
 
