@@ -135,13 +135,17 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 
 	rawEmailCleanupJob, err := emailJobs.NewRawEmailCleanupJob(rawEmailRepo, "0 5 * * *", 7)
 	if err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("failed to close db", "error", closeErr)
+		}
 		return nil, nil, fmt.Errorf("email raw cleanup schedule: %w", err)
 	}
 
 	outboxCleanupJob, err := emailJobs.NewOutboxCleanupJob(outboxRepo, "0 6 * * *", 7)
 	if err != nil {
-		db.Close()
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("failed to close db", "error", closeErr)
+		}
 		return nil, nil, fmt.Errorf("email outbox cleanup schedule: %w", err)
 	}
 
@@ -151,5 +155,9 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 	go rawEmailCleanupJob.Start(ctx)
 	go outboxCleanupJob.Start(ctx)
 
-	return db.DB, func() { db.Close() }, nil
+	return db.DB, func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Error("failed to close db", "error", closeErr)
+		}
+	}, nil
 }
