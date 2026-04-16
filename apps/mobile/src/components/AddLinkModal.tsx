@@ -38,6 +38,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
 
@@ -177,57 +178,47 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     }
 
     setError(null);
-    setLoading(true);
+    setDiscovering(true);
 
     try {
       const normalizedUrl = normalizeUrl(url);
+      const { feeds } = await ReadService.discoverFeed(normalizedUrl);
 
-      // Force feed type for "Find feed" button
-      const response = await ReadService.addURL({
-        url: normalizedUrl,
-        type: 'feed', // Always try to add as feed
-        title: detectionResult?.title ?? undefined,
-      });
-
-      if (response.type === 'feed') {
-        Alert.alert(
-          'Success',
-          `Subscribed to ${response.subscription.title}`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Info',
-          'This URL is not an RSS feed. Added as an article instead.',
-          [{ text: 'OK' }]
-        );
+      if (feeds.length === 0) {
+        setError('No RSS feed found for this site');
+        return;
       }
 
-      setUrl('');
-      setDetectionResult(null);
-      onClose();
-
-      // Call success callback if provided
-      if (onSuccess) {
-        onSuccess();
+      if (feeds.length === 1) {
+        // Single feed: update URL input; useEffect will re-detect as feed
+        // and the UI will merge the buttons into "Add Feed".
+        setUrl(feeds[0].url);
+        return;
       }
+
+      // Multiple feeds: let the user pick one via Alert.
+      Alert.alert(
+        'Multiple feeds found',
+        'Select a feed to use:',
+        [
+          ...feeds.map((feed) => ({
+            text: feed.title || feed.url,
+            onPress: () => setUrl(feed.url),
+          })),
+          { text: 'Cancel', style: 'cancel' as const },
+        ],
+        { cancelable: true }
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-
-      if (errorMessage.includes('already subscribed')) {
-        setError('Already subscribed to this feed');
-      } else if (errorMessage.includes('invalid_feed')) {
-        setError('This URL is not a valid RSS/Atom feed');
-      } else {
-        setError(errorMessage);
-      }
+      setError(errorMessage);
     } finally {
-      setLoading(false);
+      setDiscovering(false);
     }
   };
 
   const handleClose = () => {
-    if (!loading && !detecting) {
+    if (!loading && !detecting && !discovering) {
       setUrl('');
       setError(null);
       setDetectionResult(null);
@@ -320,25 +311,31 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.buttonWrapper}>
-                <TouchableOpacity
-                  style={[
-                    styles.secondaryButton,
-                    {
-                      backgroundColor: colors.background,
-                      borderColor: colors.textSecondary,
-                      opacity: loading || !url.trim() ? 0.5 : 1,
-                    }
-                  ]}
-                  onPress={handleFindFeedPress}
-                  disabled={loading || !url.trim()}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                    Find feed
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {detectionResult?.type !== 'feed' && (
+                <View style={styles.buttonWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      styles.secondaryButton,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.textSecondary,
+                        opacity: loading || discovering || !url.trim() ? 0.5 : 1,
+                      }
+                    ]}
+                    onPress={handleFindFeedPress}
+                    disabled={loading || discovering || !url.trim()}
+                    activeOpacity={0.7}
+                  >
+                    {discovering ? (
+                      <ActivityIndicator color={colors.text} size="small" />
+                    ) : (
+                      <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+                        Find feed
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
         </KeyboardAvoidingView>
