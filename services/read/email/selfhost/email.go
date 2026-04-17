@@ -103,7 +103,8 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 		APIKeyAuth:     apiKeyAuth,
 		JWTAuth:        jwtAuth,
 	})
-	r.Mount("/", emailRouter)
+	r.Handle("/api/v1/source/email", emailRouter)
+	r.Handle("/api/v1/source/email/*", emailRouter)
 
 	// Initialize email worker components
 	emailCleaner := emailProcessor.NewEmailCleaner()

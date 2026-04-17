@@ -121,7 +121,12 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 		Logger:              logger,
 	})
 
-	r.Mount("/", router)
+	// Register at specific path prefixes rather than mounting at "/" to avoid conflicts
+	// when multiple services share the same chi router in the selfhost binary.
+	r.Handle("/api/v1/auth", router)
+	r.Handle("/api/v1/auth/*", router)
+	r.Handle("/api/v1/user", router)
+	r.Handle("/api/v1/user/*", router)
 
 	return func() { db.Close() }, nil
 }

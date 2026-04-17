@@ -78,6 +78,42 @@ docker compose exec cairn-db pg_dumpall -U cairn > backup.sql
 docker compose exec -i cairn-db psql -U cairn -d postgres < backup.sql
 ```
 
+## TLS / HTTPS
+
+The selfhost binary listens on plain HTTP (port 8080 by default). **You must place a TLS-terminating reverse proxy in front of it** before exposing it to the internet.
+
+Each internal service enforces HTTPS by inspecting the `X-Forwarded-Proto` header — the same mechanism used in the multi-container production deployment (where Caddy sets that header). The selfhost binary sets `X-Forwarded-Proto: https` in its middleware layer to satisfy this check, mirroring what a real proxy would do. If your proxy already sets the header, the binary's default is skipped (`if` guard on the header value).
+
+**Example nginx config (minimal):**
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name cairn.example.com;
+
+    ssl_certificate     /etc/ssl/certs/cairn.crt;
+    ssl_certificate_key /etc/ssl/private/cairn.key;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Example Caddy config (automatic TLS via Let's Encrypt):**
+
+```caddyfile
+cairn.example.com {
+    reverse_proxy localhost:8080
+}
+```
+
+> **Why not terminate TLS inside the binary?** TLS certificate lifecycle (renewal, rotation, ACME) is a solved problem for dedicated tools like Caddy and nginx. Keeping the binary plain-HTTP preserves operator flexibility and matches how every other service in this project is deployed.
+
 ## API Endpoints
 
 All services share port 8080:
