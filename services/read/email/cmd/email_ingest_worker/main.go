@@ -165,7 +165,7 @@ func main() {
 	})
 	healthMux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if err := db.DB.PingContext(context.Background()); err != nil {
+		if err := db.PingContext(context.Background()); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"status": "unavailable", "error": err.Error()})
 			return
