@@ -8,7 +8,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -150,6 +152,35 @@ func main() {
 	slog.Info("- raw email cleanup job", slog.String("schedule", cfg.Worker.RawEmailCleanupCron))
 	slog.Info("- outbox cleanup job", slog.String("schedule", cfg.Worker.OutboxCleanupCron))
 
+	// Start health check HTTP server
+	healthPort := os.Getenv("HEALTH_PORT")
+	if healthPort == "" {
+		healthPort = "8090"
+	}
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+	healthMux.HandleFunc("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := db.DB.PingContext(context.Background()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "unavailable", "error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	})
+	healthServer := &http.Server{Addr: ":" + healthPort, Handler: healthMux}
+	go func() {
+		slog.Info("health check server starting", slog.String("port", healthPort))
+		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("health check server failed", slog.Any("error", err))
+		}
+	}()
+
 	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -167,9 +198,11 @@ func main() {
 	slog.Info("shutting down worker")
 	cancel()
 
-	// Give workers time to finish their current batch
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer shutdownCancel()
+	if err := healthServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("health check server shutdown failed", slog.Any("error", err))
+	}
 	<-shutdownCtx.Done()
 
 	slog.Info("worker exited gracefully")

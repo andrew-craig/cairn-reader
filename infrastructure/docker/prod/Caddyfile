@@ -1,10 +1,7 @@
 # Cairn Production Reverse Proxy Configuration
-# Caddy automatically obtains and renews Let's Encrypt TLS certificates.
-#
-# Set the DOMAIN environment variable to your production domain (e.g., api.cairnapp.com).
-# For local testing without TLS, set DOMAIN=localhost.
+# Serving plain HTTP on port 8080 — TLS is terminated by the host nginx reverse proxy.
 
-{$DOMAIN:localhost} {
+http://:8080 {
 	# ──────────────────────────────────────────────
 	# Security Headers
 	# ──────────────────────────────────────────────

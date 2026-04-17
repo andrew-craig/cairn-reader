@@ -44,6 +44,8 @@ type AuthConfig struct {
 	IngestAPIKey     string
 	VaultAddr        string
 	VaultToken       string
+	VaultRoleID      string
+	VaultSecretID    string
 	JWTPublicKeyPath string
 	VaultAuthPath    string
 }
@@ -94,6 +96,8 @@ func Load() (*Config, error) {
 			IngestAPIKey:     getEnv("INGEST_API_KEY", ""),
 			VaultAddr:        getEnv("VAULT_ADDR", "http://localhost:8200"),
 			VaultToken:       getEnv("VAULT_TOKEN", ""),
+			VaultRoleID:      getEnv("VAULT_ROLE_ID", ""),
+			VaultSecretID:    getEnv("VAULT_SECRET_ID", ""),
 			JWTPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt"),
 			VaultAuthPath:    getEnv("VAULT_AUTH_PATH", "approle"),
 		},
