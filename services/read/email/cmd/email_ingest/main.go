@@ -94,6 +94,8 @@ func main() {
 	vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
 		Address:  cfg.Auth.VaultAddr,
 		Token:    cfg.Auth.VaultToken,
+		RoleID:   cfg.Auth.VaultRoleID,
+		SecretID: cfg.Auth.VaultSecretID,
 		AuthPath: cfg.Auth.VaultAuthPath,
 	})
 	if err != nil {
