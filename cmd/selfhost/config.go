@@ -101,7 +101,7 @@ func loadConfig() *Config {
 		InternalAPIKey: internalKey,
 		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
 
-		KagiFeedURL:   getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/nichochar/smallweb/refs/heads/main/feeds.txt"),
+		KagiFeedURL:   getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt"),
 		FetchInterval: getEnvDuration("FETCH_INTERVAL", 60*time.Second),
 
 		ArticleRetentionDays: getEnvInt("ARTICLE_RETENTION_DAYS", 90),
