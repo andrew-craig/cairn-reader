@@ -2,14 +2,14 @@
 id: task_d23d
 title: Mobile: Update AddLinkModal Find Feed and button merge behavior
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: feature_c95a
 remote_task_url: null
 created_at: 2026-04-10T08:08:41Z
-updated_at: 2026-04-12T22:58:43Z
+updated_at: 2026-04-16T08:23:59Z
 ---
 Update AddLinkModal to implement the correct Find Feed and button-merge behavior.
 
@@ -62,3 +62,35 @@ User taps "Find feed"
 User taps "Add Feed"
   → subscribes to the feed via existing handleAddPress flow
 ```
+
+## Implementation Plan
+
+- [x] Add `discovering` state (separate from `loading`/`detecting`)
+- [x] Rewrite `handleFindFeedPress` to call `ReadService.discoverFeed()`
+  - [x] Zero feeds → show error "No RSS feed found for this site"
+  - [x] One feed → `setUrl(feed.url)` and let useEffect re-detect
+  - [x] Multiple feeds → Alert with buttons for each discovered feed
+- [x] Update button layout: when `detectionResult?.type === 'feed'`, hide "Find feed" button so only primary button is shown
+- [x] Show spinner on "Find feed" button while `discovering` (without blocking the Add button)
+- [x] Disable controls appropriately while discovering
+- [x] Run `npm run type-check` and `npm run lint` to validate
+
+## Review
+
+Implemented all 4 changes in `apps/mobile/src/components/AddLinkModal.tsx`:
+
+1. **Button merge**: Wrapped the `Find feed` button in a conditional that hides it when
+   `detectionResult?.type === 'feed'`. The primary button wrapper keeps `flex: 1` so the
+   lone `Add Feed` button fills the row.
+2. **Rewrote `handleFindFeedPress`**: Now calls `ReadService.discoverFeed()` and handles
+   three cases: no feeds (error), one feed (`setUrl` triggers re-detection), multiple feeds
+   (Alert with a button per feed).
+3. **Added `discovering` state**: Independent from `loading`/`detecting` so the `Add` button
+   stays unblocked while discovery is in flight. `Find feed` shows an `ActivityIndicator`
+   while discovering.
+4. **Removed dead code**: The old `type: 'feed'` force-subscribe path is gone.
+
+Also extended `handleClose` to avoid closing while discovery is in flight.
+
+Verified: `npm run type-check` passes. `npm run lint` has 0 errors in the changed file
+(only pre-existing warnings in unrelated files).
