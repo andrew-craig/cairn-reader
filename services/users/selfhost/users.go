@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	userAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
@@ -18,6 +20,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// envInt returns the int value of the given env var, or fallback if unset/invalid.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
 
 // UsersConfig holds configuration for the user service.
 type UsersConfig struct {
@@ -59,8 +71,8 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 		Password:        cfg.DBPassword,
 		Database:        cfg.DBName,
 		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    25,
-		MaxIdleConns:    10,
+		MaxOpenConns:    int32(envInt("DB_MAX_CONNS", 3)),
+		MaxIdleConns:    int32(envInt("DB_MIN_CONNS", 1)),
 		ConnMaxLifetime: 5 * time.Minute,
 	}
 

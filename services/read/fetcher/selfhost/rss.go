@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"os"
+	"strconv"
 	"time"
 
 	rssAPI "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
@@ -19,6 +21,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/robfig/cron/v3"
 )
+
+// envInt returns the int value of the given env var, or fallback if unset/invalid.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
 
 // RSSConfig holds configuration for the ingest RSS service.
 type RSSConfig struct {
@@ -55,8 +67,8 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 		Password:        cfg.DBPassword,
 		DBName:          cfg.DBName,
 		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    10,
-		MaxIdleConns:    5,
+		MaxOpenConns:    envInt("DB_MAX_CONNS", 3),
+		MaxIdleConns:    envInt("DB_MIN_CONNS", 1),
 		ConnMaxLifetime: 5 * time.Minute,
 		ConnMaxIdleTime: 2 * time.Minute,
 	}

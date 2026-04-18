@@ -22,6 +22,10 @@ services:
       - JWT_PUBLIC_KEY_FILE=/data/keys/public.pem
       - JWT_AUTO_GENERATE=true
       - EMAIL_DOMAIN=${EMAIL_DOMAIN:-read.cairnapp.com}
+      # Per-service connection pool caps. Defaults chosen so the sum across all
+      # services stays under POSTGRES_MAX_CONNECTIONS (default 20).
+      - DB_MAX_CONNS=${DB_MAX_CONNS:-3}
+      - DB_MIN_CONNS=${DB_MIN_CONNS:-1}
     ports:
       - "${PORT:-8099}:8099"
     volumes:
@@ -39,6 +43,27 @@ services:
 
   cairn-db:
     image: postgres:18-alpine
+    # Tuned for small self-hosted deployments (single host, few concurrent users).
+    # Override any of these via .env to run on larger hardware.
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=${POSTGRES_MAX_CONNECTIONS:-20}"
+      - "-c"
+      - "shared_buffers=${POSTGRES_SHARED_BUFFERS:-16MB}"
+      - "-c"
+      - "work_mem=${POSTGRES_WORK_MEM:-512kB}"
+      - "-c"
+      - "maintenance_work_mem=${POSTGRES_MAINTENANCE_WORK_MEM:-16MB}"
+      - "-c"
+      - "effective_cache_size=${POSTGRES_EFFECTIVE_CACHE_SIZE:-128MB}"
+      - "-c"
+      - "wal_buffers=${POSTGRES_WAL_BUFFERS:-512kB}"
+      - "-c"
+      - "min_wal_size=${POSTGRES_MIN_WAL_SIZE:-32MB}"
+      - "-c"
+      - "max_wal_size=${POSTGRES_MAX_WAL_SIZE:-256MB}"
+    shm_size: ${POSTGRES_SHM_SIZE:-64mb}
     environment:
       POSTGRES_USER: ${DB_USER:-cairn}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

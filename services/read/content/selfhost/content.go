@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
@@ -18,6 +19,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/robfig/cron/v3"
 )
+
+// envInt returns the int value of the given env var, or fallback if unset/invalid.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
 
 // ContentConfig holds configuration for the content service.
 type ContentConfig struct {
@@ -53,8 +64,8 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 		Password:        cfg.DBPassword,
 		DBName:          cfg.DBName,
 		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    25,
-		MaxIdleConns:    10,
+		MaxOpenConns:    envInt("DB_MAX_CONNS", 3),
+		MaxIdleConns:    envInt("DB_MIN_CONNS", 1),
 		ConnMaxLifetime: 5 * time.Minute,
 		ConnMaxIdleTime: 2 * time.Minute,
 	}

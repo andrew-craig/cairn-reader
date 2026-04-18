@@ -59,6 +59,29 @@ All settings go in `.env`. Only `DB_PASSWORD` is required. See `.env.example` fo
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
 | `ARTICLE_RETENTION_DAYS` | `90` | Explore article retention |
 
+### PostgreSQL tuning
+
+The `cairn-db` container ships with lightweight defaults suited to a small
+host (e.g. a 1 GB VPS or Raspberry Pi). Override any of these via `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGRES_MAX_CONNECTIONS` | `20` | Max concurrent backend connections |
+| `POSTGRES_SHARED_BUFFERS` | `16MB` | Shared buffer cache |
+| `POSTGRES_WORK_MEM` | `512kB` | Per-operation sort/hash memory |
+| `POSTGRES_MAINTENANCE_WORK_MEM` | `16MB` | Memory for VACUUM / index builds |
+| `POSTGRES_EFFECTIVE_CACHE_SIZE` | `128MB` | Planner hint for OS page cache |
+| `POSTGRES_WAL_BUFFERS` | `512kB` | WAL write buffer |
+| `POSTGRES_MIN_WAL_SIZE` | `32MB` | WAL recycling floor |
+| `POSTGRES_MAX_WAL_SIZE` | `256MB` | WAL recycling ceiling |
+| `POSTGRES_SHM_SIZE` | `64mb` | Container `/dev/shm` size |
+| `DB_MAX_CONNS` | `3` | Per-service client pool cap |
+| `DB_MIN_CONNS` | `1` | Per-service idle pool floor |
+
+The six services share one Postgres instance, so the sum of `DB_MAX_CONNS`
+across services (default `6 × 3 = 18`) must stay under
+`POSTGRES_MAX_CONNECTIONS`. If you raise one, raise the other.
+
 ## Data & Backups
 
 Two Docker volumes store persistent data:
