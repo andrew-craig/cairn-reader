@@ -57,7 +57,9 @@ func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddlew
 	cleanupJob.Start()
 
 	server := recAPI.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, logger)
-	r.Mount("/", server.Routes())
+	handler := server.Routes()
+	r.Handle("/api/v1/explore", handler)
+	r.Handle("/api/v1/explore/*", handler)
 
 	return func() {
 		cleanupJob.Stop()

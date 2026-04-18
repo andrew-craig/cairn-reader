@@ -65,7 +65,10 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 	}
 
 	contentRouter := contentAPI.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware, internalAuthMiddleware)
-	r.Mount("/", contentRouter)
+	r.Handle("/api/v1/content", contentRouter)
+	r.Handle("/api/v1/content/*", contentRouter)
+	r.Handle("/api/v1/internal", contentRouter)
+	r.Handle("/api/v1/internal/*", contentRouter)
 
 	contentRepo := repository.NewContentRepository(db.DB)
 	cleanupJob := jobs.NewCleanupJob(contentRepo, logger)

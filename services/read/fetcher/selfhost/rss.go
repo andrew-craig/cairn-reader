@@ -67,7 +67,8 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 	}
 
 	rssRouter := rssAPI.NewRouter(db)
-	r.Mount("/", rssRouter)
+	r.Handle("/api/v1/source/rss", rssRouter)
+	r.Handle("/api/v1/source/rss/*", rssRouter)
 
 	feedRepo := rssRepo.NewFeedRepository(db.DB)
 	subscriptionRepo := rssRepo.NewFeedSubscriptionRepository(db.DB)
