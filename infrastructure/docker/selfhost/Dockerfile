@@ -45,6 +45,6 @@ RUN chown -R appuser:appuser /app
 # Switch to non-root user
 USER appuser
 
-EXPOSE 8080
+EXPOSE 8099
 
 CMD ["./cairn-selfhost"]
