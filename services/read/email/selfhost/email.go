@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"os"
+	"strconv"
 	"time"
 
 	emailAPI "github.com/cairn-app/cairn-reader/services/read/email/internal/api"
@@ -25,6 +27,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+// envInt returns the int value of the given env var, or fallback if unset/invalid.
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
 
 // EmailConfig holds configuration for the email ingest service.
 type EmailConfig struct {
@@ -61,8 +73,8 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 		Password:        cfg.DBPassword,
 		DBName:          cfg.DBName,
 		SSLMode:         cfg.DBSSLMode,
-		MaxOpenConns:    25,
-		MaxIdleConns:    5,
+		MaxOpenConns:    envInt("DB_MAX_CONNS", 3),
+		MaxIdleConns:    envInt("DB_MIN_CONNS", 1),
 		ConnMaxLifetime: 1 * time.Hour,
 		ConnMaxIdleTime: 10 * time.Minute,
 	}

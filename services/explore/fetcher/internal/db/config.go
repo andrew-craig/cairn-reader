@@ -4,11 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func envInt32(key string, fallback int32) int32 {
+	if v := env.GetString(key, ""); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 32); err == nil {
+			return int32(n)
+		}
+	}
+	return fallback
+}
 
 // Config holds database configuration
 type Config struct {
@@ -43,9 +53,11 @@ func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to parse connection string: %w", err)
 	}
 
-	// Connection pool settings
-	config.MaxConns = 25
-	config.MinConns = 5
+	// Connection pool settings. Overridable via DB_MAX_CONNS / DB_MIN_CONNS
+	// so constrained deployments (e.g. selfhost) can cap pool size below the
+	// server's max_connections.
+	config.MaxConns = envInt32("DB_MAX_CONNS", 25)
+	config.MinConns = envInt32("DB_MIN_CONNS", 5)
 	config.MaxConnLifetime = 5 * time.Minute
 	config.MaxConnIdleTime = 5 * time.Minute
 
