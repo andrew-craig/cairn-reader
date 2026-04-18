@@ -75,7 +75,7 @@ func loadConfig() *Config {
 	}
 
 	return &Config{
-		Port: getEnv("PORT", "8080"),
+		Port: getEnv("PORT", "8099"),
 
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

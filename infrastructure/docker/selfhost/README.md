@@ -15,7 +15,7 @@ cp .env.example .env
 docker compose up -d --build
 
 # 3. Verify
-curl http://localhost:8080/health/ready
+curl http://localhost:8099/health/ready
 ```
 
 ## What's Included
@@ -35,7 +35,7 @@ All background workers (feed polling, outbox delivery, cleanup jobs) run as goro
 
 ```
 ┌─────────────────┐     ┌──────────────────┐
-│  cairn (:8080)  │────▶│  cairn-db (:5432) │
+│  cairn (:8099)  │────▶│  cairn-db (:5432) │
 │                 │     │  PostgreSQL       │
 │  All 6 services │     │  6 logical DBs    │
 │  All workers    │     └──────────────────┘
@@ -53,7 +53,7 @@ All settings go in `.env`. Only `DB_PASSWORD` is required. See `.env.example` fo
 |----------|---------|-------------|
 | `DB_PASSWORD` | *(required)* | PostgreSQL password |
 | `DB_USER` | `cairn` | PostgreSQL user |
-| `PORT` | `8080` | HTTP port |
+| `PORT` | `8099` | HTTP port |
 | `EMAIL_DOMAIN` | `read.cairnapp.com` | Domain for email ingestion |
 | `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
@@ -80,7 +80,7 @@ docker compose exec -i cairn-db psql -U cairn -d postgres < backup.sql
 
 ## TLS / HTTPS
 
-The selfhost binary listens on plain HTTP (port 8080 by default). **You must place a TLS-terminating reverse proxy in front of it** before exposing it to the internet.
+The selfhost binary listens on plain HTTP (port 8099 by default). **You must place a TLS-terminating reverse proxy in front of it** before exposing it to the internet.
 
 Each internal service enforces HTTPS by inspecting the `X-Forwarded-Proto` header — the same mechanism used in the multi-container production deployment (where Caddy sets that header). The selfhost binary sets `X-Forwarded-Proto: https` in its middleware layer to satisfy this check, mirroring what a real proxy would do. If your proxy already sets the header, the binary's default is skipped (`if` guard on the header value).
 
@@ -95,7 +95,7 @@ server {
     ssl_certificate_key /etc/ssl/private/cairn.key;
 
     location / {
-        proxy_pass http://localhost:8080;
+        proxy_pass http://localhost:8099;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
@@ -108,7 +108,7 @@ server {
 
 ```caddyfile
 cairn.example.com {
-    reverse_proxy localhost:8080
+    reverse_proxy localhost:8099
 }
 ```
 
@@ -116,7 +116,7 @@ cairn.example.com {
 
 ## API Endpoints
 
-All services share port 8080:
+All services share port 8099:
 
 | Prefix | Service |
 |--------|---------|
@@ -153,7 +153,7 @@ docker compose logs -f cairn
 **Check health:**
 
 ```bash
-curl -s http://localhost:8080/health/ready | jq
+curl -s http://localhost:8099/health/ready | jq
 ```
 
 **Reset everything:**

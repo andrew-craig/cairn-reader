@@ -69,7 +69,7 @@ func main() {
 	// services, so it is responsible for asserting that header — exactly as
 	// Caddy does in the multi-container prod deployment. The binary itself does
 	// not terminate TLS; operators must place a TLS-terminating reverse proxy
-	// (nginx, Caddy, Traefik, etc.) in front of port 8080. See README.md.
+	// (nginx, Caddy, Traefik, etc.) in front of port 8099. See README.md.
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.Header.Get("X-Forwarded-Proto") == "" {
