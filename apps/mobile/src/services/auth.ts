@@ -28,6 +28,17 @@ export class AuthService {
   private static refreshToken: string | null = null;
   private static user: User | null = null;
   private static expiresAt: number | null = null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static async parseJsonResponse(response: Response): Promise<any> {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('Unable to reach the server. Please try again later.');
+    }
+  }
+
   private static isRefreshing: boolean = false;
   private static refreshPromise: Promise<void> | null = null;
   private static listeners: Set<AuthStateListener> = new Set();
@@ -88,7 +99,7 @@ export class AuthService {
       body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
-    const result = await response.json();
+    const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Device login failed');
@@ -116,7 +127,7 @@ export class AuthService {
       body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
     });
 
-    const result = await response.json();
+    const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Device registration failed');
@@ -142,7 +153,7 @@ export class AuthService {
       body: JSON.stringify(credentials),
     });
 
-    const result = await response.json();
+    const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Email login failed');
@@ -168,7 +179,7 @@ export class AuthService {
       body: JSON.stringify(credentials),
     });
 
-    const result = await response.json();
+    const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Email registration failed');
