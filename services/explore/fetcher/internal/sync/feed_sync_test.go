@@ -30,7 +30,7 @@ func TestSyncFeeds_Success(t *testing.T) {
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds
 	ctx := context.Background()
@@ -80,7 +80,7 @@ https://example.com/feed2.xml
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds
 	ctx := context.Background()
@@ -119,7 +119,7 @@ https://example.com/feed2.xml`)); err != nil {
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds
 	err := syncer.syncFeeds(ctx)
@@ -160,7 +160,7 @@ func TestSyncFeeds_HTTPError(t *testing.T) {
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds should fail
 	ctx := context.Background()
@@ -193,7 +193,7 @@ func TestSyncFeeds_EmptyResponse(t *testing.T) {
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds should succeed but import no feeds
 	ctx := context.Background()
@@ -230,7 +230,7 @@ https://example.com/feed2.xml`)); err != nil {
 	defer server.Close()
 
 	// Create syncer with test server URL
-	syncer := NewFeedSyncer(repo, server.URL)
+	syncer := NewFeedSyncer(repo, "", server.URL)
 
 	// Sync feeds
 	ctx := context.Background()
@@ -252,15 +252,20 @@ func TestNewFeedSyncer(t *testing.T) {
 
 	repo := db.NewFeedRepository(database)
 	url := "https://example.com/feeds.txt"
+	path := "/tmp/feeds.txt"
 
-	syncer := NewFeedSyncer(repo, url)
+	syncer := NewFeedSyncer(repo, path, url)
 
 	if syncer == nil {
 		t.Fatal("Expected non-nil syncer")
 	}
 
-	if syncer.kagiURL != url {
-		t.Errorf("Expected kagiURL=%s, got %s", url, syncer.kagiURL)
+	if syncer.listURL != url {
+		t.Errorf("Expected listURL=%s, got %s", url, syncer.listURL)
+	}
+
+	if syncer.listPath != path {
+		t.Errorf("Expected listPath=%s, got %s", path, syncer.listPath)
 	}
 
 	if syncer.repo == nil {

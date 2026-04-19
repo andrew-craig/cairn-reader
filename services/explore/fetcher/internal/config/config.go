@@ -10,6 +10,15 @@ import (
 	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
 )
 
+// DefaultFeedListURL is the canonical location of the feed list maintained
+// in this repository. It's used when no local feed list file is mounted
+// into the container.
+const DefaultFeedListURL = "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"
+
+// DefaultFeedListPath is the in-container path the service checks for a
+// user-provided feed list. Mount a file here to override the default list.
+const DefaultFeedListPath = "/app/feeds/feeds.txt"
+
 // Config holds all configuration for the fetcher service
 type Config struct {
 	Server         sharedconfig.ServerConfig
@@ -17,7 +26,8 @@ type Config struct {
 	Logging        sharedconfig.LoggingConfig
 	RecommenderURL string
 	FetchInterval  time.Duration
-	KagiFeedURL    string
+	FeedListPath   string
+	FeedListURL    string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -28,7 +38,8 @@ func Load() (*Config, error) {
 		Logging:        sharedconfig.LoadLoggingConfig(),
 		RecommenderURL: sharedconfig.GetString("RECOMMENDER_URL", "http://localhost:8081"),
 		FetchInterval:  sharedconfig.GetDuration("FETCH_INTERVAL", 60*time.Second),
-		KagiFeedURL:    sharedconfig.GetString("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt"),
+		FeedListPath:   sharedconfig.GetString("FEED_LIST_PATH", DefaultFeedListPath),
+		FeedListURL:    sharedconfig.GetString("FEED_LIST_URL", DefaultFeedListURL),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -60,8 +71,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("FETCH_INTERVAL must be greater than 0")
 	}
 
-	if c.KagiFeedURL == "" {
-		return fmt.Errorf("KAGI_FEED_URL is required")
+	if c.FeedListPath == "" && c.FeedListURL == "" {
+		return fmt.Errorf("one of FEED_LIST_PATH or FEED_LIST_URL must be set")
 	}
 
 	return nil

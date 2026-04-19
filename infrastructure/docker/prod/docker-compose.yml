@@ -253,7 +253,11 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
       - DB_NAME=${POSTGRES_DB_FETCHER}
       - DB_SSLMODE=disable
-      - KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
+      # Feed list source: a file at FEED_LIST_PATH wins, otherwise the
+      # service downloads FEED_LIST_URL (the repository's default list)
+      # at startup. Mount your own curated list as a volume to override.
+      - FEED_LIST_PATH=/app/feeds/feeds.txt
+      - FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
     depends_on:
       cairn-db:
         condition: service_healthy

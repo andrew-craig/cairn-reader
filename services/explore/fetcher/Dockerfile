@@ -38,6 +38,12 @@ COPY --from=builder /app/services/explore/explore_fetcher .
 # Copy migrations
 COPY --from=builder /app/services/explore/fetcher/migrations ./migrations
 
+# Create feeds directory for operator-supplied feed list.
+# Mount your own feeds.txt at /app/feeds/feeds.txt to override the default
+# list; when the file is missing the service downloads the repository's
+# default list from FEED_LIST_URL at startup.
+RUN mkdir -p /app/feeds
+
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
 

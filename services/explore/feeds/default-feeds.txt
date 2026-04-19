@@ -1,0 +1,50 @@
+# Cairn Explore — Default Feed List
+#
+# This file is the default starter list used by the Explore Fetcher service
+# when no user-provided list is mounted into the container.
+#
+# Format:
+#   - One feed URL per line
+#   - Lines starting with "#" are comments
+#   - Blank lines are ignored
+#   - Only http:// and https:// URLs are accepted
+#
+# To customise: mount your own file at FEED_LIST_PATH
+# (defaults to /app/feeds/feeds.txt inside the container).
+#
+# Feeds listed below are curated, long-running personal and engineering
+# blogs. Edit freely — PRs welcome.
+
+# Personal / writing
+https://blog.jim-nielsen.com/feed.xml
+https://rachelbythebay.com/w/atom.xml
+https://danluu.com/atom.xml
+https://jvns.ca/atom.xml
+https://fasterthanli.me/index.xml
+https://www.joelonsoftware.com/feed/
+https://martinfowler.com/feed.atom
+https://overreacted.io/rss.xml
+https://blog.sigplan.org/feed/
+https://apenwarr.ca/log/rss.php
+
+# Engineering / systems
+https://blog.cloudflare.com/rss/
+https://stripe.com/blog/feed.rss
+https://netflixtechblog.com/feed
+https://engineering.fb.com/feed/
+https://github.blog/feed/
+https://blog.rust-lang.org/feed.xml
+https://go.dev/blog/feed.atom
+https://kubernetes.io/feed.xml
+https://www.postgresql.org/news.rss
+
+# Small web / indie
+https://tomcritchlow.com/feed.xml
+https://macwright.com/atom.xml
+https://interconnected.org/home/feed
+https://simonwillison.net/atom/everything/
+https://ciechanow.ski/atom.xml
+https://www.robinsloan.com/rss/
+https://daverupert.com/atom.xml
+https://adactio.com/journal/rss
+https://www.mrlacey.com/feeds/posts/default

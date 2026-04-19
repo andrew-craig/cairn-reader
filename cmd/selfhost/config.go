@@ -36,7 +36,8 @@ type Config struct {
 	BcryptCost     int
 
 	// Explore fetcher
-	KagiFeedURL   string
+	FeedListPath  string
+	FeedListURL   string
 	FetchInterval time.Duration
 
 	// Explore recommender
@@ -101,7 +102,8 @@ func loadConfig() *Config {
 		InternalAPIKey: internalKey,
 		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
 
-		KagiFeedURL:   getEnv("KAGI_FEED_URL", "https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt"),
+		FeedListPath:  getEnv("FEED_LIST_PATH", "/data/feeds/feeds.txt"),
+		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
 		FetchInterval: getEnvDuration("FETCH_INTERVAL", 60*time.Second),
 
 		ArticleRetentionDays: getEnvInt("ARTICLE_RETENTION_DAYS", 90),

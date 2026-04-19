@@ -710,7 +710,8 @@ DB_PORT=5432                       # PostgreSQL port
 DB_USER=fetcher                    # Database user
 DB_PASSWORD=fetcher_password       # Database password
 DB_NAME=fetcher_db                 # Database name
-KAGI_FEED_URL=https://github.com/kagisearch/smallweb/raw/main/smallweb.txt
+FEED_LIST_PATH=/app/feeds/feeds.txt   # Mount your own list here to override the default
+FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
 ```
 
 ### Explore Recommender (explore_recommender)

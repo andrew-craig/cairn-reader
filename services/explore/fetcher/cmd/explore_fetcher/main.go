@@ -86,7 +86,7 @@ func main() {
 	feedRepo := db.NewFeedRepository(database)
 
 	// Initialize feed syncer and start daily sync
-	feedSyncer := sync.NewFeedSyncer(feedRepo, cfg.KagiFeedURL)
+	feedSyncer := sync.NewFeedSyncer(feedRepo, cfg.FeedListPath, cfg.FeedListURL)
 
 	// Start background processes
 	bgCtx, cancel := context.WithCancel(context.Background())
