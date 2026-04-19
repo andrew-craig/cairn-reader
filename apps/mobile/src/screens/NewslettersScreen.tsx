@@ -17,7 +17,7 @@ import { RootStackParamList } from '../types';
 import { UnifiedSubscription } from '../types/read';
 import { ReadService } from '../services/read';
 
-type FeedsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Feeds'>;
+type NewslettersScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Newsletters'>;
 
 const SubscriptionTypeLabel: Record<string, string> = {
   rss: 'RSS',
@@ -33,11 +33,9 @@ interface SubscriptionRowProps {
 const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark }) => {
   const colors = isDark ? Colors.dark : Colors.light;
 
-  const subtitle = subscription.type === 'rss' && subscription.rss_data?.feed_url
-    ? subscription.rss_data.feed_url
-    : subscription.type === 'email' && subscription.email_data?.email_address
-      ? subscription.email_data.email_address
-      : subscription.description;
+  const subtitle = subscription.type === 'email' && subscription.email_data?.email_address
+    ? subscription.email_data.email_address
+    : subscription.description;
 
   return (
     <View style={[styles.row, { borderColor: colors.border }]}>
@@ -62,12 +60,12 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark 
   );
 };
 
-export const FeedsScreen: React.FC = () => {
+export const NewslettersScreen: React.FC = () => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = isDark ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<FeedsScreenNavigationProp>();
+  const navigation = useNavigation<NewslettersScreenNavigationProp>();
 
   const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +74,7 @@ export const FeedsScreen: React.FC = () => {
   const loadSubscriptions = useCallback(async () => {
     try {
       const response = await ReadService.listAllSubscriptions();
-      setSubscriptions(response.subscriptions.filter(s => s.type !== 'email'));
+      setSubscriptions(response.subscriptions.filter(s => s.type === 'email'));
     } catch (error) {
       console.error('Error loading subscriptions:', error);
     } finally {
@@ -124,7 +122,7 @@ export const FeedsScreen: React.FC = () => {
           >
             <View style={GlobalStyles.headerLeft}>
               <IconButton icon="chevron-back" onPress={() => navigation.goBack()} />
-              <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Feeds</Text>
+              <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Newsletters</Text>
             </View>
           </View>
         }
@@ -136,7 +134,7 @@ export const FeedsScreen: React.FC = () => {
           ) : (
             <View style={GlobalStyles.emptyContainer}>
               <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
-                No subscriptions yet
+                No newsletters yet
               </Text>
             </View>
           )
