@@ -9,6 +9,7 @@ export type RootStackParamList = {
   Votes: undefined;
   Account: undefined;
   Feeds: undefined;
+  Newsletters: undefined;
 };
 
 export type MainTabParamList = {

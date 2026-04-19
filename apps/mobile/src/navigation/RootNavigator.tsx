@@ -3,7 +3,7 @@ import { useColorScheme, TouchableOpacity, ActivityIndicator, View } from 'react
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen, BookmarksScreen, VotesScreen, AccountScreen, FeedsScreen } from '../screens';
+import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen, BookmarksScreen, VotesScreen, AccountScreen, FeedsScreen, NewslettersScreen } from '../screens';
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
@@ -103,6 +103,14 @@ export default function RootNavigator() {
       <Stack.Screen
         name="Feeds"
         component={FeedsScreen}
+        options={{
+          headerShown: false,
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="Newsletters"
+        component={NewslettersScreen}
         options={{
           headerShown: false,
           presentation: 'card',

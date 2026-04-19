@@ -66,6 +66,7 @@ export const YouScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedsCount, setFeedsCount] = useState(0);
+  const [newslettersCount, setNewslettersCount] = useState(0);
   const [bookmarksCount, setBookmarksCount] = useState(0);
   const [upVotesCount, setUpVotesCount] = useState(0);
   const [downVotesCount, setDownVotesCount] = useState(0);
@@ -88,7 +89,10 @@ export const YouScreen: React.FC = () => {
 
         setUpVotesCount(voteStats.upvotes);
         setDownVotesCount(voteStats.downvotes);
-        setFeedsCount(subscriptions.total_count); // Now includes all subscription types
+        const rssCount = subscriptions.subscriptions.filter(s => s.type !== 'email').length;
+        const emailCount = subscriptions.subscriptions.filter(s => s.type === 'email').length;
+        setFeedsCount(rssCount);
+        setNewslettersCount(emailCount);
         setBookmarksCount(bookmarks.total_count);
       } catch (err) {
         console.error('Error fetching user stats:', err);
@@ -107,6 +111,10 @@ export const YouScreen: React.FC = () => {
 
   const handleFeedsPress = () => {
     navigation.navigate('Feeds');
+  };
+
+  const handleNewslettersPress = () => {
+    navigation.navigate('Newsletters');
   };
 
   const handleBookmarksPress = () => {
@@ -164,6 +172,12 @@ export const YouScreen: React.FC = () => {
             title="Feeds"
             subtitle={loading ? 'Loading...' : `${feedsCount} subscriptions`}
             onPress={handleFeedsPress}
+            isDark={isDark}
+          />
+          <MenuItem
+            title="Newsletters"
+            subtitle={loading ? 'Loading...' : `${newslettersCount} subscriptions`}
+            onPress={handleNewslettersPress}
             isDark={isDark}
           />
           <MenuItem
