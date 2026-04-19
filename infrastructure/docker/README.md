@@ -267,7 +267,8 @@ Key configurations:
 - `FETCH_INTERVAL=60` (seconds)
 - `FETCH_TIMEOUT=30` (seconds)
 - `MAX_FETCH_ERRORS=10`
-- `KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt`
+- `FEED_LIST_PATH=/app/feeds/feeds.txt` — mount your own list here to override the default
+- `FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt` — used when `FEED_LIST_PATH` is absent
 
 ### Content Service (content-service)
 - `PORT=8080` (internal), exposed as 8083

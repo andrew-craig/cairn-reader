@@ -24,7 +24,8 @@ func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, health 
 		DBUser:         cfg.DB.User,
 		DBPassword:     cfg.DB.Password,
 		DBName:         cfg.DBNameFetcher,
-		KagiFeedURL:    cfg.KagiFeedURL,
+		FeedListPath:   cfg.FeedListPath,
+		FeedListURL:    cfg.FeedListURL,
 		FetchInterval:  cfg.FetchInterval,
 		RecommenderURL: fmt.Sprintf("http://localhost:%s", cfg.Port),
 	}, r, logger)

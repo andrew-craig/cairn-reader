@@ -333,7 +333,8 @@ The Fetcher service (port 8080) polls Kagi Small Web for RSS feeds and stores ar
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `RECOMMENDER_URL` | string | Yes | `http://localhost:8081` | Base URL of the Explore Recommender service |
-| `KAGI_FEED_URL` | string | Yes | `https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt` | URL to the Kagi Small Web feed list |
+| `FEED_LIST_PATH` | string | No | `/app/feeds/feeds.txt` | Path to a user-supplied feed list inside the container. Takes precedence over `FEED_LIST_URL` when the file exists |
+| `FEED_LIST_URL` | string | No | `https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt` | HTTP URL to download the feed list from when `FEED_LIST_PATH` is absent (points to the default list maintained in this repo) |
 
 #### Server Configuration
 
@@ -387,7 +388,9 @@ DB_NAME=fetcher_db
 DB_SSLMODE=disable
 
 # Feed Fetching
-KAGI_FEED_URL=https://raw.githubusercontent.com/kagisearch/smallweb/main/smallweb.txt
+# A local file (if mounted) wins; otherwise the URL is downloaded at startup.
+FEED_LIST_PATH=/app/feeds/feeds.txt
+FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
 RECOMMENDER_URL=http://localhost:8081
 FETCH_INTERVAL=60s
 

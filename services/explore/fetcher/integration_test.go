@@ -40,7 +40,7 @@ https://example.com/feed3.xml`))
 	defer kagiServer.Close()
 
 	// Step 1: Sync feeds from Kagi list
-	syncer := sync.NewFeedSyncer(repo, kagiServer.URL)
+	syncer := sync.NewFeedSyncer(repo, "", kagiServer.URL)
 	err := syncer.SyncOnce(ctx)
 	if err != nil {
 		t.Fatalf("SyncOnce failed: %v", err)
@@ -305,7 +305,7 @@ func TestDailySyncPreservesMetadata(t *testing.T) {
 	defer kagiServer.Close()
 
 	// Sync feeds
-	syncer := sync.NewFeedSyncer(repo, kagiServer.URL)
+	syncer := sync.NewFeedSyncer(repo, "", kagiServer.URL)
 	err := syncer.SyncOnce(ctx)
 	if err != nil {
 		t.Fatalf("SyncOnce failed: %v", err)

@@ -23,7 +23,8 @@ type FetcherConfig struct {
 	DBUser         string
 	DBPassword     string
 	DBName         string
-	KagiFeedURL    string
+	FeedListPath   string
+	FeedListURL    string
 	FetchInterval  time.Duration
 	RecommenderURL string
 }
@@ -49,7 +50,7 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, logger *slog.Lo
 	}
 
 	feedRepo := fetcherDB.NewFeedRepository(database)
-	feedSyncer := sync.NewFeedSyncer(feedRepo, cfg.KagiFeedURL)
+	feedSyncer := sync.NewFeedSyncer(feedRepo, cfg.FeedListPath, cfg.FeedListURL)
 
 	go func() {
 		if err := feedSyncer.Run(ctx); err != nil {
