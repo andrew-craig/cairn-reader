@@ -6,6 +6,7 @@ import {
   FlatList,
   useColorScheme,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -19,12 +20,6 @@ import { ReadService } from '../services/read';
 
 type NewslettersScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Newsletters'>;
 
-const SubscriptionTypeLabel: Record<string, string> = {
-  rss: 'RSS',
-  social: 'Social',
-  email: 'Email',
-};
-
 interface SubscriptionRowProps {
   subscription: UnifiedSubscription;
   isDark: boolean;
@@ -32,31 +27,77 @@ interface SubscriptionRowProps {
 
 const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark }) => {
   const colors = isDark ? Colors.dark : Colors.light;
-
-  const subtitle = subscription.type === 'email' && subscription.email_data?.email_address
-    ? subscription.email_data.email_address
-    : subscription.description;
+  const email = subscription.email_data?.email_address;
 
   return (
     <View style={[styles.row, { borderColor: colors.border }]}>
+      <View style={[styles.avatar, { backgroundColor: colors.hover }]}>
+        <Text style={[styles.avatarText, { color: colors.textSecondary }]}>
+          {subscription.title.charAt(0).toUpperCase()}
+        </Text>
+      </View>
       <View style={styles.rowContent}>
-        <View style={styles.rowHeader}>
-          <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-            {subscription.title}
-          </Text>
-          <View style={[styles.typeBadge, { backgroundColor: colors.hover }]}>
-            <Text style={[styles.typeBadgeText, { color: colors.textSecondary }]}>
-              {SubscriptionTypeLabel[subscription.type] || subscription.type}
-            </Text>
-          </View>
-        </View>
-        {subtitle && (
+        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+          {subscription.title}
+        </Text>
+        {email && (
           <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-            {subtitle}
+            {email}
           </Text>
         )}
       </View>
     </View>
+  );
+};
+
+interface AddNewsletterModalProps {
+  visible: boolean;
+  onClose: () => void;
+  isDark: boolean;
+  insets: ReturnType<typeof useSafeAreaInsets>;
+}
+
+const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose, isDark, insets }) => {
+  const colors = isDark ? Colors.dark : Colors.light;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={[styles.modalOverlay, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+        <View
+          style={[
+            styles.modalContent,
+            {
+              backgroundColor: colors.hover,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.modalLabel,
+              { color: colors.text },
+            ]}
+          >
+            Send or forward emails to
+          </Text>
+          <Text
+            style={[
+              styles.modalEmail,
+              { color: colors.text },
+            ]}
+          >
+            rose-parrot-74@cairnreader.app
+          </Text>
+          <Text
+            style={[
+              styles.modalDescription,
+              { color: colors.textSecondary },
+            ]}
+          >
+            New subscriptions will be automatically added to your reading list.
+          </Text>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
@@ -70,6 +111,7 @@ export const NewslettersScreen: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const loadSubscriptions = useCallback(async () => {
     try {
@@ -102,49 +144,71 @@ export const NewslettersScreen: React.FC = () => {
   const keyExtractor = useCallback((item: UnifiedSubscription) => item.id, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={subscriptions}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        ListHeaderComponent={
-          <View
-            style={[
-              GlobalStyles.header,
-              {
-                backgroundColor: colors.background,
-                paddingTop: insets.top + Spacing.md,
-                height: undefined,
-              },
-            ]}
-          >
-            <View style={GlobalStyles.headerLeft}>
-              <IconButton icon="chevron-back" onPress={() => navigation.goBack()} />
-              <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Newsletters</Text>
+    <>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <FlatList
+          data={subscriptions}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
+          ListHeaderComponent={
+            <View
+              style={[
+                styles.header,
+                {
+                  backgroundColor: colors.background,
+                  paddingTop: insets.top + Spacing.md,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.headerLeft}>
+                <IconButton icon="chevron-back" onPress={() => navigation.goBack()} />
+                <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>
+                  Newsletters
+                </Text>
+              </View>
+              <View style={styles.headerRight}>
+                <IconButton
+                  icon="add"
+                  onPress={() => setModalVisible(true)}
+                  size={24}
+                />
+                <IconButton
+                  icon="search"
+                  onPress={() => {}}
+                  size={24}
+                />
+              </View>
             </View>
-          </View>
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <View style={GlobalStyles.emptyContainer}>
-              <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
-                No newsletters yet
-              </Text>
-            </View>
-          )
-        }
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: insets.bottom + Spacing.lg },
-        ]}
+          }
+          ListEmptyComponent={
+            loading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : (
+              <View style={GlobalStyles.emptyContainer}>
+                <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
+                  No newsletters yet
+                </Text>
+              </View>
+            )
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom + Spacing.lg },
+          ]}
+        />
+      </View>
+      <AddNewsletterModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        isDark={isDark}
+        insets={insets}
       />
-    </View>
+    </>
   );
 };
 
@@ -160,35 +224,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  row: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
+    height: undefined,
   },
-  rowContent: {
-    gap: Spacing.xs,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flex: 1,
   },
-  rowHeader: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: FontSizes.lg,
+    fontFamily: FontFamily.defaultMedium,
+  },
+  rowContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
   rowTitle: {
     fontSize: FontSizes.md,
-    fontFamily: FontFamily.defaultMedium,
-    flex: 1,
-  },
-  typeBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  typeBadgeText: {
-    fontSize: FontSizes.xs,
     fontFamily: FontFamily.defaultMedium,
   },
   rowSubtitle: {
     fontSize: FontSizes.sm,
     fontFamily: FontFamily.default,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 80,
+  },
+  modalContent: {
+    marginHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  modalLabel: {
+    fontSize: FontSizes.md,
+    fontFamily: FontFamily.default,
+    textAlign: 'center',
+  },
+  modalEmail: {
+    fontSize: FontSizes.md,
+    fontFamily: FontFamily.defaultMedium,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
+    textAlign: 'center',
   },
 });
