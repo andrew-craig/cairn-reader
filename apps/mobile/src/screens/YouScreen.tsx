@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
 import { Colors, Spacing, FontSizes, FontFamily, Layout } from '../constants/theme';
@@ -73,37 +73,40 @@ export const YouScreen: React.FC = () => {
 
   const accountName = user?.email || 'Anonymous user';
 
-  // Fetch user statistics
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Fetch user statistics every time the screen comes into focus so that
+  // changes made elsewhere (e.g. voting) are reflected on return.
+  useFocusEffect(
+    useCallback(() => {
+      const fetchStats = async () => {
+        try {
+          setLoading(true);
+          setError(null);
 
-        // Fetch all stats in parallel
-        const [voteStats, subscriptions, bookmarks] = await Promise.all([
-          ExploreService.getUserVoteStats(),
-          ReadService.listAllSubscriptions(), // Use new aggregated endpoint
-          ReadService.listUserContents({ limit: 1 }), // Just get count, not all items
-        ]);
+          // Fetch all stats in parallel
+          const [voteStats, subscriptions, bookmarks] = await Promise.all([
+            ExploreService.getUserVoteStats(),
+            ReadService.listAllSubscriptions(), // Use new aggregated endpoint
+            ReadService.listUserContents({ limit: 1 }), // Just get count, not all items
+          ]);
 
-        setUpVotesCount(voteStats.upvotes);
-        setDownVotesCount(voteStats.downvotes);
-        const rssCount = subscriptions.subscriptions.filter(s => s.type !== 'email').length;
-        const emailCount = subscriptions.subscriptions.filter(s => s.type === 'email').length;
-        setFeedsCount(rssCount);
-        setNewslettersCount(emailCount);
-        setBookmarksCount(bookmarks.total_count);
-      } catch (err) {
-        console.error('Error fetching user stats:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load statistics');
-      } finally {
-        setLoading(false);
-      }
-    };
+          setUpVotesCount(voteStats.upvotes);
+          setDownVotesCount(voteStats.downvotes);
+          const rssCount = subscriptions.subscriptions.filter(s => s.type !== 'email').length;
+          const emailCount = subscriptions.subscriptions.filter(s => s.type === 'email').length;
+          setFeedsCount(rssCount);
+          setNewslettersCount(emailCount);
+          setBookmarksCount(bookmarks.total_count);
+        } catch (err) {
+          console.error('Error fetching user stats:', err);
+          setError(err instanceof Error ? err.message : 'Failed to load statistics');
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    fetchStats();
-  }, []);
+      fetchStats();
+    }, [])
+  );
 
   const handleAccountPress = () => {
     navigation.navigate('Account');
