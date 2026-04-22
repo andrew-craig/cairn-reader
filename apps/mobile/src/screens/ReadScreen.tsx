@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
@@ -25,9 +25,13 @@ export const ReadScreen: React.FC = () => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadReadArticles();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (!searchQuery) {
+        loadReadArticles(true);
+      }
+    }, [searchQuery])
+  );
 
   const loadReadArticles = async (reset = false) => {
     try {
