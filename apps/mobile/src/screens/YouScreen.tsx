@@ -173,13 +173,13 @@ export const YouScreen: React.FC = () => {
           <Spacer isDark={isDark} />
           <MenuItem
             title="Feeds"
-            subtitle={loading ? 'Loading...' : `${feedsCount} subscriptions`}
+            subtitle={loading ? 'Loading...' : `${feedsCount} ${feedsCount === 1 ? 'subscription' : 'subscriptions'}`}
             onPress={handleFeedsPress}
             isDark={isDark}
           />
           <MenuItem
             title="Newsletters"
-            subtitle={loading ? 'Loading...' : `${newslettersCount} subscriptions`}
+            subtitle={loading ? 'Loading...' : `${newslettersCount} ${newslettersCount === 1 ? 'subscription' : 'subscriptions'}`}
             onPress={handleNewslettersPress}
             isDark={isDark}
           />
@@ -194,7 +194,7 @@ export const YouScreen: React.FC = () => {
             subtitle={
               loading
                 ? 'Loading...'
-                : `${upVotesCount} up votes, ${downVotesCount} down votes`
+                : `${upVotesCount} ${upVotesCount === 1 ? 'up vote' : 'up votes'}, ${downVotesCount} ${downVotesCount === 1 ? 'down vote' : 'down votes'}`
             }
             onPress={handleVotesPress}
             isDark={isDark}
