@@ -1,4 +1,4 @@
-import { generateId, formatDate, extractDomain, isValidUrl, estimateReadingTime } from './helpers';
+import { generateId, formatDate, extractDomain, isValidUrl, estimateReadingTime, pluralize } from './helpers';
 
 describe('generateId', () => {
   it('returns a non-empty string', () => {
@@ -119,6 +119,32 @@ describe('isValidUrl', () => {
 
   it('returns true for non-http protocols', () => {
     expect(isValidUrl('ftp://files.example.com/doc')).toBe(true);
+  });
+});
+
+describe('pluralize', () => {
+  it('returns the plural form for 0', () => {
+    expect(pluralize(0, 'subscription')).toBe('subscriptions');
+  });
+
+  it('returns the singular form for 1', () => {
+    expect(pluralize(1, 'subscription')).toBe('subscription');
+  });
+
+  it('returns the plural form for 2', () => {
+    expect(pluralize(2, 'subscription')).toBe('subscriptions');
+  });
+
+  it('returns the plural form for large counts', () => {
+    expect(pluralize(42, 'vote')).toBe('votes');
+  });
+
+  it('uses a custom plural form when provided', () => {
+    expect(pluralize(2, 'entry', 'entries')).toBe('entries');
+  });
+
+  it('uses the singular form with a custom plural when count is 1', () => {
+    expect(pluralize(1, 'entry', 'entries')).toBe('entry');
   });
 });
 
