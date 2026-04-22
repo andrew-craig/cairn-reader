@@ -1,17 +1,23 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Linking,
+  Alert,
+  ActionSheetIOS,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RenderHTML from 'react-native-render-html';
+import RenderHTML, { CustomTextualRenderer } from 'react-native-render-html';
+import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { Article } from '../../types';
 import { formatDate, extractDomain } from '../../utils';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../../constants';
+import { ReadService } from '../../services/read';
 
 interface ArticleContentProps {
   article: Article;
@@ -24,6 +30,67 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+
+  const handleLinkAction = useCallback(async (actionIndex: number, href: string) => {
+    switch (actionIndex) {
+      case 0:
+        try {
+          await ReadService.addContentToUser({ url: href, source_type: 'web' });
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert('Saved', 'Link saved to your reading list.');
+        } catch {
+          Alert.alert('Error', 'Failed to save link. Please try again.');
+        }
+        break;
+      case 1:
+        Linking.openURL(href);
+        break;
+      case 2:
+        await Clipboard.setStringAsync(href);
+        break;
+    }
+  }, []);
+
+  const handleLinkLongPress = useCallback(async (href: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const options = ['Save to Reading List', 'Open in Browser', 'Copy Link', 'Cancel'];
+    const cancelButtonIndex = 3;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex, title: extractDomain(href) },
+        (index) => handleLinkAction(index, href)
+      );
+    } else {
+      Alert.alert(
+        extractDomain(href),
+        undefined,
+        [
+          { text: 'Save to Reading List', onPress: () => handleLinkAction(0, href) },
+          { text: 'Open in Browser', onPress: () => handleLinkAction(1, href) },
+          { text: 'Copy Link', onPress: () => handleLinkAction(2, href) },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  }, [handleLinkAction]);
+
+  const renderers = useMemo<{ a: CustomTextualRenderer }>(() => ({
+    a: function AnchorRenderer({ tnode, TDefaultRenderer, textProps, ...props }) {
+      const href = tnode.attributes.href;
+      return (
+        <TDefaultRenderer
+          tnode={tnode}
+          textProps={{
+            ...textProps,
+            onLongPress: href ? () => handleLinkLongPress(href) : undefined,
+          }}
+          {...props}
+        />
+      );
+    },
+  }), [handleLinkLongPress]);
 
   // Calculate padding to account for safe areas and floating action menu
   const topPadding = insets.top + Spacing.md;
@@ -134,6 +201,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
               defaultTextProps={{
                 selectable: true,
               }}
+              renderers={renderers}
             />
           ) : article.description ? (
             <Text style={[styles.bodyText, { color: colors.text }]}>
