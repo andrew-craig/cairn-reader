@@ -6,10 +6,10 @@ status: open
 priority: 2
 labels: []
 blocked_by: []
-parent: epic_a3df
+parent: 
 remote_task_url: null
 created_at: 2026-04-08T22:32:10Z
-updated_at: 2026-04-08T22:32:10Z
+updated_at: 2026-04-22T12:35:55Z
 ---
 
 ## Description

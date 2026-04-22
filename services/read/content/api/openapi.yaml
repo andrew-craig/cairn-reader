@@ -425,6 +425,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/user/bulk:
+    post:
+      tags:
+        - Bulk Operations
+      summary: Bulk add content to authenticated user
+      description: |
+        Bulk add existing content items to the authenticated user's reading list.
+        Requires a valid JWT token. All items in the request must target the authenticated
+        user — attempting to add content to another user's account returns 403.
+
+        Internal services (e.g. Ingest RSS Service) should use
+        `POST /api/v1/internal/content/user/bulk` instead, which does not require authentication.
+      operationId: bulkAddToUsers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkAddToUsersRequest'
+      responses:
+        '200':
+          description: Bulk operation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkAddToUsersResponse'
+        '400':
+          description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only add content to their own account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}:
     get:
       tags:
