@@ -10,6 +10,7 @@ import { ChevronRightIcon } from '../components/icons';
 import { RootStackParamList } from '../types';
 import { ExploreService } from '../services/explore';
 import { ReadService } from '../services/read';
+import { pluralize } from '../utils/helpers';
 
 type YouScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -173,13 +174,13 @@ export const YouScreen: React.FC = () => {
           <Spacer isDark={isDark} />
           <MenuItem
             title="Feeds"
-            subtitle={loading ? 'Loading...' : `${feedsCount} ${feedsCount === 1 ? 'subscription' : 'subscriptions'}`}
+            subtitle={loading ? 'Loading...' : `${feedsCount} ${pluralize(feedsCount, 'subscription')}`}
             onPress={handleFeedsPress}
             isDark={isDark}
           />
           <MenuItem
             title="Newsletters"
-            subtitle={loading ? 'Loading...' : `${newslettersCount} ${newslettersCount === 1 ? 'subscription' : 'subscriptions'}`}
+            subtitle={loading ? 'Loading...' : `${newslettersCount} ${pluralize(newslettersCount, 'subscription')}`}
             onPress={handleNewslettersPress}
             isDark={isDark}
           />
@@ -194,7 +195,7 @@ export const YouScreen: React.FC = () => {
             subtitle={
               loading
                 ? 'Loading...'
-                : `${upVotesCount} ${upVotesCount === 1 ? 'up vote' : 'up votes'}, ${downVotesCount} ${downVotesCount === 1 ? 'down vote' : 'down votes'}`
+                : `${upVotesCount} up ${pluralize(upVotesCount, 'vote')}, ${downVotesCount} down ${pluralize(downVotesCount, 'vote')}`
             }
             onPress={handleVotesPress}
             isDark={isDark}
