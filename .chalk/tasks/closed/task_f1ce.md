@@ -2,14 +2,14 @@
 id: task_f1ce
 title: Content Service: Document POST /api/v1/content/user/bulk in OpenAPI spec
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_8461
 remote_task_url: null
 created_at: 2026-04-07T21:37:09Z
-updated_at: 2026-04-07T21:37:09Z
+updated_at: 2026-04-22T12:38:35Z
 ---
 
 ## Context
