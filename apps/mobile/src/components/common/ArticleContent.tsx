@@ -101,7 +101,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   }), [handleLinkLongPress]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    onScrollPositionChange?.(event.nativeEvent.contentOffset.y);
+    onScrollPositionChange?.(Math.round(event.nativeEvent.contentOffset.y));
   }, [onScrollPositionChange]);
 
   const handleContentSizeChange = useCallback(() => {
@@ -193,7 +193,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       contentContainerStyle={{ paddingTop: topPadding, paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
       onScroll={handleScroll}
-      scrollEventThrottle={100}
+      scrollEventThrottle={500}
       onContentSizeChange={handleContentSizeChange}
     >
       <View style={styles.content}>
