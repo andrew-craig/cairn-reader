@@ -45,35 +45,19 @@ export const ReadArticleDetailScreen: React.FC = () => {
     }
   };
 
-  const handleArchive = () => {
-    Alert.alert(
-      'Archive Article',
-      'Are you sure you want to archive this article?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'default',
-          onPress: async () => {
-            try {
-              // Delete from local storage (archiving = deleting)
-              await StorageService.deleteArticle(article.id);
-              // Also delete from backend
-              try {
-                await ReadService.deleteUserContent(article.id);
-              } catch (backendError) {
-                console.error('Failed to archive article in backend:', backendError);
-                // Continue anyway - local deletion was successful
-              }
-              navigation.goBack();
-            } catch (error) {
-              console.error('Failed to archive article:', error);
-              Alert.alert('Error', 'Failed to archive article');
-            }
-          },
-        },
-      ]
-    );
+  const handleArchive = async () => {
+    try {
+      await StorageService.deleteArticle(article.id);
+      try {
+        await ReadService.deleteUserContent(article.id);
+      } catch (backendError) {
+        console.error('Failed to archive article in backend:', backendError);
+      }
+      navigation.goBack();
+    } catch (error) {
+      console.error('Failed to archive article:', error);
+      Alert.alert('Error', 'Failed to archive article');
+    }
   };
 
   return (
