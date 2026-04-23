@@ -453,6 +453,7 @@ export class ReadService {
         isRead: userContent.status === 'completed',
         isFavorite: userContent.is_favorite,
         addedAt: new Date(userContent.added_at).getTime(),
+        scrollPosition: userContent.scroll_position || undefined,
       };
     }
 
@@ -471,6 +472,7 @@ export class ReadService {
       isFavorite: userContent.is_favorite,
       addedAt: new Date(userContent.added_at).getTime(),
       readAt: userContent.status === 'completed' ? new Date(userContent.updated_at).getTime() : undefined,
+      scrollPosition: userContent.scroll_position || undefined,
     };
   }
 }
