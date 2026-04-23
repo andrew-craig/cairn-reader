@@ -135,10 +135,8 @@ If you have attempted to use `chalk` and it is not available, tasks can be read 
 1. **Setup tracking**: If there is not an existing task, create one with `chalk create`
 2. **Plan First**: Write plan to the task file with checkable items
 3. **Verify Plan**: Check in before starting implementation
-4. **Track Progress**: Mark items complete as you go
-5. **Explain Changes**: High-level summary at each step
-6. **Document Results**: Add review section to the task file
-7. **Capture Lessons**: Update `LEARNINGS.md` after corrections
-
-
-
+4. **Create a branch**: Put all code fixes into a new branch so they can be tracked and merged
+5. **Track Progress**: Mark items complete as you go
+6. **Explain Changes**: High-level summary at each step
+7. **Document Results**: Add review section to the task file
+8. **Capture Lessons**: Update `LEARNINGS.md` after corrections
