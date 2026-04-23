@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   ActionSheetIOS,
   Platform,
   useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHTML, { CustomTextualRenderer } from 'react-native-render-html';
@@ -22,14 +24,20 @@ import { ReadService } from '../../services/read';
 interface ArticleContentProps {
   article: Article;
   colors: typeof Colors.light;
+  onScrollPositionChange?: (position: number) => void;
+  initialScrollPosition?: number;
 }
 
 export const ArticleContent: React.FC<ArticleContentProps> = ({
   article,
   colors,
+  onScrollPositionChange,
+  initialScrollPosition,
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasRestoredPosition = useRef(false);
 
   const handleLinkAction = useCallback(async (actionIndex: number, href: string) => {
     switch (actionIndex) {
@@ -91,6 +99,17 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       );
     },
   }), [handleLinkLongPress]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    onScrollPositionChange?.(event.nativeEvent.contentOffset.y);
+  }, [onScrollPositionChange]);
+
+  const handleContentSizeChange = useCallback(() => {
+    if (!hasRestoredPosition.current && initialScrollPosition && initialScrollPosition > 0) {
+      scrollViewRef.current?.scrollTo({ y: initialScrollPosition, animated: false });
+      hasRestoredPosition.current = true;
+    }
+  }, [initialScrollPosition]);
 
   // Calculate padding to account for safe areas and floating action menu
   const topPadding = insets.top + Spacing.md;
@@ -169,9 +188,13 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       style={styles.scrollView}
       contentContainerStyle={{ paddingTop: topPadding, paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
+      onScroll={handleScroll}
+      scrollEventThrottle={100}
+      onContentSizeChange={handleContentSizeChange}
     >
       <View style={styles.content}>
         {/* Article Header */}

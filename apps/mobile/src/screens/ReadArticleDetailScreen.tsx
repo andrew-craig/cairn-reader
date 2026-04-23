@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,6 +19,27 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const [article, setArticle] = useState(route.params.article);
+  const scrollPositionRef = useRef(route.params.article.scrollPosition ?? 0);
+  const hasScrolledRef = useRef(false);
+
+  const handleScrollPositionChange = useCallback((position: number) => {
+    scrollPositionRef.current = position;
+    hasScrolledRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    const articleId = article.id;
+    return () => {
+      if (!hasScrolledRef.current) return;
+      const position = scrollPositionRef.current;
+      ReadService.updateUserContent(articleId, { scroll_position: position }).catch(
+        (err) => console.error('Failed to save scroll position:', err)
+      );
+      StorageService.updateArticle(articleId, { scrollPosition: position }).catch(
+        (err) => console.error('Failed to save scroll position locally:', err)
+      );
+    };
+  }, [article.id]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -81,6 +102,8 @@ export const ReadArticleDetailScreen: React.FC = () => {
       <ArticleContent
         article={article}
         colors={colors}
+        onScrollPositionChange={handleScrollPositionChange}
+        initialScrollPosition={article.scrollPosition}
       />
 
       <BottomActionMenu
