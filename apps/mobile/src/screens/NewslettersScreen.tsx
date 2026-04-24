@@ -7,7 +7,9 @@ import {
   useColorScheme,
   ActivityIndicator,
   Modal,
+  Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -53,50 +55,35 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark 
 interface AddNewsletterModalProps {
   visible: boolean;
   onClose: () => void;
-  isDark: boolean;
-  insets: ReturnType<typeof useSafeAreaInsets>;
 }
 
-const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose, isDark, insets }) => {
-  const colors = isDark ? Colors.dark : Colors.light;
+const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose }) => {
+  const colors = Colors.light;
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={[styles.modalOverlay, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+      <BlurView
+        style={styles.modalOverlay}
+        intensity={Platform.OS === 'ios' ? 8 : 16}
+        tint="light"
+      >
         <View
           style={[
             styles.modalContent,
-            {
-              backgroundColor: colors.hover,
-            },
+            { backgroundColor: colors.hover },
           ]}
         >
-          <Text
-            style={[
-              styles.modalLabel,
-              { color: colors.text },
-            ]}
-          >
+          <Text style={[styles.modalLabel, { color: colors.text }]}>
             Send or forward emails to
           </Text>
-          <Text
-            style={[
-              styles.modalEmail,
-              { color: colors.text },
-            ]}
-          >
+          <Text style={[styles.modalEmail, { color: colors.text }]}>
             rose-parrot-74@cairnreader.app
           </Text>
-          <Text
-            style={[
-              styles.modalDescription,
-              { color: colors.textSecondary },
-            ]}
-          >
+          <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
             New subscriptions will be automatically added to your reading list.
           </Text>
         </View>
-      </View>
+      </BlurView>
     </Modal>
   );
 };
@@ -205,8 +192,6 @@ export const NewslettersScreen: React.FC = () => {
       <AddNewsletterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        isDark={isDark}
-        insets={insets}
       />
     </>
   );
@@ -285,8 +270,8 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    gap: Spacing.sm,
+    borderRadius: 21,
+    gap: Spacing.md,
     alignItems: 'center',
   },
   modalLabel: {
@@ -296,7 +281,7 @@ const styles = StyleSheet.create({
   },
   modalEmail: {
     fontSize: FontSizes.md,
-    fontFamily: FontFamily.defaultMedium,
+    fontFamily: FontFamily.defaultBold,
     textAlign: 'center',
   },
   modalDescription: {
