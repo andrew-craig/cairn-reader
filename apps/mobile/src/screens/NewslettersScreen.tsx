@@ -6,14 +6,12 @@ import {
   FlatList,
   useColorScheme,
   ActivityIndicator,
-  Modal,
-  Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { IconButton } from '../components/common/IconButton';
+import { HeaderPopover } from '../components/common/HeaderPopover';
 import { Colors, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
 import { RootStackParamList } from '../types';
@@ -55,36 +53,24 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark 
 interface AddNewsletterModalProps {
   visible: boolean;
   onClose: () => void;
+  emailAddress: string;
 }
 
-const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose }) => {
+const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose, emailAddress }) => {
   const colors = Colors.light;
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <BlurView
-        style={styles.modalOverlay}
-        intensity={Platform.OS === 'ios' ? 8 : 16}
-        tint="light"
-      >
-        <View
-          style={[
-            styles.modalContent,
-            { backgroundColor: colors.hover },
-          ]}
-        >
-          <Text style={[styles.modalLabel, { color: colors.text }]}>
-            Send or forward emails to
-          </Text>
-          <Text style={[styles.modalEmail, { color: colors.text }]}>
-            rose-parrot-74@cairnreader.app
-          </Text>
-          <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
-            New subscriptions will be automatically added to your reading list.
-          </Text>
-        </View>
-      </BlurView>
-    </Modal>
+    <HeaderPopover visible={visible} onClose={onClose}>
+      <Text style={[styles.modalLabel, { color: colors.text }]}>
+        Send or forward emails to
+      </Text>
+      <Text style={[styles.modalEmail, { color: colors.text }]}>
+        {emailAddress}
+      </Text>
+      <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
+        New subscriptions will be automatically added to your reading list.
+      </Text>
+    </HeaderPopover>
   );
 };
 
@@ -192,6 +178,7 @@ export const NewslettersScreen: React.FC = () => {
       <AddNewsletterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
+        emailAddress="rose-parrot-74@cairnreader.app"
       />
     </>
   );
@@ -259,20 +246,6 @@ const styles = StyleSheet.create({
   rowSubtitle: {
     fontSize: FontSizes.sm,
     fontFamily: FontFamily.default,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 80,
-  },
-  modalContent: {
-    marginHorizontal: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderRadius: 21,
-    gap: Spacing.md,
-    alignItems: 'center',
   },
   modalLabel: {
     fontSize: FontSizes.md,

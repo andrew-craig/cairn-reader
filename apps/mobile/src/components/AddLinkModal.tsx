@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,
@@ -8,12 +7,10 @@ import {
   StyleSheet,
   useColorScheme,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../constants';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
+import { HeaderPopover } from './common/HeaderPopover';
 import { ReadService } from '../services/read';
 import { DetectURLResponse } from '../types/read';
 
@@ -30,10 +27,6 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const insets = useSafeAreaInsets();
-
-  // Position modal below the header + safe area top
-  const modalTopPosition = insets.top + Layout.headerHeight;
 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -235,29 +228,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      <TouchableOpacity
-        style={[styles.overlay, { paddingTop: modalTopPosition }]}
-        activeOpacity={1}
-        onPress={handleClose}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.hover }
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
+    <HeaderPopover visible={visible} onClose={handleClose}>
+          <View>
             <View style={styles.inputContainer}>
               <TextInput
                 style={[
@@ -337,36 +309,12 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                 </View>
               )}
             </View>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </TouchableOpacity>
-    </Modal>
+          </View>
+    </HeaderPopover>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'flex-start',
-    paddingHorizontal: Spacing.md,
-  },
-  keyboardView: {
-    width: '100%',
-  },
-  modalContent: {
-    borderRadius: 21,
-    padding: Spacing.md,
-    gap: Spacing.md,
-    shadowColor: 'rgba(15, 23, 42, 0.2)',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
   inputContainer: {
     width: '100%',
   },
