@@ -189,7 +189,7 @@ func NewContentServiceClient(config ContentServiceConfig) *ContentServiceClient 
 // CreateContent creates a single content item
 func (c *ContentServiceClient) CreateContent(ctx context.Context, req CreateContentRequest) (*ContentResponse, error) {
 	var result ContentResponse
-	err := c.doWithRetry(ctx, "POST", "/api/v1/contents", req, &result)
+	err := c.doWithRetry(ctx, "POST", "/api/v1/content", req, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create content: %w", err)
 	}
@@ -199,7 +199,7 @@ func (c *ContentServiceClient) CreateContent(ctx context.Context, req CreateCont
 // UpdateContent updates an existing content item (preserves user relationships)
 func (c *ContentServiceClient) UpdateContent(ctx context.Context, contentID uuid.UUID, req UpdateContentRequest) (*ContentResponse, error) {
 	var result ContentResponse
-	path := fmt.Sprintf("/api/v1/contents/%s", contentID)
+	path := fmt.Sprintf("/api/v1/content/%s", contentID)
 	err := c.doWithRetry(ctx, "PUT", path, req, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update content: %w", err)
@@ -221,7 +221,7 @@ func (c *ContentServiceClient) BulkCreateContent(ctx context.Context, contents [
 	}
 
 	var result BulkCreateContentResponse
-	err := c.doWithRetry(ctx, "POST", "/api/v1/contents/bulk", req, &result)
+	err := c.doWithRetry(ctx, "POST", "/api/v1/content/bulk", req, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bulk create content: %w", err)
 	}
@@ -242,7 +242,7 @@ func (c *ContentServiceClient) CheckDuplicates(ctx context.Context, items []Chec
 	}
 
 	var result CheckDuplicatesResponse
-	err := c.doWithRetry(ctx, "POST", "/api/v1/contents/check-duplicates", req, &result)
+	err := c.doWithRetry(ctx, "POST", "/api/v1/content/check-duplicate", req, &result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check duplicates: %w", err)
 	}

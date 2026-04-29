@@ -59,7 +59,7 @@ func TestCreateContent_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/contents", r.URL.Path)
+		assert.Equal(t, "/api/v1/content", r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
 		w.WriteHeader(http.StatusOK)
@@ -100,7 +100,7 @@ func TestUpdateContent_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
-		assert.Equal(t, "/api/v1/contents/"+contentID.String(), r.URL.Path)
+		assert.Equal(t, "/api/v1/content/"+contentID.String(), r.URL.Path)
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(expectedResponse)
@@ -146,7 +146,7 @@ func TestBulkCreateContent_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/contents/bulk", r.URL.Path)
+		assert.Equal(t, "/api/v1/content/bulk", r.URL.Path)
 
 		var req BulkCreateContentRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
@@ -227,7 +227,7 @@ func TestCheckDuplicates_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/contents/check-duplicates", r.URL.Path)
+		assert.Equal(t, "/api/v1/content/check-duplicate", r.URL.Path)
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(expectedResponse)

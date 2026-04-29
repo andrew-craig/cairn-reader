@@ -272,14 +272,14 @@ func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.Bu
 	payload := entry.ContentPayload
 
 	// Extract required fields
-	url, ok := payload["url"].(string)
+	url, ok := payload["source_url"].(string)
 	if !ok || url == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'url' field")
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'source_url' field")
 	}
 
-	html, ok := payload["html"].(string)
+	html, ok := payload["cleaned_html"].(string)
 	if !ok || html == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'html' field")
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'cleaned_html' field")
 	}
 
 	item := client.BulkContentItem{
