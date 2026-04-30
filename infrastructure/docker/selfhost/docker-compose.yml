@@ -2,9 +2,7 @@ name: cairn-selfhost
 
 services:
   cairn:
-    build:
-      context: ../../..
-      dockerfile: infrastructure/docker/selfhost/Dockerfile
+    image: ghcr.io/cairn-app/cairn-selfhost:${CAIRN_VERSION:-latest}
     environment:
       - PORT=8099
       - DB_HOST=cairn-db
