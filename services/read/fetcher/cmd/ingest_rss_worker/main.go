@@ -15,6 +15,7 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/fetcher"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/jobs"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/processor"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
@@ -64,8 +65,8 @@ func main() {
 		WorkerCount: cfg.FeedWorker.WorkerCount,
 		QueueSize:   cfg.FeedWorker.QueueSize,
 	}
-	noOpProcessor := &worker.NoOpFeedProcessor{}
-	feedWorker := worker.NewFeedWorker(feedWorkerConfig, feedRepo, noOpProcessor)
+	feedFetcher := fetcher.NewFeedFetcher(fetcher.DefaultFeedFetcherConfig(), feedRepo, feedItemRepo)
+	feedWorker := worker.NewFeedWorker(feedWorkerConfig, feedRepo, feedFetcher)
 
 	// Initialize poll scheduler
 	pollScheduler := scheduler.NewPollScheduler(cfg.PollScheduler, feedRepo, feedWorker)
