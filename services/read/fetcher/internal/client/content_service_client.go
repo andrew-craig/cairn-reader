@@ -367,7 +367,7 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, method, path strin
 			return fmt.Errorf("failed to decode response envelope: %w", err)
 		}
 		if len(envelope.Data) == 0 {
-return fmt.Errorf("response missing 'data' field: %.100s", string(respBody))
+			return fmt.Errorf("response missing 'data' field: %.100s", string(respBody))
 		}
 		if err := json.Unmarshal(envelope.Data, result); err != nil {
 			return fmt.Errorf("failed to decode response data: %w", err)
