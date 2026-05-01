@@ -83,6 +83,7 @@ services:
   # at build time. The container runs as the unprivileged `vault` user
   # rather than as root with runtime `apk add`.
   vault-init:
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-vault-init:${IMAGE_TAG:-latest}
     build:
       context: ../vault-init
     depends_on:
@@ -105,10 +106,16 @@ services:
   # on all subsequent reboots using keys written to the vault-keys volume.
   # Stays running as a watchdog to detect and recover from unexpected seal events.
   #
+  # Reuses the same custom image as vault-init so the watchdog also runs as
+  # the unprivileged `vault` user. The image is a strict superset of
+  # hashicorp/vault, so the unseal CLI is unchanged.
+  #
   # Security note: Unseal keys are stored in plaintext in the vault-keys volume.
   # For higher security, consider Vault Transit auto-unseal or a cloud KMS.
   vault-unseal:
-    image: hashicorp/vault:latest
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-vault-init:${IMAGE_TAG:-latest}
+    build:
+      context: ../vault-init
     depends_on:
       vault:
         condition: service_started

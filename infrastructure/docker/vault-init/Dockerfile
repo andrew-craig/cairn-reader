@@ -18,7 +18,10 @@
 # base image already creates, so the init container runs with the same
 # minimal privileges as the Vault server itself.
 
-FROM hashicorp/vault:1.18
+# Override at build time to keep the CLI in lockstep with the server, e.g.
+# `docker build --build-arg VAULT_VERSION=1.19 .`
+ARG VAULT_VERSION=1.18
+FROM hashicorp/vault:${VAULT_VERSION}
 
 USER root
 RUN apk add --no-cache openssl grep \
