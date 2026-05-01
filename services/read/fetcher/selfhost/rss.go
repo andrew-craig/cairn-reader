@@ -13,6 +13,7 @@ import (
 	rssAPI "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
 	rssClient "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
 	rssDB "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	rssFetcher "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/fetcher"
 	rssJobs "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/jobs"
 	rssProcessor "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/processor"
 	rssRepo "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
@@ -95,11 +96,11 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 		InternalAPIKey: cfg.InternalAPIKey,
 	})
 
-	noOpProcessor := &rssWorker.NoOpFeedProcessor{}
+	feedFetcher := rssFetcher.NewFeedFetcher(rssFetcher.DefaultFeedFetcherConfig(), feedRepo, feedItemRepo)
 	feedWorker := rssWorker.NewFeedWorker(&rssWorker.FeedWorkerConfig{
 		WorkerCount: 5,
 		QueueSize:   100,
-	}, feedRepo, noOpProcessor)
+	}, feedRepo, feedFetcher)
 
 	pollScheduler := rssScheduler.NewPollScheduler(&rssScheduler.PollSchedulerConfig{
 		BatchSize:      50,
