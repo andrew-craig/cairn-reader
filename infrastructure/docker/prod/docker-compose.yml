@@ -154,7 +154,7 @@ services:
     # Port NOT exposed to host — access only via Docker network
     # Uncomment below for debugging: ports: ["5432:5432"]
     volumes:
-      - cairn_db_data:/var/lib/postgresql/data
+      - cairn_db_data:/var/lib/postgresql
       - ../scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER:-cairn_admin} -d postgres"]
