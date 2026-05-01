@@ -2,14 +2,14 @@
 id: bug_4e3c
 title: fix(read/fetcher): outbox repository casts to nonexistent delivery_status enum
 type: bug
-status: open
+status: in_progress
 priority: 1
 labels: [outbox,read-fetcher,sql]
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-05-01T09:37:43Z
-updated_at: 2026-05-01T09:37:43Z
+updated_at: 2026-05-01T09:48:19Z
 ---
 The outbox repository at services/read/fetcher/internal/repository/outbox.go:217-218 uses SQL casts like 'failed'::delivery_status and 'pending'::delivery_status, but the migration created the column as varchar(20) with a CHECK constraint, not a Postgres enum type. Calls to IncrementRetryCount fail with: pq: type "delivery_status" does not exist.
 

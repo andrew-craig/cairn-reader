@@ -214,8 +214,8 @@ func (r *outboxRepository) IncrementRetryCount(ctx context.Context, id uuid.UUID
 			next_retry_at = $2,
 			last_error = $3,
 			delivery_status = CASE
-				WHEN retry_count + 1 >= max_retries THEN 'failed'::delivery_status
-				ELSE 'pending'::delivery_status
+				WHEN retry_count + 1 >= max_retries THEN 'failed'
+				ELSE 'pending'
 			END
 		WHERE id = $1
 	`
