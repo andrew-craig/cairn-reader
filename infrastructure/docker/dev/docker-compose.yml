@@ -22,8 +22,12 @@ services:
       - cairn-network
 
   # Vault Initializer - Populates Vault with JWT keys on startup
+  # Uses a purpose-built image (../vault-init) that bakes in the required
+  # CLI tools (openssl, grep) at build time and runs as the unprivileged
+  # `vault` user, instead of installing them at runtime as root.
   vault-init:
-    image: hashicorp/vault:latest
+    build:
+      context: ../vault-init
     depends_on:
       vault:
         condition: service_healthy
@@ -31,9 +35,9 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
     volumes:
-      - ../scripts/init-vault.sh:/init-vault.sh
+      - ../scripts/init-vault.sh:/init-vault.sh:ro
       - vault-keys:/vault-keys
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
+    entrypoint: ["/bin/sh", "/init-vault.sh"]
     restart: "no"
     networks:
       - cairn-network
