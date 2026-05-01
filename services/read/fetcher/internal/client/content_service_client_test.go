@@ -13,6 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// writeEnvelope writes a successful response in the {"data": ...} envelope
+// format used by the Content Service (pkg/api.WriteSuccess).
+func writeEnvelope(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": data,
+		"meta": map[string]string{"version": "v1"},
+	})
+}
+
 func TestNewContentServiceClient(t *testing.T) {
 	config := ContentServiceConfig{
 		BaseURL: "http://localhost:8080",
@@ -62,8 +73,7 @@ func TestCreateContent_Success(t *testing.T) {
 		assert.Equal(t, "/api/v1/content", r.URL.Path)
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 
@@ -102,8 +112,7 @@ func TestUpdateContent_Success(t *testing.T) {
 		assert.Equal(t, "PUT", r.Method)
 		assert.Equal(t, "/api/v1/content/"+contentID.String(), r.URL.Path)
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 
@@ -153,8 +162,7 @@ func TestBulkCreateContent_Success(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, req.Contents, 2)
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 
@@ -229,8 +237,7 @@ func TestCheckDuplicates_Success(t *testing.T) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/api/v1/content/check-duplicate", r.URL.Path)
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 
@@ -276,8 +283,7 @@ func TestAddContentToUsers_Success(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, req.Items, 2)
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 
@@ -324,8 +330,7 @@ func TestRetryLogic_SuccessOnRetry(t *testing.T) {
 			return
 		}
 		// Succeed on 3rd attempt
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(expectedResponse)
+		writeEnvelope(w, http.StatusOK, expectedResponse)
 	}))
 	defer server.Close()
 

@@ -356,10 +356,21 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, method, path strin
 		return fmt.Errorf("HTTP %d: %s - %s", resp.StatusCode, errResp.Error, errResp.Message)
 	}
 
-	// Decode response
+	// Decode response. Content Service wraps successful responses in a
+	// {"data": ..., "meta": ...} envelope (see pkg/api/response.go), so we
+	// unwrap the envelope before unmarshalling into the caller's result.
 	if result != nil {
-		if err := json.Unmarshal(respBody, result); err != nil {
-			return fmt.Errorf("failed to decode response: %w", err)
+		var envelope struct {
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(respBody, &envelope); err != nil {
+			return fmt.Errorf("failed to decode response envelope: %w", err)
+		}
+		if len(envelope.Data) == 0 {
+			return fmt.Errorf("response missing 'data' field: %.100s", string(respBody))
+		}
+		if err := json.Unmarshal(envelope.Data, result); err != nil {
+			return fmt.Errorf("failed to decode response data: %w", err)
 		}
 	}
 
