@@ -72,7 +72,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: postgres
     volumes:
-      - cairn_db_data:/var/lib/postgresql/data
+      - cairn_db_data:/var/lib/postgresql
       - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-cairn} -d postgres"]
