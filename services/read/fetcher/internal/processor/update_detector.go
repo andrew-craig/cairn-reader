@@ -55,6 +55,7 @@ func NewUpdateDetector(
 
 	httpClient := &http.Client{Timeout: config.ContentFetchTimeout}
 	conditionalFetcher := fetcher.NewConditionalFetcher(httpClient)
+	conditionalFetcher.MaxBodySize = config.MaxContentSize
 
 	return &UpdateDetector{
 		config:               config,
@@ -128,13 +129,15 @@ func (ud *UpdateDetector) checkItem(ctx context.Context, item *models.FeedItem) 
 
 	// Stamp the canonical hash from the Content Service back onto feed_items
 	// so future polls can short-circuit unchanged articles via the (now
-	// downstream-computed) hash.
+	// downstream-computed) hash. Advance processed_at so cleanup jobs and
+	// observability queries see this item as fresh.
 	var hashPtr *string
 	if resp != nil && resp.ContentHash != "" {
 		hashPtr = &resp.ContentHash
 	}
+	processedAt := time.Now()
 	if err := ud.feedItemRepo.UpdateProcessingStatus(
-		ctx, item.ID, models.ProcessingStatusCompleted, hashPtr, item.ContentServiceID, nil,
+		ctx, item.ID, models.ProcessingStatusCompleted, hashPtr, item.ContentServiceID, &processedAt,
 	); err != nil {
 		slog.Error("Failed to update content hash for item", "item_id", item.ID, "error", err)
 	}

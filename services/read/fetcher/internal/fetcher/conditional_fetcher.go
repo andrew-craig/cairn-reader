@@ -26,6 +26,10 @@ type ConditionalFetchResult struct {
 // ConditionalFetcher handles HTTP requests with conditional headers
 type ConditionalFetcher struct {
 	httpClient *http.Client
+	// MaxBodySize caps the bytes read from the response body. Zero means
+	// unlimited (preserves the original behavior). When set, a body strictly
+	// larger than the cap surfaces as an error rather than a silent truncation.
+	MaxBodySize int64
 }
 
 // NewConditionalFetcher creates a new conditional fetcher
@@ -87,10 +91,20 @@ func (cf *ConditionalFetcher) FetchWithConditionals(
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Read response body
-	content, err := io.ReadAll(resp.Body)
+	// Read response body, optionally capped. Read MaxBodySize+1 so we can
+	// distinguish "exactly at the cap" from "over the cap" — io.LimitReader
+	// returns nil error on EOF even when the source had more data, which
+	// would otherwise cause silent truncation.
+	var reader io.Reader = resp.Body
+	if cf.MaxBodySize > 0 {
+		reader = io.LimitReader(resp.Body, cf.MaxBodySize+1)
+	}
+	content, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if cf.MaxBodySize > 0 && int64(len(content)) > cf.MaxBodySize {
+		return nil, fmt.Errorf("content size exceeds maximum of %d bytes", cf.MaxBodySize)
 	}
 
 	result.Content = content

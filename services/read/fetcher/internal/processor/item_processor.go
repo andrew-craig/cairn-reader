@@ -120,11 +120,13 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	rawHTML, err := p.fetchArticleContent(ctx, item.ItemURL)
 	if err != nil {
 		slog.Warn("Failed to fetch article content, using RSS description", "error", err)
-		if item.Description != nil && *item.Description != "" {
-			rawHTML = *item.Description
-		} else {
+		if item.Description == nil || *item.Description == "" {
 			return fmt.Errorf("failed to fetch article content and no description available: %w", err)
 		}
+		if int64(len(*item.Description)) > p.config.MaxContentSize {
+			return fmt.Errorf("RSS description exceeds maximum content size of %d bytes", p.config.MaxContentSize)
+		}
+		rawHTML = *item.Description
 	}
 
 	contentPayload := map[string]interface{}{
@@ -188,8 +190,10 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	return nil
 }
 
-// fetchArticleContent fetches the full article HTML, capped at MaxContentSize
-// via io.LimitReader so a malicious server cannot exhaust memory.
+// fetchArticleContent fetches the full article HTML and rejects any response
+// strictly larger than MaxContentSize. We read MaxContentSize+1 so the size
+// check distinguishes "exactly at the cap" from "truncated by LimitReader",
+// avoiding partial HTML reaching the Content Service.
 func (p *ItemProcessor) fetchArticleContent(ctx context.Context, url string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -208,10 +212,13 @@ func (p *ItemProcessor) fetchArticleContent(ctx context.Context, url string) (st
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	limitedReader := io.LimitReader(resp.Body, p.config.MaxContentSize)
+	limitedReader := io.LimitReader(resp.Body, p.config.MaxContentSize+1)
 	content, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	if int64(len(content)) > p.config.MaxContentSize {
+		return "", fmt.Errorf("content size exceeds maximum of %d bytes", p.config.MaxContentSize)
 	}
 
 	return string(content), nil

@@ -358,7 +358,10 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 	assert.Equal(t, desc, capturedOutbox.ContentPayload[models.PayloadKeyRawHTML])
 }
 
-func TestItemProcessor_FetchHonors5MBCap(t *testing.T) {
+// Oversized responses must error rather than silently truncate. io.LimitReader
+// returns N bytes with nil error on EOF, so a "truncate then ship" approach
+// would send partial HTML to the Content Service and break page structure.
+func TestItemProcessor_FetchRejectsOversizedBody(t *testing.T) {
 	feedItemRepo := new(mockFeedItemRepo)
 	subRepo := new(mockSubscriptionRepo)
 	outboxRepo := new(mockOutboxRepo)
@@ -373,7 +376,31 @@ func TestItemProcessor_FetchHonors5MBCap(t *testing.T) {
 	cfg := DefaultItemProcessorConfig()
 	p := NewItemProcessor(cfg, feedItemRepo, subRepo, outboxRepo)
 
-	got, err := p.fetchArticleContent(context.Background(), srv.URL+"/big")
+	_, err := p.fetchArticleContent(context.Background(), srv.URL+"/big")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum")
+}
+
+// A response exactly at the cap is accepted in full.
+func TestItemProcessor_FetchAcceptsBodyAtExactCap(t *testing.T) {
+	feedItemRepo := new(mockFeedItemRepo)
+	subRepo := new(mockSubscriptionRepo)
+	outboxRepo := new(mockOutboxRepo)
+
+	cfg := &ItemProcessorConfig{
+		ContentFetchTimeout: 30 * time.Second,
+		MaxContentSize:      1024,
+		MaxRetries:          3,
+	}
+	body := strings.Repeat("a", int(cfg.MaxContentSize))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+
+	p := NewItemProcessor(cfg, feedItemRepo, subRepo, outboxRepo)
+	got, err := p.fetchArticleContent(context.Background(), srv.URL+"/exact")
 	require.NoError(t, err)
-	assert.LessOrEqual(t, int64(len(got)), cfg.MaxContentSize)
+	assert.Equal(t, int64(len(got)), cfg.MaxContentSize)
 }
