@@ -39,9 +39,9 @@ Create pkg/rss/ with these subpackages. Each subpackage has its own Go module pa
 
 ### pkg/rss/sanitize/
 - Single bluemonday policy implementing the decision from decision_3727.
-- Source policy: lift `services/read/content/internal/processor/sanitizer.go:14-62` verbatim. Allowlist (decided in decision_3727): text formatting + lists + tables (incl. `col`/`colgroup`, `colspan`/`rowspan`, `scope`); links with `href`/`title` and `RequireNoReferrerOnLinks(true)`; `img`/`figure`/`figcaption`/`picture`/`source` with `src`/`alt`/`title`/integer `width`/`height` and `srcset`/`sizes`/`type`/`media` on `<source>`; `audio`/`video` with `src`/`controls`; `class` (space-separated tokens) on `p`/`div`/`span`/`blockquote`/`code`/`pre`; `id` (space-separated tokens) on `h1`–`h6`; URL schemes `http`/`https`/`mailto`.
+- Source policy: based on `services/read/content/internal/processor/sanitizer.go:14-62` with two corrections (see decision_3727): allow `src` on `<source>`, and restrict `id` to a single token. Allowlist (decided in decision_3727): text formatting + lists + tables (incl. `col`/`colgroup`, `colspan`/`rowspan`, `scope`); links with `href`/`title` and `RequireNoReferrerOnLinks(true)`; `img` with `src`/`alt`/`title`/integer `width`/`height`; `figure`/`figcaption`/`picture`; `source` with `src`/`srcset`/`sizes`/`type`/`media`; `audio`/`video` with `src`/`controls`; `class` (space-separated tokens) on `p`/`div`/`span`/`blockquote`/`code`/`pre`; `id` (single token, no whitespace) on `h1`–`h6`; URL schemes `http`/`https`/`mailto`.
 - Exported func Policy() *bluemonday.Policy and func Sanitize(html string) string.
-- Tests: each kept/stripped tag/attribute is covered with one positive and one negative case.
+- Tests: each kept/stripped tag/attribute is covered with one positive and one negative case. Include explicit cases for `<audio><source src=...>` and for an `id` containing whitespace (must be stripped).
 
 ### pkg/rss/readability/
 - Thin wrapper around go-shiori/go-readability. Returns a struct with Title, Author, Content (HTML), Excerpt, Image, Length.

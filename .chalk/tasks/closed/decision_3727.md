@@ -64,7 +64,7 @@ Rationale:
 
 ### Canonical sanitizer policy
 
-Adopt the **Read Content service's policy** verbatim — `services/read/content/internal/processor/sanitizer.go:14-62` — as the single policy used by every sanitizer pass in the pipeline. Lands in `pkg/rss/sanitize/` as `Policy()`/`Sanitize()`.
+Adopt the **Read Content service's policy** at `services/read/content/internal/processor/sanitizer.go:14-62` as the basis for the single policy used by every sanitizer pass in the pipeline, with two small corrections noted below. Lands in `pkg/rss/sanitize/` as `Policy()`/`Sanitize()`.
 
 Concrete allowlist (the superset):
 
@@ -72,15 +72,20 @@ Concrete allowlist (the superset):
 - Lists: `ul`, `ol`, `li`, `dl`, `dt`, `dd`
 - Tables: `table`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td`, `caption`, `col`, `colgroup`; `colspan`/`rowspan` on `th`/`td`; `scope` on `th`
 - Links: `a` with `href`, `title`; `RequireNoReferrerOnLinks(true)`
-- Media: `img` with `src`, `alt`, `title`, integer `width`/`height`; `figure`, `figcaption`, `picture`, `source` with `srcset`, `sizes`, `type`, `media`
+- Media: `img` with `src`, `alt`, `title`, integer `width`/`height`; `figure`, `figcaption`, `picture`; `source` with `src`, `srcset`, `sizes`, `type`, `media`
 - Audio/video: `audio`, `video` with `src`, `controls`
-- Attributes: `class` (space-separated tokens) on `p`, `div`, `span`, `blockquote`, `code`, `pre`; `id` (space-separated tokens) on `h1`–`h6`
+- Attributes: `class` (space-separated tokens) on `p`, `div`, `span`, `blockquote`, `code`, `pre`; `id` (single token, no whitespace) on `h1`–`h6`
 - URL schemes: `http`, `https`, `mailto`
+
+Corrections vs. the source policy (both encoded in `pkg/rss/sanitize` from day one, not deferred):
+
+1. Add `src` to the allowed attributes on `<source>`. The current Read Content policy permits `src` on `<audio>`/`<video>` but not on their `<source>` children, so feeds that use `<audio><source src="…"></audio>` (the dominant pattern for podcast enclosures) silently lose the URL. `srcset` continues to cover `<picture><source>`.
+2. Restrict `id` to a single token, not `bluemonday.SpaceSeparatedTokens`. HTML5 IDs are by spec a single whitespace-free token; allowing multiple tokens just produces invalid HTML downstream.
 
 Rationale:
 - It's a strict superset of Explore's policy — no content currently rendered by Explore becomes blocked when Explore migrates, so this is a one-way ratchet with no user-visible regression.
-- Audio, video, and `<source>` `srcset`/`sizes`/`media` are needed for podcast feeds and responsive images that already render in the Read app today; stripping them would visibly degrade the reading view.
-- `class` and `id` are scoped to a small validated set of elements (text containers and headings) and matched against `bluemonday.SpaceSeparatedTokens`, so they don't open a styling-injection vector against any consumer that ships the article HTML to a browser inside its own page.
+- Audio, video, and `<source>` `srcset`/`sizes`/`media`/`src` are needed for podcast feeds and responsive images that already render in the Read app today; stripping them would visibly degrade the reading view.
+- `class` and `id` are scoped to a small validated set of elements (text containers and headings) and matched against bluemonday token matchers, so they don't open a styling-injection vector against any consumer that ships the article HTML to a browser inside its own page.
 - bluemonday is centralized in one package — drift physically can't reappear without someone adding a second import in another service, which the migration tasks (`task_5ee6`, `task_69fd`) explicitly forbid.
 
 ### Safety check on the more permissive policy
