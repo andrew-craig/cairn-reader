@@ -2,14 +2,14 @@
 id: bug_fda7
 title: Plumb RSS title and author through fetcher -> outbox -> Content Service
 type: bug
-status: in_progress
+status: closed
 priority: 0
 labels: []
 blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:17:10Z
-updated_at: 2026-05-02T04:30:50Z
+updated_at: 2026-05-02T04:38:22Z
 ---
 # Stop dropping RSS title/author on the way to the Content Service
 
