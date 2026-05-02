@@ -5,11 +5,11 @@ type: feature
 status: open
 priority: 1
 labels: []
-blocked_by: [task_7479,decision_3727]
+blocked_by: [task_7479]
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:02Z
-updated_at: 2026-05-02T04:18:02Z
+updated_at: 2026-05-02T08:31:16Z
 ---
 # Create pkg/rss/ as the single home for stateless RSS-ingestion primitives
 

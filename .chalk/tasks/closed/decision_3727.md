@@ -2,14 +2,14 @@
 id: decision_3727
 title: Pick canonical sanitizer policy and User-Agent for all RSS ingestion
 type: decision
-status: in_progress
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:17:42Z
-updated_at: 2026-05-02T08:29:33Z
+updated_at: 2026-05-02T08:31:16Z
 ---
 # Single source of truth for sanitizer policy and User-Agent
 
