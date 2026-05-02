@@ -5,11 +5,11 @@ type: feature
 status: open
 priority: 1
 labels: []
-blocked_by: [task_7479,decision_3727]
+blocked_by: [task_7479]
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:02Z
-updated_at: 2026-05-02T04:18:02Z
+updated_at: 2026-05-02T08:31:16Z
 ---
 # Create pkg/rss/ as the single home for stateless RSS-ingestion primitives
 
@@ -39,8 +39,9 @@ Create pkg/rss/ with these subpackages. Each subpackage has its own Go module pa
 
 ### pkg/rss/sanitize/
 - Single bluemonday policy implementing the decision from decision_3727.
+- Source policy: based on `services/read/content/internal/processor/sanitizer.go:14-62` with two corrections (see decision_3727): allow `src` on `<source>`, and restrict `id` to a single token. Allowlist (decided in decision_3727): text formatting + lists + tables (incl. `col`/`colgroup`, `colspan`/`rowspan`, `scope`); links with `href`/`title` and `RequireNoReferrerOnLinks(true)`; `img` with `src`/`alt`/`title`/integer `width`/`height`; `figure`/`figcaption`/`picture`; `source` with `src`/`srcset`/`sizes`/`type`/`media`; `audio`/`video` with `src`/`controls`; `class` (space-separated tokens) on `p`/`div`/`span`/`blockquote`/`code`/`pre`; `id` (single token, no whitespace) on `h1`–`h6`; URL schemes `http`/`https`/`mailto`.
 - Exported func Policy() *bluemonday.Policy and func Sanitize(html string) string.
-- Tests: each kept/stripped tag/attribute is covered with one positive and one negative case.
+- Tests: each kept/stripped tag/attribute is covered with one positive and one negative case. Include explicit cases for `<audio><source src=...>` and for an `id` containing whitespace (must be stripped).
 
 ### pkg/rss/readability/
 - Thin wrapper around go-shiori/go-readability. Returns a struct with Title, Author, Content (HTML), Excerpt, Image, Length.
@@ -48,6 +49,7 @@ Create pkg/rss/ with these subpackages. Each subpackage has its own Go module pa
 
 ### pkg/rss/fetch/
 - HTTP client with: configurable timeout (default 30s), 10-redirect cap, optional ETag/If-None-Match and Last-Modified/If-Modified-Since support, canonical User-Agent constant from decision_3727.
+- Canonical User-Agent (decided in decision_3727): `CairnBot/1.0 (+https://github.com/cairn-app/cairn-reader)`. Exported as a `const UserAgent` and set on every outbound request, with no per-call override.
 - Exported func Fetch(ctx, url, FetchOpts) (*Response, error) where Response carries Body []byte, ETag, LastModified, NotModified bool, StatusCode int.
 - Connection pooling tuned for multi-feed use (MaxIdleConnsPerHost 10, IdleConnTimeout 90s).
 
