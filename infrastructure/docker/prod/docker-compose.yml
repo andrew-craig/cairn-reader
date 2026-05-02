@@ -77,9 +77,15 @@ services:
   # This runs once and creates scoped credentials for each service.
   # Uses service_started (not service_healthy) because vault-init is responsible
   # for the initial unseal - it cannot wait for Vault to be healthy first.
+  #
+  # The image is built from ../vault-init/Dockerfile, which extends
+  # hashicorp/vault with the required CLI tools (openssl, grep) baked in
+  # at build time. The container runs as the unprivileged `vault` user
+  # rather than as root with runtime `apk add`.
   vault-init:
-    image: hashicorp/vault:latest
-    user: "0"
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-vault-init:${IMAGE_TAG:-latest}
+    build:
+      context: ../vault-init
     depends_on:
       vault:
         condition: service_started
@@ -90,7 +96,7 @@ services:
       - ../scripts/init-vault-prod.sh:/init-vault-prod.sh:ro
       - ../vault-config/policies:/vault/policies:ro
       - vault-keys:/vault-keys
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl grep && /bin/sh /init-vault-prod.sh"]
+    entrypoint: ["/bin/sh", "/init-vault-prod.sh"]
     restart: "no"
     networks:
       - cairn-network
@@ -100,10 +106,16 @@ services:
   # on all subsequent reboots using keys written to the vault-keys volume.
   # Stays running as a watchdog to detect and recover from unexpected seal events.
   #
+  # Reuses the same custom image as vault-init so the watchdog also runs as
+  # the unprivileged `vault` user. The image is a strict superset of
+  # hashicorp/vault, so the unseal CLI is unchanged.
+  #
   # Security note: Unseal keys are stored in plaintext in the vault-keys volume.
   # For higher security, consider Vault Transit auto-unseal or a cloud KMS.
   vault-unseal:
-    image: hashicorp/vault:latest
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-vault-init:${IMAGE_TAG:-latest}
+    build:
+      context: ../vault-init
     depends_on:
       vault:
         condition: service_started

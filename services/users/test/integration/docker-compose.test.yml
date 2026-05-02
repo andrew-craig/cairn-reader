@@ -41,8 +41,11 @@ services:
       - test-network
 
   # Vault initializer for tests
+  # Builds the same image used by dev/prod (openssl pre-installed, runs
+  # as the unprivileged `vault` user) instead of `apk add`-ing at runtime.
   test-vault-init:
-    image: hashicorp/vault:latest
+    build:
+      context: ../../../../infrastructure/docker/vault-init
     depends_on:
       test-vault:
         condition: service_healthy
@@ -50,8 +53,8 @@ services:
       - VAULT_ADDR=http://test-vault:8200
       - VAULT_TOKEN=test-root-token
     volumes:
-      - ./scripts/init-test-vault.sh:/init-vault.sh
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache openssl && /bin/sh /init-vault.sh"]
+      - ./scripts/init-test-vault.sh:/init-vault.sh:ro
+    entrypoint: ["/bin/sh", "/init-vault.sh"]
     networks:
       - test-network
 

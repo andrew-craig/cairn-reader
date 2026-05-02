@@ -23,6 +23,8 @@ infrastructure/docker/
 ├── vault-config/             # Shared Vault configuration
 │   ├── vault.hcl             # Vault server config (prod)
 │   └── policies/             # Vault ACL policies
+├── vault-init/               # Custom image used by the vault-init container
+│   └── Dockerfile            # hashicorp/vault + openssl/grep, runs as non-root
 └── README.md
 ```
 
@@ -557,6 +559,28 @@ Runs on first production startup to securely initialize Vault:
 - Unseal keys are written to a file that should be retrieved and deleted
 
 Located at: `scripts/init-vault-prod.sh`
+
+### vault-init image (`vault-init/Dockerfile`)
+
+Both `init-vault.sh` and `init-vault-prod.sh` need `openssl` (to generate the
+RSA key pair for JWT signing) and GNU `grep` (to parse the JSON output of
+`vault operator init`). Rather than `apk add`-ing those packages from the
+container's entrypoint — which forces the container to run as root and makes
+startup depend on Alpine package mirrors — we extend `hashicorp/vault` with a
+small custom image that:
+
+- Pre-installs `openssl` and `grep` at build time
+- Pre-creates `/vault-keys` owned by the `vault` user
+- Drops to the unprivileged `vault` user as the default `USER`
+
+The `vault-init` services in `dev/docker-compose.yml`, `prod/docker-compose.yml`,
+and the integration test compose all build this image via a `build:` directive.
+
+> **Upgrading an existing prod deployment:** the `vault-keys` volume created by
+> the previous root-owned image is owned by root, which the new non-root
+> container cannot write to. Either recreate the volume (`docker compose down
+> -v` — destructive, requires re-init) or `chown -R vault:vault` the volume
+> contents from a temporary root container before bringing the stack back up.
 
 ### init-databases.sh
 
