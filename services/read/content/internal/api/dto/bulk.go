@@ -17,6 +17,8 @@ type BulkContentItem struct {
 	SourceType   string     `json:"source_type"`
 	SourceFeedID *uuid.UUID `json:"source_feed_id,omitempty"`
 	PublishedAt  *time.Time `json:"published_at,omitempty"`
+	Title        *string    `json:"title,omitempty"`
+	Author       *string    `json:"author,omitempty"`
 }
 
 // Validate validates the BulkContentItem
@@ -33,6 +35,16 @@ func (b BulkContentItem) Validate() error {
 			validation.Required.Error("source_type is required"),
 			validation.In(models.SourceTypeRSS, models.SourceTypeWeb, models.SourceTypeEmail).
 				Error("Invalid source_type. Must be 'rss', 'web', or 'email'"),
+		),
+		validation.Field(&b.Title,
+			validation.When(b.Title != nil,
+				validation.Length(0, 1000).Error("title must be 1000 characters or fewer"),
+			),
+		),
+		validation.Field(&b.Author,
+			validation.When(b.Author != nil,
+				validation.Length(0, 255).Error("author must be 255 characters or fewer"),
+			),
 		),
 	)
 }

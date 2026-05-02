@@ -55,6 +55,8 @@ type BulkContentItem struct {
 	SourceType   string     `json:"source_type"`
 	SourceFeedID *uuid.UUID `json:"source_feed_id,omitempty"`
 	PublishedAt  *time.Time `json:"published_at,omitempty"`
+	Title        *string    `json:"title,omitempty"`
+	Author       *string    `json:"author,omitempty"`
 }
 
 // BulkCreateContentRequest represents the request body for batch creating contents

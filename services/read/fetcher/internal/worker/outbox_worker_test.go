@@ -4,7 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOutboxWorker_NewOutboxWorker_WithNilConfig(t *testing.T) {
@@ -80,4 +83,47 @@ func TestOutboxWorker_QueueSize(t *testing.T) {
 
 	// Initially queue should be empty
 	assert.Equal(t, 0, worker.QueueSize())
+}
+
+func TestOutboxWorker_BuildContentItem_RoundTripsTitleAndAuthor(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil)
+
+	feedID := uuid.New()
+	entry := &models.ContentOutbox{
+		ID:         uuid.New(),
+		FeedItemID: uuid.New(),
+		ContentPayload: map[string]interface{}{
+			"source_url":     "https://example.com/article",
+			"cleaned_html":   "<p>body</p>",
+			"source_feed_id": feedID.String(),
+			"title":          "RSS-supplied title",
+			"author":         "Jane Doe",
+		},
+	}
+
+	item, err := worker.buildContentItem(entry)
+	require.NoError(t, err)
+
+	require.NotNil(t, item.Title)
+	assert.Equal(t, "RSS-supplied title", *item.Title)
+	require.NotNil(t, item.Author)
+	assert.Equal(t, "Jane Doe", *item.Author)
+}
+
+func TestOutboxWorker_BuildContentItem_OmitsMissingTitleAndAuthor(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil)
+
+	entry := &models.ContentOutbox{
+		ID: uuid.New(),
+		ContentPayload: map[string]interface{}{
+			"source_url":   "https://example.com/article",
+			"cleaned_html": "<p>body</p>",
+		},
+	}
+
+	item, err := worker.buildContentItem(entry)
+	require.NoError(t, err)
+
+	assert.Nil(t, item.Title)
+	assert.Nil(t, item.Author)
 }

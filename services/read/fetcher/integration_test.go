@@ -14,6 +14,7 @@ import (
 
 	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
@@ -54,6 +55,73 @@ func setupTestRouter(subscriptionHandler *handlers.SubscriptionHandler) *chi.Mux
 	})
 
 	return r
+}
+
+// TestContentServiceReceivesRSSTitleAndAuthor verifies that an RSS-parsed
+// title and author end up in the HTTP request body sent to the Content
+// Service. This is the bug regression test for bug_fda7.
+func TestContentServiceReceivesRSSTitleAndAuthor(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	rssTitle := "Why Cairns Matter"
+	rssAuthor := "Ada Lovelace"
+	feedID := uuid.New()
+
+	type captured struct {
+		Title  *string `json:"title,omitempty"`
+		Author *string `json:"author,omitempty"`
+	}
+	var receivedItems []captured
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "/api/v1/content/bulk", r.URL.Path)
+
+		var body struct {
+			Contents []captured `json:"contents"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		receivedItems = append(receivedItems, body.Contents...)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"created":  []interface{}{map[string]interface{}{"id": uuid.New().String()}},
+				"existing": []interface{}{},
+				"failed":   []interface{}{},
+			},
+			"meta": map[string]string{"version": "v1"},
+		})
+	}))
+	defer server.Close()
+
+	contentClient := client.NewContentServiceClient(client.ContentServiceConfig{
+		BaseURL: server.URL,
+	})
+
+	// Build the BulkContentItem the same way the outbox worker does
+	// (services/read/fetcher/internal/worker/outbox_worker.go buildContentItem)
+	// so we cover the same JSON contract exposed to the Content Service.
+	item := client.BulkContentItem{
+		URL:          "https://example.com/cairns",
+		HTML:         "<p>body</p>",
+		SourceType:   "rss",
+		SourceFeedID: &feedID,
+		Title:        &rssTitle,
+		Author:       &rssAuthor,
+	}
+
+	_, err := contentClient.BulkCreateContent(context.Background(), []client.BulkContentItem{item})
+	require.NoError(t, err)
+
+	require.Len(t, receivedItems, 1)
+	require.NotNil(t, receivedItems[0].Title, "Content Service did not receive title")
+	assert.Equal(t, rssTitle, *receivedItems[0].Title)
+	require.NotNil(t, receivedItems[0].Author, "Content Service did not receive author")
+	assert.Equal(t, rssAuthor, *receivedItems[0].Author)
 }
 
 // TestFeedSubscriptionIntegration tests the feed subscription flow
