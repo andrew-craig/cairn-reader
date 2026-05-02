@@ -39,6 +39,7 @@ Create pkg/rss/ with these subpackages. Each subpackage has its own Go module pa
 
 ### pkg/rss/sanitize/
 - Single bluemonday policy implementing the decision from decision_3727.
+- Source policy: lift `services/read/content/internal/processor/sanitizer.go:14-62` verbatim. Allowlist (decided in decision_3727): text formatting + lists + tables (incl. `col`/`colgroup`, `colspan`/`rowspan`, `scope`); links with `href`/`title` and `RequireNoReferrerOnLinks(true)`; `img`/`figure`/`figcaption`/`picture`/`source` with `src`/`alt`/`title`/integer `width`/`height` and `srcset`/`sizes`/`type`/`media` on `<source>`; `audio`/`video` with `src`/`controls`; `class` (space-separated tokens) on `p`/`div`/`span`/`blockquote`/`code`/`pre`; `id` (space-separated tokens) on `h1`–`h6`; URL schemes `http`/`https`/`mailto`.
 - Exported func Policy() *bluemonday.Policy and func Sanitize(html string) string.
 - Tests: each kept/stripped tag/attribute is covered with one positive and one negative case.
 
@@ -48,6 +49,7 @@ Create pkg/rss/ with these subpackages. Each subpackage has its own Go module pa
 
 ### pkg/rss/fetch/
 - HTTP client with: configurable timeout (default 30s), 10-redirect cap, optional ETag/If-None-Match and Last-Modified/If-Modified-Since support, canonical User-Agent constant from decision_3727.
+- Canonical User-Agent (decided in decision_3727): `CairnBot/1.0 (+https://github.com/cairn-app/cairn-reader)`. Exported as a `const UserAgent` and set on every outbound request, with no per-call override.
 - Exported func Fetch(ctx, url, FetchOpts) (*Response, error) where Response carries Body []byte, ETag, LastModified, NotModified bool, StatusCode int.
 - Connection pooling tuned for multi-feed use (MaxIdleConnsPerHost 10, IdleConnTimeout 90s).
 
