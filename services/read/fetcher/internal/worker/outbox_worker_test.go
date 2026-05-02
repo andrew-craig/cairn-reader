@@ -11,7 +11,7 @@ import (
 )
 
 func TestOutboxWorker_NewOutboxWorker_WithNilConfig(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil)
+	worker := NewOutboxWorker(nil, nil, nil, nil)
 
 	assert.NotNil(t, worker)
 	assert.NotNil(t, worker.config)
@@ -29,7 +29,7 @@ func TestOutboxWorker_NewOutboxWorker_WithCustomConfig(t *testing.T) {
 		MaxRetries:   3,
 	}
 
-	worker := NewOutboxWorker(customConfig, nil, nil)
+	worker := NewOutboxWorker(customConfig, nil, nil, nil)
 
 	assert.NotNil(t, worker)
 	assert.Equal(t, customConfig, worker.config)
@@ -50,7 +50,7 @@ func TestDefaultOutboxWorkerConfig(t *testing.T) {
 }
 
 func TestOutboxWorker_CalculateNextRetry(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil)
+	worker := NewOutboxWorker(nil, nil, nil, nil)
 
 	testCases := []struct {
 		retryCount    int
@@ -79,14 +79,14 @@ func TestOutboxWorker_CalculateNextRetry(t *testing.T) {
 }
 
 func TestOutboxWorker_QueueSize(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil)
+	worker := NewOutboxWorker(nil, nil, nil, nil)
 
 	// Initially queue should be empty
 	assert.Equal(t, 0, worker.QueueSize())
 }
 
 func TestOutboxWorker_BuildContentItem_RoundTripsTitleAndAuthor(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil)
+	worker := NewOutboxWorker(nil, nil, nil, nil)
 
 	feedID := uuid.New()
 	entry := &models.ContentOutbox{
@@ -94,7 +94,7 @@ func TestOutboxWorker_BuildContentItem_RoundTripsTitleAndAuthor(t *testing.T) {
 		FeedItemID: uuid.New(),
 		ContentPayload: map[string]interface{}{
 			"source_url":     "https://example.com/article",
-			"cleaned_html":   "<p>body</p>",
+			"raw_html":       "<html><body><p>body</p></body></html>",
 			"source_feed_id": feedID.String(),
 			"title":          "RSS-supplied title",
 			"author":         "Jane Doe",
@@ -111,13 +111,13 @@ func TestOutboxWorker_BuildContentItem_RoundTripsTitleAndAuthor(t *testing.T) {
 }
 
 func TestOutboxWorker_BuildContentItem_OmitsMissingTitleAndAuthor(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil)
+	worker := NewOutboxWorker(nil, nil, nil, nil)
 
 	entry := &models.ContentOutbox{
 		ID: uuid.New(),
 		ContentPayload: map[string]interface{}{
-			"source_url":   "https://example.com/article",
-			"cleaned_html": "<p>body</p>",
+			"source_url": "https://example.com/article",
+			"raw_html":   "<html><body><p>body</p></body></html>",
 		},
 	}
 
@@ -126,4 +126,58 @@ func TestOutboxWorker_BuildContentItem_OmitsMissingTitleAndAuthor(t *testing.T) 
 
 	assert.Nil(t, item.Title)
 	assert.Nil(t, item.Author)
+}
+
+// Outbox entries written by the previous fetcher version (which carried
+// already-cleaned HTML under "cleaned_html") must continue to drain after the
+// fetcher is upgraded.
+func TestOutboxWorker_BuildContentItem_FallsBackToLegacyCleanedHTML(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil, nil)
+
+	entry := &models.ContentOutbox{
+		ID: uuid.New(),
+		ContentPayload: map[string]interface{}{
+			"source_url":   "https://example.com/article",
+			"cleaned_html": "<p>legacy already-cleaned body</p>",
+		},
+	}
+
+	item, err := worker.buildContentItem(entry)
+	require.NoError(t, err)
+
+	assert.Equal(t, "<p>legacy already-cleaned body</p>", item.HTML)
+}
+
+// raw_html must win over cleaned_html if both are present so a half-migrated
+// queue can't accidentally re-process cleaned HTML.
+func TestOutboxWorker_BuildContentItem_PrefersRawHTMLOverLegacyKey(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil, nil)
+
+	entry := &models.ContentOutbox{
+		ID: uuid.New(),
+		ContentPayload: map[string]interface{}{
+			"source_url":   "https://example.com/article",
+			"raw_html":     "<html><body>raw</body></html>",
+			"cleaned_html": "<p>legacy</p>",
+		},
+	}
+
+	item, err := worker.buildContentItem(entry)
+	require.NoError(t, err)
+
+	assert.Equal(t, "<html><body>raw</body></html>", item.HTML)
+}
+
+func TestOutboxWorker_BuildContentItem_ErrorsWhenHTMLMissing(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil, nil)
+
+	entry := &models.ContentOutbox{
+		ID: uuid.New(),
+		ContentPayload: map[string]interface{}{
+			"source_url": "https://example.com/article",
+		},
+	}
+
+	_, err := worker.buildContentItem(entry)
+	require.Error(t, err)
 }

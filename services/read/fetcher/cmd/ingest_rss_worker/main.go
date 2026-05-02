@@ -81,7 +81,7 @@ func main() {
 	contentExtractionJob := jobs.NewContentExtractionJob(cfg.ContentExtraction, itemProcessor)
 
 	// Initialize outbox worker
-	outboxWorker := worker.NewOutboxWorker(cfg.OutboxWorker, outboxRepo, contentServiceClient)
+	outboxWorker := worker.NewOutboxWorker(cfg.OutboxWorker, outboxRepo, feedItemRepo, contentServiceClient)
 
 	// Initialize cleanup jobs
 	outboxCleanupJob := jobs.NewOutboxCleanupJob(cfg.OutboxCleanup, outboxRepo)

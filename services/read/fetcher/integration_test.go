@@ -126,6 +126,86 @@ func TestContentServiceReceivesRSSTitleAndAuthor(t *testing.T) {
 	assert.Equal(t, rssAuthor, *receivedItems[0].Author)
 }
 
+// TestRawHTMLPipelineIntegration is the regression test for the
+// double-readability bug: <head>/<meta>/class attributes must reach the
+// Content Service untouched so it can run the single readability+sanitize
+// pass on the original markup.
+func TestRawHTMLPipelineIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	const rawHTML = `<html>
+  <head>
+    <title>Page Title</title>
+    <meta name="author" content="Meta Author">
+  </head>
+  <body><article class="post"><p>Body</p></article></body>
+</html>`
+
+	rssTitle := "RSS Title"
+	rssAuthor := "RSS Author"
+	feedID := uuid.New()
+
+	type captured struct {
+		URL    string  `json:"url"`
+		HTML   string  `json:"html"`
+		Title  *string `json:"title,omitempty"`
+		Author *string `json:"author,omitempty"`
+	}
+	var got []captured
+
+	csServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "/api/v1/content/bulk", r.URL.Path)
+
+		var body struct {
+			Contents []captured `json:"contents"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		got = append(got, body.Contents...)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"created": []interface{}{map[string]interface{}{
+					"id":           uuid.New().String(),
+					"content_hash": "deadbeef",
+				}},
+				"existing": []interface{}{},
+				"failed":   []interface{}{},
+			},
+			"meta": map[string]string{"version": "v1"},
+		})
+	}))
+	defer csServer.Close()
+
+	contentClient := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: csServer.URL})
+
+	item := client.BulkContentItem{
+		URL:          "https://example.com/article",
+		HTML:         rawHTML,
+		SourceType:   "rss",
+		SourceFeedID: &feedID,
+		Title:        &rssTitle,
+		Author:       &rssAuthor,
+	}
+
+	_, err := contentClient.BulkCreateContent(context.Background(), []client.BulkContentItem{item})
+	require.NoError(t, err)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, rawHTML, got[0].HTML)
+	// <meta> and class attributes are stripped by bluemonday's UGCPolicy. If
+	// they survive end-to-end, the fetcher is no longer sanitizing.
+	assert.Contains(t, got[0].HTML, `<meta name="author"`)
+	assert.Contains(t, got[0].HTML, `class="post"`)
+	require.NotNil(t, got[0].Title)
+	assert.Equal(t, rssTitle, *got[0].Title)
+	require.NotNil(t, got[0].Author)
+	assert.Equal(t, rssAuthor, *got[0].Author)
+}
+
 // TestFeedSubscriptionIntegration tests the feed subscription flow
 func TestFeedSubscriptionIntegration(t *testing.T) {
 	if testing.Short() {

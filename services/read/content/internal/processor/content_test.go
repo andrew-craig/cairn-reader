@@ -124,18 +124,16 @@ func TestContentProcessor_GenerateContentHash(t *testing.T) {
 func TestContentProcessor_ContentSizeValidation(t *testing.T) {
 	processor := NewContentProcessor()
 
-	// Create content that exceeds 5MB
-	largeContent := strings.Repeat("x", MaxContentSize+1)
-
-	// ProcessHTML doesn't validate size, only ProcessURL does through fetching
-	// So we'll test that the content can be processed and verify the size is large
-	result, err := processor.ProcessHTML("https://example.com", largeContent)
-	if err != nil {
-		t.Errorf("ProcessHTML() failed: %v", err)
+	// Content at exactly the cap is accepted.
+	atLimit := strings.Repeat("x", MaxContentSize)
+	if _, err := processor.ProcessHTML("https://example.com", atLimit); err != nil {
+		t.Errorf("ProcessHTML(at limit) returned error: %v", err)
 	}
 
-	// Verify that we got a result
-	if result == nil {
-		t.Error("ProcessHTML() returned nil result")
+	// Content one byte over the cap is rejected so the fetcher cannot smuggle
+	// oversized payloads past the Content Service.
+	overLimit := strings.Repeat("x", MaxContentSize+1)
+	if _, err := processor.ProcessHTML("https://example.com", overLimit); err == nil {
+		t.Error("ProcessHTML(over limit) expected error, got nil")
 	}
 }

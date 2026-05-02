@@ -122,7 +122,7 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 	)
 
 	outboxWorker := rssWorker.NewOutboxWorker(
-		rssWorker.DefaultOutboxWorkerConfig(), outboxRepo, contentServiceClient,
+		rssWorker.DefaultOutboxWorkerConfig(), outboxRepo, feedItemRepo, contentServiceClient,
 	)
 
 	outboxCleanupJob := rssJobs.NewOutboxCleanupJob(

@@ -39,6 +39,7 @@ func DefaultOutboxWorkerConfig() *OutboxWorkerConfig {
 type OutboxWorker struct {
 	config         *OutboxWorkerConfig
 	outboxRepo     repository.OutboxRepository
+	feedItemRepo   repository.FeedItemRepository
 	contentClient  *client.ContentServiceClient
 	outboxQueue    chan *models.ContentOutbox
 	stopCh         chan struct{}
@@ -46,10 +47,12 @@ type OutboxWorker struct {
 	pollTickerDone chan struct{}
 }
 
-// NewOutboxWorker creates a new outbox worker pool
+// NewOutboxWorker creates a new outbox worker pool. feedItemRepo may be nil
+// only in tests that don't exercise the post-delivery write-back path.
 func NewOutboxWorker(
 	config *OutboxWorkerConfig,
 	outboxRepo repository.OutboxRepository,
+	feedItemRepo repository.FeedItemRepository,
 	contentClient *client.ContentServiceClient,
 ) *OutboxWorker {
 	if config == nil {
@@ -59,6 +62,7 @@ func NewOutboxWorker(
 	return &OutboxWorker{
 		config:         config,
 		outboxRepo:     outboxRepo,
+		feedItemRepo:   feedItemRepo,
 		contentClient:  contentClient,
 		outboxQueue:    make(chan *models.ContentOutbox, config.BatchSize*2),
 		stopCh:         make(chan struct{}),
@@ -201,13 +205,15 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 		return
 	}
 
-	// Determine which content to use (created or existing)
 	var contentID uuid.UUID
+	var contentHash string
 	if len(bulkResp.Created) > 0 {
 		contentID = bulkResp.Created[0].ID
+		contentHash = bulkResp.Created[0].ContentHash
 		slog.Info("Created new content", "worker_id", workerID, "content_id", contentID)
 	} else if len(bulkResp.Existing) > 0 {
 		contentID = bulkResp.Existing[0].ID
+		contentHash = bulkResp.Existing[0].ContentHash
 		slog.Info("Using existing content", "worker_id", workerID, "content_id", contentID)
 	} else if len(bulkResp.Failed) > 0 {
 		errorMsg := fmt.Sprintf("Content creation failed: %s - %s",
@@ -260,6 +266,25 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 		return
 	}
 
+	// Best-effort write-back. A failure here doesn't fail the delivery (the
+	// content is already in the user's reading list), but it does cost
+	// update_detector its no-op short-circuit for this article.
+	if ow.feedItemRepo != nil {
+		var hashPtr *string
+		if contentHash != "" {
+			hashPtr = &contentHash
+		}
+		if err := ow.feedItemRepo.UpdateProcessingStatus(
+			ctx, entry.FeedItemID, models.ProcessingStatusCompleted,
+			hashPtr, &contentID, &deliveredAt,
+		); err != nil {
+			slog.Warn("Failed to stamp content_hash/content_service_id on feed_item",
+				"worker_id", workerID,
+				"feed_item_id", entry.FeedItemID,
+				"error", err)
+		}
+	}
+
 	slog.Info("Successfully delivered outbox entry",
 		"worker_id", workerID,
 		"entry_id", entry.ID,
@@ -267,19 +292,24 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 		"content_id", contentID)
 }
 
-// buildContentItem builds a BulkContentItem from the outbox entry's payload
+// buildContentItem builds a BulkContentItem from the outbox entry's payload.
+// Accepts the legacy PayloadKeyCleanedHTML key for one release cycle so
+// in-flight entries written by the previous fetcher version still drain.
 func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.BulkContentItem, error) {
 	payload := entry.ContentPayload
 
-	// Extract required fields
-	url, ok := payload["source_url"].(string)
+	url, ok := payload[models.PayloadKeySourceURL].(string)
 	if !ok || url == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'source_url' field")
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid '%s' field", models.PayloadKeySourceURL)
 	}
 
-	html, ok := payload["cleaned_html"].(string)
-	if !ok || html == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'cleaned_html' field")
+	html, _ := payload[models.PayloadKeyRawHTML].(string)
+	if html == "" {
+		html, _ = payload[models.PayloadKeyCleanedHTML].(string)
+	}
+	if html == "" {
+		return client.BulkContentItem{}, fmt.Errorf("missing HTML payload (neither '%s' nor legacy '%s' present)",
+			models.PayloadKeyRawHTML, models.PayloadKeyCleanedHTML)
 	}
 
 	item := client.BulkContentItem{
@@ -288,29 +318,23 @@ func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.Bu
 		SourceType: "rss",
 	}
 
-	// Extract optional feed ID
-	if feedIDStr, ok := payload["source_feed_id"].(string); ok && feedIDStr != "" {
-		feedID, err := uuid.Parse(feedIDStr)
-		if err == nil {
+	if feedIDStr, ok := payload[models.PayloadKeySourceFeedID].(string); ok && feedIDStr != "" {
+		if feedID, err := uuid.Parse(feedIDStr); err == nil {
 			item.SourceFeedID = &feedID
 		}
 	}
 
-	// Extract optional published_at
-	if publishedAtStr, ok := payload["published_at"].(string); ok && publishedAtStr != "" {
-		publishedAt, err := time.Parse(time.RFC3339, publishedAtStr)
-		if err == nil {
+	if publishedAtStr, ok := payload[models.PayloadKeyPublishedAt].(string); ok && publishedAtStr != "" {
+		if publishedAt, err := time.Parse(time.RFC3339, publishedAtStr); err == nil {
 			item.PublishedAt = &publishedAt
 		}
 	}
 
-	// Extract optional title from RSS-parsed metadata
-	if title, ok := payload["title"].(string); ok && title != "" {
+	if title, ok := payload[models.PayloadKeyTitle].(string); ok && title != "" {
 		item.Title = &title
 	}
 
-	// Extract optional author from RSS-parsed metadata
-	if author, ok := payload["author"].(string); ok && author != "" {
+	if author, ok := payload[models.PayloadKeyAuthor].(string); ok && author != "" {
 		item.Author = &author
 	}
 

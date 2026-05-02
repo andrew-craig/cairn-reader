@@ -1,10 +1,7 @@
 package processor
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,9 +10,7 @@ import (
 
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
-	"github.com/go-shiori/go-readability"
 	"github.com/google/uuid"
-	"github.com/microcosm-cc/bluemonday"
 )
 
 // ItemProcessorConfig holds configuration for the item processor
@@ -37,11 +32,12 @@ func DefaultItemProcessorConfig() *ItemProcessorConfig {
 	}
 }
 
-// ItemProcessor processes pending feed items
+// ItemProcessor fetches RSS items and enqueues them, as raw HTML, to the
+// content_outbox. Readability + sanitize + hash run exactly once, downstream
+// in the Content Service.
 type ItemProcessor struct {
 	config           *ItemProcessorConfig
 	httpClient       *http.Client
-	sanitizer        *bluemonday.Policy
 	feedItemRepo     repository.FeedItemRepository
 	subscriptionRepo repository.FeedSubscriptionRepository
 	outboxRepo       repository.OutboxRepository
@@ -62,13 +58,9 @@ func NewItemProcessor(
 		Timeout: config.ContentFetchTimeout,
 	}
 
-	// Create sanitizer policy (allows safe HTML tags)
-	sanitizer := bluemonday.UGCPolicy()
-
 	return &ItemProcessor{
 		config:           config,
 		httpClient:       httpClient,
-		sanitizer:        sanitizer,
 		feedItemRepo:     feedItemRepo,
 		subscriptionRepo: subscriptionRepo,
 		outboxRepo:       outboxRepo,
@@ -125,41 +117,24 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		return fmt.Errorf("failed to update status to processing: %w", err)
 	}
 
-	// Fetch article content
-	content, err := p.fetchArticleContent(ctx, item.ItemURL)
+	rawHTML, err := p.fetchArticleContent(ctx, item.ItemURL)
 	if err != nil {
-		// Fallback to RSS description if content fetch fails
 		slog.Warn("Failed to fetch article content, using RSS description", "error", err)
 		if item.Description != nil && *item.Description != "" {
-			content = *item.Description
+			rawHTML = *item.Description
 		} else {
 			return fmt.Errorf("failed to fetch article content and no description available: %w", err)
 		}
 	}
 
-	// Apply readability parsing
-	cleanedHTML, err := p.applyReadability(item.ItemURL, content)
-	if err != nil {
-		slog.Warn("Readability parsing failed, using sanitized raw content", "error", err)
-		cleanedHTML = content
-	}
-
-	// Sanitize HTML
-	sanitizedHTML := p.sanitizer.Sanitize(cleanedHTML)
-
-	// Generate content hash
-	contentHash := p.generateContentHash(sanitizedHTML)
-
-	// Create content payload for Content Service
 	contentPayload := map[string]interface{}{
-		"title":           item.Title,
-		"author":          item.Author,
-		"published_at":    item.PublishedAt,
-		"source_url":      item.ItemURL,
-		"cleaned_html":    sanitizedHTML,
-		"content_hash":    contentHash,
-		"source_feed_id":  item.FeedID.String(),
-		"raw_description": item.Description,
+		models.PayloadKeyTitle:          item.Title,
+		models.PayloadKeyAuthor:         item.Author,
+		models.PayloadKeyPublishedAt:    item.PublishedAt,
+		models.PayloadKeySourceURL:      item.ItemURL,
+		models.PayloadKeyRawHTML:        rawHTML,
+		models.PayloadKeySourceFeedID:   item.FeedID.String(),
+		models.PayloadKeyRawDescription: item.Description,
 	}
 
 	// Get list of users subscribed to this feed
@@ -172,7 +147,7 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		slog.Info("No subscriptions found for feed, marking item as completed", "feed_id", item.FeedID)
 		now := time.Now()
 		return p.feedItemRepo.UpdateProcessingStatus(
-			ctx, item.ID, models.ProcessingStatusCompleted, &contentHash, nil, &now,
+			ctx, item.ID, models.ProcessingStatusCompleted, nil, nil, &now,
 		)
 	}
 
@@ -199,10 +174,12 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		return fmt.Errorf("failed to create outbox entry: %w", err)
 	}
 
-	// Update item status to 'completed'
+	// content_hash is stamped by outbox_worker from the Content Service
+	// response after successful delivery; this is the only short-circuit
+	// update_detector has to skip unchanged articles.
 	now := time.Now()
 	if err := p.feedItemRepo.UpdateProcessingStatus(
-		ctx, item.ID, models.ProcessingStatusCompleted, &contentHash, nil, &now,
+		ctx, item.ID, models.ProcessingStatusCompleted, nil, nil, &now,
 	); err != nil {
 		return fmt.Errorf("failed to update item status to completed: %w", err)
 	}
@@ -211,7 +188,8 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 	return nil
 }
 
-// fetchArticleContent fetches the full article content from the source URL
+// fetchArticleContent fetches the full article HTML, capped at MaxContentSize
+// via io.LimitReader so a malicious server cannot exhaust memory.
 func (p *ItemProcessor) fetchArticleContent(ctx context.Context, url string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -230,7 +208,6 @@ func (p *ItemProcessor) fetchArticleContent(ctx context.Context, url string) (st
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Read response with size limit
 	limitedReader := io.LimitReader(resp.Body, p.config.MaxContentSize)
 	content, err := io.ReadAll(limitedReader)
 	if err != nil {
@@ -238,21 +215,4 @@ func (p *ItemProcessor) fetchArticleContent(ctx context.Context, url string) (st
 	}
 
 	return string(content), nil
-}
-
-// applyReadability applies readability parsing to extract article content
-func (p *ItemProcessor) applyReadability(url, htmlContent string) (string, error) {
-	reader := bytes.NewReader([]byte(htmlContent))
-	article, err := readability.FromReader(reader, nil)
-	if err != nil {
-		return "", fmt.Errorf("readability parsing failed: %w", err)
-	}
-
-	return article.Content, nil
-}
-
-// generateContentHash generates a SHA-256 hash of the content
-func (p *ItemProcessor) generateContentHash(content string) string {
-	hash := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(hash[:])
 }

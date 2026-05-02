@@ -62,23 +62,22 @@ type ProcessedContent struct {
 // - The content is too large (>5MB)
 // - The content cannot be processed
 func (p *ContentProcessor) ProcessURL(url string) (*ProcessedContent, error) {
-	// Fetch the content
 	rawHTML, err := p.fetchURL(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch URL: %w", err)
 	}
 
-	// Validate content size
+	return p.ProcessHTML(url, rawHTML)
+}
+
+// ProcessHTML runs readability + sanitize + hash on rawHTML. The 5MB cap is
+// enforced here so the Content Service is the single source of truth for the
+// limit (callers send raw HTML).
+func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedContent, error) {
 	if len(rawHTML) > MaxContentSize {
 		return nil, fmt.Errorf("content size %d bytes exceeds maximum of %d bytes", len(rawHTML), MaxContentSize)
 	}
 
-	// Process the HTML
-	return p.ProcessHTML(url, rawHTML)
-}
-
-// ProcessHTML processes raw HTML content through the pipeline
-func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedContent, error) {
 	var cleanedHTML string
 	var title, author, description, imageURL string
 
