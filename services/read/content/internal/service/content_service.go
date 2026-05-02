@@ -47,6 +47,8 @@ type BulkContentItem struct {
 	SourceType   string
 	SourceFeedID *uuid.UUID
 	PublishedAt  *time.Time
+	Title        *string
+	Author       *string
 }
 
 // BulkCreateError represents an error for a specific bulk item
@@ -284,20 +286,29 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 			}
 		}
 
+		// Prefer caller-supplied title; fall back to readability output.
+		title := processed.Title
+		if item.Title != nil && *item.Title != "" {
+			title = *item.Title
+		}
+
 		// Create the content model
 		content := &models.Content{
 			ContentHash:  processed.ContentHash,
 			CleanedHTML:  processed.CleanedHTML,
 			OriginalURL:  item.URL,
 			CanonicalURL: &processed.CanonicalURL,
-			Title:        processed.Title,
+			Title:        title,
 			SourceType:   item.SourceType,
 			SourceFeedID: item.SourceFeedID,
 			PublishedAt:  item.PublishedAt,
 		}
 
-		// Set optional fields if they're not empty
-		if processed.Author != "" {
+		// Prefer caller-supplied author; fall back to readability output.
+		if item.Author != nil && *item.Author != "" {
+			author := *item.Author
+			content.Author = &author
+		} else if processed.Author != "" {
 			content.Author = &processed.Author
 		}
 		if processed.Description != "" {

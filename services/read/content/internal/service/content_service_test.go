@@ -450,6 +450,107 @@ func TestBulkCreateFromHTML_WithDuplicates(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+// TestBulkCreateFromHTML_CallerSuppliedTitleWins verifies that a caller-supplied
+// title overrides whatever readability extracts from the HTML.
+func TestBulkCreateFromHTML_CallerSuppliedTitleWins(t *testing.T) {
+	mockRepo := new(MockContentRepository)
+	service := NewContentService(mockRepo, &sql.DB{})
+
+	ctx := context.Background()
+	suppliedTitle := "Caller-Supplied Title"
+	suppliedAuthor := "Caller-Supplied Author"
+	items := []BulkContentItem{
+		{
+			URL:        "https://example.com/article",
+			HTML:       "<html><head><title>Readability Title</title></head><body><p>Content</p></body></html>",
+			SourceType: "web",
+			Title:      &suppliedTitle,
+			Author:     &suppliedAuthor,
+		},
+	}
+
+	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
+		if len(contents) != 1 {
+			return false
+		}
+		if contents[0].Title != suppliedTitle {
+			return false
+		}
+		if contents[0].Author == nil || *contents[0].Author != suppliedAuthor {
+			return false
+		}
+		return true
+	})).Return(nil)
+
+	contents, errs, err := service.BulkCreateFromHTML(ctx, items)
+
+	assert.NoError(t, err)
+	assert.Empty(t, errs)
+	assert.Len(t, contents, 1)
+	assert.Equal(t, suppliedTitle, contents[0].Title)
+	if assert.NotNil(t, contents[0].Author) {
+		assert.Equal(t, suppliedAuthor, *contents[0].Author)
+	}
+	mockRepo.AssertExpectations(t)
+}
+
+// TestBulkCreateFromHTML_FallsBackToReadabilityTitle verifies that when no
+// caller-supplied title is provided, readability output is used.
+func TestBulkCreateFromHTML_FallsBackToReadabilityTitle(t *testing.T) {
+	mockRepo := new(MockContentRepository)
+	service := NewContentService(mockRepo, &sql.DB{})
+
+	ctx := context.Background()
+	items := []BulkContentItem{
+		{
+			URL:        "https://example.com/article",
+			HTML:       "<html><head><title>Readability Title</title></head><body><p>Content</p></body></html>",
+			SourceType: "web",
+		},
+	}
+
+	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
+		return len(contents) == 1 && contents[0].Title == "Readability Title"
+	})).Return(nil)
+
+	contents, errs, err := service.BulkCreateFromHTML(ctx, items)
+
+	assert.NoError(t, err)
+	assert.Empty(t, errs)
+	assert.Len(t, contents, 1)
+	assert.Equal(t, "Readability Title", contents[0].Title)
+	mockRepo.AssertExpectations(t)
+}
+
+// TestBulkCreateFromHTML_EmptyCallerTitleFallsBack verifies that an empty
+// caller-supplied title is treated as "not supplied" and we fall back to
+// readability output.
+func TestBulkCreateFromHTML_EmptyCallerTitleFallsBack(t *testing.T) {
+	mockRepo := new(MockContentRepository)
+	service := NewContentService(mockRepo, &sql.DB{})
+
+	ctx := context.Background()
+	emptyTitle := ""
+	items := []BulkContentItem{
+		{
+			URL:        "https://example.com/article",
+			HTML:       "<html><head><title>Readability Title</title></head><body><p>Content</p></body></html>",
+			SourceType: "web",
+			Title:      &emptyTitle,
+		},
+	}
+
+	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
+		return len(contents) == 1 && contents[0].Title == "Readability Title"
+	})).Return(nil)
+
+	contents, _, err := service.BulkCreateFromHTML(ctx, items)
+	assert.NoError(t, err)
+	assert.Len(t, contents, 1)
+	assert.Equal(t, "Readability Title", contents[0].Title)
+	mockRepo.AssertExpectations(t)
+}
+
 // TestBulkCreateFromHTML_BulkCreateError tests error during bulk creation
 func TestBulkCreateFromHTML_BulkCreateError(t *testing.T) {
 	mockRepo := new(MockContentRepository)

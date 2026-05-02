@@ -58,6 +58,8 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 			SourceType:   item.SourceType,
 			SourceFeedID: item.SourceFeedID,
 			PublishedAt:  item.PublishedAt,
+			Title:        item.Title,
+			Author:       item.Author,
 		}
 	}
 

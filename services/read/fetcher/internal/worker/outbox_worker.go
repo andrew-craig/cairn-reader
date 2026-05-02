@@ -304,6 +304,16 @@ func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.Bu
 		}
 	}
 
+	// Extract optional title from RSS-parsed metadata
+	if title, ok := payload["title"].(string); ok && title != "" {
+		item.Title = &title
+	}
+
+	// Extract optional author from RSS-parsed metadata
+	if author, ok := payload["author"].(string); ok && author != "" {
+		item.Author = &author
+	}
+
 	return item, nil
 }
 

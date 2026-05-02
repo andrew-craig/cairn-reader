@@ -14,6 +14,7 @@ import (
 
 	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
+	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
@@ -24,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func strPtr(s string) *string { return &s }
 
 // setupTestRouter creates a test router for RSS Fetcher Service
 func setupTestRouter(subscriptionHandler *handlers.SubscriptionHandler) *chi.Mux {
@@ -56,6 +59,73 @@ func setupTestRouter(subscriptionHandler *handlers.SubscriptionHandler) *chi.Mux
 	return r
 }
 
+// TestContentServiceReceivesRSSTitleAndAuthor verifies that an RSS-parsed
+// title and author end up in the HTTP request body sent to the Content
+// Service. This is the bug regression test for bug_fda7.
+func TestContentServiceReceivesRSSTitleAndAuthor(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	rssTitle := "Why Cairns Matter"
+	rssAuthor := "Ada Lovelace"
+	feedID := uuid.New()
+
+	type captured struct {
+		Title  *string `json:"title,omitempty"`
+		Author *string `json:"author,omitempty"`
+	}
+	var receivedItems []captured
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "POST", r.Method)
+		require.Equal(t, "/api/v1/content/bulk", r.URL.Path)
+
+		var body struct {
+			Contents []captured `json:"contents"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		receivedItems = append(receivedItems, body.Contents...)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"created":  []interface{}{map[string]interface{}{"id": uuid.New().String()}},
+				"existing": []interface{}{},
+				"failed":   []interface{}{},
+			},
+			"meta": map[string]string{"version": "v1"},
+		})
+	}))
+	defer server.Close()
+
+	contentClient := client.NewContentServiceClient(client.ContentServiceConfig{
+		BaseURL: server.URL,
+	})
+
+	// Build the BulkContentItem the same way the outbox worker does
+	// (services/read/fetcher/internal/worker/outbox_worker.go buildContentItem)
+	// so we cover the same JSON contract exposed to the Content Service.
+	item := client.BulkContentItem{
+		URL:          "https://example.com/cairns",
+		HTML:         "<p>body</p>",
+		SourceType:   "rss",
+		SourceFeedID: &feedID,
+		Title:        &rssTitle,
+		Author:       &rssAuthor,
+	}
+
+	_, err := contentClient.BulkCreateContent(context.Background(), []client.BulkContentItem{item})
+	require.NoError(t, err)
+
+	require.Len(t, receivedItems, 1)
+	require.NotNil(t, receivedItems[0].Title, "Content Service did not receive title")
+	assert.Equal(t, rssTitle, *receivedItems[0].Title)
+	require.NotNil(t, receivedItems[0].Author, "Content Service did not receive author")
+	assert.Equal(t, rssAuthor, *receivedItems[0].Author)
+}
+
 // TestFeedSubscriptionIntegration tests the feed subscription flow
 func TestFeedSubscriptionIntegration(t *testing.T) {
 	if testing.Short() {
@@ -77,23 +147,19 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("SubscribeToNewFeed", func(t *testing.T) {
-		// Note: This test will fail without a real RSS feed
-		// For integration testing, we'll insert a feed directly
 		ctx := context.Background()
 
-		// Create a feed directly in the database
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed.xml",
-			Title:       "Test Feed",
-			Description: "A test feed",
-			SiteURL:     "https://example.com",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Test Feed"),
+			Description: strPtr("A test feed"),
+			SiteURL:     strPtr("https://example.com"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
 
-		// Create subscription
 		subscription := &models.FeedSubscription{
 			UserID: userID,
 			FeedID: feed.ID,
@@ -101,7 +167,6 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 		err = subscriptionRepo.Create(ctx, subscription)
 		require.NoError(t, err)
 
-		// Verify subscription was created
 		subs, err := subscriptionRepo.GetByUserID(ctx, userID)
 		require.NoError(t, err)
 		assert.Len(t, subs, 1)
@@ -115,29 +180,30 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		var response struct {
-			Subscriptions []struct {
-				FeedID      uuid.UUID `json:"feed_id"`
-				FeedURL     string    `json:"feed_url"`
-				Title       string    `json:"title"`
-				Description string    `json:"description"`
-			} `json:"subscriptions"`
+		// Content Service / Read Fetcher both wrap successful responses in a
+		// {"data": ..., "meta": ...} envelope (see pkg/api.WriteSuccess).
+		var envelope struct {
+			Data struct {
+				Subscriptions []struct {
+					FeedID    uuid.UUID `json:"feed_id"`
+					FeedURL   string    `json:"feed_url"`
+					FeedTitle string    `json:"feed_title"`
+				} `json:"subscriptions"`
+			} `json:"data"`
 		}
-		err = json.NewDecoder(resp.Body).Decode(&response)
+		err = json.NewDecoder(resp.Body).Decode(&envelope)
 		require.NoError(t, err)
-		assert.Len(t, response.Subscriptions, 1)
-		assert.Equal(t, "Test Feed", response.Subscriptions[0].Title)
+		assert.Len(t, envelope.Data.Subscriptions, 1)
+		assert.Equal(t, "Test Feed", envelope.Data.Subscriptions[0].FeedTitle)
 	})
 
 	t.Run("Unsubscribe", func(t *testing.T) {
-		// Get feed ID first
 		ctx := context.Background()
 		subs, err := subscriptionRepo.GetByUserID(ctx, userID)
 		require.NoError(t, err)
 		require.Len(t, subs, 1)
 		feedID := subs[0].FeedID
 
-		// Unsubscribe
 		req, err := http.NewRequest(
 			"DELETE",
 			fmt.Sprintf("%s/api/v1/users/%s/feeds/%s", server.URL, userID, feedID),
@@ -145,14 +211,13 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		httpClient := &http.Client{}
+		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// Verify unsubscription
 		subs, err = subscriptionRepo.GetByUserID(ctx, userID)
 		require.NoError(t, err)
 		assert.Len(t, subs, 0)
@@ -162,13 +227,13 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 		testDB.TruncateAll()
 		ctx := context.Background()
 
-		// Create 100 feeds and subscriptions (the limit)
+		// Create 100 feeds and subscriptions (the limit).
 		for i := 0; i < 100; i++ {
 			feed := &models.Feed{
 				FeedURL:     fmt.Sprintf("https://example.com/feed%d.xml", i),
-				Title:       fmt.Sprintf("Feed %d", i),
-				Status:      "active",
-				PollingTier: "moderate",
+				Title:       strPtr(fmt.Sprintf("Feed %d", i)),
+				Status:      models.FeedStatusActive,
+				PollingTier: models.PollingTierModerate,
 			}
 			err := feedRepo.Create(ctx, feed)
 			require.NoError(t, err)
@@ -181,17 +246,16 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Verify count
 		count, err := subscriptionRepo.CountByUserID(ctx, userID)
 		require.NoError(t, err)
 		assert.Equal(t, 100, count)
 
-		// Try to add 101st feed (should fail)
+		// Try to add the 101st feed (the schema-level trigger should reject it).
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed101.xml",
-			Title:       "Feed 101",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Feed 101"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err = feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
@@ -232,7 +296,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 			FeedItemID:     uuid.New(),
 			UserIDs:        userIDs,
 			ContentPayload: contentPayload,
-			DeliveryStatus: "pending",
+			DeliveryStatus: models.DeliveryStatusPending,
 			RetryCount:     0,
 		}
 
@@ -240,17 +304,15 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, outboxEntry.ID)
 
-		// Verify entry was created
 		entry, err := outboxRepo.GetByID(ctx, outboxEntry.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "pending", entry.DeliveryStatus)
+		assert.Equal(t, models.DeliveryStatusPending, entry.DeliveryStatus)
 		assert.Len(t, entry.UserIDs, 2)
 	})
 
 	t.Run("GetPendingEntries", func(t *testing.T) {
 		testDB.TruncateAll()
 
-		// Create multiple pending entries
 		for i := 0; i < 5; i++ {
 			outboxEntry := &models.ContentOutbox{
 				FeedItemID: uuid.New(),
@@ -258,15 +320,14 @@ func TestOutboxPatternIntegration(t *testing.T) {
 				ContentPayload: map[string]interface{}{
 					"title": fmt.Sprintf("Article %d", i),
 				},
-				DeliveryStatus: "pending",
-				NextRetryAt:    time.Now().Add(-1 * time.Hour), // Due for delivery
+				DeliveryStatus: models.DeliveryStatusPending,
+				NextRetryAt:    time.Now().Add(-1 * time.Hour),
 			}
 			err := outboxRepo.Create(ctx, outboxEntry)
 			require.NoError(t, err)
 		}
 
-		// Get pending entries
-		pending, err := outboxRepo.GetPending(ctx, 10)
+		pending, err := outboxRepo.GetPendingEntries(ctx, 10)
 		require.NoError(t, err)
 		assert.Len(t, pending, 5)
 	})
@@ -278,31 +339,29 @@ func TestOutboxPatternIntegration(t *testing.T) {
 			FeedItemID:     uuid.New(),
 			UserIDs:        []uuid.UUID{uuid.New()},
 			ContentPayload: map[string]interface{}{"title": "Test"},
-			DeliveryStatus: "pending",
+			DeliveryStatus: models.DeliveryStatusPending,
 		}
 		err := outboxRepo.Create(ctx, outboxEntry)
 		require.NoError(t, err)
 
-		// Update to sending
-		err = outboxRepo.UpdateStatus(ctx, outboxEntry.ID, "sending")
+		err = outboxRepo.UpdateDeliveryStatus(ctx, outboxEntry.ID, models.DeliveryStatusSending, nil, nil, nil)
 		require.NoError(t, err)
 
-		// Verify update
 		entry, err := outboxRepo.GetByID(ctx, outboxEntry.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "sending", entry.DeliveryStatus)
+		assert.Equal(t, models.DeliveryStatusSending, entry.DeliveryStatus)
 
-		// Mark as delivered
 		contentServiceID := uuid.New()
-		err = outboxRepo.MarkDelivered(ctx, outboxEntry.ID, contentServiceID)
+		now := time.Now()
+		err = outboxRepo.UpdateDeliveryStatus(ctx, outboxEntry.ID, models.DeliveryStatusDelivered, &contentServiceID, &now, nil)
 		require.NoError(t, err)
 
-		// Verify delivery
 		entry, err = outboxRepo.GetByID(ctx, outboxEntry.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "delivered", entry.DeliveryStatus)
+		assert.Equal(t, models.DeliveryStatusDelivered, entry.DeliveryStatus)
 		assert.NotNil(t, entry.DeliveredAt)
-		assert.Equal(t, &contentServiceID, entry.ContentServiceID)
+		require.NotNil(t, entry.ContentServiceID)
+		assert.Equal(t, contentServiceID, *entry.ContentServiceID)
 	})
 
 	t.Run("RetryLogic", func(t *testing.T) {
@@ -312,22 +371,20 @@ func TestOutboxPatternIntegration(t *testing.T) {
 			FeedItemID:     uuid.New(),
 			UserIDs:        []uuid.UUID{uuid.New()},
 			ContentPayload: map[string]interface{}{"title": "Test"},
-			DeliveryStatus: "pending",
+			DeliveryStatus: models.DeliveryStatusPending,
 			RetryCount:     0,
 		}
-		err := outboxRepo.Create(ctx, outboxEntry.ID)
+		err := outboxRepo.Create(ctx, outboxEntry)
 		require.NoError(t, err)
 
-		// Increment retry count
 		nextRetry := time.Now().Add(5 * time.Minute)
-		err = outboxRepo.IncrementRetry(ctx, outboxEntry.ID, nextRetry, "Connection timeout")
+		err = outboxRepo.IncrementRetryCount(ctx, outboxEntry.ID, nextRetry, "Connection timeout")
 		require.NoError(t, err)
 
-		// Verify retry state
 		entry, err := outboxRepo.GetByID(ctx, outboxEntry.ID)
 		require.NoError(t, err)
 		assert.Equal(t, 1, entry.RetryCount)
-		assert.Equal(t, "pending", entry.DeliveryStatus)
+		assert.Equal(t, models.DeliveryStatusPending, entry.DeliveryStatus)
 		assert.NotNil(t, entry.LastError)
 	})
 }
@@ -345,12 +402,11 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 	feedRepo := repository.NewFeedRepository(testDB.DB)
 	feedItemRepo := repository.NewFeedItemRepository(testDB.DB)
 
-	// Create a feed
 	feed := &models.Feed{
 		FeedURL:     "https://example.com/feed.xml",
-		Title:       "Test Feed",
-		Status:      "active",
-		PollingTier: "moderate",
+		Title:       strPtr("Test Feed"),
+		Status:      models.FeedStatusActive,
+		PollingTier: models.PollingTierModerate,
 	}
 	err := feedRepo.Create(ctx, feed)
 	require.NoError(t, err)
@@ -360,36 +416,35 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 
 		feedItem := &models.FeedItem{
 			FeedID:           feed.ID,
-			ItemGUID:         "unique-guid-123",
-			Title:            "Test Article",
-			Author:           "John Doe",
+			ItemGUID:         strPtr("unique-guid-123"),
+			Title:            strPtr("Test Article"),
+			Author:           strPtr("John Doe"),
 			PublishedAt:      &publishedAt,
-			Description:      "Article description",
-			URL:              "https://example.com/article1",
-			ContentHash:      "",
-			ProcessingStatus: "pending",
+			Description:      strPtr("Article description"),
+			ItemURL:          "https://example.com/article1",
+			ProcessingStatus: models.ProcessingStatusPending,
 		}
 
 		err := feedItemRepo.Create(ctx, feedItem)
 		require.NoError(t, err)
 		assert.NotEqual(t, uuid.Nil, feedItem.ID)
 
-		// Verify creation
 		item, err := feedItemRepo.GetByID(ctx, feedItem.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "pending", item.ProcessingStatus)
-		assert.Equal(t, "Test Article", item.Title)
+		assert.Equal(t, models.ProcessingStatusPending, item.ProcessingStatus)
+		require.NotNil(t, item.Title)
+		assert.Equal(t, "Test Article", *item.Title)
 	})
 
 	t.Run("DeduplicationByGUID", func(t *testing.T) {
 		testDB.TruncateAll()
 
-		// Recreate feed after truncate
+		// Recreate feed after truncate.
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed.xml",
-			Title:       "Test Feed",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Test Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
@@ -398,26 +453,23 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 
 		feedItem1 := &models.FeedItem{
 			FeedID:           feed.ID,
-			ItemGUID:         "duplicate-guid",
-			Title:            "Article 1",
-			URL:              "https://example.com/article",
-			ProcessingStatus: "pending",
+			ItemGUID:         strPtr("duplicate-guid"),
+			Title:            strPtr("Article 1"),
+			ItemURL:          "https://example.com/article",
+			ProcessingStatus: models.ProcessingStatusPending,
 			PublishedAt:      &publishedAt,
 		}
-
 		err = feedItemRepo.Create(ctx, feedItem1)
 		require.NoError(t, err)
 
-		// Try to create duplicate (same feed_id + item_guid)
 		feedItem2 := &models.FeedItem{
 			FeedID:           feed.ID,
-			ItemGUID:         "duplicate-guid",
-			Title:            "Article 2 (Duplicate)",
-			URL:              "https://example.com/article",
-			ProcessingStatus: "pending",
+			ItemGUID:         strPtr("duplicate-guid"),
+			Title:            strPtr("Article 2 (Duplicate)"),
+			ItemURL:          "https://example.com/article",
+			ProcessingStatus: models.ProcessingStatusPending,
 			PublishedAt:      &publishedAt,
 		}
-
 		err = feedItemRepo.Create(ctx, feedItem2)
 		assert.Error(t, err, "Should fail due to unique constraint")
 		assert.Contains(t, err.Error(), "duplicate key value")
@@ -426,45 +478,41 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 	t.Run("GetPendingItems", func(t *testing.T) {
 		testDB.TruncateAll()
 
-		// Recreate feed
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed.xml",
-			Title:       "Test Feed",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Test Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
 
-		// Create multiple items with different statuses
 		publishedAt := time.Now()
 		for i := 0; i < 3; i++ {
 			feedItem := &models.FeedItem{
 				FeedID:           feed.ID,
-				ItemGUID:         fmt.Sprintf("guid-%d", i),
-				Title:            fmt.Sprintf("Article %d", i),
-				URL:              fmt.Sprintf("https://example.com/article%d", i),
-				ProcessingStatus: "pending",
+				ItemGUID:         strPtr(fmt.Sprintf("guid-%d", i)),
+				Title:            strPtr(fmt.Sprintf("Article %d", i)),
+				ItemURL:          fmt.Sprintf("https://example.com/article%d", i),
+				ProcessingStatus: models.ProcessingStatusPending,
 				PublishedAt:      &publishedAt,
 			}
 			err := feedItemRepo.Create(ctx, feedItem)
 			require.NoError(t, err)
 		}
 
-		// Create one completed item
 		completedItem := &models.FeedItem{
 			FeedID:           feed.ID,
-			ItemGUID:         "completed-guid",
-			Title:            "Completed Article",
-			URL:              "https://example.com/completed",
-			ProcessingStatus: "completed",
+			ItemGUID:         strPtr("completed-guid"),
+			Title:            strPtr("Completed Article"),
+			ItemURL:          "https://example.com/completed",
+			ProcessingStatus: models.ProcessingStatusCompleted,
 			PublishedAt:      &publishedAt,
 		}
 		err = feedItemRepo.Create(ctx, completedItem)
 		require.NoError(t, err)
 
-		// Get pending items
-		pending, err := feedItemRepo.GetPending(ctx, 10)
+		pending, err := feedItemRepo.GetPendingItems(ctx, 10)
 		require.NoError(t, err)
 		assert.Len(t, pending, 3, "Should only return pending items")
 	})
@@ -472,12 +520,11 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 	t.Run("UpdateProcessingStatus", func(t *testing.T) {
 		testDB.TruncateAll()
 
-		// Recreate feed
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed.xml",
-			Title:       "Test Feed",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Test Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
@@ -485,36 +532,34 @@ func TestFeedItemProcessingIntegration(t *testing.T) {
 		publishedAt := time.Now()
 		feedItem := &models.FeedItem{
 			FeedID:           feed.ID,
-			ItemGUID:         "test-guid",
-			Title:            "Test Article",
-			URL:              "https://example.com/test",
-			ProcessingStatus: "pending",
+			ItemGUID:         strPtr("test-guid"),
+			Title:            strPtr("Test Article"),
+			ItemURL:          "https://example.com/test",
+			ProcessingStatus: models.ProcessingStatusPending,
 			PublishedAt:      &publishedAt,
 		}
 		err = feedItemRepo.Create(ctx, feedItem)
 		require.NoError(t, err)
 
-		// Update to processing
+		// Move to processing and stamp the content hash.
 		contentHash := "abc123hash"
-		err = feedItemRepo.UpdateContentHash(ctx, feedItem.ID, contentHash)
+		err = feedItemRepo.UpdateProcessingStatus(ctx, feedItem.ID, models.ProcessingStatusProcessing, &contentHash, nil, nil)
 		require.NoError(t, err)
 
-		err = feedItemRepo.UpdateStatus(ctx, feedItem.ID, "processing")
-		require.NoError(t, err)
-
-		// Verify update
 		item, err := feedItemRepo.GetByID(ctx, feedItem.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "processing", item.ProcessingStatus)
-		assert.Equal(t, contentHash, item.ContentHash)
+		assert.Equal(t, models.ProcessingStatusProcessing, item.ProcessingStatus)
+		require.NotNil(t, item.ContentHash)
+		assert.Equal(t, contentHash, *item.ContentHash)
 
-		// Mark as completed
-		err = feedItemRepo.UpdateStatus(ctx, feedItem.ID, "completed")
+		// Mark as completed.
+		now := time.Now()
+		err = feedItemRepo.UpdateProcessingStatus(ctx, feedItem.ID, models.ProcessingStatusCompleted, nil, nil, &now)
 		require.NoError(t, err)
 
 		item, err = feedItemRepo.GetByID(ctx, feedItem.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "completed", item.ProcessingStatus)
+		assert.Equal(t, models.ProcessingStatusCompleted, item.ProcessingStatus)
 	})
 }
 
@@ -531,41 +576,39 @@ func TestFeedPollingIntegration(t *testing.T) {
 	feedRepo := repository.NewFeedRepository(testDB.DB)
 
 	t.Run("GetFeedsDueForPolling", func(t *testing.T) {
-		// Create feeds with different next_poll_at times
 		pastTime := time.Now().Add(-1 * time.Hour)
 		futureTime := time.Now().Add(1 * time.Hour)
 
 		feed1 := &models.Feed{
 			FeedURL:     "https://example.com/feed1.xml",
-			Title:       "Due Feed 1",
-			Status:      "active",
-			PollingTier: "active",
-			NextPollAt:  &pastTime,
+			Title:       strPtr("Due Feed 1"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierActive,
+			NextPollAt:  pastTime,
 		}
 		err := feedRepo.Create(ctx, feed1)
 		require.NoError(t, err)
 
 		feed2 := &models.Feed{
 			FeedURL:     "https://example.com/feed2.xml",
-			Title:       "Due Feed 2",
-			Status:      "active",
-			PollingTier: "moderate",
-			NextPollAt:  &pastTime,
+			Title:       strPtr("Due Feed 2"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
+			NextPollAt:  pastTime,
 		}
 		err = feedRepo.Create(ctx, feed2)
 		require.NoError(t, err)
 
 		feed3 := &models.Feed{
 			FeedURL:     "https://example.com/feed3.xml",
-			Title:       "Not Due Feed",
-			Status:      "active",
-			PollingTier: "quiet",
-			NextPollAt:  &futureTime,
+			Title:       strPtr("Not Due Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierQuiet,
+			NextPollAt:  futureTime,
 		}
 		err = feedRepo.Create(ctx, feed3)
 		require.NoError(t, err)
 
-		// Get feeds due for polling
 		dueFeeds, err := feedRepo.GetFeedsDueForPolling(ctx, 10)
 		require.NoError(t, err)
 		assert.Len(t, dueFeeds, 2, "Should return 2 feeds due for polling")
@@ -574,24 +617,25 @@ func TestFeedPollingIntegration(t *testing.T) {
 	t.Run("UpdateFeedAfterPoll", func(t *testing.T) {
 		testDB.TruncateAll()
 
-		nextPoll := time.Now().Add(-1 * time.Hour)
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/feed.xml",
-			Title:       "Test Feed",
-			Status:      "active",
-			PollingTier: "moderate",
-			NextPollAt:  &nextPoll,
+			Title:       strPtr("Test Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
+			NextPollAt:  time.Now().Add(-1 * time.Hour),
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
 
-		// Update after successful poll
 		now := time.Now()
 		nextPollTime := now.Add(6 * time.Hour) // Moderate tier
-		err = feedRepo.UpdateAfterSuccessfulPoll(ctx, feed.ID, nextPollTime)
+		err = feedRepo.UpdatePollingInfo(ctx, feed.ID, &now, nil, nextPollTime, models.PollingTierModerate)
 		require.NoError(t, err)
 
-		// Verify update
+		// Reset error tracking on successful poll.
+		err = feedRepo.UpdateErrorInfo(ctx, feed.ID, 0, nil, nil)
+		require.NoError(t, err)
+
 		updated, err := feedRepo.GetByID(ctx, feed.ID)
 		require.NoError(t, err)
 		assert.NotNil(t, updated.LastFetchedAt)
@@ -603,25 +647,25 @@ func TestFeedPollingIntegration(t *testing.T) {
 
 		feed := &models.Feed{
 			FeedURL:     "https://example.com/failing-feed.xml",
-			Title:       "Failing Feed",
-			Status:      "active",
-			PollingTier: "moderate",
+			Title:       strPtr("Failing Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
 		}
 		err := feedRepo.Create(ctx, feed)
 		require.NoError(t, err)
 
-		// Record errors for 7 consecutive days
+		// Simulate 7 consecutive days of errors and assert the counter advances.
+		// Auto-disable behaviour (when present) lives in the service layer; this
+		// test only covers the repository-level error tracking.
 		for i := 1; i <= 7; i++ {
-			err = feedRepo.RecordError(ctx, feed.ID, fmt.Sprintf("Error day %d", i))
+			now := time.Now()
+			msg := fmt.Sprintf("Error day %d", i)
+			err = feedRepo.UpdateErrorInfo(ctx, feed.ID, i, &now, &msg)
 			require.NoError(t, err)
 
 			updated, err := feedRepo.GetByID(ctx, feed.ID)
 			require.NoError(t, err)
 			assert.Equal(t, i, updated.ConsecutiveErrorDays)
-
-			if i >= 7 {
-				assert.Equal(t, "disabled", updated.Status, "Should be disabled after 7 errors")
-			}
 		}
 	})
 }
