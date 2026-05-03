@@ -2,14 +2,14 @@
 id: task_d5bc
 title: Remove legacy cleaned_html fallback in outbox_worker (post-task_7479 drain cleanup)
 type: task
-status: in_progress
+status: closed
 priority: 3
 labels: []
 blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T21:57:43Z
-updated_at: 2026-05-03T21:08:48Z
+updated_at: 2026-05-03T21:11:26Z
 ---
 
 # Remove legacy cleaned_html fallback in outbox_worker
