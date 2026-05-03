@@ -2,14 +2,14 @@
 id: task_5ee6
 title: Migrate Explore fetcher to pkg/rss/
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:21Z
-updated_at: 2026-05-03T06:16:21Z
+updated_at: 2026-05-03T06:22:56Z
 ---
 # Replace Explore fetcher's RSS internals with pkg/rss/
 
