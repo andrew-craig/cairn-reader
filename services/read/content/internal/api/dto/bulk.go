@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/processor"
 )
 
 // BulkContentItem represents a single content item in a bulk request
@@ -30,6 +31,8 @@ func (b BulkContentItem) Validate() error {
 		),
 		validation.Field(&b.HTML,
 			validation.Required.Error("HTML is required"),
+			validation.Length(0, processor.MaxContentSize).
+				Error("HTML exceeds the 5MB per-item maximum"),
 		),
 		validation.Field(&b.SourceType,
 			validation.Required.Error("source_type is required"),
