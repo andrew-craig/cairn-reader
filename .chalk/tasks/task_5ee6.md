@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [feature_610d]
+blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:21Z
-updated_at: 2026-05-02T04:18:21Z
+updated_at: 2026-05-03T04:21:03Z
 ---
 # Replace Explore fetcher's RSS internals with pkg/rss/
 
