@@ -4,16 +4,16 @@
 package hash
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"strings"
 )
 
 // ContentHash returns the lowercase hex SHA-256 of html after trimming leading
 // and trailing whitespace. The trim step normalises minor whitespace differences
 // that arise when the same article is fetched at different times.
 func ContentHash(html []byte) string {
-	normalized := strings.TrimSpace(string(html))
-	sum := sha256.Sum256([]byte(normalized))
+	normalized := bytes.TrimSpace(html)
+	sum := sha256.Sum256(normalized)
 	return hex.EncodeToString(sum[:])
 }

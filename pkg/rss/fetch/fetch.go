@@ -22,6 +22,8 @@ const (
 	maxRedirects    = 10
 	maxIdlePerHost  = 10
 	idleConnTimeout = 90 * time.Second
+	// DefaultMaxBodySize is the body-read limit applied when FetchOpts.MaxBodySize is zero.
+	DefaultMaxBodySize int64 = 5 * 1024 * 1024 // 5 MB
 )
 
 // sharedClient is the single http.Client used by all Fetch calls. The
@@ -40,13 +42,16 @@ var sharedClient = &http.Client{
 	},
 }
 
-// FetchOpts configures conditional-GET headers for a Fetch call.
-// Zero value performs an unconditional GET.
+// FetchOpts configures conditional-GET headers and resource limits for a Fetch call.
+// Zero value performs an unconditional GET with the default 5 MB body limit.
 type FetchOpts struct {
 	// ETag is sent as If-None-Match when non-empty.
 	ETag string
 	// LastModified is sent as If-Modified-Since when non-empty.
 	LastModified string
+	// MaxBodySize caps how many bytes are read from the response body.
+	// If zero, DefaultMaxBodySize (5 MB) is applied.
+	MaxBodySize int64
 }
 
 // Response carries the result of a successful Fetch call.
@@ -102,9 +107,17 @@ func Fetch(ctx context.Context, url string, opts FetchOpts) (*Response, error) {
 		return nil, fmt.Errorf("fetch %q: unexpected status %d", url, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	limit := opts.MaxBodySize
+	if limit <= 0 {
+		limit = DefaultMaxBodySize
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("fetch %q: read body: %w", url, err)
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("fetch %q: body exceeds limit of %d bytes", url, limit)
 	}
 
 	result.Body = body

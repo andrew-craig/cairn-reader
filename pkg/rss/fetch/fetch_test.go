@@ -122,3 +122,38 @@ func TestFetch_InvalidURL(t *testing.T) {
 	_, err := fetch.Fetch(context.Background(), "://not-a-url", fetch.FetchOpts{})
 	assert.Error(t, err)
 }
+
+func TestFetch_BodyExceedsLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Return 11 bytes; limit is set to 10
+		fmt.Fprint(w, "01234567890")
+	}))
+	defer srv.Close()
+
+	_, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds limit")
+}
+
+func TestFetch_BodyAtLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "0123456789") // exactly 10 bytes
+	}))
+	defer srv.Close()
+
+	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
+	require.NoError(t, err)
+	assert.Equal(t, 10, len(resp.Body))
+}
+
+func TestFetch_DefaultLimitApplied(t *testing.T) {
+	// Verify MaxBodySize=0 uses the default (does not panic, succeeds for small body)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "small")
+	}))
+	defer srv.Close()
+
+	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	require.NoError(t, err)
+	assert.Equal(t, []byte("small"), resp.Body)
+}
