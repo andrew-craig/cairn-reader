@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
@@ -252,7 +253,7 @@ func (s *feedService) ValidateAndExtractFeedMetadata(ctx context.Context, feedUR
 	}
 
 	// Set user agent
-	req.Header.Set("User-Agent", "Cairn-RSS-Fetcher/1.0")
+	req.Header.Set("User-Agent", fetch.UserAgent)
 
 	// Fetch the feed
 	resp, err := s.httpClient.Do(req)

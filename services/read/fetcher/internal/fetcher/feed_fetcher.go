@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/scheduler"
@@ -31,7 +32,7 @@ func DefaultFeedFetcherConfig() *FeedFetcherConfig {
 	return &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    "Cairn-RSS-Fetcher/1.0",
+		UserAgent:    fetch.UserAgent,
 		VerifySSL:    true,
 	}
 }

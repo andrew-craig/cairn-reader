@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
@@ -233,7 +234,7 @@ func TestDefaultFeedFetcherConfig(t *testing.T) {
 	assert.NotNil(t, config)
 	assert.Equal(t, 30*time.Second, config.Timeout)
 	assert.Equal(t, 10, config.MaxRedirects)
-	assert.Equal(t, "Cairn-RSS-Fetcher/1.0", config.UserAgent)
+	assert.Equal(t, fetch.UserAgent, config.UserAgent)
 	assert.True(t, config.VerifySSL)
 }
 

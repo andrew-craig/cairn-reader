@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/pkg/rss/hash"
 )
 
@@ -113,7 +114,7 @@ func (p *ContentProcessor) fetchURL(url string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CairnBot/1.0; +https://github.com/cairn-app/cairn-reader/services/read)")
+	req.Header.Set("User-Agent", fetch.UserAgent)
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {

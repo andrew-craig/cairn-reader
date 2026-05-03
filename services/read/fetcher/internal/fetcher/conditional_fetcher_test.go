@@ -32,7 +32,7 @@ func TestFetchWithConditionals_NoHeaders(t *testing.T) {
 		// Verify no conditional headers are sent
 		assert.Empty(t, r.Header.Get("If-Modified-Since"))
 		assert.Empty(t, r.Header.Get("If-None-Match"))
-		assert.Contains(t, r.Header.Get("User-Agent"), "Cairn-RSS-Fetcher")
+		assert.Contains(t, r.Header.Get("User-Agent"), "CairnBot")
 
 		// Set response headers
 		w.Header().Set("Last-Modified", lastModified)
@@ -533,7 +533,7 @@ func TestFetchWithConditionals_UserAgent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userAgent := r.Header.Get("User-Agent")
 		assert.NotEmpty(t, userAgent)
-		assert.Contains(t, userAgent, "Cairn-RSS-Fetcher/1.0")
+		assert.Contains(t, userAgent, "CairnBot/1.0")
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
