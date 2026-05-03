@@ -303,7 +303,7 @@ func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.Bu
 
 	html, _ := payload[models.PayloadKeyRawHTML].(string)
 	if html == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing '%s' field", models.PayloadKeyRawHTML)
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid '%s' field", models.PayloadKeyRawHTML)
 	}
 
 	item := client.BulkContentItem{
