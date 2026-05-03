@@ -128,46 +128,6 @@ func TestOutboxWorker_BuildContentItem_OmitsMissingTitleAndAuthor(t *testing.T) 
 	assert.Nil(t, item.Author)
 }
 
-// Outbox entries written by the previous fetcher version (which carried
-// already-cleaned HTML under "cleaned_html") must continue to drain after the
-// fetcher is upgraded.
-func TestOutboxWorker_BuildContentItem_FallsBackToLegacyCleanedHTML(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil, nil)
-
-	entry := &models.ContentOutbox{
-		ID: uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"source_url":   "https://example.com/article",
-			"cleaned_html": "<p>legacy already-cleaned body</p>",
-		},
-	}
-
-	item, err := worker.buildContentItem(entry)
-	require.NoError(t, err)
-
-	assert.Equal(t, "<p>legacy already-cleaned body</p>", item.HTML)
-}
-
-// raw_html must win over cleaned_html if both are present so a half-migrated
-// queue can't accidentally re-process cleaned HTML.
-func TestOutboxWorker_BuildContentItem_PrefersRawHTMLOverLegacyKey(t *testing.T) {
-	worker := NewOutboxWorker(nil, nil, nil, nil)
-
-	entry := &models.ContentOutbox{
-		ID: uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"source_url":   "https://example.com/article",
-			"raw_html":     "<html><body>raw</body></html>",
-			"cleaned_html": "<p>legacy</p>",
-		},
-	}
-
-	item, err := worker.buildContentItem(entry)
-	require.NoError(t, err)
-
-	assert.Equal(t, "<html><body>raw</body></html>", item.HTML)
-}
-
 func TestOutboxWorker_BuildContentItem_ErrorsWhenHTMLMissing(t *testing.T) {
 	worker := NewOutboxWorker(nil, nil, nil, nil)
 

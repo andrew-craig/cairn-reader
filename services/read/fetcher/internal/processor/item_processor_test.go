@@ -282,7 +282,7 @@ func TestItemProcessor_OutboxPayloadCarriesRawHTML(t *testing.T) {
 	assert.Equal(t, srv.URL+"/article", payload[models.PayloadKeySourceURL])
 	assert.Equal(t, feedID.String(), payload[models.PayloadKeySourceFeedID])
 
-	_, hasCleanedHTML := payload[models.PayloadKeyCleanedHTML]
+	_, hasCleanedHTML := payload["cleaned_html"]
 	assert.False(t, hasCleanedHTML)
 	_, hasHash := payload["content_hash"]
 	assert.False(t, hasHash)
