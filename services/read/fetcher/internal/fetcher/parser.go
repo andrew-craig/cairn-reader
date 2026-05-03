@@ -1,6 +1,7 @@
 package fetcher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -56,7 +57,16 @@ func (p *Parser) ParseFromURL(ctx context.Context, feedURL string, httpClient *h
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return p.ParseFromReader(resp.Body)
+	limited := io.LimitReader(resp.Body, fetch.DefaultMaxBodySize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read feed body: %w", err)
+	}
+	if int64(len(data)) > fetch.DefaultMaxBodySize {
+		return nil, fmt.Errorf("feed exceeds maximum size of %d bytes", fetch.DefaultMaxBodySize)
+	}
+
+	return p.ParseFromReader(bytes.NewReader(data))
 }
 
 // ParseFromReader parses a feed from an io.Reader

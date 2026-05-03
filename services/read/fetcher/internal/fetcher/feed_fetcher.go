@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/scheduler"
@@ -21,8 +20,6 @@ type FeedFetcherConfig struct {
 	Timeout time.Duration
 	// MaxRedirects is the maximum number of redirects to follow
 	MaxRedirects int
-	// UserAgent is the user agent string to use
-	UserAgent string
 	// VerifySSL determines whether to verify SSL certificates
 	VerifySSL bool
 }
@@ -32,7 +29,6 @@ func DefaultFeedFetcherConfig() *FeedFetcherConfig {
 	return &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    fetch.UserAgent,
 		VerifySSL:    true,
 	}
 }

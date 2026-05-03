@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -266,7 +267,16 @@ func (s *feedService) ValidateAndExtractFeedMetadata(ctx context.Context, feedUR
 		return nil, fmt.Errorf("feed returned status %d", resp.StatusCode)
 	}
 
-	parsedFeed, err := parse.ParseReader(resp.Body)
+	limited := io.LimitReader(resp.Body, fetch.DefaultMaxBodySize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read feed body: %w", err)
+	}
+	if int64(len(data)) > fetch.DefaultMaxBodySize {
+		return nil, fmt.Errorf("feed exceeds maximum size of %d bytes", fetch.DefaultMaxBodySize)
+	}
+
+	parsedFeed, err := parse.ParseBytes(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse feed: %w", err)
 	}
