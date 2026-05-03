@@ -18,10 +18,10 @@ import (
 const UserAgent = "CairnBot/1.0 (+https://github.com/cairn-app/cairn-reader)"
 
 const (
-	defaultTimeout   = 30 * time.Second
-	maxRedirects     = 10
-	maxIdlePerHost   = 10
-	idleConnTimeout  = 90 * time.Second
+	defaultTimeout  = 30 * time.Second
+	maxRedirects    = 10
+	maxIdlePerHost  = 10
+	idleConnTimeout = 90 * time.Second
 )
 
 // sharedClient is the single http.Client used by all Fetch calls. The
