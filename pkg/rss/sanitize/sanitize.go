@@ -4,10 +4,14 @@
 package sanitize
 
 import (
+	htmlpkg "html"
 	"regexp"
+	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
 )
+
+var whitespaceRe = regexp.MustCompile(`\s+`)
 
 // singleToken matches an HTML id value: one non-whitespace token, no spaces.
 // HTML5 §2.7.1 defines id as a string that contains no ASCII whitespace.
@@ -76,4 +80,15 @@ func Policy() *bluemonday.Policy {
 // Sanitize runs html through the canonical policy and returns the cleaned string.
 func Sanitize(html string) string {
 	return canonicalPolicy.Sanitize(html)
+}
+
+// StripHTML removes all HTML tags, decodes entities, and normalises whitespace,
+// returning plain text. Use this for description/preview fields.
+func StripHTML(input string) string {
+	if input == "" {
+		return ""
+	}
+	text := bluemonday.StrictPolicy().Sanitize(input)
+	text = htmlpkg.UnescapeString(text)
+	return strings.TrimSpace(whitespaceRe.ReplaceAllString(text, " "))
 }

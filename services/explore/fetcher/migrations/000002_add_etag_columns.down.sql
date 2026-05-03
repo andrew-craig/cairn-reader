@@ -1,0 +1,3 @@
+ALTER TABLE feeds
+    DROP COLUMN IF EXISTS etag,
+    DROP COLUMN IF EXISTS last_modified;
