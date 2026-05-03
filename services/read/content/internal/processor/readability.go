@@ -3,10 +3,9 @@ package processor
 import (
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
 
-	"github.com/go-shiori/go-readability"
+	"github.com/cairn-app/cairn-reader/pkg/rss/readability"
 )
 
 // ReadabilityProcessor provides HTML content extraction and cleaning
@@ -30,36 +29,27 @@ type ReadabilityResult struct {
 }
 
 // Parse processes HTML content to extract the main article content
-// Falls back to the raw HTML if readability parsing fails
 func (r *ReadabilityProcessor) Parse(urlStr string, htmlReader io.Reader) (*ReadabilityResult, error) {
-	// Parse the URL string into a *url.URL
-	parsedURL, err := url.Parse(urlStr)
+	data, err := io.ReadAll(htmlReader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL: %w", err)
+		return nil, fmt.Errorf("failed to read HTML: %w", err)
 	}
+	return r.ParseString(urlStr, string(data))
+}
 
-	// Parse the HTML using go-readability
-	article, err := readability.FromReader(htmlReader, parsedURL)
+// ParseString is a convenience method that takes an HTML string instead of a reader
+func (r *ReadabilityProcessor) ParseString(urlStr string, html string) (*ReadabilityResult, error) {
+	result, err := readability.Extract(urlStr, html)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse HTML with readability: %w", err)
 	}
 
-	// Extract the author, handling empty strings
-	author := strings.TrimSpace(article.Byline)
-
 	return &ReadabilityResult{
-		Title:       strings.TrimSpace(article.Title),
-		Author:      author,
-		Content:     article.Content,
-		TextContent: strings.TrimSpace(article.TextContent),
-		Excerpt:     strings.TrimSpace(article.Excerpt),
-		SiteName:    strings.TrimSpace(article.SiteName),
-		Image:       strings.TrimSpace(article.Image),
-		Favicon:     strings.TrimSpace(article.Favicon),
+		Title:   result.Title,
+		Author:  strings.TrimSpace(result.Author),
+		Content: result.Content,
+		Excerpt: result.Excerpt,
+		Image:   result.Image,
+		// TextContent, SiteName, Favicon not provided by pkg/rss/readability
 	}, nil
-}
-
-// ParseString is a convenience method that takes an HTML string instead of a reader
-func (r *ReadabilityProcessor) ParseString(url string, html string) (*ReadabilityResult, error) {
-	return r.Parse(url, strings.NewReader(html))
 }

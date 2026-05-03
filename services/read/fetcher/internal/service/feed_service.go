@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
-	"github.com/mmcdole/gofeed"
 )
 
 const (
@@ -265,9 +265,7 @@ func (s *feedService) ValidateAndExtractFeedMetadata(ctx context.Context, feedUR
 		return nil, fmt.Errorf("feed returned status %d", resp.StatusCode)
 	}
 
-	// Parse the feed using gofeed
-	fp := gofeed.NewParser()
-	parsedFeed, err := fp.Parse(resp.Body)
+	parsedFeed, err := parse.ParseReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse feed: %w", err)
 	}
@@ -276,7 +274,7 @@ func (s *feedService) ValidateAndExtractFeedMetadata(ctx context.Context, feedUR
 	metadata := &FeedMetadata{
 		Title:       parsedFeed.Title,
 		Description: parsedFeed.Description,
-		SiteURL:     parsedFeed.Link,
+		SiteURL:     parsedFeed.SiteURL,
 	}
 
 	// Provide defaults if fields are empty
