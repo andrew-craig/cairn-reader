@@ -293,8 +293,6 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 }
 
 // buildContentItem builds a BulkContentItem from the outbox entry's payload.
-// Accepts the legacy PayloadKeyCleanedHTML key for one release cycle so
-// in-flight entries written by the previous fetcher version still drain.
 func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.BulkContentItem, error) {
 	payload := entry.ContentPayload
 
@@ -305,11 +303,7 @@ func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.Bu
 
 	html, _ := payload[models.PayloadKeyRawHTML].(string)
 	if html == "" {
-		html, _ = payload[models.PayloadKeyCleanedHTML].(string)
-	}
-	if html == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing HTML payload (neither '%s' nor legacy '%s' present)",
-			models.PayloadKeyRawHTML, models.PayloadKeyCleanedHTML)
+		return client.BulkContentItem{}, fmt.Errorf("missing '%s' field", models.PayloadKeyRawHTML)
 	}
 
 	item := client.BulkContentItem{
