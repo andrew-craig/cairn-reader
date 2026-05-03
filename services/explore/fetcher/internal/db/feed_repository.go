@@ -25,12 +25,13 @@ func NewFeedRepository(db *pgxpool.Pool) FeedRepositoryInterface {
 
 // GetNextFeed returns the next feed to fetch
 // Prioritizes: 1) Never fetched (last_fetched_at IS NULL)
+//
 //  2. Oldest fetched
 //
 // Only returns enabled feeds
 func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) {
 	query := `
-		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, created_at, updated_at
+		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, etag, last_modified, created_at, updated_at
 		FROM feeds
 		WHERE enabled = true
 		ORDER BY last_fetched_at NULLS FIRST, last_fetched_at ASC
@@ -38,7 +39,7 @@ func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 	`
 
 	var feed models.Feed
-	var title, description sql.NullString
+	var title, description, etag, lastModified sql.NullString
 	err := r.db.QueryRow(ctx, query).Scan(
 		&feed.ID,
 		&feed.URL,
@@ -47,6 +48,8 @@ func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 		&feed.LastFetchedAt,
 		&feed.ConsecutiveFailures,
 		&feed.Enabled,
+		&etag,
+		&lastModified,
 		&feed.CreatedAt,
 		&feed.UpdatedAt,
 	)
@@ -56,6 +59,12 @@ func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 	}
 	if description.Valid {
 		feed.Description = description.String
+	}
+	if etag.Valid {
+		feed.ETag = etag.String
+	}
+	if lastModified.Valid {
+		feed.LastModified = lastModified.String
 	}
 
 	if err == pgx.ErrNoRows {
@@ -68,18 +77,21 @@ func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) 
 	return &feed, nil
 }
 
-// UpdateFetchResult records fetch success or failure
-func (r *feedRepository) UpdateFetchResult(ctx context.Context, feedID int, success bool) error {
+// UpdateFetchResult records fetch success or failure.
+// On success, etag and lastModified are persisted (empty string clears the value).
+// On failure, etag and lastModified are ignored.
+func (r *feedRepository) UpdateFetchResult(ctx context.Context, feedID int, success bool, etag, lastModified string) error {
 	if success {
-		// Reset consecutive_failures to 0, update last_fetched_at
 		query := `
 			UPDATE feeds
 			SET last_fetched_at = NOW(),
 				consecutive_failures = 0,
+				etag = NULLIF($2, ''),
+				last_modified = NULLIF($3, ''),
 				updated_at = NOW()
 			WHERE id = $1
 		`
-		_, err := r.db.Exec(ctx, query, feedID)
+		_, err := r.db.Exec(ctx, query, feedID, etag, lastModified)
 		if err != nil {
 			return fmt.Errorf("update feed success: %w", err)
 		}

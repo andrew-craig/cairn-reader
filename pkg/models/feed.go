@@ -11,6 +11,8 @@ type Feed struct {
 	LastFetchedAt       *time.Time `json:"last_fetched_at,omitempty"`
 	ConsecutiveFailures int        `json:"consecutive_failures"`
 	Enabled             bool       `json:"enabled"`
+	ETag                string     `json:"etag,omitempty"`
+	LastModified        string     `json:"last_modified,omitempty"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
