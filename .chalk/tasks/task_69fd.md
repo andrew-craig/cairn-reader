@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_5ee6]
+blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:35Z
-updated_at: 2026-05-03T04:21:03Z
+updated_at: 2026-05-03T06:22:56Z
 ---
 # Replace Read's RSS/sanitize/readability internals with pkg/rss/
 

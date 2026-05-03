@@ -14,8 +14,10 @@ type FeedRepositoryInterface interface {
 	// Only returns enabled feeds
 	GetNextFeed(ctx context.Context) (*models.Feed, error)
 
-	// UpdateFetchResult records fetch success or failure
-	UpdateFetchResult(ctx context.Context, feedID int, success bool) error
+	// UpdateFetchResult records fetch success or failure.
+	// On success, etag and lastModified are persisted (empty string clears the value).
+	// On failure, etag and lastModified are ignored.
+	UpdateFetchResult(ctx context.Context, feedID int, success bool, etag, lastModified string) error
 
 	// ImportFeeds upserts feeds from Kagi list
 	// Only adds new feeds, preserves existing feed metadata
