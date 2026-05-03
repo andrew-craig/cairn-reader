@@ -95,9 +95,6 @@ func convertParsedItem(item parse.Item) *ParsedItem {
 	if url == "" {
 		url = item.GUID
 	}
-	if url == "" {
-		return nil
-	}
 
 	return &ParsedItem{
 		GUID:        item.GUID,

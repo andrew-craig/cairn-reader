@@ -3,7 +3,6 @@ package processor
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/cairn-app/cairn-reader/pkg/rss/readability"
 )
@@ -30,7 +29,8 @@ type ReadabilityResult struct {
 
 // Parse processes HTML content to extract the main article content
 func (r *ReadabilityProcessor) Parse(urlStr string, htmlReader io.Reader) (*ReadabilityResult, error) {
-	data, err := io.ReadAll(htmlReader)
+	limitedReader := io.LimitReader(htmlReader, MaxContentSize)
+	data, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read HTML: %w", err)
 	}
@@ -46,7 +46,7 @@ func (r *ReadabilityProcessor) ParseString(urlStr string, html string) (*Readabi
 
 	return &ReadabilityResult{
 		Title:   result.Title,
-		Author:  strings.TrimSpace(result.Author),
+		Author:  result.Author,
 		Content: result.Content,
 		Excerpt: result.Excerpt,
 		Image:   result.Image,
