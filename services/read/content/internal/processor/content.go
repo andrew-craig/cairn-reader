@@ -1,13 +1,12 @@
 package processor
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/cairn-app/cairn-reader/pkg/rss/hash"
 )
 
 const (
@@ -35,7 +34,6 @@ func NewContentProcessor() *ContentProcessor {
 		httpClient: &http.Client{
 			Timeout: FetchTimeout,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				// Allow up to 10 redirects
 				if len(via) >= 10 {
 					return fmt.Errorf("stopped after 10 redirects")
 				}
@@ -57,10 +55,6 @@ type ProcessedContent struct {
 }
 
 // ProcessURL fetches and processes content from a URL
-// Returns an error if:
-// - The URL cannot be fetched
-// - The content is too large (>5MB)
-// - The content cannot be processed
 func (p *ContentProcessor) ProcessURL(url string) (*ProcessedContent, error) {
 	rawHTML, err := p.fetchURL(url)
 	if err != nil {
@@ -81,14 +75,9 @@ func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedCo
 	var cleanedHTML string
 	var title, author, description, imageURL string
 
-	// Try to parse with readability
 	result, err := p.readability.ParseString(url, rawHTML)
 	if err != nil {
-		// Fallback to raw HTML if readability fails
 		cleanedHTML = rawHTML
-		title = ""
-		author = ""
-		description = ""
 	} else {
 		cleanedHTML = result.Content
 		title = result.Title
@@ -97,16 +86,12 @@ func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedCo
 		imageURL = result.Image
 	}
 
-	// Sanitize the HTML
 	sanitizedHTML := p.sanitizer.Sanitize(cleanedHTML)
 
-	// Generate content hash
 	contentHash := p.generateContentHash(sanitizedHTML)
 
-	// Canonicalize the URL
 	canonicalURL, err := p.canonicalizer.Canonicalize(url)
 	if err != nil {
-		// If canonicalization fails, use the original URL
 		canonicalURL = url
 	}
 
@@ -123,35 +108,29 @@ func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedCo
 
 // fetchURL fetches the content from a URL with timeout and error handling
 func (p *ContentProcessor) fetchURL(url string) (string, error) {
-	// Create a new request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set a user agent to avoid being blocked by some sites
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CairnBot/1.0; +https://github.com/cairn-app/cairn-reader/services/read)")
 
-	// Execute the request
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Check status code
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Read the response body with size limit
 	limitedReader := io.LimitReader(resp.Body, MaxContentSize+1)
 	bodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Check if content exceeds size limit
 	if len(bodyBytes) > MaxContentSize {
 		return "", fmt.Errorf("content size exceeds maximum of %d bytes", MaxContentSize)
 	}
@@ -159,18 +138,9 @@ func (p *ContentProcessor) fetchURL(url string) (string, error) {
 	return string(bodyBytes), nil
 }
 
-// generateContentHash generates a SHA-256 hash of the content
+// generateContentHash returns the SHA-256 hash of the sanitized content.
 func (p *ContentProcessor) generateContentHash(content string) string {
-	// Normalize the content before hashing (trim whitespace, lowercase)
-	normalized := strings.TrimSpace(content)
-
-	// Generate SHA-256 hash
-	hasher := sha256.New()
-	hasher.Write([]byte(normalized))
-	hashBytes := hasher.Sum(nil)
-
-	// Convert to hex string
-	return hex.EncodeToString(hashBytes)
+	return hash.ContentHash([]byte(content))
 }
 
 // GetCanonicalURL returns the canonical version of a URL

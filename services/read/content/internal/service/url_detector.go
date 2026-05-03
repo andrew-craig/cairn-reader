@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mmcdole/gofeed"
+	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 	"golang.org/x/net/html"
 )
 
@@ -44,7 +44,6 @@ type URLDetector interface {
 // urlDetectorImpl implements URLDetector
 type urlDetectorImpl struct {
 	httpClient *http.Client
-	feedParser *gofeed.Parser
 }
 
 // NewURLDetector creates a new URL detector with a 10-second timeout
@@ -53,7 +52,6 @@ func NewURLDetector() URLDetector {
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		feedParser: gofeed.NewParser(),
 	}
 }
 
@@ -203,8 +201,7 @@ func (d *urlDetectorImpl) tryParseFeed(ctx context.Context, feedURL string) *Dis
 		return nil
 	}
 
-	// Try to parse as feed
-	feed, err := d.feedParser.ParseString(string(body))
+	feed, err := parse.ParseBytes(body)
 	if err != nil || feed == nil {
 		return nil
 	}
@@ -317,7 +314,7 @@ func (d *urlDetectorImpl) DetectURL(ctx context.Context, url string) (*URLDetect
 
 	// Try to detect as feed first
 	if isFeedContentType(contentType) || isFeedURL(finalURL) {
-		feed, err := d.feedParser.ParseString(string(body))
+		feed, err := parse.ParseBytes(body)
 		if err == nil && feed != nil {
 			title := feed.Title
 			return &URLDetectionResult{

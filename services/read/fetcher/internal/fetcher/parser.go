@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mmcdole/gofeed"
+	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 )
 
 // ParsedFeed represents a parsed RSS/Atom feed with metadata
@@ -29,15 +29,11 @@ type ParsedItem struct {
 }
 
 // Parser handles RSS/Atom feed parsing
-type Parser struct {
-	parser *gofeed.Parser
-}
+type Parser struct{}
 
 // NewParser creates a new feed parser
 func NewParser() *Parser {
-	return &Parser{
-		parser: gofeed.NewParser(),
-	}
+	return &Parser{}
 }
 
 // ParseFromURL fetches and parses a feed from a URL
@@ -47,7 +43,6 @@ func (p *Parser) ParseFromURL(ctx context.Context, feedURL string, httpClient *h
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set user agent
 	req.Header.Set("User-Agent", "Cairn-RSS-Fetcher/1.0")
 
 	resp, err := httpClient.Do(req)
@@ -65,108 +60,48 @@ func (p *Parser) ParseFromURL(ctx context.Context, feedURL string, httpClient *h
 
 // ParseFromReader parses a feed from an io.Reader
 func (p *Parser) ParseFromReader(reader io.Reader) (*ParsedFeed, error) {
-	feed, err := p.parser.Parse(reader)
+	feed, err := parse.ParseReader(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse feed: %w", err)
 	}
 
-	// Extract feed metadata
-	title := ""
-	if feed.Title != "" {
-		title = feed.Title
-	}
-
-	description := ""
-	if feed.Description != "" {
-		description = feed.Description
-	}
-
-	siteURL := ""
-	if feed.Link != "" {
-		siteURL = feed.Link
-	}
-
-	// Parse items
 	items := make([]*ParsedItem, 0, len(feed.Items))
 	for _, item := range feed.Items {
-		parsedItem := p.parseItem(item)
-		if parsedItem != nil {
-			items = append(items, parsedItem)
+		parsed := convertParsedItem(item)
+		if parsed != nil {
+			items = append(items, parsed)
 		}
 	}
 
 	return &ParsedFeed{
-		Title:       title,
-		Description: description,
-		SiteURL:     siteURL,
+		Title:       feed.Title,
+		Description: feed.Description,
+		SiteURL:     feed.SiteURL,
 		Items:       items,
 	}, nil
 }
 
-// parseItem converts a gofeed.Item to our ParsedItem
-func (p *Parser) parseItem(item *gofeed.Item) *ParsedItem {
-	if item == nil {
+// convertParsedItem maps a pkg/rss/parse.Item to our ParsedItem, skipping
+// entries that have no usable URL or identifier.
+func convertParsedItem(item parse.Item) *ParsedItem {
+	// pkg/rss/parse already sets GUID = Link when the feed omits GUID.
+	// If both are empty, the item has no usable identifier.
+	if item.GUID == "" {
 		return nil
 	}
 
-	// Extract GUID (prefer GUID, fallback to Link)
-	guid := ""
-	if item.GUID != "" {
-		guid = item.GUID
-	} else if item.Link != "" {
-		guid = item.Link
-	} else {
-		// Skip items without any identifier
-		return nil
-	}
-
-	// Extract URL (prefer Link, fallback to GUID if it looks like a URL)
-	url := ""
-	if item.Link != "" {
-		url = item.Link
-	} else if item.GUID != "" {
+	// Prefer Link as the canonical article URL; fall back to GUID.
+	url := item.Link
+	if url == "" {
 		url = item.GUID
 	}
 
-	if url == "" {
-		// Skip items without a URL
-		return nil
-	}
-
-	// Extract title
-	title := ""
-	if item.Title != "" {
-		title = item.Title
-	}
-
-	// Extract author
-	author := ""
-	if item.Author != nil && item.Author.Name != "" {
-		author = item.Author.Name
-	}
-
-	// Extract published date
-	var publishedAt *time.Time
-	if item.PublishedParsed != nil {
-		publishedAt = item.PublishedParsed
-	} else if item.UpdatedParsed != nil {
-		publishedAt = item.UpdatedParsed
-	}
-
-	// Extract description (prefer Description, fallback to Content)
-	description := ""
-	if item.Description != "" {
-		description = item.Description
-	} else if item.Content != "" {
-		description = item.Content
-	}
-
 	return &ParsedItem{
-		Title:       title,
-		Author:      author,
-		PublishedAt: publishedAt,
-		Description: description,
+		GUID:        item.GUID,
+		Title:       item.Title,
+		Author:      item.Author,
+		PublishedAt: item.PublishedAt,
+		Description: item.Description,
 		URL:         url,
-		GUID:        guid,
 	}
 }

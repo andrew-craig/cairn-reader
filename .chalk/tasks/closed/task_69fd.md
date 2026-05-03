@@ -2,14 +2,14 @@
 id: task_69fd
 title: Migrate Read fetcher and Content Service to pkg/rss/
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:35Z
-updated_at: 2026-05-03T06:22:56Z
+updated_at: 2026-05-03T11:24:05Z
 ---
 # Replace Read's RSS/sanitize/readability internals with pkg/rss/
 
