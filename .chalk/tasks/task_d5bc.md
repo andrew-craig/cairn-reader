@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 3
 labels: []
-blocked_by: [task_7479]
+blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T21:57:43Z
-updated_at: 2026-05-02T21:57:43Z
+updated_at: 2026-05-03T04:13:27Z
 ---
 
 # Remove legacy cleaned_html fallback in outbox_worker

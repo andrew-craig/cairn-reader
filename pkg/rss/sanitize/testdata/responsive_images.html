@@ -1,0 +1,15 @@
+<section>
+  <h1 id="gallery">Photo Gallery</h1>
+  <picture>
+    <source srcset="hero-large.webp" media="(min-width: 1200px)" type="image/webp">
+    <source srcset="hero-medium.webp" media="(min-width: 600px)" type="image/webp">
+    <img src="hero-fallback.jpg" alt="Hero image" width="1200" height="600">
+  </picture>
+  <figure>
+    <img src="https://images.example.com/photo.jpg" alt="A photo" title="Photo caption" width="800" height="600">
+    <figcaption>A beautiful landscape</figcaption>
+  </figure>
+  <p>Images with <em>responsive</em> loading.</p>
+  <style>body { color: red }</style>
+  <img src="javascript:alert(1)" alt="xss attempt">
+</section>

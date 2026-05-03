@@ -2,14 +2,14 @@
 id: feature_610d
 title: Extract pkg/rss/ shared package (parse, sanitize, readability, fetch)
 type: feature
-status: open
+status: in_progress
 priority: 1
 labels: []
-blocked_by: [task_7479]
+blocked_by: []
 parent: epic_6d46
 remote_task_url: null
 created_at: 2026-05-02T04:18:02Z
-updated_at: 2026-05-02T08:31:16Z
+updated_at: 2026-05-03T04:13:32Z
 ---
 # Create pkg/rss/ as the single home for stateless RSS-ingestion primitives
 
