@@ -164,6 +164,10 @@ func (f *Fetcher) convertItems(items []parse.Item, feed *parse.Feed, feedURL str
 	return articles
 }
 
+// maxContentBytes caps the content payload sent to the recommender.
+// Matches fetch.DefaultMaxBodySize so no single item can exceed the ingestion limit.
+const maxContentBytes = 5 * 1024 * 1024
+
 // convertToArticle converts a parse.Item to our Article model.
 // Article ID is derived from a content hash for consistency with the Read service.
 func convertToArticle(item parse.Item, feed *parse.Feed, feedURL string) models.Article {
@@ -172,8 +176,18 @@ func convertToArticle(item parse.Item, feed *parse.Feed, feedURL string) models.
 		published = *item.PublishedAt
 	}
 
+	// pkg/rss/parse already falls back to Description when Content is absent.
+	// Guard against oversized payloads before sanitising.
+	content := item.Content
+	if content == "" {
+		content = item.Description
+	}
+	if len(content) > maxContentBytes {
+		content = content[:maxContentBytes]
+	}
+
 	cleanDescription := sanitize.StripHTML(item.Description)
-	cleanContent := sanitize.Sanitize(item.Content)
+	cleanContent := sanitize.Sanitize(content)
 
 	id := hash.ContentHash([]byte(cleanContent))
 

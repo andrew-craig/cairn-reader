@@ -18,6 +18,7 @@ var whitespaceRe = regexp.MustCompile(`\s+`)
 var singleToken = regexp.MustCompile(`^\S+$`)
 
 var canonicalPolicy = buildPolicy()
+var strictPolicy = bluemonday.StrictPolicy()
 
 // buildPolicy constructs the canonical Cairn sanitizer policy.
 // Source: services/read/content/internal/processor/sanitizer.go with two corrections:
@@ -88,7 +89,7 @@ func StripHTML(input string) string {
 	if input == "" {
 		return ""
 	}
-	text := bluemonday.StrictPolicy().Sanitize(input)
+	text := strictPolicy.Sanitize(input)
 	text = htmlpkg.UnescapeString(text)
 	return strings.TrimSpace(whitespaceRe.ReplaceAllString(text, " "))
 }
