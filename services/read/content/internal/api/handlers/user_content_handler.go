@@ -3,6 +3,9 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -18,6 +21,38 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+// paginationCursor is the decoded form of an opaque page cursor.
+type paginationCursor struct {
+	T  string `json:"t"`  // RFC3339Nano timestamp
+	ID string `json:"id"` // UUID
+}
+
+func encodeCursor(addedAt time.Time, id uuid.UUID) string {
+	c := paginationCursor{T: addedAt.UTC().Format(time.RFC3339Nano), ID: id.String()}
+	data, _ := json.Marshal(c)
+	return base64.StdEncoding.EncodeToString(data)
+}
+
+func decodeCursor(cursor string) (time.Time, uuid.UUID, error) {
+	data, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return time.Time{}, uuid.Nil, fmt.Errorf("invalid cursor encoding")
+	}
+	var c paginationCursor
+	if err := json.Unmarshal(data, &c); err != nil {
+		return time.Time{}, uuid.Nil, fmt.Errorf("invalid cursor format")
+	}
+	t, err := time.Parse(time.RFC3339Nano, c.T)
+	if err != nil {
+		return time.Time{}, uuid.Nil, fmt.Errorf("invalid cursor timestamp")
+	}
+	id, err := uuid.Parse(c.ID)
+	if err != nil {
+		return time.Time{}, uuid.Nil, fmt.Errorf("invalid cursor id")
+	}
+	return t, id, nil
+}
 
 // UserContentHandler handles user-content-related HTTP requests
 type UserContentHandler struct {
@@ -47,7 +82,6 @@ func NewUserContentHandler(
 
 // ListUserContents handles GET /api/v1/users/:user_id/contents
 func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Request) {
-	// Extract authenticated user ID from context
 	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
 	if err != nil {
 		slog.Error("user ID not found in context", slog.Any("error", err))
@@ -55,7 +89,6 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
@@ -63,29 +96,30 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Verify user owns the content
 	if authenticatedUserID != userID {
 		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
-	// Parse query parameters
-	limit := 20 // Default limit as per spec
-	offset := 0
-
+	limit := 20
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}
 
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
+	var cursorTime *time.Time
+	var cursorID *uuid.UUID
+	if cursorStr := r.URL.Query().Get("cursor"); cursorStr != "" {
+		t, id, err := decodeCursor(cursorStr)
+		if err != nil {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid cursor", nil, "v1")
+			return
 		}
+		cursorTime = &t
+		cursorID = &id
 	}
 
-	// Parse filter parameters
 	var status *string
 	var isFavorite *bool
 
@@ -108,31 +142,38 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Get user contents with filters
-	userContents, err := h.userContentRepo.ListByUserWithFilter(r.Context(), userID, status, isFavorite, limit, offset)
+	// Fetch limit+1 to determine whether a next page exists.
+	userContents, err := h.userContentRepo.ListByUserWithCursor(r.Context(), userID, status, isFavorite, limit+1, cursorTime, cursorID)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents: "+err.Error(), nil, "v1")
+		slog.Error("failed to list user contents", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents", nil, "v1")
 		return
 	}
 
-	// Get total count
-	totalCount, err := h.userContentRepo.CountByUser(r.Context(), userID)
+	hasMore := len(userContents) > limit
+	if hasMore {
+		userContents = userContents[:limit]
+	}
+
+	// Batch-fetch all content records in one query to avoid N+1.
+	contentIDs := make([]uuid.UUID, len(userContents))
+	for i, uc := range userContents {
+		contentIDs[i] = uc.ContentID
+	}
+	contentMap, err := h.contentRepo.GetByIDs(r.Context(), contentIDs)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to count user contents: "+err.Error(), nil, "v1")
+		slog.Error("failed to fetch content details", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents", nil, "v1")
 		return
 	}
 
-	// Fetch content details for each user-content
 	responses := make([]*dto.UserContentResponse, 0, len(userContents))
 	for _, uc := range userContents {
-		// Get content details
-		content, err := h.contentRepo.GetByID(r.Context(), uc.ContentID)
-		if err != nil {
-			// Skip if content not found (shouldn't happen due to FK constraint)
+		content := contentMap[uc.ContentID]
+		if content == nil {
 			continue
 		}
-
-		response := &dto.UserContentResponse{
+		responses = append(responses, &dto.UserContentResponse{
 			ID:             uc.ID,
 			UserID:         uc.UserID,
 			ContentID:      uc.ContentID,
@@ -142,26 +183,20 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 			AddedAt:        uc.AddedAt,
 			UpdatedAt:      uc.UpdatedAt,
 			Content:        contentToResponse(content),
-		}
-		responses = append(responses, response)
+		})
 	}
 
-	// Build pagination info
-	cursor := ""
-	if offset+limit < int(totalCount) {
-		nextOffset := offset + limit
-		cursor = strconv.Itoa(nextOffset)
+	nextCursor := ""
+	if hasMore && len(userContents) > 0 {
+		last := userContents[len(userContents)-1]
+		nextCursor = encodeCursor(last.AddedAt, last.ID)
 	}
 
-	paginationInfo := api.PaginationInfo{
-		Cursor:  cursor,
-		HasMore: offset+limit < int(totalCount),
+	api.WritePaginated(w, http.StatusOK, responses, api.PaginationInfo{
+		Cursor:  nextCursor,
+		HasMore: hasMore,
 		Limit:   limit,
-		Offset:  offset,
-		Total:   int(totalCount),
-	}
-
-	api.WritePaginated(w, http.StatusOK, responses, paginationInfo, "v1")
+	}, "v1")
 }
 
 // AddContentToUser handles POST /api/v1/content/user/:user_id
@@ -543,7 +578,6 @@ func (h *UserContentHandler) DeleteUserContent(w http.ResponseWriter, r *http.Re
 
 // SearchUserContents handles GET /api/v1/users/:user_id/contents/search
 func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.Request) {
-	// Extract authenticated user ID from context
 	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
 	if err != nil {
 		slog.Error("user ID not found in context", slog.Any("error", err))
@@ -551,7 +585,6 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get user ID from URL
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
@@ -559,53 +592,68 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Verify user owns the content
 	if authenticatedUserID != userID {
 		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
 		return
 	}
 
-	// Get search query
 	query := r.URL.Query().Get("q")
 	if query == "" {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Search query 'q' is required", nil, "v1")
 		return
 	}
 
-	// Parse pagination parameters
 	limit := 20
-	offset := 0
-
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 	}
 
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
+	var cursorTime *time.Time
+	var cursorID *uuid.UUID
+	if cursorStr := r.URL.Query().Get("cursor"); cursorStr != "" {
+		t, id, err := decodeCursor(cursorStr)
+		if err != nil {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid cursor", nil, "v1")
+			return
 		}
+		cursorTime = &t
+		cursorID = &id
 	}
 
-	// Search user contents
-	userContents, err := h.userContentRepo.Search(r.Context(), userID, query, limit, offset)
+	// Fetch limit+1 to determine whether a next page exists.
+	userContents, err := h.userContentRepo.SearchWithCursor(r.Context(), userID, query, limit+1, cursorTime, cursorID)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents: "+err.Error(), nil, "v1")
+		slog.Error("failed to search user contents", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents", nil, "v1")
 		return
 	}
 
-	// Fetch content details for each user-content
+	hasMore := len(userContents) > limit
+	if hasMore {
+		userContents = userContents[:limit]
+	}
+
+	// Batch-fetch all content records in one query to avoid N+1.
+	searchContentIDs := make([]uuid.UUID, len(userContents))
+	for i, uc := range userContents {
+		searchContentIDs[i] = uc.ContentID
+	}
+	searchContentMap, err := h.contentRepo.GetByIDs(r.Context(), searchContentIDs)
+	if err != nil {
+		slog.Error("failed to fetch content details", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents", nil, "v1")
+		return
+	}
+
 	responses := make([]*dto.UserContentResponse, 0, len(userContents))
 	for _, uc := range userContents {
-		// Get content details
-		content, err := h.contentRepo.GetByID(r.Context(), uc.ContentID)
-		if err != nil {
-			// Skip if content not found
+		content := searchContentMap[uc.ContentID]
+		if content == nil {
 			continue
 		}
-
-		response := &dto.UserContentResponse{
+		responses = append(responses, &dto.UserContentResponse{
 			ID:             uc.ID,
 			UserID:         uc.UserID,
 			ContentID:      uc.ContentID,
@@ -615,9 +663,18 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 			AddedAt:        uc.AddedAt,
 			UpdatedAt:      uc.UpdatedAt,
 			Content:        contentToResponse(content),
-		}
-		responses = append(responses, response)
+		})
 	}
 
-	api.WriteSuccess(w, http.StatusOK, responses, "v1")
+	nextCursor := ""
+	if hasMore && len(userContents) > 0 {
+		last := userContents[len(userContents)-1]
+		nextCursor = encodeCursor(last.AddedAt, last.ID)
+	}
+
+	api.WritePaginated(w, http.StatusOK, responses, api.PaginationInfo{
+		Cursor:  nextCursor,
+		HasMore: hasMore,
+		Limit:   limit,
+	}, "v1")
 }

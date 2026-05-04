@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
@@ -38,6 +39,9 @@ type ContentRepository interface {
 
 	// GetByContentHashesAndFeedID retrieves multiple contents by their hashes and feed ID (for bulk deduplication)
 	GetByContentHashesAndFeedID(ctx context.Context, contentHashes []string, feedID uuid.UUID) (map[string]*models.Content, error)
+
+	// GetByIDs retrieves multiple content records by ID in a single query, returning a map keyed by ID.
+	GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error)
 
 	// BulkCreate creates multiple content records in a transaction
 	BulkCreate(ctx context.Context, contents []*models.Content) error
@@ -451,6 +455,68 @@ func (r *contentRepository) GetByContentHashesAndFeedID(ctx context.Context, con
 			return nil, fmt.Errorf("failed to scan content: %w", err)
 		}
 		result[content.ContentHash] = content
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating content rows: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetByIDs retrieves multiple content records by ID in a single query.
+func (r *contentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error) {
+	if len(ids) == 0 {
+		return make(map[uuid.UUID]*models.Content), nil
+	}
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			id, content_hash, cleaned_html, original_url, canonical_url,
+			title, author, published_at, description, image_urls,
+			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
+		FROM contents
+		WHERE id IN (%s)
+	`, strings.Join(placeholders, ", "))
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contents by IDs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[uuid.UUID]*models.Content, len(ids))
+	for rows.Next() {
+		content := &models.Content{}
+		err := rows.Scan(
+			&content.ID,
+			&content.ContentHash,
+			&content.CleanedHTML,
+			&content.OriginalURL,
+			&content.CanonicalURL,
+			&content.Title,
+			&content.Author,
+			&content.PublishedAt,
+			&content.Description,
+			&content.ImageURLs,
+			&content.SourceType,
+			&content.SourceFeedID,
+			&content.Metadata,
+			&content.CreatedAt,
+			&content.UpdatedAt,
+			&content.OrphanedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan content: %w", err)
+		}
+		result[content.ID] = content
 	}
 
 	if err = rows.Err(); err != nil {

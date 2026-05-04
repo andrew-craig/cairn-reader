@@ -130,6 +130,14 @@ func (m *mockUserContentRepo) Search(ctx context.Context, userID uuid.UUID, quer
 	return nil, nil
 }
 
+func (m *mockUserContentRepo) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	return nil, nil
+}
+
+func (m *mockUserContentRepo) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	return nil, nil
+}
+
 func (m *mockUserContentRepo) BulkCreate(ctx context.Context, userContents []*models.UserContent) error {
 	return nil
 }
@@ -151,6 +159,10 @@ func (m *mockContentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Co
 		OriginalURL: "https://example.com",
 		CleanedHTML: "<p>Test content</p>",
 	}, nil
+}
+
+func (m *mockContentRepo) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error) {
+	return nil, nil
 }
 
 func (m *mockContentRepo) GetByContentHashAndFeedID(ctx context.Context, contentHash string, feedID uuid.UUID) (*models.Content, error) {

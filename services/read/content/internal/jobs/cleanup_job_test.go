@@ -77,6 +77,14 @@ func (m *MockContentRepository) BulkCreate(ctx context.Context, contents []*mode
 	return args.Error(0)
 }
 
+func (m *MockContentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error) {
+	args := m.Called(ctx, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[uuid.UUID]*models.Content), args.Error(1)
+}
+
 func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan time.Duration) (int64, error) {
 	args := m.Called(ctx, olderThan)
 	return args.Get(0).(int64), args.Error(1)
