@@ -59,25 +59,17 @@ type IngestRSSError struct {
 	Message string `json:"message"`
 }
 
-// FeedInfo represents feed information in subscription list
-type FeedInfo struct {
-	ID            string `json:"id"`
-	FeedURL       string `json:"feed_url"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	SiteURL       string `json:"site_url"`
-	PollingTier   string `json:"polling_tier"`
-	Status        string `json:"status"`
-	LastFetchedAt string `json:"last_fetched_at"`
-}
-
-// SubscriptionInfo represents subscription information in list
+// SubscriptionInfo represents subscription information in list.
+// Fields match the flat response from the Ingest RSS service's list endpoint.
 type SubscriptionInfo struct {
-	ID           string   `json:"id"`
-	UserID       string   `json:"user_id"`
-	FeedID       string   `json:"feed_id"`
-	SubscribedAt string   `json:"subscribed_at"`
-	Feed         FeedInfo `json:"feed"`
+	ID            string `json:"subscription_id"`
+	FeedID        string `json:"feed_id"`
+	FeedURL       string `json:"feed_url"`
+	FeedTitle     string `json:"feed_title"`
+	FeedStatus    string `json:"feed_status"`
+	PollingTier   string `json:"polling_tier"`
+	LastFetchedAt string `json:"last_fetched_at"`
+	SubscribedAt  string `json:"subscribed_at"`
 }
 
 // ListSubscriptionsResponse represents the response from listing subscriptions
