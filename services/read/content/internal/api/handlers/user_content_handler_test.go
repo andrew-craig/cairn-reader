@@ -110,6 +110,22 @@ func (m *MockUserContentRepository) Search(ctx context.Context, userID uuid.UUID
 	return args.Get(0).([]*models.UserContent), args.Error(1)
 }
 
+func (m *MockUserContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	args := m.Called(ctx, userID, status, isFavorite, limit, cursorTime, cursorID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.UserContent), args.Error(1)
+}
+
+func (m *MockUserContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	args := m.Called(ctx, userID, query, limit, cursorTime, cursorID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.UserContent), args.Error(1)
+}
+
 // MockContentRepository is a mock implementation of repository.ContentRepository
 type MockContentRepository struct {
 	mock.Mock
@@ -210,9 +226,9 @@ func TestListUserContents_Success(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	mockUserContentRepo.On("ListByUserWithFilter", mock.Anything, userID, (*string)(nil), (*bool)(nil), 20, 0).
+	// Handler fetches limit+1 (21) to detect has_more; only 1 item returned so has_more=false.
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID).Return(int64(1), nil)
 	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents", nil)
@@ -229,8 +245,8 @@ func TestListUserContents_Success(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	pagination := response["pagination"].(map[string]interface{})
-	assert.Equal(t, float64(1), pagination["total"])
 	assert.Equal(t, float64(20), pagination["limit"])
+	assert.Equal(t, false, pagination["has_more"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -245,9 +261,8 @@ func TestListUserContents_WithFilters(t *testing.T) {
 	status := "read"
 	isFavorite := true
 
-	mockUserContentRepo.On("ListByUserWithFilter", mock.Anything, userID, &status, &isFavorite, 20, 0).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, &status, &isFavorite, 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return([]*models.UserContent{}, nil)
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID).Return(int64(0), nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?status=read&is_favorite=true", nil)
 	rctx := chi.NewRouteContext()
@@ -263,26 +278,51 @@ func TestListUserContents_WithFilters(t *testing.T) {
 	mockUserContentRepo.AssertExpectations(t)
 }
 
-// TestListUserContents_WithPagination tests pagination parameters
+// TestListUserContents_WithPagination tests cursor-based pagination
 func TestListUserContents_WithPagination(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
 	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
+	contentID := uuid.New()
 
-	mockUserContentRepo.On("ListByUserWithFilter", mock.Anything, userID, (*string)(nil), (*bool)(nil), 50, 10).
-		Return([]*models.UserContent{}, nil)
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID).Return(int64(100), nil)
+	// Return limit+1 items so handler sets has_more=true.
+	addedAt := time.Now()
+	ucID := uuid.New()
+	items := make([]*models.UserContent, 51)
+	for i := range items {
+		items[i] = &models.UserContent{
+			ID:        uuid.New(),
+			UserID:    userID,
+			ContentID: contentID,
+			Status:    "unread",
+			AddedAt:   addedAt,
+			UpdatedAt: addedAt,
+		}
+	}
+	items[49].ID = ucID // last item in the page (index 49)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?limit=50&offset=10", nil)
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 51, (*time.Time)(nil), (*uuid.UUID)(nil)).
+		Return(items, nil)
+	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(&models.Content{
+		ID:          contentID,
+		Title:       "T",
+		OriginalURL: "https://example.com",
+		ContentHash: "h",
+		CleanedHTML: "<p>T</p>",
+		SourceType:  "web",
+		CreatedAt:   addedAt,
+		UpdatedAt:   addedAt,
+	}, nil).Times(50)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?limit=50", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 	req = addAuthContextToRequest(req, userID)
 
 	w := httptest.NewRecorder()
-
 	handler.ListUserContents(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -290,9 +330,15 @@ func TestListUserContents_WithPagination(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	pagination := response["pagination"].(map[string]interface{})
 	assert.Equal(t, float64(50), pagination["limit"])
-	assert.Equal(t, float64(10), pagination["offset"])
-	assert.Equal(t, true, pagination["has_more"]) // Should have more since 10+50 < 100
+	assert.Equal(t, true, pagination["has_more"])
+	assert.NotEmpty(t, pagination["cursor"])
+	// offset and total should not be present
+	_, hasOffset := pagination["offset"]
+	assert.False(t, hasOffset)
+	_, hasTotal := pagination["total"]
+	assert.False(t, hasTotal)
 	mockUserContentRepo.AssertExpectations(t)
+	mockContentRepo.AssertExpectations(t)
 }
 
 // TestListUserContents_InvalidUserID tests handling of invalid user ID
@@ -711,7 +757,8 @@ func TestSearchUserContents_Success(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	mockUserContentRepo.On("Search", mock.Anything, userID, "test query", 20, 0).Return(userContents, nil)
+	// Handler fetches limit+1 (21); only 1 returned so has_more=false.
+	mockUserContentRepo.On("SearchWithCursor", mock.Anything, userID, "test query", 21, (*time.Time)(nil), (*uuid.UUID)(nil)).Return(userContents, nil)
 	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/search?q=test+query", nil)
@@ -730,6 +777,8 @@ func TestSearchUserContents_Success(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	data := response["data"].([]interface{})
 	assert.Len(t, data, 1)
+	pagination := response["pagination"].(map[string]interface{})
+	assert.Equal(t, false, pagination["has_more"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }
@@ -867,9 +916,8 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	mockUserContentRepo.On("ListByUserWithFilter", mock.Anything, userID, (*string)(nil), (*bool)(nil), 20, 0).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID).Return(int64(1), nil)
 	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
 
 	// Same user ID for both authenticated and requested user
@@ -883,7 +931,8 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	pagination := response["pagination"].(map[string]interface{})
-	assert.Equal(t, float64(1), pagination["total"])
+	assert.Equal(t, float64(20), pagination["limit"])
+	assert.Equal(t, false, pagination["has_more"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
 }

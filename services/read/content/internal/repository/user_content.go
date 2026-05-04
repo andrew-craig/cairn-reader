@@ -30,6 +30,11 @@ type UserContentRepository interface {
 	// ListByUserWithFilter retrieves content for a user with filtering and pagination
 	ListByUserWithFilter(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit, offset int) ([]*models.UserContent, error)
 
+	// ListByUserWithCursor retrieves content for a user with optional filtering and keyset (cursor) pagination.
+	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
+	// Callers should request limit+1 rows to determine whether a next page exists.
+	ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
+
 	// Update updates an existing user-content record
 	Update(ctx context.Context, userContent *models.UserContent) error
 
@@ -50,6 +55,11 @@ type UserContentRepository interface {
 
 	// Search searches user's content by title and author
 	Search(ctx context.Context, userID uuid.UUID, query string, limit, offset int) ([]*models.UserContent, error)
+
+	// SearchWithCursor searches user's content using full-text search with keyset (cursor) pagination.
+	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
+	// Callers should request limit+1 rows to determine whether a next page exists.
+	SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
 	// BulkCreate creates multiple user-content relationships in a transaction
 	BulkCreate(ctx context.Context, userContents []*models.UserContent) error
@@ -305,6 +315,70 @@ func (r *userContentRepository) ListByUserWithFilter(ctx context.Context, userID
 	return userContents, nil
 }
 
+// ListByUserWithCursor retrieves content for a user with optional filters and keyset pagination.
+func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	query := `
+		SELECT id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+		FROM user_contents
+		WHERE user_id = $1
+	`
+
+	args := []interface{}{userID}
+	argPos := 2
+
+	if status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argPos)
+		args = append(args, *status)
+		argPos++
+	}
+
+	if isFavorite != nil {
+		query += fmt.Sprintf(" AND is_favorite = $%d", argPos)
+		args = append(args, *isFavorite)
+		argPos++
+	}
+
+	if cursorTime != nil && cursorID != nil {
+		query += fmt.Sprintf(" AND (added_at < $%d OR (added_at = $%d AND id < $%d))", argPos, argPos, argPos+1)
+		args = append(args, *cursorTime, *cursorID)
+		argPos += 2
+	}
+
+	query += fmt.Sprintf(" ORDER BY added_at DESC, id DESC LIMIT $%d", argPos)
+	args = append(args, limit)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list user contents with cursor: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var userContents []*models.UserContent
+	for rows.Next() {
+		userContent := &models.UserContent{}
+		err := rows.Scan(
+			&userContent.ID,
+			&userContent.UserID,
+			&userContent.ContentID,
+			&userContent.Status,
+			&userContent.ScrollPosition,
+			&userContent.IsFavorite,
+			&userContent.AddedAt,
+			&userContent.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user-content: %w", err)
+		}
+		userContents = append(userContents, userContent)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating user-content rows: %w", err)
+	}
+
+	return userContents, nil
+}
+
 // Update updates an existing user-content record
 func (r *userContentRepository) Update(ctx context.Context, userContent *models.UserContent) error {
 	query := `
@@ -524,6 +598,60 @@ func (r *userContentRepository) Search(ctx context.Context, userID uuid.UUID, qu
 
 	if err = rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating user-content rows: %w", err)
+	}
+
+	return userContents, nil
+}
+
+// SearchWithCursor searches user's content using full-text search with keyset pagination.
+func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	sqlQuery := `
+		SELECT uc.id, uc.user_id, uc.content_id, uc.status, uc.scroll_position, uc.is_favorite, uc.added_at, uc.updated_at
+		FROM user_contents uc
+		JOIN contents c ON uc.content_id = c.id
+		WHERE uc.user_id = $1
+		AND to_tsvector('english', coalesce(c.title, '') || ' ' || coalesce(c.author, '')) @@ plainto_tsquery('english', $2)
+	`
+
+	args := []interface{}{userID, query}
+	argPos := 3
+
+	if cursorTime != nil && cursorID != nil {
+		sqlQuery += fmt.Sprintf(" AND (uc.added_at < $%d OR (uc.added_at = $%d AND uc.id < $%d))", argPos, argPos, argPos+1)
+		args = append(args, *cursorTime, *cursorID)
+		argPos += 2
+	}
+
+	sqlQuery += fmt.Sprintf(" ORDER BY uc.added_at DESC, uc.id DESC LIMIT $%d", argPos)
+	args = append(args, limit)
+
+	rows, err := r.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search user contents with cursor: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var userContents []*models.UserContent
+	for rows.Next() {
+		userContent := &models.UserContent{}
+		err := rows.Scan(
+			&userContent.ID,
+			&userContent.UserID,
+			&userContent.ContentID,
+			&userContent.Status,
+			&userContent.ScrollPosition,
+			&userContent.IsFavorite,
+			&userContent.AddedAt,
+			&userContent.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user-content in search: %w", err)
+		}
+		userContents = append(userContents, userContent)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating user-content search rows: %w", err)
 	}
 
 	return userContents, nil

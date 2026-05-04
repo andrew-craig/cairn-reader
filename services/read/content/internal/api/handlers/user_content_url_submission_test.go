@@ -130,6 +130,14 @@ func (m *mockUserContentRepo) Search(ctx context.Context, userID uuid.UUID, quer
 	return nil, nil
 }
 
+func (m *mockUserContentRepo) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	return nil, nil
+}
+
+func (m *mockUserContentRepo) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	return nil, nil
+}
+
 func (m *mockUserContentRepo) BulkCreate(ctx context.Context, userContents []*models.UserContent) error {
 	return nil
 }
