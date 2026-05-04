@@ -1,12 +1,14 @@
 package fetcher
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 )
 
@@ -43,7 +45,7 @@ func (p *Parser) ParseFromURL(ctx context.Context, feedURL string, httpClient *h
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Cairn-RSS-Fetcher/1.0")
+	req.Header.Set("User-Agent", fetch.UserAgent)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -55,7 +57,16 @@ func (p *Parser) ParseFromURL(ctx context.Context, feedURL string, httpClient *h
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return p.ParseFromReader(resp.Body)
+	limited := io.LimitReader(resp.Body, fetch.DefaultMaxBodySize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read feed body: %w", err)
+	}
+	if int64(len(data)) > fetch.DefaultMaxBodySize {
+		return nil, fmt.Errorf("feed exceeds maximum size of %d bytes", fetch.DefaultMaxBodySize)
+	}
+
+	return p.ParseFromReader(bytes.NewReader(data))
 }
 
 // ParseFromReader parses a feed from an io.Reader

@@ -161,7 +161,7 @@ func TestParser_ParseFromURL_Success(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Contains(t, r.Header.Get("User-Agent"), "Cairn-RSS-Fetcher")
+		assert.Contains(t, r.Header.Get("User-Agent"), "CairnBot")
 
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusOK)

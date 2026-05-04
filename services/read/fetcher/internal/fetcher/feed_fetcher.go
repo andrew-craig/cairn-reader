@@ -20,8 +20,6 @@ type FeedFetcherConfig struct {
 	Timeout time.Duration
 	// MaxRedirects is the maximum number of redirects to follow
 	MaxRedirects int
-	// UserAgent is the user agent string to use
-	UserAgent string
 	// VerifySSL determines whether to verify SSL certificates
 	VerifySSL bool
 }
@@ -31,7 +29,6 @@ func DefaultFeedFetcherConfig() *FeedFetcherConfig {
 	return &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    "Cairn-RSS-Fetcher/1.0",
 		VerifySSL:    true,
 	}
 }

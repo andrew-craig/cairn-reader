@@ -233,7 +233,6 @@ func TestDefaultFeedFetcherConfig(t *testing.T) {
 	assert.NotNil(t, config)
 	assert.Equal(t, 30*time.Second, config.Timeout)
 	assert.Equal(t, 10, config.MaxRedirects)
-	assert.Equal(t, "Cairn-RSS-Fetcher/1.0", config.UserAgent)
 	assert.True(t, config.VerifySSL)
 }
 
@@ -242,7 +241,6 @@ func TestNewFeedFetcher_WithConfig(t *testing.T) {
 	config := &FeedFetcherConfig{
 		Timeout:      15 * time.Second,
 		MaxRedirects: 5,
-		UserAgent:    "CustomAgent/1.0",
 		VerifySSL:    false,
 	}
 
@@ -480,7 +478,6 @@ func TestProcessFeed_HTTPTimeout(t *testing.T) {
 	config := &FeedFetcherConfig{
 		Timeout:      100 * time.Millisecond, // Very short timeout
 		MaxRedirects: 10,
-		UserAgent:    "Test/1.0",
 		VerifySSL:    true,
 	}
 
@@ -524,7 +521,6 @@ func TestProcessFeed_MaxRedirects(t *testing.T) {
 	config := &FeedFetcherConfig{
 		Timeout:      5 * time.Second,
 		MaxRedirects: maxRedirects,
-		UserAgent:    "Test/1.0",
 		VerifySSL:    true,
 	}
 
@@ -613,7 +609,6 @@ func TestProcessFeed_SSLConfig(t *testing.T) {
 	configWithSSL := &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    "Test/1.0",
 		VerifySSL:    true,
 	}
 
@@ -628,7 +623,6 @@ func TestProcessFeed_SSLConfig(t *testing.T) {
 	configWithoutSSL := &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    "Test/1.0",
 		VerifySSL:    false,
 	}
 
@@ -642,7 +636,6 @@ func TestProcessFeed_TLSConfig(t *testing.T) {
 	config := &FeedFetcherConfig{
 		Timeout:      30 * time.Second,
 		MaxRedirects: 10,
-		UserAgent:    "Test/1.0",
 		VerifySSL:    true,
 	}
 

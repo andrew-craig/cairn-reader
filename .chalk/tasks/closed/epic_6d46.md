@@ -2,14 +2,14 @@
 id: epic_6d46
 title: Consolidate RSS feed handling into shared pkg/rss/ and fix metadata loss
 type: epic
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-05-02T04:16:55Z
-updated_at: 2026-05-02T04:16:55Z
+updated_at: 2026-05-03T22:52:54Z
 ---
 # Re-architect RSS ingestion to share code and stop dropping article metadata
 
