@@ -139,6 +139,14 @@ func (m *MockContentRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 	return args.Get(0).(*models.Content), args.Error(1)
 }
 
+func (m *MockContentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error) {
+	args := m.Called(ctx, ids)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[uuid.UUID]*models.Content), args.Error(1)
+}
+
 func (m *MockContentRepository) Create(ctx context.Context, content *models.Content) error {
 	args := m.Called(ctx, content)
 	return args.Error(0)
@@ -226,10 +234,12 @@ func TestListUserContents_Success(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
+	contentMap := map[uuid.UUID]*models.Content{contentID: content}
+
 	// Handler fetches limit+1 (21) to detect has_more; only 1 item returned so has_more=false.
 	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
-	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
+	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(contentMap, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents", nil)
 	rctx := chi.NewRouteContext()
@@ -263,6 +273,7 @@ func TestListUserContents_WithFilters(t *testing.T) {
 
 	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, &status, &isFavorite, 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return([]*models.UserContent{}, nil)
+	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(map[uuid.UUID]*models.Content{}, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?status=read&is_favorite=true", nil)
 	rctx := chi.NewRouteContext()
@@ -303,9 +314,7 @@ func TestListUserContents_WithPagination(t *testing.T) {
 	}
 	items[49].ID = ucID // last item in the page (index 49)
 
-	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 51, (*time.Time)(nil), (*uuid.UUID)(nil)).
-		Return(items, nil)
-	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(&models.Content{
+	pagedContent := &models.Content{
 		ID:          contentID,
 		Title:       "T",
 		OriginalURL: "https://example.com",
@@ -314,7 +323,12 @@ func TestListUserContents_WithPagination(t *testing.T) {
 		SourceType:  "web",
 		CreatedAt:   addedAt,
 		UpdatedAt:   addedAt,
-	}, nil).Times(50)
+	}
+	pagedContentMap := map[uuid.UUID]*models.Content{contentID: pagedContent}
+
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 51, (*time.Time)(nil), (*uuid.UUID)(nil)).
+		Return(items, nil)
+	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(pagedContentMap, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?limit=50", nil)
 	rctx := chi.NewRouteContext()
@@ -757,9 +771,11 @@ func TestSearchUserContents_Success(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
+	searchContentMap := map[uuid.UUID]*models.Content{contentID: content}
+
 	// Handler fetches limit+1 (21); only 1 returned so has_more=false.
 	mockUserContentRepo.On("SearchWithCursor", mock.Anything, userID, "test query", 21, (*time.Time)(nil), (*uuid.UUID)(nil)).Return(userContents, nil)
-	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
+	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(searchContentMap, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/search?q=test+query", nil)
 
@@ -916,9 +932,11 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
+	authContentMap := map[uuid.UUID]*models.Content{contentID: content}
+
 	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
-	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
+	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(authContentMap, nil)
 
 	// Same user ID for both authenticated and requested user
 	req := setupUserContentRequest(userID, userID, "/api/v1/users/"+userID.String()+"/contents", http.MethodGet)

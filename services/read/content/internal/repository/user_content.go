@@ -339,7 +339,7 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 	}
 
 	if cursorTime != nil && cursorID != nil {
-		query += fmt.Sprintf(" AND (added_at < $%d OR (added_at = $%d AND id < $%d))", argPos, argPos, argPos+1)
+		query += fmt.Sprintf(" AND (added_at, id) < ($%d, $%d)", argPos, argPos+1)
 		args = append(args, *cursorTime, *cursorID)
 		argPos += 2
 	}
@@ -617,7 +617,7 @@ func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uui
 	argPos := 3
 
 	if cursorTime != nil && cursorID != nil {
-		sqlQuery += fmt.Sprintf(" AND (uc.added_at < $%d OR (uc.added_at = $%d AND uc.id < $%d))", argPos, argPos, argPos+1)
+		sqlQuery += fmt.Sprintf(" AND (uc.added_at, uc.id) < ($%d, $%d)", argPos, argPos+1)
 		args = append(args, *cursorTime, *cursorID)
 		argPos += 2
 	}

@@ -145,7 +145,8 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 	// Fetch limit+1 to determine whether a next page exists.
 	userContents, err := h.userContentRepo.ListByUserWithCursor(r.Context(), userID, status, isFavorite, limit+1, cursorTime, cursorID)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents: "+err.Error(), nil, "v1")
+		slog.Error("failed to list user contents", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents", nil, "v1")
 		return
 	}
 
@@ -154,10 +155,22 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		userContents = userContents[:limit]
 	}
 
+	// Batch-fetch all content records in one query to avoid N+1.
+	contentIDs := make([]uuid.UUID, len(userContents))
+	for i, uc := range userContents {
+		contentIDs[i] = uc.ContentID
+	}
+	contentMap, err := h.contentRepo.GetByIDs(r.Context(), contentIDs)
+	if err != nil {
+		slog.Error("failed to fetch content details", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents", nil, "v1")
+		return
+	}
+
 	responses := make([]*dto.UserContentResponse, 0, len(userContents))
 	for _, uc := range userContents {
-		content, err := h.contentRepo.GetByID(r.Context(), uc.ContentID)
-		if err != nil {
+		content := contentMap[uc.ContentID]
+		if content == nil {
 			continue
 		}
 		responses = append(responses, &dto.UserContentResponse{
@@ -612,7 +625,8 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 	// Fetch limit+1 to determine whether a next page exists.
 	userContents, err := h.userContentRepo.SearchWithCursor(r.Context(), userID, query, limit+1, cursorTime, cursorID)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents: "+err.Error(), nil, "v1")
+		slog.Error("failed to search user contents", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents", nil, "v1")
 		return
 	}
 
@@ -621,10 +635,22 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 		userContents = userContents[:limit]
 	}
 
+	// Batch-fetch all content records in one query to avoid N+1.
+	searchContentIDs := make([]uuid.UUID, len(userContents))
+	for i, uc := range userContents {
+		searchContentIDs[i] = uc.ContentID
+	}
+	searchContentMap, err := h.contentRepo.GetByIDs(r.Context(), searchContentIDs)
+	if err != nil {
+		slog.Error("failed to fetch content details", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents", nil, "v1")
+		return
+	}
+
 	responses := make([]*dto.UserContentResponse, 0, len(userContents))
 	for _, uc := range userContents {
-		content, err := h.contentRepo.GetByID(r.Context(), uc.ContentID)
-		if err != nil {
+		content := searchContentMap[uc.ContentID]
+		if content == nil {
 			continue
 		}
 		responses = append(responses, &dto.UserContentResponse{

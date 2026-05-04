@@ -161,6 +161,10 @@ func (m *mockContentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Co
 	}, nil
 }
 
+func (m *mockContentRepo) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*models.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentRepo) GetByContentHashAndFeedID(ctx context.Context, contentHash string, feedID uuid.UUID) (*models.Content, error) {
 	return nil, nil
 }
