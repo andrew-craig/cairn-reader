@@ -1,7 +1,7 @@
 // Read Service API Types
 // Based on OpenAPI spec in services/read/api/openapi.yaml
 
-export interface ContentResponse {
+interface ContentResponse {
   id: string;
   content_hash: string;
   cleaned_html: string;
@@ -20,7 +20,7 @@ export interface ContentResponse {
   updated_at: string;
 }
 
-export type ContentStatus = 'unread' | 'reading' | 'completed' | 'archived';
+type ContentStatus = 'unread' | 'reading' | 'completed' | 'archived';
 
 export interface UserContentResponse {
   id: string;
@@ -43,7 +43,7 @@ export interface UserContentsListResponse {
 }
 
 // URL Detection Types
-export type URLType = 'feed' | 'page' | 'unknown';
+type URLType = 'feed' | 'page' | 'unknown';
 
 export interface DetectURLResponse {
   url: string;
@@ -52,7 +52,7 @@ export interface DetectURLResponse {
 }
 
 // Feed Discovery Types
-export interface DiscoveredFeed {
+interface DiscoveredFeed {
   url: string;
   title: string;
 }
@@ -67,7 +67,7 @@ export interface AddURLRequest {
   title?: string;
 }
 
-export interface AddFeedResponse {
+interface AddFeedResponse {
   type: 'feed';
   feed_id: string;
   subscription: {
@@ -80,7 +80,7 @@ export interface AddFeedResponse {
   };
 }
 
-export interface AddPageResponse {
+interface AddPageResponse {
   type: 'page';
   content: UserContentResponse;
 }
@@ -115,7 +115,7 @@ export interface ListContentsParams {
 }
 
 // Feed Subscription Types (Legacy - kept for backward compatibility)
-export interface FeedSubscriptionResponse {
+interface FeedSubscriptionResponse {
   subscription_id: string;
   feed_id: string;
   feed_url: string;
@@ -132,21 +132,21 @@ export interface ListFeedSubscriptionsResponse {
 }
 
 // Unified Subscription Types
-export type SubscriptionType = 'rss' | 'social' | 'email';
+type SubscriptionType = 'rss' | 'social' | 'email';
 
-export interface RSSSubscriptionData {
+interface RSSSubscriptionData {
   feed_url: string;
   site_url?: string;
   polling_tier?: string;
   last_fetched_at?: string;
 }
 
-export interface SocialSubscriptionData {
+interface SocialSubscriptionData {
   platform: string;
   handle: string;
 }
 
-export interface EmailSubscriptionData {
+interface EmailSubscriptionData {
   email_address: string;
   filter_rules?: string;
 }

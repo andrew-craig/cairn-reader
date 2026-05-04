@@ -199,14 +199,23 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       <View style={styles.content}>
         {/* Article Header */}
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>
+          <Text
+            style={[styles.title, { color: colors.text }]}
+            onPress={() => Linking.openURL(article.url).catch(() => {})}
+          >
             {article.title}
           </Text>
           <Text style={[styles.publishedOn, { color: colors.textSecondary }]}>
             Published on{' '}
             <Text
               style={[styles.publisherLink, { color: colors.textSecondary }]}
-              onPress={() => Linking.openURL(article.url)}
+              onPress={async () => {
+                try {
+                  await Linking.openURL(new URL(article.url).origin);
+                } catch {
+                  Linking.openURL(article.url).catch(() => {});
+                }
+              }}
             >
               {extractDomain(article.url)}
             </Text>
