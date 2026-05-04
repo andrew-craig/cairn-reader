@@ -107,14 +107,12 @@ func (h *SubscriptionAggregatorHandler) fetchRSSSubscriptions(ctx context.Contex
 		unified = append(unified, dto.UnifiedSubscription{
 			ID:           rssSub.ID,
 			Type:         dto.SubscriptionTypeRSS,
-			Title:        rssSub.Feed.Title,
-			Description:  rssSub.Feed.Description,
+			Title:        rssSub.FeedTitle,
 			SubscribedAt: rssSub.SubscribedAt,
 			RSSData: &dto.RSSSubscriptionData{
-				FeedURL:       rssSub.Feed.FeedURL,
-				SiteURL:       rssSub.Feed.SiteURL,
-				PollingTier:   rssSub.Feed.PollingTier,
-				LastFetchedAt: rssSub.Feed.LastFetchedAt,
+				FeedURL:       rssSub.FeedURL,
+				PollingTier:   rssSub.PollingTier,
+				LastFetchedAt: rssSub.LastFetchedAt,
 			},
 		})
 	}
