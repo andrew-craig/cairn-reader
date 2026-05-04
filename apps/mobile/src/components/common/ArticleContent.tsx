@@ -201,7 +201,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
         <View style={styles.header}>
           <Text
             style={[styles.title, { color: colors.text }]}
-            onPress={() => Linking.openURL(article.url)}
+            onPress={() => Linking.openURL(article.url).catch(() => {})}
           >
             {article.title}
           </Text>
@@ -209,11 +209,11 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
             Published on{' '}
             <Text
               style={[styles.publisherLink, { color: colors.textSecondary }]}
-              onPress={() => {
+              onPress={async () => {
                 try {
-                  Linking.openURL(new URL(article.url).origin);
+                  await Linking.openURL(new URL(article.url).origin);
                 } catch {
-                  Linking.openURL(article.url);
+                  Linking.openURL(article.url).catch(() => {});
                 }
               }}
             >
