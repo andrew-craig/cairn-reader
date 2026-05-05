@@ -2,7 +2,6 @@ import React, { ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { GlobalStyles } from '../../constants/globalStyles';
 import { Colors, Spacing } from '../../constants/theme';
 
@@ -34,9 +33,6 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
-
-  const handleBack = onBack ?? (() => navigation.goBack());
 
   return (
     <View
@@ -50,7 +46,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
       ]}
     >
       <View style={GlobalStyles.headerLeft}>
-        <BackButton onPress={handleBack} color={colors.text} />
+        {onBack && <BackButton onPress={onBack} color={colors.text} />}
         <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
       </View>
       {rightActions && (

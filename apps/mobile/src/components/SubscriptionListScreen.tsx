@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ScreenHeader } from './common/ScreenHeader';
 import { Colors, Layout, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
@@ -63,6 +63,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +111,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
         onRefresh={handleRefresh}
         refreshing={refreshing}
         ListHeaderComponent={
-          <ScreenHeader title={title} rightActions={headerActions} />
+          <ScreenHeader title={title} onBack={() => navigation.goBack()} rightActions={headerActions} />
         }
         ListEmptyComponent={
           loading ? (
