@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/common';
+import { LogoMark } from '../components/LogoMark';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { AuthService } from '../services';
 
@@ -87,16 +88,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo Placeholder */}
-          <View style={[styles.logoPlaceholder, { backgroundColor: colors.border }]} />
-
-          {/* Title */}
-          <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
-
-          {/* Subtitle */}
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Read and discover{'\n'}what you love
-          </Text>
+          <View style={styles.header}>
+            <LogoMark size={90} />
+            <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Read and discover{'\n'}what you love
+            </Text>
+          </View>
 
           {!showEmailLogin ? (
             <View style={styles.buttonContainer}>
@@ -109,7 +107,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Button
                 title="Login"
                 onPress={() => setShowEmailLogin(true)}
-                variant="secondary"
+                variant="outline"
                 disabled={isLoading}
               />
             </View>
@@ -186,44 +184,41 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xxl,
+    gap: 64,
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.xl,
+  header: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    maxWidth: 240,
+    width: '100%',
   },
   title: {
-    fontSize: 48,
-    fontFamily: FontFamily.headingBold,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  subtitle: {
-    fontSize: FontSizes.lg,
+    fontSize: 56,
     fontFamily: FontFamily.heading,
     textAlign: 'center',
-    marginBottom: Spacing.xxl,
-    lineHeight: 28,
+  },
+  subtitle: {
+    fontSize: 26,
+    fontFamily: FontFamily.heading,
+    textAlign: 'center',
+    lineHeight: 32,
   },
   buttonContainer: {
-    gap: Spacing.md,
-    marginVertical: Spacing.lg,
+    gap: 12,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 280,
   },
   emailForm: {
     gap: Spacing.md,
-    marginTop: Spacing.lg,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 280,
   },
   input: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     fontSize: FontSizes.md,
     fontFamily: FontFamily.default,
     borderWidth: 1,
