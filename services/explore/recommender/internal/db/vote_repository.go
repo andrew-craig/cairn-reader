@@ -12,7 +12,6 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/lib/pq"
 )
 
 // voteRepository handles vote database operations
@@ -281,11 +280,10 @@ func (r *voteRepository) GetUserVotedArticles(ctx context.Context, userID string
 	for rows.Next() {
 		var article models.Article
 		var voteType string
-		var categories []string
 
 		err := rows.Scan(
 			&article.ID, &article.Title, &article.Link, &article.Description, &article.Content, &article.Author,
-			&article.Published, &article.FeedURL, &article.FeedTitle, pq.Array(&categories),
+			&article.Published, &article.FeedURL, &article.FeedTitle, &article.Categories,
 			&article.Upvotes, &article.Downvotes, &article.Recommends, &article.Deleted,
 			&article.CreatedAt, &article.UpdatedAt,
 			&voteType,
@@ -294,7 +292,6 @@ func (r *voteRepository) GetUserVotedArticles(ctx context.Context, userID string
 			return nil, fmt.Errorf("failed to scan voted article: %w", err)
 		}
 
-		article.Categories = categories
 		votedArticles = append(votedArticles, VotedArticle{
 			Article:  article,
 			VoteType: voteType,
