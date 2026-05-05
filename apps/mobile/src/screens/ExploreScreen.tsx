@@ -216,7 +216,8 @@ export const ExploreScreen: React.FC = () => {
 
   const handleArticlePress = async (article: Article) => {
     // Navigate to the Explore article detail screen
-    navigation.navigate('ExploreArticleDetail', { article });
+    const currentIndex = filteredArticles.findIndex(a => a.id === article.id);
+    navigation.navigate('ExploreArticleDetail', { article, articles: filteredArticles, currentIndex });
 
     // Mark as read in the backend
     try {

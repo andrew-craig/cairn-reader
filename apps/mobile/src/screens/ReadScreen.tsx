@@ -132,7 +132,8 @@ export const ReadScreen: React.FC = () => {
   }, [loadingMore, hasMore, loading, offset, searchQuery]);
 
   const handleArticlePress = (article: Article) => {
-    navigation.navigate('ArticleDetail', { article });
+    const currentIndex = articles.findIndex(a => a.id === article.id);
+    navigation.navigate('ArticleDetail', { article, articles, currentIndex });
   };
 
   const handleAddPress = () => {

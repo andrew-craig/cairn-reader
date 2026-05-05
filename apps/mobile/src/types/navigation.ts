@@ -2,8 +2,8 @@ import { Article } from './article';
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  ArticleDetail: { article: Article };
-  ExploreArticleDetail: { article: Article };
+  ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
+  ExploreArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
   AddArticle: undefined;
   Bookmarks: undefined;
   Votes: undefined;

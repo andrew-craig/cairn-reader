@@ -6,19 +6,23 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { Colors } from '../constants';
 import { ExploreService, ReadService } from '../services';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 
 type ExploreArticleDetailRouteProp = RouteProp<RootStackParamList, 'ExploreArticleDetail'>;
+type ExploreArticleDetailNavigationProp = StackNavigationProp<RootStackParamList, 'ExploreArticleDetail'>;
 
 export const ExploreArticleDetailScreen: React.FC = () => {
   const route = useRoute<ExploreArticleDetailRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<ExploreArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const article = route.params.article;
+  const { article, articles = [], currentIndex = -1 } = route.params;
+
+  const hasNextArticle = currentIndex >= 0 && currentIndex < articles.length - 1;
 
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,6 +32,20 @@ export const ExploreArticleDetailScreen: React.FC = () => {
 
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  const handleNextArticle = () => {
+    if (!hasNextArticle) return;
+    const nextIndex = currentIndex + 1;
+    const nextArticle = articles[nextIndex];
+    navigation.replace('ExploreArticleDetail', {
+      article: nextArticle,
+      articles,
+      currentIndex: nextIndex,
+    });
+    ExploreService.markAsRead(nextArticle.id).catch(
+      (error) => console.error('Error marking article as read:', error)
+    );
   };
 
   const handleSave = async () => {
@@ -109,6 +127,11 @@ export const ExploreArticleDetailScreen: React.FC = () => {
           {
             icon: 'return',
             onPress: handleBack,
+          },
+          {
+            icon: 'next-article',
+            onPress: handleNextArticle,
+            disabled: !hasNextArticle,
           },
           {
             icon: 'bookmark',
