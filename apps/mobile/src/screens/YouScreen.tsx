@@ -79,30 +79,46 @@ export const YouScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       const fetchStats = async () => {
-        try {
-          setLoading(true);
-          setError(null);
+        setLoading(true);
+        setError(null);
 
-          // Fetch all stats in parallel
-          const [voteStats, subscriptions, bookmarks] = await Promise.all([
-            ExploreService.getUserVoteStats(),
-            ReadService.listAllSubscriptions(), // Use new aggregated endpoint
-            ReadService.listUserContents({ limit: 1 }), // Just get count, not all items
-          ]);
+        // Fetch all stats in parallel, tolerating individual failures so that
+        // a broken votes endpoint doesn't hide feed/bookmark counts.
+        const [voteResult, subscriptionsResult, bookmarksResult] = await Promise.allSettled([
+          ExploreService.getUserVoteStats(),
+          ReadService.listAllSubscriptions(),
+          ReadService.listUserContents({ limit: 1 }),
+        ]);
 
-          setUpVotesCount(voteStats.upvotes);
-          setDownVotesCount(voteStats.downvotes);
-          const rssCount = subscriptions.subscriptions.filter(s => s.type !== 'email').length;
-          const emailCount = subscriptions.subscriptions.filter(s => s.type === 'email').length;
-          setFeedsCount(rssCount);
-          setNewslettersCount(emailCount);
-          setBookmarksCount(bookmarks.total_count);
-        } catch (err) {
-          console.error('Error fetching user stats:', err);
-          setError(err instanceof Error ? err.message : 'Failed to load statistics');
-        } finally {
-          setLoading(false);
+        // Show the first error encountered so the user knows something failed.
+        let errorMsg: string | null = null;
+
+        if (voteResult.status === 'fulfilled') {
+          setUpVotesCount(voteResult.value.upvotes);
+          setDownVotesCount(voteResult.value.downvotes);
+        } else {
+          console.error('Error fetching vote stats:', voteResult.reason);
+          errorMsg = voteResult.reason instanceof Error ? voteResult.reason.message : 'Failed to load vote statistics';
         }
+
+        if (subscriptionsResult.status === 'fulfilled') {
+          const subs = subscriptionsResult.value.subscriptions;
+          setFeedsCount(subs.filter(s => s.type !== 'email').length);
+          setNewslettersCount(subs.filter(s => s.type === 'email').length);
+        } else {
+          console.error('Error fetching subscriptions:', subscriptionsResult.reason);
+          if (!errorMsg) errorMsg = 'Failed to load subscription data';
+        }
+
+        if (bookmarksResult.status === 'fulfilled') {
+          setBookmarksCount(bookmarksResult.value.total_count);
+        } else {
+          console.error('Error fetching bookmarks:', bookmarksResult.reason);
+          if (!errorMsg) errorMsg = 'Failed to load bookmark data';
+        }
+
+        setError(errorMsg);
+        setLoading(false);
       };
 
       fetchStats();
