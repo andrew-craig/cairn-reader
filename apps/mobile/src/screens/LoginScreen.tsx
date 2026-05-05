@@ -14,6 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/common';
 import { LogoMark } from '../components/LogoMark';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
+
+const LOGIN_FONT_SIZE_TITLE = 56;
+const LOGIN_FONT_SIZE_SUBTITLE = 26;
+const LOGIN_GAP_SECTIONS = 64;
+const LOGIN_GAP_BUTTONS = 12;
+const LOGIN_MAX_WIDTH_HEADER = 240;
+const LOGIN_MAX_WIDTH_BUTTONS = 280;
 import { AuthService } from '../services';
 
 interface LoginScreenProps {
@@ -186,34 +193,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xxl,
-    gap: 64,
+    gap: LOGIN_GAP_SECTIONS,
   },
   header: {
     alignItems: 'center',
     gap: Spacing.sm,
-    maxWidth: 240,
+    maxWidth: LOGIN_MAX_WIDTH_HEADER,
     width: '100%',
   },
   title: {
-    fontSize: 56,
+    fontSize: LOGIN_FONT_SIZE_TITLE,
     fontFamily: FontFamily.heading,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 26,
+    fontSize: LOGIN_FONT_SIZE_SUBTITLE,
     fontFamily: FontFamily.heading,
     textAlign: 'center',
     lineHeight: 32,
   },
   buttonContainer: {
-    gap: 12,
+    gap: LOGIN_GAP_BUTTONS,
     width: '100%',
-    maxWidth: 280,
+    maxWidth: LOGIN_MAX_WIDTH_BUTTONS,
   },
   emailForm: {
     gap: Spacing.md,
     width: '100%',
-    maxWidth: 280,
+    maxWidth: LOGIN_MAX_WIDTH_BUTTONS,
   },
   input: {
     paddingVertical: Spacing.md,

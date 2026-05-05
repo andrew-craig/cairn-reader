@@ -27,14 +27,13 @@ export const Button: React.FC<ButtonProps> = ({
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
   const getBackgroundColor = () => {
+    if (variant === 'outline') return 'transparent';
     if (disabled) return colors.border;
     switch (variant) {
       case 'primary':
         return colors.primary;
       case 'secondary':
         return colors.card;
-      case 'outline':
-        return 'transparent';
       case 'danger':
         return colors.error;
       default:
@@ -85,7 +84,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
