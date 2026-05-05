@@ -90,12 +90,15 @@ export const YouScreen: React.FC = () => {
           ReadService.listUserContents({ limit: 1 }),
         ]);
 
+        // Show the first error encountered so the user knows something failed.
+        let errorMsg: string | null = null;
+
         if (voteResult.status === 'fulfilled') {
           setUpVotesCount(voteResult.value.upvotes);
           setDownVotesCount(voteResult.value.downvotes);
         } else {
           console.error('Error fetching vote stats:', voteResult.reason);
-          setError(voteResult.reason instanceof Error ? voteResult.reason.message : 'Failed to get voted articles');
+          errorMsg = voteResult.reason instanceof Error ? voteResult.reason.message : 'Failed to load vote statistics';
         }
 
         if (subscriptionsResult.status === 'fulfilled') {
@@ -104,14 +107,17 @@ export const YouScreen: React.FC = () => {
           setNewslettersCount(subs.filter(s => s.type === 'email').length);
         } else {
           console.error('Error fetching subscriptions:', subscriptionsResult.reason);
+          if (!errorMsg) errorMsg = 'Failed to load subscription data';
         }
 
         if (bookmarksResult.status === 'fulfilled') {
           setBookmarksCount(bookmarksResult.value.total_count);
         } else {
           console.error('Error fetching bookmarks:', bookmarksResult.reason);
+          if (!errorMsg) errorMsg = 'Failed to load bookmark data';
         }
 
+        setError(errorMsg);
         setLoading(false);
       };
 
