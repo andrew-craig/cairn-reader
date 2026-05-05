@@ -12,7 +12,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/common';
+import { LogoMark } from '../components/LogoMark';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
+
+const LOGIN_FONT_SIZE_TITLE = 56;
+const LOGIN_FONT_SIZE_SUBTITLE = 26;
+const LOGIN_GAP_SECTIONS = 64;
+const LOGIN_GAP_BUTTONS = 12;
+const LOGIN_MAX_WIDTH_HEADER = 240;
+const LOGIN_MAX_WIDTH_BUTTONS = 280;
 import { AuthService } from '../services';
 
 interface LoginScreenProps {
@@ -87,16 +95,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.content}>
-          {/* Logo Placeholder */}
-          <View style={[styles.logoPlaceholder, { backgroundColor: colors.border }]} />
-
-          {/* Title */}
-          <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
-
-          {/* Subtitle */}
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Read and discover{'\n'}what you love
-          </Text>
+          <View style={styles.header}>
+            <LogoMark size={90} />
+            <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Read and discover{'\n'}what you love
+            </Text>
+          </View>
 
           {!showEmailLogin ? (
             <View style={styles.buttonContainer}>
@@ -109,7 +114,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               <Button
                 title="Login"
                 onPress={() => setShowEmailLogin(true)}
-                variant="secondary"
+                variant="outline"
                 disabled={isLoading}
               />
             </View>
@@ -186,44 +191,41 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xxl,
+    gap: LOGIN_GAP_SECTIONS,
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: BorderRadius.sm,
-    marginBottom: Spacing.xl,
+  header: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    maxWidth: LOGIN_MAX_WIDTH_HEADER,
+    width: '100%',
   },
   title: {
-    fontSize: 48,
-    fontFamily: FontFamily.headingBold,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  subtitle: {
-    fontSize: FontSizes.lg,
+    fontSize: LOGIN_FONT_SIZE_TITLE,
     fontFamily: FontFamily.heading,
     textAlign: 'center',
-    marginBottom: Spacing.xxl,
-    lineHeight: 28,
+  },
+  subtitle: {
+    fontSize: LOGIN_FONT_SIZE_SUBTITLE,
+    fontFamily: FontFamily.heading,
+    textAlign: 'center',
+    lineHeight: 32,
   },
   buttonContainer: {
-    gap: Spacing.md,
-    marginVertical: Spacing.lg,
+    gap: LOGIN_GAP_BUTTONS,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: LOGIN_MAX_WIDTH_BUTTONS,
   },
   emailForm: {
     gap: Spacing.md,
-    marginTop: Spacing.lg,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: LOGIN_MAX_WIDTH_BUTTONS,
   },
   input: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     fontSize: FontSizes.md,
     fontFamily: FontFamily.default,
     borderWidth: 1,

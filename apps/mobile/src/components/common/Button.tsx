@@ -11,7 +11,7 @@ import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../../cons
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
   disabled?: boolean;
   loading?: boolean;
 }
@@ -27,6 +27,7 @@ export const Button: React.FC<ButtonProps> = ({
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
   const getBackgroundColor = () => {
+    if (variant === 'outline') return 'transparent';
     if (disabled) return colors.border;
     switch (variant) {
       case 'primary':
@@ -42,12 +43,30 @@ export const Button: React.FC<ButtonProps> = ({
 
   const getTextColor = () => {
     if (disabled) return colors.textSecondary;
-    return variant === 'secondary' ? colors.text : '#FFFFFF';
+    switch (variant) {
+      case 'primary':
+        return colors.background;
+      case 'secondary':
+        return colors.text;
+      case 'outline':
+        return colors.primary;
+      case 'danger':
+        return '#FFFFFF';
+      default:
+        return colors.background;
+    }
+  };
+
+  const getBorderStyle = () => {
+    if (variant === 'outline') {
+      return { borderWidth: 1, borderColor: disabled ? colors.border : colors.textSecondary };
+    }
+    return {};
   };
 
   return (
     <TouchableOpacity
-      style={[styles.button, { backgroundColor: getBackgroundColor() }]}
+      style={[styles.button, { backgroundColor: getBackgroundColor() }, getBorderStyle()]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
@@ -65,7 +84,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
