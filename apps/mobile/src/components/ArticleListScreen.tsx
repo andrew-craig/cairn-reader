@@ -1,4 +1,4 @@
-import React, { ReactNode, useRef } from 'react';
+import React, { ReactElement, ReactNode, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, GlobalStyles, Layout, Spacing, FontSizes, FontFamily } from '../constants';
 import { ArticleRow } from './common/ArticleRow';
+import { ScreenHeader } from './common/ScreenHeader';
 import { Article } from '../types';
 
 interface ArticleListScreenProps {
   title: string;
   articles: Article[];
   loading: boolean;
+  onBack?: () => void;
   headerActions?: ReactNode;
-  onArticlePress: (article: Article) => void;
+  onArticlePress?: (article: Article) => void;
+  renderItem?: (article: Article) => ReactElement;
   onRefresh?: () => void;
   refreshing?: boolean;
   emptyMessage?: string;
@@ -37,8 +40,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   title,
   articles,
   loading,
+  onBack,
   headerActions,
   onArticlePress,
+  renderItem: renderItemProp,
   onRefresh,
   refreshing = false,
   emptyMessage = 'No articles found',
@@ -62,23 +67,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 
   const renderHeader = () => (
     <View>
-      <View
-        style={[
-          GlobalStyles.header,
-          {
-            backgroundColor: colors.background,
-            paddingTop: insets.top + Spacing.md,
-            height: undefined, // Override fixed height to allow safe area padding
-          },
-        ]}
-      >
-        <View style={GlobalStyles.headerLeft}>
-          <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
-        </View>
-        {headerActions && (
-          <View style={GlobalStyles.headerRight}>{headerActions}</View>
-        )}
-      </View>
+      <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
       {searchQuery && onClearSearch && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
@@ -92,9 +81,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     </View>
   );
 
-  const renderArticle = ({ item }: { item: Article }) => (
-    <ArticleRow article={item} onPress={() => onArticlePress(item)} />
-  );
+  const renderArticle = ({ item }: { item: Article }) => {
+    if (renderItemProp) return renderItemProp(item);
+    return <ArticleRow article={item} onPress={() => onArticlePress?.(item)} />;
+  };
 
   const renderEmpty = () => (
     <View style={GlobalStyles.emptyContainer}>

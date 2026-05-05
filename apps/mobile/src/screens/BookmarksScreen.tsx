@@ -136,6 +136,7 @@ export const BookmarksScreen: React.FC = () => {
         title="Bookmarks"
         articles={articles}
         loading={loading}
+        onBack={() => navigation.goBack()}
         headerActions={headerActions}
         onArticlePress={handleArticlePress}
         onRefresh={handleRefresh}

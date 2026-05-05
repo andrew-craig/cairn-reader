@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 24,
     borderBottomWidth: 1,
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   textCluster: {
     flex: 1,
@@ -106,10 +106,11 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.default,
   },
   imageFrame: {
-    width: 64,
-    height: 64,
+    width: 48,
+    height: 48,
     borderRadius: 6,
     overflow: 'hidden',
+    flexShrink: 0,
   },
   image: {
     width: '100%',

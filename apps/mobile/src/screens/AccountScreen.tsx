@@ -16,9 +16,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthService } from '../services/auth';
 import { Button } from '../components/common';
-import { IconButton } from '../components/common/IconButton';
-import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../constants/theme';
-import { GlobalStyles } from '../constants/globalStyles';
+import { ScreenHeader } from '../components/common/ScreenHeader';
+import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants/theme';
 import { RootStackParamList } from '../types';
 
 type AccountScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Account'>;
@@ -133,21 +132,7 @@ export const AccountScreen: React.FC = () => {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.lg }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View
-          style={[
-            GlobalStyles.header,
-            {
-              backgroundColor: colors.background,
-              paddingTop: insets.top + Spacing.md,
-              height: undefined,
-            },
-          ]}
-        >
-          <View style={GlobalStyles.headerLeft}>
-            <IconButton icon="chevron-back" onPress={() => navigation.goBack()} />
-            <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>Account</Text>
-          </View>
-        </View>
+        <ScreenHeader title="Account" onBack={() => navigation.goBack()} />
 
         <View style={styles.content}>
           <Text style={[styles.accountLabel, { color: colors.textSecondary }]}>
