@@ -1,63 +1,23 @@
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  useColorScheme,
-  ActivityIndicator,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import React, { useState } from 'react';
+import { Text, StyleSheet, useColorScheme } from 'react-native';
 import { IconButton } from '../components/common/IconButton';
 import { HeaderPopover } from '../components/common/HeaderPopover';
-import { Colors, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
-import { GlobalStyles } from '../constants/globalStyles';
-import { RootStackParamList } from '../types';
+import { SubscriptionListScreen } from '../components/SubscriptionListScreen';
+import { Colors, FontSizes, FontFamily } from '../constants/theme';
 import { UnifiedSubscription } from '../types/read';
-import { ReadService } from '../services/read';
 
-type NewslettersScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Newsletters'>;
+const newslettersFilter = (s: UnifiedSubscription) => s.type === 'email';
 
-interface SubscriptionRowProps {
-  subscription: UnifiedSubscription;
-  isDark: boolean;
-}
+const getNewslettersSubtitle = (s: UnifiedSubscription): string | undefined =>
+  s.email_data?.email_address ?? s.description;
 
-const SubscriptionRow: React.FC<SubscriptionRowProps> = ({ subscription, isDark }) => {
-  const colors = isDark ? Colors.dark : Colors.light;
-  const email = subscription.email_data?.email_address;
-
-  return (
-    <View style={[styles.row, { borderColor: colors.border }]}>
-      <View style={[styles.avatar, { backgroundColor: colors.hover }]}>
-        <Text style={[styles.avatarText, { color: colors.textSecondary }]}>
-          {subscription.title.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-      <View style={styles.rowContent}>
-        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-          {subscription.title}
-        </Text>
-        {email && (
-          <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-            {email}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-};
-
-interface AddNewsletterModalProps {
-  visible: boolean;
-  onClose: () => void;
-  emailAddress: string;
-}
-
-const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClose, emailAddress }) => {
-  const colors = Colors.light;
+const AddNewsletterModal: React.FC<{ visible: boolean; onClose: () => void; emailAddress: string }> = ({
+  visible,
+  onClose,
+  emailAddress,
+}) => {
+  const colorScheme = useColorScheme();
+  const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
   return (
     <HeaderPopover visible={visible} onClose={onClose}>
@@ -75,106 +35,24 @@ const AddNewsletterModal: React.FC<AddNewsletterModalProps> = ({ visible, onClos
 };
 
 export const NewslettersScreen: React.FC = () => {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = isDark ? Colors.dark : Colors.light;
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NewslettersScreenNavigationProp>();
-
-  const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const loadSubscriptions = useCallback(async () => {
-    try {
-      const response = await ReadService.listAllSubscriptions();
-      setSubscriptions(response.subscriptions.filter(s => s.type === 'email'));
-    } catch (error) {
-      console.error('Error loading subscriptions:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      loadSubscriptions();
-    }, [loadSubscriptions])
+  const headerActions = (
+    <>
+      <IconButton icon="add" onPress={() => setModalVisible(true)} size={24} />
+      <IconButton icon="search-outline" onPress={() => {}} size={24} />
+    </>
   );
-
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadSubscriptions();
-  }, [loadSubscriptions]);
-
-  const renderItem = useCallback(({ item }: { item: UnifiedSubscription }) => (
-    <SubscriptionRow subscription={item} isDark={isDark} />
-  ), [isDark]);
-
-  const keyExtractor = useCallback((item: UnifiedSubscription) => item.id, []);
 
   return (
     <>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <FlatList
-          data={subscriptions}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          onRefresh={handleRefresh}
-          refreshing={refreshing}
-          ListHeaderComponent={
-            <View
-              style={[
-                styles.header,
-                {
-                  backgroundColor: colors.background,
-                  paddingTop: insets.top + Spacing.md,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.headerLeft}>
-                <IconButton icon="chevron-back" onPress={() => navigation.goBack()} />
-                <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>
-                  Newsletters
-                </Text>
-              </View>
-              <View style={styles.headerRight}>
-                <IconButton
-                  icon="add"
-                  onPress={() => setModalVisible(true)}
-                  size={24}
-                />
-                <IconButton
-                  icon="search"
-                  onPress={() => {}}
-                  size={24}
-                />
-              </View>
-            </View>
-          }
-          ListEmptyComponent={
-            loading ? (
-              <View style={styles.centered}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            ) : (
-              <View style={GlobalStyles.emptyContainer}>
-                <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
-                  No newsletters yet
-                </Text>
-              </View>
-            )
-          }
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + Spacing.lg },
-          ]}
-        />
-      </View>
+      <SubscriptionListScreen
+        title="Newsletters"
+        filter={newslettersFilter}
+        getSubtitle={getNewslettersSubtitle}
+        headerActions={headerActions}
+        emptyMessage="No newsletters yet"
+      />
       <AddNewsletterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -185,68 +63,6 @@ export const NewslettersScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContent: {
-    flexGrow: 1,
-  },
-  centered: {
-    padding: Spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    height: undefined,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    flex: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: FontSizes.lg,
-    fontFamily: FontFamily.defaultMedium,
-  },
-  rowContent: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
-  rowTitle: {
-    fontSize: FontSizes.md,
-    fontFamily: FontFamily.defaultMedium,
-  },
-  rowSubtitle: {
-    fontSize: FontSizes.sm,
-    fontFamily: FontFamily.default,
-  },
   modalLabel: {
     fontSize: FontSizes.md,
     fontFamily: FontFamily.default,

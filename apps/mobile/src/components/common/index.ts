@@ -7,3 +7,4 @@ export * from './QuickAccessButton';
 export * from './BottomActionMenu';
 export * from './TopBlurGradient';
 export * from './HeaderPopover';
+export * from './ScreenHeader';
