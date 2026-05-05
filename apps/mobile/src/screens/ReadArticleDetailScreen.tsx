@@ -6,21 +6,26 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { StorageService, ReadService } from '../services';
 import { Colors } from '../constants';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 
 type ReadArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
+type ReadArticleDetailNavigationProp = StackNavigationProp<RootStackParamList, 'ArticleDetail'>;
 
 export const ReadArticleDetailScreen: React.FC = () => {
   const route = useRoute<ReadArticleDetailRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<ReadArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const [article, setArticle] = useState(route.params.article);
-  const scrollPositionRef = useRef(route.params.article.scrollPosition ?? 0);
+  const { article: initialArticle, articles = [], currentIndex = -1 } = route.params;
+  const [article, setArticle] = useState(initialArticle);
+  const scrollPositionRef = useRef(initialArticle.scrollPosition ?? 0);
   const hasScrolledRef = useRef(false);
+
+  const hasNextArticle = currentIndex >= 0 && currentIndex < articles.length - 1;
 
   const handleScrollPositionChange = useCallback((position: number) => {
     scrollPositionRef.current = position;
@@ -43,6 +48,16 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  const handleNextArticle = () => {
+    if (!hasNextArticle) return;
+    const nextIndex = currentIndex + 1;
+    navigation.replace('ArticleDetail', {
+      article: articles[nextIndex],
+      articles,
+      currentIndex: nextIndex,
+    });
   };
 
   const handleToggleFavorite = async () => {
@@ -95,6 +110,11 @@ export const ReadArticleDetailScreen: React.FC = () => {
           {
             icon: 'return',
             onPress: handleBack,
+          },
+          {
+            icon: 'next-article',
+            onPress: handleNextArticle,
+            disabled: !hasNextArticle,
           },
           {
             icon: 'bookmark',

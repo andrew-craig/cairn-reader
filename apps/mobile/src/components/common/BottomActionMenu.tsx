@@ -9,6 +9,7 @@ interface BottomActionMenuAction {
   icon: QuickAccessButtonIcon;
   onPress: () => void;
   active?: boolean;
+  disabled?: boolean;
 }
 
 interface BottomActionMenuProps {
@@ -48,6 +49,7 @@ export const BottomActionMenu: React.FC<BottomActionMenuProps> = ({ actions }) =
               icon={action.icon}
               onPress={action.onPress}
               active={action.active}
+              disabled={action.disabled}
             />
           ))}
         </BlurView>
