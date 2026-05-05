@@ -111,7 +111,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
         onRefresh={handleRefresh}
         refreshing={refreshing}
         ListHeaderComponent={
-          <ScreenHeader title={title} onBack={() => navigation.goBack()} rightActions={headerActions} />
+          <ScreenHeader title={title} onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} rightActions={headerActions} />
         }
         ListEmptyComponent={
           loading ? (
