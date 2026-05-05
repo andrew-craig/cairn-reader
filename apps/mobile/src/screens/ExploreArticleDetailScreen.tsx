@@ -34,7 +34,7 @@ export const ExploreArticleDetailScreen: React.FC = () => {
     navigation.goBack();
   };
 
-  const handleNextArticle = async () => {
+  const handleNextArticle = () => {
     if (!hasNextArticle) return;
     const nextIndex = currentIndex + 1;
     const nextArticle = articles[nextIndex];
@@ -43,11 +43,9 @@ export const ExploreArticleDetailScreen: React.FC = () => {
       articles,
       currentIndex: nextIndex,
     });
-    try {
-      await ExploreService.markAsRead(nextArticle.id);
-    } catch (error) {
-      console.error('Error marking article as read:', error);
-    }
+    ExploreService.markAsRead(nextArticle.id).catch(
+      (error) => console.error('Error marking article as read:', error)
+    );
   };
 
   const handleSave = async () => {
