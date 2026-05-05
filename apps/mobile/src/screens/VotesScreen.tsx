@@ -1,9 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, TouchableOpacity, useColorScheme } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Colors } from '../constants';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { ArticleRow } from '../components/common/ArticleRow';
 import { IconButton } from '../components/common/IconButton';
@@ -17,8 +14,6 @@ const PAGE_SIZE = 20;
 
 export const VotesScreen: React.FC = () => {
   const navigation = useNavigation<VotesScreenNavigationProp>();
-  const colorScheme = useColorScheme();
-  const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
   const [articles, setArticles] = useState<VotedArticleWithType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,14 +100,7 @@ export const VotesScreen: React.FC = () => {
   const clearSearch = useCallback(() => setSearchQuery(null), []);
 
   const headerActions = (
-    <>
-      <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} />
-      {searchQuery && (
-        <TouchableOpacity onPress={clearSearch} hitSlop={8}>
-          <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-      )}
-    </>
+    <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} />
   );
 
   return (

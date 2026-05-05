@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Alert,
   useColorScheme,
   ActivityIndicator,
 } from 'react-native';
@@ -11,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { ScreenHeader } from './common/ScreenHeader';
-import { Colors, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
+import { Colors, Layout, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
 import { UnifiedSubscription } from '../types/read';
 import { ReadService } from '../services/read';
@@ -72,7 +73,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
       const response = await ReadService.listAllSubscriptions();
       setSubscriptions(response.subscriptions.filter(filter));
     } catch (error) {
-      console.error('Error loading subscriptions:', error);
+      Alert.alert('Error', 'Failed to load subscriptions. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -81,7 +82,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
+      if (subscriptions.length === 0) setLoading(true);
       load();
     }, [load])
   );
@@ -126,7 +127,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
         }
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + Spacing.lg },
+          { paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.lg },
         ]}
       />
     </View>
