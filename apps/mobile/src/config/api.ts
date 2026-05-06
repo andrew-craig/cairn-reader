@@ -1,24 +1,50 @@
-// API Configuration
-// In production, these would come from environment variables via Expo's config
-// For now, using the production API endpoints
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
+const SERVER_URL_KEY = '@cairn:server_url';
 
 export const API_CONFIG = {
-  // User service base URL
-  USER_SERVICE_URL: 'https://cairn.seatrain.net',
-
-  // Recommender service base URL
-  RECOMMENDER_SERVICE_URL: 'https://cairn.seatrain.net',
-
-  // Read service base URL (Content Service)
-  READ_SERVICE_URL: 'https://cairn.seatrain.net',
-
-  // Request timeout in milliseconds
   REQUEST_TIMEOUT: 30000,
 };
 
-// For development, you can override these values:
-// export const API_CONFIG = {
-//   USER_SERVICE_URL: 'http://localhost:8080',
-//   RECOMMENDER_SERVICE_URL: 'http://localhost:8081',
-//   REQUEST_TIMEOUT: 30000,
-// };
+let currentServerUrl: string = DEFAULT_SERVER_URL;
+
+function normalizeServerUrl(url: string): string {
+  let trimmed = url.trim().replace(/\/+$/, '');
+  if (!trimmed) return DEFAULT_SERVER_URL;
+  if (!/^https?:\/\//i.test(trimmed)) {
+    trimmed = `https://${trimmed}`;
+  }
+  return trimmed;
+}
+
+export function getServerUrl(): string {
+  return currentServerUrl;
+}
+
+export async function loadServerUrl(): Promise<string> {
+  try {
+    const stored = await AsyncStorage.getItem(SERVER_URL_KEY);
+    currentServerUrl = stored ? normalizeServerUrl(stored) : DEFAULT_SERVER_URL;
+  } catch (error) {
+    console.error('Failed to load server URL, using default:', error);
+    currentServerUrl = DEFAULT_SERVER_URL;
+  }
+  return currentServerUrl;
+}
+
+export async function setServerUrl(url: string): Promise<string> {
+  const normalized = normalizeServerUrl(url);
+  currentServerUrl = normalized;
+  if (normalized === DEFAULT_SERVER_URL) {
+    await AsyncStorage.removeItem(SERVER_URL_KEY);
+  } else {
+    await AsyncStorage.setItem(SERVER_URL_KEY, normalized);
+  }
+  return normalized;
+}
+
+export async function resetServerUrl(): Promise<void> {
+  currentServerUrl = DEFAULT_SERVER_URL;
+  await AsyncStorage.removeItem(SERVER_URL_KEY);
+}

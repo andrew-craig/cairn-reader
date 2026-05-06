@@ -14,9 +14,8 @@ import {
   ListFeedSubscriptionsResponse,
   UnifiedSubscriptionsResponse,
 } from '../types/read';
-import { API_CONFIG } from '../config/api';
+import { getServerUrl } from '../config/api';
 
-const READ_SERVICE_BASE_URL = API_CONFIG.READ_SERVICE_URL;
 const PAGE_SIZE_DEFAULT = 20;
 
 export class ReadService {
@@ -94,7 +93,7 @@ export class ReadService {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.offset) queryParams.append('offset', params.offset.toString());
 
-      const url = `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}${
+      const url = `${getServerUrl()}/api/v1/content/user/${userId}${
         queryParams.toString() ? `?${queryParams.toString()}` : ''
       }`;
 
@@ -141,7 +140,7 @@ export class ReadService {
       if (params.limit) queryParams.append('limit', params.limit.toString());
       if (params.offset) queryParams.append('offset', params.offset.toString());
 
-      const url = `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
+      const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
 
       const response = await this.fetchWithAuth(url);
 
@@ -172,7 +171,7 @@ export class ReadService {
       }
 
       const response = await this.fetchWithAuth(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}`,
+        `${getServerUrl()}/api/v1/content/user/${userId}`,
         {
           method: 'POST',
           body: JSON.stringify(request),
@@ -207,7 +206,7 @@ export class ReadService {
       }
 
       const response = await this.fetchWithAuth(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}/${contentId}`,
+        `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`,
         {
           method: 'PATCH',
           body: JSON.stringify(updates),
@@ -239,7 +238,7 @@ export class ReadService {
       }
 
       const response = await this.fetchWithAuth(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}/${contentId}`,
+        `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`,
         {
           method: 'DELETE',
         }
@@ -265,7 +264,7 @@ export class ReadService {
 
     try {
       const response = await fetch(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/detect`,
+        `${getServerUrl()}/api/v1/content/detect`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -309,7 +308,7 @@ export class ReadService {
 
     try {
       const response = await fetch(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/discover-feed`,
+        `${getServerUrl()}/api/v1/content/discover-feed`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -346,7 +345,7 @@ export class ReadService {
       }
 
       const response = await this.fetchWithAuth(
-        `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}`,
+        `${getServerUrl()}/api/v1/content/user/${userId}`,
         {
           method: 'POST',
           body: JSON.stringify(request),
@@ -379,7 +378,7 @@ export class ReadService {
       }
 
       // Use the new aggregated endpoint in Content Service
-      const url = `${READ_SERVICE_BASE_URL}/api/v1/content/user/${userId}/subscriptions`;
+      const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions`;
       console.log('Fetching subscriptions from:', url);
 
       const response = await this.fetchWithAuth(url);
@@ -409,7 +408,7 @@ export class ReadService {
         throw new Error('Not authenticated');
       }
 
-      const url = `${READ_SERVICE_BASE_URL}/api/v1/source/rss/user/${userId}/subscription`;
+      const url = `${getServerUrl()}/api/v1/source/rss/user/${userId}/subscription`;
       console.log('Fetching feed subscriptions from:', url);
 
       const response = await this.fetchWithAuth(url);

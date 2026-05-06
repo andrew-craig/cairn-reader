@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,18 @@ import {
   Platform,
   ScrollView,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/common';
 import { LogoMark } from '../components/LogoMark';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
+import { AuthService } from '../services';
+import {
+  DEFAULT_SERVER_URL,
+  getServerUrl,
+  setServerUrl,
+} from '../config/api';
 
 const LOGIN_FONT_SIZE_TITLE = 56;
 const LOGIN_FONT_SIZE_SUBTITLE = 26;
@@ -21,7 +28,6 @@ const LOGIN_GAP_SECTIONS = 64;
 const LOGIN_GAP_BUTTONS = 12;
 const LOGIN_MAX_WIDTH_HEADER = 240;
 const LOGIN_MAX_WIDTH_BUTTONS = 280;
-import { AuthService } from '../services';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -36,6 +42,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const [showServerInput, setShowServerInput] = useState(false);
+  const [serverUrl, setServerUrlInput] = useState(getServerUrl());
+  const [activeServerUrl, setActiveServerUrl] = useState(getServerUrl());
+  const [isSavingServer, setIsSavingServer] = useState(false);
+
+  useEffect(() => {
+    const url = getServerUrl();
+    setServerUrlInput(url);
+    setActiveServerUrl(url);
+  }, []);
 
   const handleGetStarted = async () => {
     setIsLoading(true);
@@ -78,6 +95,42 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setIsLoading(false);
     }
   };
+
+  const handleSaveServer = async () => {
+    setIsSavingServer(true);
+    try {
+      const saved = await setServerUrl(serverUrl);
+      setServerUrlInput(saved);
+      setActiveServerUrl(saved);
+      setShowServerInput(false);
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to save server URL',
+      );
+    } finally {
+      setIsSavingServer(false);
+    }
+  };
+
+  const handleResetServer = async () => {
+    setIsSavingServer(true);
+    try {
+      const saved = await setServerUrl(DEFAULT_SERVER_URL);
+      setServerUrlInput(saved);
+      setActiveServerUrl(saved);
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to reset server URL',
+      );
+    } finally {
+      setIsSavingServer(false);
+    }
+  };
+
+  const isCustomServer = activeServerUrl !== DEFAULT_SERVER_URL;
+  const serverDisplay = activeServerUrl.replace(/^https?:\/\//i, '');
 
   return (
     <KeyboardAvoidingView
@@ -173,6 +226,69 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </View>
           )}
 
+          <View style={styles.serverSection}>
+            {!showServerInput ? (
+              <TouchableOpacity
+                onPress={() => setShowServerInput(true)}
+                disabled={isLoading || isSavingServer}
+                accessibilityRole="button"
+                accessibilityLabel="Change server"
+              >
+                <Text style={[styles.serverLabel, { color: colors.textSecondary }]}>
+                  Server: <Text style={{ color: colors.text }}>{serverDisplay}</Text>
+                  {isCustomServer ? ' (custom)' : ''}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.serverForm}>
+                <Text style={[styles.serverHint, { color: colors.textSecondary }]}>
+                  Point the app at a self-hosted Cairn server.
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.card,
+                      color: colors.text,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  placeholder="https://your-server.example.com"
+                  placeholderTextColor={colors.textSecondary}
+                  value={serverUrl}
+                  onChangeText={setServerUrlInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  editable={!isSavingServer}
+                />
+                <View style={styles.buttonContainer}>
+                  <Button
+                    title="Save"
+                    onPress={handleSaveServer}
+                    loading={isSavingServer}
+                    disabled={isSavingServer}
+                  />
+                  <Button
+                    title="Use Default"
+                    onPress={handleResetServer}
+                    variant="secondary"
+                    disabled={isSavingServer}
+                  />
+                  <Button
+                    title="Cancel"
+                    onPress={() => {
+                      setServerUrlInput(activeServerUrl);
+                      setShowServerInput(false);
+                    }}
+                    variant="outline"
+                    disabled={isSavingServer}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -235,5 +351,25 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     textAlign: 'center',
     marginTop: Spacing.lg,
+  },
+  serverSection: {
+    width: '100%',
+    maxWidth: LOGIN_MAX_WIDTH_BUTTONS,
+    alignItems: 'center',
+  },
+  serverLabel: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  serverForm: {
+    gap: Spacing.md,
+    width: '100%',
+  },
+  serverHint: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
+    textAlign: 'center',
   },
 });

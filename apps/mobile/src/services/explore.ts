@@ -1,8 +1,6 @@
 import { AuthService } from './auth';
 import { Article } from '../types';
-import { API_CONFIG } from '../config/api';
-
-const RECOMMENDER_BASE_URL = API_CONFIG.RECOMMENDER_SERVICE_URL;
+import { getServerUrl } from '../config/api';
 
 interface RecommendationsResponse {
   user_id: string;
@@ -110,7 +108,7 @@ export class ExploreService {
       }
 
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/recommendation/${userId}`
+        `${getServerUrl()}/api/v1/explore/recommendation/${userId}`
       );
 
       const result = await response.json();
@@ -132,7 +130,7 @@ export class ExploreService {
   static async markAsRead(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/read`,
+        `${getServerUrl()}/api/v1/explore/article/${articleId}/read`,
         {
           method: 'POST',
         }
@@ -154,7 +152,7 @@ export class ExploreService {
   ): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`,
+        `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'POST',
           body: JSON.stringify({ vote_type: voteType } as VoteRequest),
@@ -182,7 +180,7 @@ export class ExploreService {
   static async removeVote(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`,
+        `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'DELETE',
         }
@@ -203,7 +201,7 @@ export class ExploreService {
   ): Promise<{ upvotes: number; downvotes: number; user_vote?: string }> {
     try {
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/article/${articleId}/vote`
+        `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`
       );
 
       const result = await response.json();
@@ -231,7 +229,7 @@ export class ExploreService {
       }
 
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/user/${userId}/votes?limit=${limit}&offset=${offset}`
+        `${getServerUrl()}/api/v1/explore/user/${userId}/votes?limit=${limit}&offset=${offset}`
       );
 
       const result = await response.json();
@@ -263,7 +261,7 @@ export class ExploreService {
 
       // Fetch all votes with a high limit to get complete counts
       const response = await this.fetchWithAuth(
-        `${RECOMMENDER_BASE_URL}/api/v1/explore/user/${userId}/votes?limit=10000&offset=0`
+        `${getServerUrl()}/api/v1/explore/user/${userId}/votes?limit=10000&offset=0`
       );
 
       const result = await response.json();
