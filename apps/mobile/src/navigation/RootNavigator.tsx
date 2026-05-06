@@ -1,6 +1,6 @@
 import React from 'react';
 import { useColorScheme, TouchableOpacity, ActivityIndicator, View } from 'react-native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
 import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, LoginScreen, BookmarksScreen, VotesScreen, AccountScreen, FeedsScreen, NewslettersScreen } from '../screens';
@@ -66,6 +66,7 @@ export default function RootNavigator() {
         options={{
           headerShown: false,
           presentation: 'card',
+          cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
         }}
       />
       <Stack.Screen
