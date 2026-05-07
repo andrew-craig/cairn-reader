@@ -18,8 +18,8 @@ export const TabNavigator: React.FC = () => {
         headerShown: false,
       }}
     >
-      <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Read" component={ReadScreen} />
+      <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="You" component={YouScreen} />
     </Tab.Navigator>
   );
