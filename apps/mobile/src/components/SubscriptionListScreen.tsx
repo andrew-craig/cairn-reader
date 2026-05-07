@@ -96,6 +96,8 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
   const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const subscriptionsRef = useRef(subscriptions);
+  subscriptionsRef.current = subscriptions;
 
   const load = useCallback(async () => {
     try {
@@ -137,8 +139,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
           text: 'Unsubscribe',
           style: 'destructive',
           onPress: async () => {
-            // Optimistically remove from list
-            const previous = subscriptions;
+            const previous = subscriptionsRef.current;
             setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
             try {
               await ReadService.unsubscribeFromRSSFeed(feedId);
@@ -150,7 +151,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
         },
       ]
     );
-  }, [subscriptions]);
+  }, []);
 
   const renderItem = useCallback(({ item }: { item: UnifiedSubscription }) => (
     <SourceRow

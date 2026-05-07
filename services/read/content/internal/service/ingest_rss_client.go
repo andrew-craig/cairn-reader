@@ -163,17 +163,18 @@ func (c *IngestRSSClient) UnsubscribeUserFromFeed(ctx context.Context, userID, f
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
 		return ErrSubscriptionNotFound
+	}
+
+	const maxErrorBodySize = 4096
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodySize))
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var apiError IngestRSSError
