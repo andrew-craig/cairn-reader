@@ -96,12 +96,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  const applyServerUrl = async (url: string) => {
+    const previous = activeServerUrl;
+    const saved = await setServerUrl(url);
+    if (saved !== previous) {
+      // Auth tokens are server-specific; clear them so the user re-authenticates
+      // against the new server rather than leaking credentials across instances.
+      await AuthService.clearTokens();
+    }
+    setServerUrlInput(saved);
+    setActiveServerUrl(saved);
+    return saved;
+  };
+
   const handleSaveServer = async () => {
     setIsSavingServer(true);
     try {
-      const saved = await setServerUrl(serverUrl);
-      setServerUrlInput(saved);
-      setActiveServerUrl(saved);
+      await applyServerUrl(serverUrl);
       setShowServerInput(false);
     } catch (error) {
       Alert.alert(
@@ -116,9 +127,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const handleResetServer = async () => {
     setIsSavingServer(true);
     try {
-      const saved = await setServerUrl(DEFAULT_SERVER_URL);
-      setServerUrlInput(saved);
-      setActiveServerUrl(saved);
+      await applyServerUrl(DEFAULT_SERVER_URL);
     } catch (error) {
       Alert.alert(
         'Error',

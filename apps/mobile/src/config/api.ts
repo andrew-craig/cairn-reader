@@ -13,7 +13,9 @@ function normalizeServerUrl(url: string): string {
   let trimmed = url.trim().replace(/\/+$/, '');
   if (!trimmed) return DEFAULT_SERVER_URL;
   if (!/^https?:\/\//i.test(trimmed)) {
-    trimmed = `https://${trimmed}`;
+    const cleanUrl = trimmed.replace(/^https?:\/*/i, '');
+    if (!cleanUrl) return DEFAULT_SERVER_URL;
+    trimmed = `https://${cleanUrl}`;
   }
   return trimmed;
 }
@@ -35,16 +37,16 @@ export async function loadServerUrl(): Promise<string> {
 
 export async function setServerUrl(url: string): Promise<string> {
   const normalized = normalizeServerUrl(url);
-  currentServerUrl = normalized;
   if (normalized === DEFAULT_SERVER_URL) {
     await AsyncStorage.removeItem(SERVER_URL_KEY);
   } else {
     await AsyncStorage.setItem(SERVER_URL_KEY, normalized);
   }
+  currentServerUrl = normalized;
   return normalized;
 }
 
 export async function resetServerUrl(): Promise<void> {
-  currentServerUrl = DEFAULT_SERVER_URL;
   await AsyncStorage.removeItem(SERVER_URL_KEY);
+  currentServerUrl = DEFAULT_SERVER_URL;
 }
