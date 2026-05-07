@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useCallback } from 'react';
+import React, { ReactNode, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Alert,
   useColorScheme,
   ActivityIndicator,
+  Animated,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,30 +19,56 @@ import { GlobalStyles } from '../constants/globalStyles';
 import { UnifiedSubscription } from '../types/read';
 import { ReadService } from '../services/read';
 
+const AVATAR_SIZE = 48;
+const SLIDE_AMOUNT = AVATAR_SIZE + Spacing.lg; // 72px — avatar + gap, so avatar slides off left
+
 interface SourceRowProps {
   title: string;
   subtitle?: string;
+  onDeletePress?: () => void;
 }
 
-const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle }) => {
+const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle, onDeletePress }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handlePress = useCallback(() => {
+    const toValue = isOpen ? 0 : -SLIDE_AMOUNT;
+    Animated.spring(slideAnim, {
+      toValue,
+      useNativeDriver: true,
+      damping: 20,
+      stiffness: 300,
+    }).start();
+    setIsOpen(prev => !prev);
+  }, [isOpen, slideAnim]);
 
   return (
     <View style={[styles.row, { borderColor: colors.border }]}>
-      <View style={[styles.avatar, { backgroundColor: colors.hover }]}>
-        <Ionicons name="person" size={24} color={colors.textSecondary} />
-      </View>
-      <View style={styles.rowText}>
-        <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle && (
-          <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        )}
-      </View>
+      <TouchableOpacity style={styles.trashButton} onPress={onDeletePress} activeOpacity={0.7}>
+        <Ionicons name="trash-outline" size={24} color={colors.error} />
+      </TouchableOpacity>
+      <Animated.View
+        style={[styles.rowContent, { backgroundColor: colors.background, transform: [{ translateX: slideAnim }] }]}
+      >
+        <TouchableOpacity onPress={handlePress} activeOpacity={1} style={styles.rowInner}>
+          <View style={[styles.avatar, { backgroundColor: colors.hover }]}>
+            <Ionicons name="person" size={24} color={colors.textSecondary} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+              {title}
+            </Text>
+            {subtitle && (
+              <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -148,16 +176,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   row: {
+    position: 'relative',
+    borderBottomWidth: 1,
+    overflow: 'hidden',
+  },
+  trashButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: SLIDE_AMOUNT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: Spacing.md,
+  },
+  rowContent: {},
+  rowInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
   },
   avatar: {
-    width: 48,
-    height: 48,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
