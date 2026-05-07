@@ -3,10 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 const SERVER_URL_KEY = '@cairn:server_url';
 
-export const API_CONFIG = {
-  REQUEST_TIMEOUT: 30000,
-};
-
 let currentServerUrl: string = DEFAULT_SERVER_URL;
 
 function normalizeServerUrl(url: string): string {
@@ -44,9 +40,4 @@ export async function setServerUrl(url: string): Promise<string> {
   }
   currentServerUrl = normalized;
   return normalized;
-}
-
-export async function resetServerUrl(): Promise<void> {
-  await AsyncStorage.removeItem(SERVER_URL_KEY);
-  currentServerUrl = DEFAULT_SERVER_URL;
 }
