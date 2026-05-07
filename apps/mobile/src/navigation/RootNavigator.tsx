@@ -58,6 +58,7 @@ export default function RootNavigator() {
         options={{
           headerShown: false,
           presentation: 'card',
+          cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
         }}
       />
       <Stack.Screen
