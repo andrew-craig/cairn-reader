@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -93,6 +94,51 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
+// UnsubscribeRSS handles DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}.
+// It removes the user's RSS subscription via the Ingest RSS service. Already-delivered
+// articles in the user's reading list are preserved; only future deliveries are stopped.
+func (h *SubscriptionAggregatorHandler) UnsubscribeRSS(w http.ResponseWriter, r *http.Request) {
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only modify their own subscriptions", nil, "v1")
+		return
+	}
+
+	feedIDStr := chi.URLParam(r, "feed_id")
+	if _, err := uuid.Parse(feedIDStr); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid feed ID format", nil, "v1")
+		return
+	}
+
+	if err := h.ingestRSSClient.UnsubscribeUserFromFeed(r.Context(), userID.String(), feedIDStr); err != nil {
+		if errors.Is(err, service.ErrSubscriptionNotFound) {
+			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Subscription not found", nil, "v1")
+			return
+		}
+		slog.Error("Failed to unsubscribe from RSS feed", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to unsubscribe from feed", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]any{
+		"success": true,
+		"message": "Successfully unsubscribed from feed",
+	}, "v1")
+}
+
 // fetchRSSSubscriptions fetches and transforms RSS subscriptions from Ingest RSS service
 func (h *SubscriptionAggregatorHandler) fetchRSSSubscriptions(ctx context.Context, userID string) ([]dto.UnifiedSubscription, error) {
 	// Call Ingest RSS service
@@ -110,6 +156,7 @@ func (h *SubscriptionAggregatorHandler) fetchRSSSubscriptions(ctx context.Contex
 			Title:        rssSub.FeedTitle,
 			SubscribedAt: rssSub.SubscribedAt,
 			RSSData: &dto.RSSSubscriptionData{
+				FeedID:        rssSub.FeedID,
 				FeedURL:       rssSub.FeedURL,
 				PollingTier:   rssSub.PollingTier,
 				LastFetchedAt: rssSub.LastFetchedAt,

@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 )
+
+// ErrSubscriptionNotFound is returned when an unsubscribe targets a subscription
+// that does not exist (already unsubscribed or never subscribed).
+var ErrSubscriptionNotFound = errors.New("subscription not found")
 
 // IngestRSSClient handles communication with the Ingest RSS service
 type IngestRSSClient struct {
@@ -140,6 +145,42 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 	}
 
 	return &subscription, nil
+}
+
+// UnsubscribeUserFromFeed removes a user's subscription to an RSS feed.
+// It returns nil on success, ErrSubscriptionNotFound if no such subscription exists.
+func (c *IngestRSSClient) UnsubscribeUserFromFeed(ctx context.Context, userID, feedID string) error {
+	url := fmt.Sprintf("%s/api/v1/source/rss/user/%s/subscription/%s", c.baseURL, userID, feedID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to call ingest RSS service: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrSubscriptionNotFound
+	}
+
+	var apiError IngestRSSError
+	if err := json.Unmarshal(body, &apiError); err != nil {
+		return fmt.Errorf("ingest RSS service error (status %d): %s", resp.StatusCode, string(body))
+	}
+	return fmt.Errorf("ingest RSS service error: %s", apiError.Message)
 }
 
 // ListUserSubscriptions fetches RSS subscriptions for a user from Ingest RSS service

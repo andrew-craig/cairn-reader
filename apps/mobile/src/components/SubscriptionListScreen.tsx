@@ -121,12 +121,44 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
     load();
   }, [load]);
 
+  const handleUnsubscribe = useCallback((subscription: UnifiedSubscription) => {
+    if (subscription.type !== 'rss' || !subscription.rss_data?.feed_id) {
+      Alert.alert('Unsupported', 'Unsubscribing from this source type is not yet supported.');
+      return;
+    }
+
+    const feedId = subscription.rss_data.feed_id;
+    Alert.alert(
+      'Unsubscribe',
+      `Stop receiving new articles from "${subscription.title}"? Articles already in your reading list will be kept.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unsubscribe',
+          style: 'destructive',
+          onPress: async () => {
+            // Optimistically remove from list
+            const previous = subscriptions;
+            setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
+            try {
+              await ReadService.unsubscribeFromRSSFeed(feedId);
+            } catch (error) {
+              setSubscriptions(previous);
+              Alert.alert('Error', 'Failed to unsubscribe. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  }, [subscriptions]);
+
   const renderItem = useCallback(({ item }: { item: UnifiedSubscription }) => (
     <SourceRow
       title={item.title}
       subtitle={getSubtitle ? getSubtitle(item) : item.description}
+      onDeletePress={() => handleUnsubscribe(item)}
     />
-  ), [getSubtitle]);
+  ), [getSubtitle, handleUnsubscribe]);
 
   const keyExtractor = useCallback((item: UnifiedSubscription) => item.id, []);
 

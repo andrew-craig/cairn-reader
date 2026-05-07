@@ -135,6 +135,7 @@ export interface ListFeedSubscriptionsResponse {
 type SubscriptionType = 'rss' | 'social' | 'email';
 
 interface RSSSubscriptionData {
+  feed_id: string;
   feed_url: string;
   site_url?: string;
   polling_tier?: string;
