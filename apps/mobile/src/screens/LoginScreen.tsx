@@ -61,7 +61,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       try {
         await AuthService.loginWithDevice();
         onLoginSuccess();
-      } catch (loginError) {
+      } catch {
         // If login fails, try to register
         await AuthService.registerWithDevice();
         onLoginSuccess();
