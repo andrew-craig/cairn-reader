@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthService } from '../services';
+import { loadServerUrl } from '../config/api';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -32,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuthStatus = async () => {
     try {
+      await loadServerUrl();
       await AuthService.initialize();
       const hasToken = await AuthService.isAuthenticated();
 

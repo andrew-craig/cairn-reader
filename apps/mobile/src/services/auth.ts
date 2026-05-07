@@ -9,9 +9,8 @@ import {
   AuthTokens,
   User,
 } from '../types';
-import { API_CONFIG } from '../config/api';
+import { getServerUrl } from '../config/api';
 
-const API_BASE_URL = API_CONFIG.USER_SERVICE_URL;
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
 const USER_KEY = '@cairn:user';
@@ -91,7 +90,7 @@ export class AuthService {
   static async loginWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/mobile`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/auth/login/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,7 +118,7 @@ export class AuthService {
   static async registerWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register/mobile`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/auth/register/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -145,7 +144,7 @@ export class AuthService {
   }
 
   static async loginWithEmail(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -171,7 +170,7 @@ export class AuthService {
   }
 
   static async registerWithEmail(credentials: RegisterRequest): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -199,7 +198,7 @@ export class AuthService {
   static async logout(): Promise<void> {
     if (this.refreshToken) {
       try {
-        await fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+        await fetch(`${getServerUrl()}/api/v1/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -353,13 +352,13 @@ export class AuthService {
 
     const refreshTokenPreview = `${this.refreshToken.substring(0, 20)}...`;
     console.log(`[Auth] Attempting refresh with token: ${refreshTokenPreview}`);
-    console.log(`[Auth] Refresh endpoint: ${API_BASE_URL}/api/v1/auth/refresh`);
+    console.log(`[Auth] Refresh endpoint: ${getServerUrl()}/api/v1/auth/refresh`);
 
     try {
       const requestBody = { refresh_token: this.refreshToken };
       console.log('[Auth] Sending refresh request...');
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -458,7 +457,7 @@ export class AuthService {
       throw new Error('No user found');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/user/${userId}/upgrade`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/upgrade`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -489,7 +488,7 @@ export class AuthService {
       throw new Error('No user found');
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/user/${userId}/password`, {
+    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
