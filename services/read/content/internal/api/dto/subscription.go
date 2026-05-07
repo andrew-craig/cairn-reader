@@ -25,6 +25,7 @@ type UnifiedSubscription struct {
 
 // RSSSubscriptionData contains RSS-specific subscription information
 type RSSSubscriptionData struct {
+	FeedID        string `json:"feed_id"`
 	FeedURL       string `json:"feed_url"`
 	SiteURL       string `json:"site_url,omitempty"`
 	PollingTier   string `json:"polling_tier,omitempty"`

@@ -103,6 +103,8 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 
 			// Subscription aggregation endpoint - returns unified list from all sources
 			r.Get("/subscriptions", subscriptionAggregator.ListAllSubscriptions)
+			// Unsubscribe from an RSS feed (proxies to Ingest RSS service)
+			r.Delete("/subscriptions/rss/{feed_id}", subscriptionAggregator.UnsubscribeRSS)
 		})
 
 		// Protected bulk user-content route

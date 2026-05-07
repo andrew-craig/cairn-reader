@@ -397,6 +397,28 @@ export class ReadService {
   }
 
   /**
+   * Unsubscribe the current user from an RSS feed.
+   * Existing articles already in the user's reading list are preserved;
+   * only future deliveries from this feed are stopped.
+   */
+  static async unsubscribeFromRSSFeed(feedId: string): Promise<void> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions/rss/${feedId}`;
+
+    const response = await this.fetchWithAuth(url, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to unsubscribe (HTTP ${response.status}): ${text.substring(0, 200)}`);
+    }
+  }
+
+  /**
    * List user's feed subscriptions (RSS only)
    * @deprecated Use listAllSubscriptions() for unified subscriptions across all sources
    */

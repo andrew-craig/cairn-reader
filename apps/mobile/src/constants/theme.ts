@@ -8,7 +8,7 @@ export const Colors = {
     border: '#F1EFEE', // Figma: red/line
     hover: '#EDEAE9', // Figma: red/hover
     success: '#34C759',
-    error: '#FF3B30',
+    error: '#C63E06',
     warning: '#FF9500',
     tabIconDefault: '#696563',
     tabIconSelected: '#0F0C0B',
