@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useCallback, useRef } from 'react';
+import React, { ReactNode, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -97,7 +97,9 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const subscriptionsRef = useRef(subscriptions);
-  subscriptionsRef.current = subscriptions;
+  useEffect(() => {
+    subscriptionsRef.current = subscriptions;
+  }, [subscriptions]);
 
   const load = useCallback(async () => {
     try {
@@ -139,12 +141,16 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
           text: 'Unsubscribe',
           style: 'destructive',
           onPress: async () => {
-            const previous = subscriptionsRef.current;
+            const index = subscriptionsRef.current.findIndex(s => s.id === subscription.id);
             setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
             try {
               await ReadService.unsubscribeFromRSSFeed(feedId);
             } catch (error) {
-              setSubscriptions(previous);
+              setSubscriptions(prev => {
+                const next = [...prev];
+                next.splice(index, 0, subscription);
+                return next;
+              });
               Alert.alert('Error', 'Failed to unsubscribe. Please try again.');
             }
           },

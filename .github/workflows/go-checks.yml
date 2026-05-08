@@ -24,7 +24,7 @@ jobs:
       pkg-auth: ${{ steps.filter.outputs.pkg-auth == 'true' }}
       selfhost: ${{ steps.filter.outputs.selfhost == 'true' || steps.filter.outputs.pkg == 'true' || steps.filter.outputs.anyservice == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -51,7 +51,7 @@ jobs:
     name: gofmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -74,7 +74,7 @@ jobs:
     if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -91,7 +91,7 @@ jobs:
     if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -108,7 +108,7 @@ jobs:
     if: needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -125,7 +125,7 @@ jobs:
     if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -144,7 +144,7 @@ jobs:
     if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -159,7 +159,7 @@ jobs:
     if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -174,7 +174,7 @@ jobs:
     if: needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -189,7 +189,7 @@ jobs:
     if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -206,7 +206,7 @@ jobs:
     if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -224,7 +224,7 @@ jobs:
     if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -241,7 +241,7 @@ jobs:
     if: needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -258,7 +258,7 @@ jobs:
     if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -277,7 +277,7 @@ jobs:
     if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -306,7 +306,7 @@ jobs:
     if: needs.changes.outputs.read == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -337,7 +337,7 @@ jobs:
     if: needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -366,7 +366,7 @@ jobs:
     if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -397,7 +397,7 @@ jobs:
     if: needs.changes.outputs.selfhost == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -414,7 +414,7 @@ jobs:
     if: needs.changes.outputs.selfhost == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -429,7 +429,7 @@ jobs:
     if: needs.changes.outputs.selfhost == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -450,7 +450,7 @@ jobs:
     if: needs.changes.outputs.selfhost == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -481,7 +481,7 @@ jobs:
     if: needs.changes.outputs.pkg-auth == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
