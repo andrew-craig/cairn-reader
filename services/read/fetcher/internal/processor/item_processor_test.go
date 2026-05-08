@@ -338,6 +338,7 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 		ItemURL:          srv.URL + "/article",
 		Description:      &desc,
 		ProcessingStatus: models.ProcessingStatusPending,
+		DiscoveredAt:     time.Now(),
 	}
 
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
@@ -356,6 +357,87 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 	require.NoError(t, p.processItem(context.Background(), item))
 	require.NotNil(t, capturedOutbox)
 	assert.Equal(t, desc, capturedOutbox.ContentPayload[models.PayloadKeyRawHTML])
+}
+
+// A user who subscribes after an item was published must not receive that
+// item — otherwise subscribing to a feed backfills the entire RSS history
+// into the user's read list.
+func TestItemProcessor_FiltersSubscribersBySubscriptionTime(t *testing.T) {
+	p, feedItemRepo, subRepo, outboxRepo, srv := newProcessorWithStubServer(t)
+
+	feedID := uuid.New()
+	itemID := uuid.New()
+	earlyUserID := uuid.New() // subscribed before the article was published
+	lateUserID := uuid.New()  // subscribed after the article was published
+
+	title := "Old article"
+	publishedAt := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	item := &models.FeedItem{
+		ID:               itemID,
+		FeedID:           feedID,
+		ItemURL:          srv.URL + "/old-article",
+		Title:            &title,
+		PublishedAt:      &publishedAt,
+		ProcessingStatus: models.ProcessingStatusPending,
+		DiscoveredAt:     time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
+		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
+
+	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
+		{ID: uuid.New(), UserID: earlyUserID, FeedID: feedID,
+			SubscribedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)},
+		{ID: uuid.New(), UserID: lateUserID, FeedID: feedID,
+			SubscribedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},
+	}, nil).Once()
+
+	var capturedOutbox *models.ContentOutbox
+	outboxRepo.On("Create", mock.Anything, mock.AnythingOfType("*models.ContentOutbox")).
+		Run(func(args mock.Arguments) { capturedOutbox = args.Get(1).(*models.ContentOutbox) }).
+		Return(nil).Once()
+	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
+		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
+
+	require.NoError(t, p.processItem(context.Background(), item))
+	require.NotNil(t, capturedOutbox)
+	assert.Equal(t, []uuid.UUID{earlyUserID}, capturedOutbox.UserIDs)
+}
+
+// When every subscriber joined after the item was published, the item still
+// gets marked completed but no outbox entry is written — there's no one to
+// deliver it to.
+func TestItemProcessor_AllSubscribersAfterItem_SkipsOutbox(t *testing.T) {
+	p, feedItemRepo, subRepo, outboxRepo, srv := newProcessorWithStubServer(t)
+
+	feedID := uuid.New()
+	itemID := uuid.New()
+	publishedAt := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	title := "Historical article"
+
+	item := &models.FeedItem{
+		ID:               itemID,
+		FeedID:           feedID,
+		ItemURL:          srv.URL + "/historical",
+		Title:            &title,
+		PublishedAt:      &publishedAt,
+		ProcessingStatus: models.ProcessingStatusPending,
+		DiscoveredAt:     time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
+		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
+	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
+		{ID: uuid.New(), UserID: uuid.New(), FeedID: feedID,
+			SubscribedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},
+	}, nil).Once()
+	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
+		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
+
+	require.NoError(t, p.processItem(context.Background(), item))
+
+	outboxRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
 
 // Oversized responses must error rather than silently truncate. io.LimitReader
