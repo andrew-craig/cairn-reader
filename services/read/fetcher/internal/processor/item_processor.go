@@ -146,18 +146,32 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		return fmt.Errorf("failed to get subscriptions: %w", err)
 	}
 
-	if len(subscriptions) == 0 {
-		slog.Info("No subscriptions found for feed, marking item as completed", "feed_id", item.FeedID)
+	// Only deliver this item to users who subscribed before the item existed.
+	// Without this filter, subscribing to a new feed backfills the user's read
+	// list with the entire RSS history. Prefer published_at (when the article
+	// went out on the feed); fall back to discovered_at if the feed omits it.
+	itemTime := item.DiscoveredAt
+	if item.PublishedAt != nil {
+		itemTime = *item.PublishedAt
+	}
+
+	userIDs := make([]uuid.UUID, 0, len(subscriptions))
+	for _, sub := range subscriptions {
+		if sub.SubscribedAt.Before(itemTime) {
+			userIDs = append(userIDs, sub.UserID)
+		}
+	}
+
+	if len(userIDs) == 0 {
+		slog.Info("No eligible subscribers for item, marking as completed",
+			"feed_id", item.FeedID,
+			"item_id", item.ID,
+			"total_subscriptions", len(subscriptions),
+		)
 		now := time.Now()
 		return p.feedItemRepo.UpdateProcessingStatus(
 			ctx, item.ID, models.ProcessingStatusCompleted, nil, nil, &now,
 		)
-	}
-
-	// Extract user IDs
-	userIDs := make([]uuid.UUID, len(subscriptions))
-	for i, sub := range subscriptions {
-		userIDs[i] = sub.UserID
 	}
 
 	// Create outbox entry
