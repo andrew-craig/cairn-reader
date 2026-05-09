@@ -388,7 +388,7 @@ POST /fetch               # Manually trigger feed fetch
 ```
 GET  /health                               # Health check
 POST /explore/articles                     # Submit articles (from fetcher)
-GET  /explore/recommendations/{userID}     # Get 5 recommendations (requires auth)
+GET  /explore/recommendation              # Get 5 recommendations for authenticated user (requires auth)
 POST /explore/articles/read                # Mark article as read (requires auth)
 POST /explore/articles/{articleID}/vote    # Vote on article (requires auth)
 DELETE /explore/articles/{articleID}/vote  # Remove vote (requires auth)
@@ -1199,8 +1199,8 @@ ELSE
 |---|---|
 | `GET /health/live`, `GET /health/ready` | No |
 | `POST /api/v1/explore/article` | No |
-| `GET /api/v1/explore/recommendation/:user_id` | Yes |
-| `GET /api/v1/explore/user/:user_id/votes` | Yes |
+| `GET /api/v1/explore/recommendation` | Yes |
+| `GET /api/v1/explore/user/votes` | Yes |
 | `POST/DELETE /api/v1/explore/article/:id/vote` | Yes |
 | `POST /api/v1/explore/article/:id/read` | Yes |
 

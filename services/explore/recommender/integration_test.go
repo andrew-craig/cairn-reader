@@ -702,7 +702,7 @@ func TestEndToEndFlow(t *testing.T) {
 
 	// 2. User gets recommendations (with authentication)
 	client := &http.Client{}
-	req, err := makeAuthenticatedRequest("GET", suite.server.URL+"/api/v1/explore/recommendation/"+userID, userID, nil, suite.jwtHelper)
+	req, err := makeAuthenticatedRequest("GET", suite.server.URL+"/api/v1/explore/recommendation", userID, nil, suite.jwtHelper)
 	if err != nil {
 		t.Fatalf("Failed to create authenticated request: %v", err)
 	}

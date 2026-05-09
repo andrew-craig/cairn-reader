@@ -222,23 +222,16 @@ paths:
         '500':
           description: Failed to store articles
 
-  /api/v1/explore/recommendation/{user_id}:
+  /api/v1/explore/recommendation:
     get:
       tags:
         - Recommendations
       summary: Get personalized recommendations
       description: |
         Returns 5 personalized article recommendations for the authenticated user.
+        The user is identified by the JWT token; no user ID parameter is required.
         The algorithm returns 4 high-quality articles plus 1 new article with low recommend count.
       operationId: getRecommendations
-      parameters:
-        - name: user_id
-          in: path
-          required: true
-          description: User ID (extracted from JWT token)
-          schema:
-            type: string
-            format: uuid
       security:
         - bearerAuth: []
       responses:
@@ -445,24 +438,18 @@ paths:
         '500':
           description: Failed to get vote counts
 
-  /api/v1/explore/user/{user_id}/votes:
+  /api/v1/explore/user/votes:
     get:
       tags:
         - Votes
       summary: Get user's voted articles
       description: |
         Returns all articles the authenticated user has voted on, along with their vote types.
+        The user is identified by the JWT token; no user ID parameter is required.
         Results are ordered by vote creation time (most recent first).
         Supports pagination via limit and offset query parameters.
       operationId: getUserVotedArticles
       parameters:
-        - name: user_id
-          in: path
-          required: true
-          description: User ID (must match authenticated user from JWT token)
-          schema:
-            type: string
-            format: uuid
         - name: limit
           in: query
           required: false

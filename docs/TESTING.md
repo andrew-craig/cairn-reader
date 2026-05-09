@@ -488,7 +488,7 @@ SELECT COUNT(*) as article_count, feed_id FROM articles GROUP BY feed_id;
 
 **Objective**: Validate recommendation algorithm and user tracking
 
-- [ ] Request recommendations for new user (`GET /api/v1/explore/recommendation/{user_id}`, requires JWT)
+- [ ] Request recommendations for new user (`GET /api/v1/explore/recommendation`, requires JWT)
 - [ ] Verify 5 articles returned
 - [ ] Check recommendation scoring (quality score: `(upvotes + (downvotes * 3)) / recommends`)
 - [ ] Verify algorithm selects 4 high-quality articles + 1 low-exposure article
@@ -502,10 +502,10 @@ SELECT COUNT(*) as article_count, feed_id FROM articles GROUP BY feed_id;
 
 **Test Commands**:
 ```bash
-curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/test-user-001
-curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/test-user-002
+curl -H "Authorization: Bearer <user-001-JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation
+curl -H "Authorization: Bearer <user-002-JWT>" \
+  http://localhost:8081/api/v1/explore/recommendation
 ```
 
 ##### 6. User Interaction Tests
@@ -528,7 +528,7 @@ curl -H "Authorization: Bearer <JWT>" \
 ```bash
 # Get recommendations (requires JWT)
 RECS=$(curl -s -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/test-user-001)
+  http://localhost:8081/api/v1/explore/recommendation)
 ARTICLE_ID=$(echo $RECS | jq -r '.articles[0].id')
 
 # Mark as read (requires JWT)
@@ -538,7 +538,7 @@ curl -X POST \
 
 # Verify filtered out
 curl -s -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/test-user-001 | jq
+  http://localhost:8081/api/v1/explore/recommendation | jq
 ```
 
 **Validation SQL**:
