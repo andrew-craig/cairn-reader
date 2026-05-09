@@ -5,10 +5,10 @@ type: task
 status: open
 priority: 3
 labels: [ci,backend,testing]
-blocked_by: []
-parent: epic_d014
+blocked_by: [decision_4052]
+parent: epic_7c9e
 created_at: 2026-04-01T03:38:21Z
-updated_at: 2026-04-01T03:38:21Z
+updated_at: 2026-05-09T03:00:39Z
 ---
 Create a separate workflow (or job) for integration tests that require Docker and PostgreSQL. This is more complex than standalone checks and should be tackled after the P1/P2 checks are in place.
 
