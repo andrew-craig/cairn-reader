@@ -20,24 +20,24 @@ export const ReadScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
+  const [cursor, setCursor] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   const loadReadArticles = useCallback(async (reset = false) => {
     try {
-      const currentOffset = reset ? 0 : offset;
+      const currentCursor = reset ? '' : cursor;
 
       if (reset) {
         setLoading(true);
-        setOffset(0);
+        setCursor('');
         setHasMore(true);
       }
 
       const response = await ReadService.listUserContents({
         limit: PAGE_SIZE,
-        offset: currentOffset,
+        cursor: currentCursor || undefined,
       });
 
       const transformedArticles = response.contents.map((content) =>
@@ -50,9 +50,8 @@ export const ReadScreen: React.FC = () => {
         setArticles((prev) => [...prev, ...transformedArticles]);
       }
 
-      // Check if there are more items to load
-      setHasMore(response.contents.length === PAGE_SIZE);
-      setOffset(currentOffset + response.contents.length);
+      setHasMore(response.has_more);
+      setCursor(response.cursor);
     } catch (error) {
       console.error('Error loading read articles:', error);
       Alert.alert(
@@ -65,7 +64,7 @@ export const ReadScreen: React.FC = () => {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [offset]);
+  }, [cursor]);
 
   // Reload the list whenever the screen regains focus (e.g. after returning
   // from the article detail screen where an article may have been archived).
@@ -90,7 +89,6 @@ export const ReadScreen: React.FC = () => {
       const response = await ReadService.searchUserContents({
         q: query,
         limit: PAGE_SIZE,
-        offset: 0,
       });
 
       const transformedArticles = response.contents.map((content) =>
@@ -98,8 +96,8 @@ export const ReadScreen: React.FC = () => {
       );
 
       setArticles(transformedArticles);
-      setOffset(transformedArticles.length);
-      setHasMore(response.contents.length === PAGE_SIZE);
+      setCursor('');
+      setHasMore(false);
     } catch (error) {
       console.error('Error searching articles:', error);
       Alert.alert('Error', 'Failed to search articles. Please try again.');
@@ -111,7 +109,7 @@ export const ReadScreen: React.FC = () => {
   const clearSearch = () => {
     setSearchQuery(null);
     setArticles([]);
-    setOffset(0);
+    setCursor('');
     loadReadArticles(true);
   };
 
@@ -129,7 +127,7 @@ export const ReadScreen: React.FC = () => {
       setLoadingMore(true);
       loadReadArticles(false);
     }
-  }, [loadingMore, hasMore, loading, offset, searchQuery]);
+  }, [loadingMore, hasMore, loading, loadReadArticles, searchQuery]);
 
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex(a => a.id === article.id);

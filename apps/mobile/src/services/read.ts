@@ -91,7 +91,7 @@ export class ReadService {
         queryParams.append('is_favorite', params.is_favorite.toString());
       }
       if (params?.limit) queryParams.append('limit', params.limit.toString());
-      if (params?.offset) queryParams.append('offset', params.offset.toString());
+      if (params?.cursor) queryParams.append('cursor', params.cursor);
 
       const url = `${getServerUrl()}/api/v1/content/user/${userId}${
         queryParams.toString() ? `?${queryParams.toString()}` : ''
@@ -105,16 +105,17 @@ export class ReadService {
         throw new Error(result.message || result.error || 'Failed to list user contents');
       }
 
-      // The backend returns a paginated response where:
-      // - result.data is the array of contents directly (not { contents: [...] })
-      // - result.pagination contains limit, offset, total, etc.
+      // The backend returns a paginated response with cursor-based pagination:
+      // - result.data is the array of contents
+      // - result.pagination contains cursor (next page), has_more, limit
       const contents = Array.isArray(result.data) ? result.data : [];
       const pagination = result.pagination || {};
       return {
         contents: contents,
         total_count: pagination.total || 0,
         limit: pagination.limit || params?.limit || PAGE_SIZE_DEFAULT,
-        offset: pagination.offset || params?.offset || 0,
+        cursor: pagination.cursor || '',
+        has_more: pagination.has_more === true,
       };
     } catch (error) {
       console.error('Error listing user contents:', error);
@@ -138,7 +139,7 @@ export class ReadService {
       const queryParams = new URLSearchParams();
       queryParams.append('q', params.q);
       if (params.limit) queryParams.append('limit', params.limit.toString());
-      if (params.offset) queryParams.append('offset', params.offset.toString());
+      if (params.cursor) queryParams.append('cursor', params.cursor);
 
       const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
 
