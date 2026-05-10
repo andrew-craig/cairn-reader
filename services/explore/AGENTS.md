@@ -207,9 +207,9 @@ curl -X POST http://localhost:8081/api/v1/explore/article \
 
 #### Recommendations (requires authentication)
 ```bash
-# Get 5 recommendations for user
+# Get 5 recommendations for the authenticated user (user identified by JWT)
 curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/user123
+  http://localhost:8081/api/v1/explore/recommendation
 ```
 
 #### User Interactions (requires authentication)
@@ -237,7 +237,7 @@ curl -H "Authorization: Bearer <JWT>" \
 
 # Get all articles user has voted on (with pagination)
 curl -H "Authorization: Bearer <JWT>" \
-  "http://localhost:8081/api/v1/explore/user/{user_id}/votes?limit=20&offset=0"
+  "http://localhost:8081/api/v1/explore/user/votes?limit=20&offset=0"
 ```
 
 ## Data Models
@@ -455,8 +455,8 @@ go run recommender/cmd/cleanup/main.go
 - Article submission (`POST /api/v1/explore/article`)
 
 **Protected Endpoints** (require JWT):
-- Recommendations (`GET /api/v1/explore/recommendation/:user_id`)
-- User voted articles (`GET /api/v1/explore/user/:user_id/votes`)
+- Recommendations (`GET /api/v1/explore/recommendation`)
+- User voted articles (`GET /api/v1/explore/user/votes`)
 - Voting (`POST/DELETE /api/v1/explore/article/:id/vote`)
 - Read tracking (`POST /api/v1/explore/article/:id/read`)
 
@@ -519,7 +519,7 @@ curl http://localhost:8080/api/v1/explore/feed/stats
 **4. Get recommendations (requires JWT from User Service):**
 ```bash
 curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/user123
+  http://localhost:8081/api/v1/explore/recommendation
 ```
 
 **5. Vote on article:**

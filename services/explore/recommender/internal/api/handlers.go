@@ -118,8 +118,8 @@ func (s *Server) handleArticles(w http.ResponseWriter, r *http.Request) {
 	}, "v1")
 }
 
-// handleRecommendations returns recommended articles for a user
-// GET /api/v1/explore/recommendation/{user_id}
+// handleRecommendations returns recommended articles for the authenticated user
+// GET /api/v1/explore/recommendation
 func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
@@ -284,8 +284,6 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the authenticated user's vote using the JWT context
-	// TODO: Consider removing the query parameter option and always using JWT user ID
-	userVote := ""
 	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
 	if err != nil {
 		slog.Error("user ID not found in context", slog.Any("error", err))
@@ -293,12 +291,10 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := authenticatedUserID.String()
-	if userID != "" {
-		userVote, err = s.voteRepo.GetUserVote(r.Context(), userID, articleID)
-		if err != nil {
-			slog.Error("failed to get user vote", slog.Any("error", err))
-			// Don't fail the request, just log the error
-		}
+	userVote, err := s.voteRepo.GetUserVote(r.Context(), userID, articleID)
+	if err != nil {
+		slog.Error("failed to get user vote", slog.Any("error", err))
+		// Don't fail the request, just log the error
 	}
 
 	response := map[string]interface{}{
@@ -314,8 +310,8 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
-// handleGetUserVotedArticles returns all articles a user has voted on
-// GET /api/v1/explore/user/{user_id}/votes
+// handleGetUserVotedArticles returns all articles the authenticated user has voted on
+// GET /api/v1/explore/user/votes
 func (s *Server) handleGetUserVotedArticles(w http.ResponseWriter, r *http.Request) {
 	// Extract authenticated user ID from JWT token context
 	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())

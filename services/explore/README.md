@@ -193,7 +193,7 @@ curl -X POST http://localhost:8080/api/v1/explore/feed/sync
 - `POST /api/v1/explore/article` - Submit article (from fetcher)
 
 #### Recommendations
-- `GET /api/v1/explore/recommendation/{user_id}` - Get 5 recommendations (requires auth)
+- `GET /api/v1/explore/recommendation` - Get 5 recommendations for the authenticated user (requires auth)
 
 #### User Interactions
 - `POST /api/v1/explore/article/{article_id}/read` - Mark article as read (requires auth)
@@ -210,7 +210,7 @@ curl http://localhost:8081/health/ready
 
 # Get recommendations (requires auth)
 curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation/user123
+  http://localhost:8081/api/v1/explore/recommendation
 
 # Mark article as read (requires auth)
 curl -X POST \

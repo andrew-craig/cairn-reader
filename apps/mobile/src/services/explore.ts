@@ -101,14 +101,8 @@ export class ExploreService {
 
   static async getRecommendations(): Promise<Article[]> {
     try {
-      const userId = await AuthService.getUserId();
-
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
-
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/recommendation/${userId}`
+        `${getServerUrl()}/api/v1/explore/recommendation`
       );
 
       const result = await response.json();
@@ -222,14 +216,8 @@ export class ExploreService {
     offset: number = 0
   ): Promise<VotedArticleWithType[]> {
     try {
-      const userId = await AuthService.getUserId();
-
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
-
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/user/${userId}/votes?limit=${limit}&offset=${offset}`
+        `${getServerUrl()}/api/v1/explore/user/votes?limit=${limit}&offset=${offset}`
       );
 
       const result = await response.json();
@@ -253,15 +241,9 @@ export class ExploreService {
 
   static async getUserVoteStats(): Promise<{ upvotes: number; downvotes: number }> {
     try {
-      const userId = await AuthService.getUserId();
-
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
-
       // Fetch all votes with a high limit to get complete counts
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/user/${userId}/votes?limit=10000&offset=0`
+        `${getServerUrl()}/api/v1/explore/user/votes?limit=10000&offset=0`
       );
 
       const result = await response.json();
