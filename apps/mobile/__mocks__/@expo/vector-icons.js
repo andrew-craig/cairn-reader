@@ -2,7 +2,7 @@ const React = require('react');
 const { Text } = require('react-native');
 
 const createIconSet = () => {
-  const Icon = ({ name, size, color, testID }) =>
+  const Icon = ({ name, _size, _color, testID }) =>
     React.createElement(Text, { testID }, name);
   Icon.glyphMap = new Proxy({}, { get: () => 0 });
   return Icon;
