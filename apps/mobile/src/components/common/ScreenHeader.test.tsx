@@ -11,17 +11,13 @@ describe('ScreenHeader', () => {
 
   it('does not render a back button when onBack is not provided', () => {
     render(<ScreenHeader title="Settings" />);
-    // No TouchableOpacity back button — only the header container
     expect(screen.queryByRole('button')).toBeNull();
   });
 
   it('calls onBack when the back button is pressed', () => {
     const onBack = jest.fn();
     render(<ScreenHeader title="Settings" onBack={onBack} />);
-    // The back button is the first TouchableOpacity in the tree
-    const { TouchableOpacity } = require('react-native');
-    const backButton = screen.UNSAFE_getAllByType(TouchableOpacity)[0];
-    fireEvent.press(backButton);
+    fireEvent.press(screen.getByRole('button'));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, TouchableOpacity } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import { render, fireEvent, screen } from '@testing-library/react-native';
 import { Button } from './Button';
 
@@ -18,8 +18,7 @@ describe('Button', () => {
 
   it('disables the touchable when disabled prop is set', () => {
     render(<Button title="Save" onPress={() => {}} disabled />);
-    const touchable = screen.UNSAFE_getByType(TouchableOpacity);
-    expect(touchable.props.disabled).toBe(true);
+    expect(screen.getByRole('button', { disabled: true })).toBeTruthy();
   });
 
   it('hides title and shows ActivityIndicator when loading', () => {
@@ -30,8 +29,7 @@ describe('Button', () => {
 
   it('disables the touchable when loading', () => {
     render(<Button title="Save" onPress={() => {}} loading />);
-    const touchable = screen.UNSAFE_getByType(TouchableOpacity);
-    expect(touchable.props.disabled).toBe(true);
+    expect(screen.getByRole('button', { disabled: true })).toBeTruthy();
   });
 
   it('renders secondary and outline variants without crashing', () => {
