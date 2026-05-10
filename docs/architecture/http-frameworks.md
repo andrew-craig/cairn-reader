@@ -49,7 +49,7 @@ Applied via `r.Use(...)` inside `r.Route(...)` blocks:
 | `CORS` / `DevelopmentCORS` | `pkg/middleware` | Handles CORS preflight and response headers; strict config in prod |
 | `RateLimit` | `pkg/middleware` | Token-bucket rate limiter keyed by client IP; configured per route group |
 | `RequireAuth` | `pkg/auth` | Validates RS256 JWT; stores `user_id` UUID in context via `UserIDContextKey` |
-| `OptionalAuth` | `pkg/auth` | Validates JWT if present; continues unauthenticated if absent |
+| `OptionalAuth` | `pkg/auth` | Anonymous when no `Authorization` header; **401** when a header is present but the token is malformed/invalid (fail-closed on presented credentials) |
 | `RequireInternalAPIKey` | `pkg/auth` | Validates `X-Internal-API-Key` header using constant-time compare |
 | `ValidateJSON` | service-local | Rejects non-JSON content types on write methods |
 
@@ -92,7 +92,8 @@ middleware.RequireJSON()                     // enforce application/json
 ```go
 // JWT middleware
 auth.NewMiddleware(validator).RequireAuth    // require valid JWT → sets user_id in context
-auth.NewMiddleware(validator).OptionalAuth   // validate JWT if present
+auth.NewMiddleware(validator).OptionalAuth   // anonymous if no Authorization header;
+                                             // 401 if header present but token is invalid
 
 // Context helpers
 auth.GetUserIDFromContext(ctx)              // returns (uuid.UUID, bool)

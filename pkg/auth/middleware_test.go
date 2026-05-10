@@ -235,13 +235,8 @@ func TestOptionalAuth_InvalidToken(t *testing.T) {
 	validator := NewValidator(publicKey)
 	middleware := NewMiddleware(validator)
 
-	handlerCalled := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlerCalled = true
-		if IsAuthenticated(r.Context()) {
-			t.Error("Expected request to not be authenticated with invalid token")
-		}
-		w.WriteHeader(http.StatusOK)
+		t.Error("Handler should not be called when Authorization header carries an invalid token")
 	})
 
 	optionalHandler := middleware.OptionalAuth(handler)
@@ -252,12 +247,120 @@ func TestOptionalAuth_InvalidToken(t *testing.T) {
 
 	optionalHandler.ServeHTTP(w, req)
 
-	if !handlerCalled {
-		t.Error("Handler should be called even with invalid token")
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 when a presented token is invalid, got %d", w.Code)
+	}
+}
+
+func TestOptionalAuth_ExpiredToken(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	middleware := NewMiddleware(validator)
+	userID := uuid.New()
+
+	token := generateTestToken(t, privateKey, userID, "cairn-user-service", "cairn-api", -1*time.Hour)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Handler should not be called with an expired token")
+	})
+
+	optionalHandler := middleware.OptionalAuth(handler)
+
+	req := httptest.NewRequest("GET", "/optional", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+
+	optionalHandler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401 for expired token, got %d", w.Code)
+	}
+}
+
+func TestOptionalAuth_MalformedHeader(t *testing.T) {
+	_, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	middleware := NewMiddleware(validator)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Handler should not be called when Authorization header is malformed")
+	})
+
+	optionalHandler := middleware.OptionalAuth(handler)
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{"no bearer prefix", "token123"},
+		{"wrong scheme", "Basic token123"},
+		{"empty bearer", "Bearer "},
 	}
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/optional", nil)
+			req.Header.Set("Authorization", tt.header)
+			w := httptest.NewRecorder()
+
+			optionalHandler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusUnauthorized {
+				t.Errorf("Expected status 401, got %d", w.Code)
+			}
+		})
+	}
+}
+
+func TestOptionalAuth_DoesNotLeakErrorDetails(t *testing.T) {
+	privateKey, publicKey := generateTestKeys(t)
+	validator := NewValidator(publicKey)
+	middleware := NewMiddleware(validator)
+	userID := uuid.New()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("Handler should not be called")
+	})
+	optionalHandler := middleware.OptionalAuth(handler)
+
+	leakyStrings := []string{
+		"token has expired",
+		"invalid token signature",
+		"invalid token issuer",
+		"invalid token audience",
+		"missing authorization token",
+		"invalid authorization header format",
+	}
+
+	tests := []struct {
+		name   string
+		header string
+	}{
+		{"expired token", "Bearer " + generateTestToken(t, privateKey, userID, "cairn-user-service", "cairn-api", -1*time.Hour)},
+		{"wrong issuer", "Bearer " + generateTestToken(t, privateKey, userID, "wrong-issuer", "cairn-api", 1*time.Hour)},
+		{"malformed token", "Bearer not.a.valid.token"},
+		{"invalid format", "NotBearer token"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/optional", nil)
+			req.Header.Set("Authorization", tt.header)
+			w := httptest.NewRecorder()
+
+			optionalHandler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusUnauthorized {
+				t.Errorf("Expected status 401, got %d", w.Code)
+			}
+
+			body := w.Body.String()
+			for _, s := range leakyStrings {
+				if containsString(body, s) {
+					t.Errorf("Response body leaks JWT detail %q: %s", s, body)
+				}
+			}
+		})
 	}
 }
 
