@@ -38,8 +38,8 @@ export interface UserContentsListResponse {
   contents: UserContentResponse[];
   total_count: number;
   limit: number;
-  offset: number;
-  next_cursor?: string;
+  cursor: string;
+  has_more: boolean;
 }
 
 // URL Detection Types
@@ -104,14 +104,14 @@ export interface UpdateUserContentRequest {
 export interface SearchParams {
   q: string;
   limit?: number;
-  offset?: number;
+  cursor?: string;
 }
 
 export interface ListContentsParams {
   status?: ContentStatus;
   is_favorite?: boolean;
   limit?: number;
-  offset?: number;
+  cursor?: string;
 }
 
 // Feed Subscription Types (Legacy - kept for backward compatibility)

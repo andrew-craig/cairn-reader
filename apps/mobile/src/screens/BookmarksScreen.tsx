@@ -19,24 +19,24 @@ export const BookmarksScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
+  const [cursor, setCursor] = useState<string>('');
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
   const loadBookmarks = useCallback(async (reset = false) => {
     try {
-      const currentOffset = reset ? 0 : offset;
+      const currentCursor = reset ? '' : cursor;
 
       if (reset) {
         setLoading(true);
-        setOffset(0);
+        setCursor('');
         setHasMore(true);
       }
 
       const response = await ReadService.listUserContents({
         is_favorite: true,
         limit: PAGE_SIZE,
-        offset: currentOffset,
+        cursor: currentCursor || undefined,
       });
 
       const transformedArticles = response.contents.map((content) =>
@@ -49,8 +49,8 @@ export const BookmarksScreen: React.FC = () => {
         setArticles((prev) => [...prev, ...transformedArticles]);
       }
 
-      setHasMore(response.contents.length === PAGE_SIZE);
-      setOffset(currentOffset + response.contents.length);
+      setHasMore(response.has_more);
+      setCursor(response.cursor);
     } catch (error) {
       console.error('Error loading bookmarks:', error);
     } finally {
@@ -58,7 +58,7 @@ export const BookmarksScreen: React.FC = () => {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [offset]);
+  }, [cursor]);
 
   const searchArticles = async (query: string) => {
     setSearchQuery(query);
@@ -69,7 +69,6 @@ export const BookmarksScreen: React.FC = () => {
       const response = await ReadService.searchUserContents({
         q: query,
         limit: PAGE_SIZE,
-        offset: 0,
       });
 
       const transformedArticles = response.contents.map((content) =>
@@ -77,8 +76,8 @@ export const BookmarksScreen: React.FC = () => {
       );
 
       setArticles(transformedArticles);
-      setOffset(transformedArticles.length);
-      setHasMore(response.contents.length === PAGE_SIZE);
+      setCursor('');
+      setHasMore(false);
     } catch (error) {
       console.error('Error searching articles:', error);
       Alert.alert('Error', 'Failed to search articles. Please try again.');
@@ -90,7 +89,7 @@ export const BookmarksScreen: React.FC = () => {
   const clearSearch = () => {
     setSearchQuery(null);
     setArticles([]);
-    setOffset(0);
+    setCursor('');
     loadBookmarks(true);
   };
 
