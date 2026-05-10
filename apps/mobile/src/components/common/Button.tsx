@@ -70,6 +70,7 @@ export const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
+      accessibilityRole="button"
     >
       {loading ? (
         <ActivityIndicator color={getTextColor()} />

@@ -12,7 +12,7 @@ interface ScreenHeaderProps {
 }
 
 const BackButton: React.FC<{ onPress: () => void; color: string }> = ({ onPress, color }) => (
-  <TouchableOpacity style={styles.backButton} onPress={onPress} activeOpacity={0.7}>
+  <TouchableOpacity style={styles.backButton} onPress={onPress} activeOpacity={0.7} accessibilityRole="button">
     <Svg width={16} height={13} viewBox="0 0 17.5 14.5" fill="none">
       <Path
         d="M7.41667 0.75L0.75 7.25L7.41667 13.75M0.75 7.25H16.75"

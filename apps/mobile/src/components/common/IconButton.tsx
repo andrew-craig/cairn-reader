@@ -29,6 +29,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
     >
       <Ionicons name={icon} size={size} color={iconColor} />
     </TouchableOpacity>
