@@ -151,7 +151,15 @@ export class ReadService {
         throw new Error(result.message || result.error || 'Failed to search contents');
       }
 
-      return result.data;
+      const contents = Array.isArray(result.data) ? result.data : [];
+      const pagination = result.pagination || {};
+      return {
+        contents: contents,
+        total_count: pagination.total || 0,
+        limit: pagination.limit || params.limit || PAGE_SIZE_DEFAULT,
+        cursor: pagination.cursor || '',
+        has_more: pagination.has_more === true,
+      };
     } catch (error) {
       console.error('Error searching contents:', error);
       throw error;
