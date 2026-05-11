@@ -109,9 +109,14 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 
 	slog.Info("fetched feed", slog.String("title", feedData.Title), slog.Int("items", len(feedData.Items)))
 
-	newArticles := f.filterNewArticles(feedData.Items, feed.LastFetchedAt, feedData, feed.URL)
+	// Forward every item; the recommender deduplicates by link
+	// (article_repository.go: INSERT ... ON CONFLICT (link) DO UPDATE).
+	// Filtering by PublishedAt vs. last_fetched_at silently drops items
+	// when an upstream CDN serves stale RSS — by the time the cached feed
+	// refreshes, last_fetched_at has advanced past the publish timestamp.
+	newArticles := f.convertItems(feedData.Items, feedData, feed.URL)
 
-	slog.Info("found new articles", slog.Int("new_count", len(newArticles)), slog.Int("total_items", len(feedData.Items)))
+	slog.Info("forwarding articles", slog.Int("count", len(newArticles)), slog.Int("total_items", len(feedData.Items)))
 
 	articlesSent := 0
 	if len(newArticles) > 0 {
@@ -137,22 +142,6 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// filterNewArticles returns only articles published after lastFetch.
-// For the first fetch of a feed (lastFetch is nil), all articles are returned.
-func (f *Fetcher) filterNewArticles(items []parse.Item, lastFetch *time.Time, feed *parse.Feed, feedURL string) []models.Article {
-	if lastFetch == nil {
-		return f.convertItems(items, feed, feedURL)
-	}
-
-	var newItems []parse.Item
-	for _, item := range items {
-		if item.PublishedAt != nil && item.PublishedAt.After(*lastFetch) {
-			newItems = append(newItems, item)
-		}
-	}
-	return f.convertItems(newItems, feed, feedURL)
 }
 
 // convertItems converts parse.Items to Article models.
