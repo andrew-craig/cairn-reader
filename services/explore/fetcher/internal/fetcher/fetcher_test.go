@@ -30,99 +30,6 @@ func (m *mockRecommenderClient) SubmitArticles(ctx context.Context, articles []m
 	return nil
 }
 
-func TestFilterNewArticles_FirstFetch(t *testing.T) {
-	database := testutil.SetupTestDB(t)
-	defer database.Close()
-
-	repo := db.NewFeedRepository(database)
-	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-
-	now := time.Now()
-	items := []parse.Item{
-		{
-			Title:       "Article 1",
-			Link:        "https://example.com/article1",
-			Description: "Description 1",
-			Content:     "Content 1",
-			PublishedAt: &now,
-		},
-		{
-			Title:       "Article 2",
-			Link:        "https://example.com/article2",
-			Description: "Description 2",
-			Content:     "Content 2",
-			PublishedAt: ptrTime(now.Add(-1 * time.Hour)),
-		},
-	}
-
-	feed := &parse.Feed{Title: "Test Feed"}
-
-	articles := fetcher.filterNewArticles(items, nil, feed, "https://example.com/feed.xml")
-
-	if len(articles) != 2 {
-		t.Errorf("Expected 2 articles on first fetch, got %d", len(articles))
-	}
-}
-
-func TestFilterNewArticles_OnlyNew(t *testing.T) {
-	database := testutil.SetupTestDB(t)
-	defer database.Close()
-
-	repo := db.NewFeedRepository(database)
-	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-
-	lastFetch := time.Now().Add(-2 * time.Hour)
-	now := time.Now()
-	items := []parse.Item{
-		{
-			Title:       "New Article",
-			Link:        "https://example.com/new",
-			Description: "New article description",
-			Content:     "New article content",
-			PublishedAt: ptrTime(now.Add(-1 * time.Hour)),
-		},
-		{
-			Title:       "Old Article",
-			Link:        "https://example.com/old",
-			Description: "Old article description",
-			Content:     "Old article content",
-			PublishedAt: ptrTime(now.Add(-3 * time.Hour)),
-		},
-	}
-
-	feed := &parse.Feed{Title: "Test Feed"}
-
-	articles := fetcher.filterNewArticles(items, &lastFetch, feed, "https://example.com/feed.xml")
-
-	if len(articles) != 1 {
-		t.Errorf("Expected 1 new article, got %d", len(articles))
-	}
-	if len(articles) > 0 && articles[0].Title != "New Article" {
-		t.Errorf("Expected 'New Article', got '%s'", articles[0].Title)
-	}
-}
-
-func TestFilterNewArticles_EmptyItems(t *testing.T) {
-	database := testutil.SetupTestDB(t)
-	defer database.Close()
-
-	repo := db.NewFeedRepository(database)
-	mockClient := &mockRecommenderClient{}
-	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-
-	lastFetch := time.Now().Add(-2 * time.Hour)
-	items := []parse.Item{}
-	feed := &parse.Feed{Title: "Test Feed"}
-
-	articles := fetcher.filterNewArticles(items, &lastFetch, feed, "https://example.com/feed.xml")
-
-	if len(articles) != 0 {
-		t.Errorf("Expected 0 articles from empty items, got %d", len(articles))
-	}
-}
-
 func TestConvertToArticle_Complete(t *testing.T) {
 	publishedTime := time.Now()
 	item := parse.Item{
@@ -180,6 +87,25 @@ func TestConvertToArticle_Minimal(t *testing.T) {
 	}
 	if article.Author != "" {
 		t.Errorf("Expected empty author, got '%s'", article.Author)
+	}
+}
+
+func TestConvertToArticle_NoPublishedAtIsZeroTime(t *testing.T) {
+	item := parse.Item{
+		Title:   "Dateless Article",
+		Link:    "https://example.com/dateless",
+		Content: "content",
+	}
+	feed := &parse.Feed{Title: "Test Feed"}
+
+	a1 := convertToArticle(item, feed, "https://example.com/feed.xml")
+	a2 := convertToArticle(item, feed, "https://example.com/feed.xml")
+
+	if !a1.Published.IsZero() {
+		t.Errorf("Expected zero published time when item has no PublishedAt, got %v", a1.Published)
+	}
+	if !a1.Published.Equal(a2.Published) {
+		t.Error("Expected convertToArticle to be idempotent for items without PublishedAt")
 	}
 }
 
@@ -344,7 +270,7 @@ func TestFetchSingleFeed_NoEnabledFeeds(t *testing.T) {
 	}
 }
 
-func TestFetchSingleFeed_OnlyNewArticles(t *testing.T) {
+func TestFetchSingleFeed_ForwardsAllItems(t *testing.T) {
 	database := testutil.SetupTestDB(t)
 	defer database.Close()
 	defer testutil.CleanupTestDB(t, database)
@@ -365,16 +291,14 @@ func TestFetchSingleFeed_OnlyNewArticles(t *testing.T) {
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
 	ctx := context.Background()
 
-	err := fetcher.FetchSingleFeed(ctx)
-	if err != nil {
+	if err := fetcher.FetchSingleFeed(ctx); err != nil {
 		t.Fatalf("FetchSingleFeed failed: %v", err)
 	}
 
-	// SampleRSSFeed creates articles 1..N hours ago. With lastFetch 2h ago, only
-	// the article from 1h ago is new.
-	if len(mockClient.submitted) != 1 {
-		t.Logf("Articles submitted: %d", len(mockClient.submitted))
-		t.Errorf("Expected 1 new article (published in last 2 hours), got %d", len(mockClient.submitted))
+	// All items are forwarded regardless of last_fetched_at; the recommender
+	// deduplicates by link.
+	if len(mockClient.submitted) != 5 {
+		t.Errorf("Expected 5 articles submitted, got %d", len(mockClient.submitted))
 	}
 
 	_, _, failures, lastFetchedAfter := testutil.GetFeedByID(t, database, feedID)
@@ -432,11 +356,6 @@ func TestFetchSingleFeed_ETagSentOnSubsequentFetch(t *testing.T) {
 	if receivedIfNoneMatch != testETag {
 		t.Errorf("Expected If-None-Match=%q on second fetch, got %q", testETag, receivedIfNoneMatch)
 	}
-}
-
-// Helper function to create time pointers
-func ptrTime(t time.Time) *time.Time {
-	return &t
 }
 
 // Compile-time check that mockRecommenderClient implements client.RecommenderClient interface
