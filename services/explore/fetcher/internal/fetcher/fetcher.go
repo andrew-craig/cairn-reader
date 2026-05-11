@@ -159,8 +159,14 @@ const maxContentBytes = 5 * 1024 * 1024
 
 // convertToArticle converts a parse.Item to our Article model.
 // Article ID is derived from a content hash for consistency with the Read service.
+//
+// When the feed provides no publish timestamp we emit the zero time rather
+// than time.Now(). Items are forwarded on every fetch and the recommender's
+// ON CONFLICT (link) DO UPDATE overwrites the published column, so a
+// time.Now() fallback would re-stamp dateless items on every cycle and make
+// them perpetually float to the top of date-sorted views.
 func convertToArticle(item parse.Item, feed *parse.Feed, feedURL string) models.Article {
-	published := time.Now()
+	var published time.Time
 	if item.PublishedAt != nil {
 		published = *item.PublishedAt
 	}

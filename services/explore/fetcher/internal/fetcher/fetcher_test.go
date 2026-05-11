@@ -90,6 +90,25 @@ func TestConvertToArticle_Minimal(t *testing.T) {
 	}
 }
 
+func TestConvertToArticle_NoPublishedAtIsZeroTime(t *testing.T) {
+	item := parse.Item{
+		Title:   "Dateless Article",
+		Link:    "https://example.com/dateless",
+		Content: "content",
+	}
+	feed := &parse.Feed{Title: "Test Feed"}
+
+	a1 := convertToArticle(item, feed, "https://example.com/feed.xml")
+	a2 := convertToArticle(item, feed, "https://example.com/feed.xml")
+
+	if !a1.Published.IsZero() {
+		t.Errorf("Expected zero published time when item has no PublishedAt, got %v", a1.Published)
+	}
+	if !a1.Published.Equal(a2.Published) {
+		t.Error("Expected convertToArticle to be idempotent for items without PublishedAt")
+	}
+}
+
 func TestConvertToArticle_IDIsContentHash(t *testing.T) {
 	item := parse.Item{
 		Link:    "https://example.com/article",
