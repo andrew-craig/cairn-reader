@@ -35,15 +35,22 @@ export const ExploreScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const lastVisibleIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
+  const hasMoreRef = useRef(true);
   const articlesRef = useRef<Article[]>([]);
   const loadMoreRef = useRef<((minArticles?: number) => Promise<void>) | null>(null);
 
+  const markNoMore = useCallback(() => {
+    hasMoreRef.current = false;
+    setHasMore(false);
+  }, []);
+
   const loadMoreUntilBuffer = useCallback(async (minArticles?: number) => {
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current || !hasMoreRef.current) return;
 
     isFetchingRef.current = true;
     setLoadingMore(true);
@@ -79,6 +86,7 @@ export const ExploreScreen: React.FC = () => {
 
         if (newRecommendations.length === 0) {
           // No more articles available from backend
+          markNoMore();
           break;
         }
 
@@ -96,6 +104,7 @@ export const ExploreScreen: React.FC = () => {
 
         // If we didn't get any new unique articles, break to avoid infinite loop
         if (addedCount === 0) {
+          markNoMore();
           break;
         }
       }
@@ -105,7 +114,7 @@ export const ExploreScreen: React.FC = () => {
       setLoadingMore(false);
       isFetchingRef.current = false;
     }
-  }, []); // No dependencies - uses refs for mutable values
+  }, [markNoMore]);
 
   const loadExploreArticles = useCallback(async () => {
     try {
@@ -120,6 +129,11 @@ export const ExploreScreen: React.FC = () => {
       // Also update ref immediately so loadMoreUntilBuffer can see current count
       articlesRef.current = recommendations;
 
+      // If the initial batch was empty, the backend has nothing for us
+      if (recommendations.length === 0) {
+        markNoMore();
+      }
+
       // If we need more articles, fetch them
       if (recommendations.length < minInitialArticles) {
         // Fetch more batches until we have enough
@@ -129,6 +143,7 @@ export const ExploreScreen: React.FC = () => {
           const moreRecommendations = await ExploreService.getRecommendations();
 
           if (moreRecommendations.length === 0) {
+            markNoMore();
             break;
           }
 
@@ -137,6 +152,7 @@ export const ExploreScreen: React.FC = () => {
           const uniqueNew = moreRecommendations.filter(a => !existingIds.has(a.id));
 
           if (uniqueNew.length === 0) {
+            markNoMore();
             break;
           }
 
@@ -165,7 +181,7 @@ export const ExploreScreen: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [logout]);
+  }, [logout, markNoMore]);
 
   // Keep refs updated with latest values
   useEffect(() => {
@@ -184,10 +200,13 @@ export const ExploreScreen: React.FC = () => {
     setRefreshing(true);
     setArticles([]);
     lastVisibleIndexRef.current = 0;
+    hasMoreRef.current = true;
+    setHasMore(true);
     loadExploreArticles();
   };
 
   const handleEndReached = () => {
+    if (!hasMoreRef.current) return;
     // Trigger loading more articles when user scrolls near the end
     loadMoreUntilBuffer();
   };
@@ -206,7 +225,11 @@ export const ExploreScreen: React.FC = () => {
 
         // Check if we need to load more articles
         const remainingArticles = currentArticles.length - index;
-        if (remainingArticles < MIN_LOOKAHEAD_ARTICLES && !isFetchingRef.current) {
+        if (
+          remainingArticles < MIN_LOOKAHEAD_ARTICLES &&
+          !isFetchingRef.current &&
+          hasMoreRef.current
+        ) {
           // Use ref to get current loadMore function
           loadMoreRef.current?.();
         }
@@ -283,6 +306,11 @@ export const ExploreScreen: React.FC = () => {
         onEndReached={searchQuery ? undefined : handleEndReached}
         onViewableItemsChanged={searchQuery ? undefined : handleViewableItemsChanged}
         loadingMore={searchQuery ? false : loadingMore}
+        endOfListMessage={
+          !searchQuery && !hasMore && articles.length > 0
+            ? 'Nothing more. Maybe take a walk?'
+            : undefined
+        }
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
       />
