@@ -32,6 +32,7 @@ interface ArticleListScreenProps {
     changed: ViewToken[];
   }) => void;
   loadingMore?: boolean;
+  endOfListMessage?: string;
   searchQuery?: string;
   onClearSearch?: () => void;
 }
@@ -50,6 +51,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   onEndReached,
   onViewableItemsChanged,
   loadingMore = false,
+  endOfListMessage,
   searchQuery,
   onClearSearch,
 }) => {
@@ -95,13 +97,32 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   );
 
   const renderFooter = () => {
-    if (!loadingMore) return null;
+    if (loadingMore) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      );
+    }
 
-    return (
-      <View style={{ padding: 20, alignItems: 'center' }}>
-        <ActivityIndicator size="small" color={colors.primary} />
-      </View>
-    );
+    if (endOfListMessage && articles.length > 0) {
+      return (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: FontSizes.sm,
+              fontFamily: FontFamily.default,
+              textAlign: 'center',
+            }}
+          >
+            {endOfListMessage}
+          </Text>
+        </View>
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
