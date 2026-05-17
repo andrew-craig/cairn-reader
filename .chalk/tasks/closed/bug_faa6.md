@@ -2,14 +2,14 @@
 id: bug_faa6
 title: Users Service: make test fails due to nonexistent ./pkg/... path in Makefile
 type: bug
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-05-17T10:14:24Z
-updated_at: 2026-05-17T10:14:42Z
+updated_at: 2026-05-17T10:15:26Z
 ---
 
 ## Bug Description
