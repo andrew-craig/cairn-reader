@@ -71,16 +71,12 @@ func (c *DBConfig) ConnString(dbName string) string {
 func loadConfig() *Config {
 	internalKey := getEnv("INTERNAL_API_KEY", "")
 	if internalKey == "" {
-		b := make([]byte, 32)
-		_, _ = rand.Read(b)
-		internalKey = hex.EncodeToString(b)
+		internalKey = mustGenerateKey()
 	}
 
 	emailIngestKey := getEnv("INGEST_API_KEY", "")
 	if emailIngestKey == "" {
-		b := make([]byte, 32)
-		_, _ = rand.Read(b)
-		emailIngestKey = hex.EncodeToString(b)
+		emailIngestKey = mustGenerateKey()
 	}
 
 	return &Config{
@@ -122,6 +118,18 @@ func loadConfig() *Config {
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "text"),
 	}
+}
+
+// mustGenerateKey returns a hex-encoded 32-byte random key, panicking on
+// entropy failure. crypto/rand.Read is documented as never failing in
+// practice on the platforms we support, so a failure here indicates an
+// unrecoverable environment problem and refusing to start is correct.
+func mustGenerateKey() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("failed to generate random key: %v", err))
+	}
+	return hex.EncodeToString(b)
 }
 
 func getEnv(key, defaultValue string) string {
