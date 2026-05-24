@@ -5,7 +5,9 @@ package selfhost
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -48,7 +50,16 @@ type EmailConfig struct {
 	DBSSLMode      string
 	EmailDomain    string
 	ContentBaseURL string
+	// IngestAPIKey, if non-empty, is upserted into the api_keys table on
+	// startup under the well-known name "selfhost-default" so that the
+	// selfhost binary can be configured purely from environment variables.
+	IngestAPIKey string
 }
+
+// selfhostAPIKeyName is the key_name used for the API key seeded from the
+// INGEST_API_KEY env var. Keeping this stable lets operators rotate the key
+// by changing the env var and restarting the binary.
+const selfhostAPIKeyName = "selfhost-default"
 
 // RunEmailMigrations runs embedded migrations for the email database.
 func RunEmailMigrations(cfg EmailConfig, migrations fs.FS) error {
@@ -82,6 +93,15 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 	db, err := emailDB.NewConnection(dbConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("email db: %w", err)
+	}
+
+	if cfg.IngestAPIKey != "" {
+		if err := seedIngestAPIKey(ctx, db.DB, cfg.IngestAPIKey); err != nil {
+			if closeErr := db.Close(); closeErr != nil {
+				logger.Error("failed to close db", "error", closeErr)
+			}
+			return nil, nil, fmt.Errorf("seed ingest api key: %w", err)
+		}
 	}
 
 	// Initialize repositories
@@ -173,4 +193,25 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 			logger.Error("failed to close db", "error", closeErr)
 		}
 	}, nil
+}
+
+// seedIngestAPIKey upserts the selfhost ingest API key into the api_keys
+// table. The row is keyed by selfhostAPIKeyName so changing INGEST_API_KEY
+// and restarting rotates the key in place.
+func seedIngestAPIKey(ctx context.Context, db *sql.DB, key string) error {
+	sum := sha256.Sum256([]byte(key))
+	keyHash := hex.EncodeToString(sum[:])
+
+	const query = `
+		INSERT INTO api_keys (key_name, key_hash, status, created_by, notes)
+		VALUES ($1, $2, 'active', 'selfhost', 'seeded from INGEST_API_KEY env var')
+		ON CONFLICT (key_name) DO UPDATE
+		SET key_hash   = EXCLUDED.key_hash,
+		    status     = 'active',
+		    revoked_at = NULL
+	`
+	if _, err := db.ExecContext(ctx, query, selfhostAPIKeyName, keyHash); err != nil {
+		return fmt.Errorf("upsert selfhost api key: %w", err)
+	}
+	return nil
 }

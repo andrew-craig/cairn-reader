@@ -32,8 +32,9 @@ type Config struct {
 	JWTRefreshExpiry  time.Duration
 
 	// Auth
-	InternalAPIKey string
-	BcryptCost     int
+	InternalAPIKey    string
+	EmailIngestAPIKey string
+	BcryptCost        int
 
 	// Explore fetcher
 	FeedListPath  string
@@ -70,9 +71,12 @@ func (c *DBConfig) ConnString(dbName string) string {
 func loadConfig() *Config {
 	internalKey := getEnv("INTERNAL_API_KEY", "")
 	if internalKey == "" {
-		b := make([]byte, 32)
-		_, _ = rand.Read(b)
-		internalKey = hex.EncodeToString(b)
+		internalKey = mustGenerateKey()
+	}
+
+	emailIngestKey := getEnv("INGEST_API_KEY", "")
+	if emailIngestKey == "" {
+		emailIngestKey = mustGenerateKey()
 	}
 
 	return &Config{
@@ -99,8 +103,9 @@ func loadConfig() *Config {
 		JWTAccessExpiry:   getEnvDuration("JWT_ACCESS_EXPIRY", 15*time.Minute),
 		JWTRefreshExpiry:  getEnvDuration("JWT_REFRESH_EXPIRY", 7*24*time.Hour),
 
-		InternalAPIKey: internalKey,
-		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
+		InternalAPIKey:    internalKey,
+		EmailIngestAPIKey: emailIngestKey,
+		BcryptCost:        getEnvInt("BCRYPT_COST", 12),
 
 		FeedListPath:  getEnv("FEED_LIST_PATH", "/data/feeds/feeds.txt"),
 		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
@@ -113,6 +118,18 @@ func loadConfig() *Config {
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "text"),
 	}
+}
+
+// mustGenerateKey returns a hex-encoded 32-byte random key, panicking on
+// entropy failure. crypto/rand.Read is documented as never failing in
+// practice on the platforms we support, so a failure here indicates an
+// unrecoverable environment problem and refusing to start is correct.
+func mustGenerateKey() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("failed to generate random key: %v", err))
+	}
+	return hex.EncodeToString(b)
 }
 
 func getEnv(key, defaultValue string) string {

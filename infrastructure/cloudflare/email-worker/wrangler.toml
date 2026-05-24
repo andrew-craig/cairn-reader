@@ -6,18 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 # Email Routing → Routes → Send to Worker is configured in the Cloudflare
 # dashboard. Point all routes for read.cairnapp.com at this worker.
 
-[vars]
-# Public, non-secret configuration. Override per environment below.
-INGEST_API_URL = "https://email-ingest.cairnapp.com/api/v1/source/email/ingest"
-
-# Secrets (do NOT put these in wrangler.toml):
-#   wrangler secret put INGEST_API_KEY
-#
-# INGEST_API_KEY must match a row in the email_ingest service's `api_keys`
-# table (SHA-256 of the raw key is what the service stores).
-
-[env.staging.vars]
-INGEST_API_URL = "https://email-ingest.staging.cairnapp.com/api/v1/source/email/ingest"
-
-[env.production.vars]
-INGEST_API_URL = "https://email-ingest.cairnapp.com/api/v1/source/email/ingest"
+# Secrets (set via `wrangler secret put`, never committed):
+#   INGEST_API_URL  - Full URL of the ingest endpoint
+#   INGEST_API_KEY  - Must match a row in the email_ingest service's `api_keys`
+#                    table (SHA-256 of the raw key is what the service stores)
