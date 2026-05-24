@@ -10,3 +10,6 @@ fi
 curl -fsSL https://raw.githubusercontent.com/andrew-craig/chalk/main/install.sh | bash
 
 echo "export PATH=\"${CHALK_INSTALL_DIR:-$HOME/.local/bin}:\$PATH\"" >> "$CLAUDE_ENV_FILE"
+
+# Install semble tool for code analysis (idempotent)
+command -v semble &>/dev/null || uv tool install semble
