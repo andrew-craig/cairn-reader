@@ -131,6 +131,12 @@ func main() {
 	closers = append(closers, rssCloser)
 
 	slog.Info("initializing email ingest service")
+	if os.Getenv("INGEST_API_KEY") == "" {
+		slog.Warn("INGEST_API_KEY not set; generated an ephemeral key for email ingest. "+
+			"Set INGEST_API_KEY in your .env to a stable value and configure your "+
+			"Cloudflare Email Worker with the same value.",
+			slog.String("generated_key", cfg.EmailIngestAPIKey))
+	}
 	emailCloser, err := mountEmailIngest(ctx, cfg, r, publicKey, health, logger)
 	if err != nil {
 		slog.Error("failed to initialize email ingest service", slog.Any("error", err))

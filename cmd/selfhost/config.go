@@ -32,8 +32,9 @@ type Config struct {
 	JWTRefreshExpiry  time.Duration
 
 	// Auth
-	InternalAPIKey string
-	BcryptCost     int
+	InternalAPIKey    string
+	EmailIngestAPIKey string
+	BcryptCost        int
 
 	// Explore fetcher
 	FeedListPath  string
@@ -75,6 +76,13 @@ func loadConfig() *Config {
 		internalKey = hex.EncodeToString(b)
 	}
 
+	emailIngestKey := getEnv("INGEST_API_KEY", "")
+	if emailIngestKey == "" {
+		b := make([]byte, 32)
+		_, _ = rand.Read(b)
+		emailIngestKey = hex.EncodeToString(b)
+	}
+
 	return &Config{
 		Port: getEnv("PORT", "8099"),
 
@@ -99,8 +107,9 @@ func loadConfig() *Config {
 		JWTAccessExpiry:   getEnvDuration("JWT_ACCESS_EXPIRY", 15*time.Minute),
 		JWTRefreshExpiry:  getEnvDuration("JWT_REFRESH_EXPIRY", 7*24*time.Hour),
 
-		InternalAPIKey: internalKey,
-		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
+		InternalAPIKey:    internalKey,
+		EmailIngestAPIKey: emailIngestKey,
+		BcryptCost:        getEnvInt("BCRYPT_COST", 12),
 
 		FeedListPath:  getEnv("FEED_LIST_PATH", "/data/feeds/feeds.txt"),
 		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
