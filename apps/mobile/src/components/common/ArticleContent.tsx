@@ -224,7 +224,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       contentContainerStyle={{ paddingTop: topPadding, paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
       onScroll={handleScroll}
-      scrollEventThrottle={500}
+      scrollEventThrottle={100}
       onContentSizeChange={handleContentSizeChange}
       onLayout={handleScrollViewLayout}
     >
