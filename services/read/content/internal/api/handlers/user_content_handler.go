@@ -125,7 +125,7 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 
 	if statusStr := r.URL.Query().Get("status"); statusStr != "" {
 		if !middleware.ValidateStatus(statusStr) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'", nil, "v1")
 			return
 		}
 		status = &statusStr
@@ -413,7 +413,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 
 	// Validate status
 	if !middleware.ValidateStatus(status) {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'read', or 'archived'", nil, "v1")
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'", nil, "v1")
 		return
 	}
 

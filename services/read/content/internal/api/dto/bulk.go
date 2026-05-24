@@ -135,8 +135,8 @@ func (b BulkAddToUsersItem) Validate() error {
 	return validation.ValidateStruct(&b,
 		validation.Field(&b.Status,
 			validation.When(b.Status != "",
-				validation.In(models.StatusUnread, models.StatusRead, models.StatusArchived).
-					Error("Invalid status. Must be 'unread', 'read', or 'archived'"),
+				validation.In(models.StatusUnread, models.StatusReading, models.StatusCompleted, models.StatusArchived).
+					Error("Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'"),
 			),
 		),
 	)

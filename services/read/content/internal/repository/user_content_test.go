@@ -126,13 +126,13 @@ func TestUserContentRepository_GetByUserAndContent_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).AddRow(
-			ucID, userID, contentID, models.StatusRead, 100, true, now, now,
+			ucID, userID, contentID, models.StatusCompleted, 100, true, now, now,
 		))
 
 	result, err := repo.GetByUserAndContent(ctx, userID, contentID)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, models.StatusRead, result.Status)
+	assert.Equal(t, models.StatusCompleted, result.Status)
 	assert.Equal(t, 100, result.ScrollPosition)
 	assert.True(t, result.IsFavorite)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -176,13 +176,13 @@ func TestUserContentRepository_ListByUser_Success(t *testing.T) {
 			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).
 			AddRow(uuid.New(), userID, uuid.New(), models.StatusUnread, 0, false, now, now).
-			AddRow(uuid.New(), userID, uuid.New(), models.StatusRead, 50, true, now, now))
+			AddRow(uuid.New(), userID, uuid.New(), models.StatusCompleted, 50, true, now, now))
 
 	results, err := repo.ListByUser(ctx, userID, 10, 0)
 	assert.NoError(t, err)
 	assert.Len(t, results, 2)
 	assert.Equal(t, models.StatusUnread, results[0].Status)
-	assert.Equal(t, models.StatusRead, results[1].Status)
+	assert.Equal(t, models.StatusCompleted, results[1].Status)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -229,7 +229,7 @@ func TestUserContentRepository_ListByUserWithFilter_FavoriteOnly(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).
-			AddRow(uuid.New(), userID, uuid.New(), models.StatusRead, 100, true, now, now))
+			AddRow(uuid.New(), userID, uuid.New(), models.StatusCompleted, 100, true, now, now))
 
 	results, err := repo.ListByUserWithFilter(ctx, userID, nil, &isFavorite, 10, 0)
 	assert.NoError(t, err)
@@ -279,7 +279,7 @@ func TestUserContentRepository_Update_Success(t *testing.T) {
 
 	uc := &models.UserContent{
 		ID:             ucID,
-		Status:         models.StatusRead,
+		Status:         models.StatusCompleted,
 		ScrollPosition: 250,
 		IsFavorite:     true,
 	}
@@ -331,7 +331,7 @@ func TestUserContentRepository_UpdateMetadata_StatusOnly(t *testing.T) {
 	ctx := context.Background()
 
 	ucID := uuid.New()
-	status := models.StatusRead
+	status := models.StatusCompleted
 
 	mock.ExpectExec(`UPDATE user_contents SET updated_at = \$1, status = \$2 WHERE id = \$3`).
 		WithArgs(sqlmock.AnyArg(), status, ucID).
@@ -351,7 +351,7 @@ func TestUserContentRepository_UpdateMetadata_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	ucID := uuid.New()
-	status := models.StatusRead
+	status := models.StatusCompleted
 
 	mock.ExpectExec(`UPDATE user_contents SET`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -569,7 +569,7 @@ func TestUserContentRepository_UpdateWithTx_Success(t *testing.T) {
 
 	uc := &models.UserContent{
 		ID:             ucID,
-		Status:         models.StatusRead,
+		Status:         models.StatusCompleted,
 		ScrollPosition: 100,
 		IsFavorite:     true,
 	}

@@ -72,9 +72,10 @@ func (j *JSONB) Scan(value interface{}) error {
 
 // ContentStatus constants
 const (
-	StatusUnread   = "unread"
-	StatusRead     = "read"
-	StatusArchived = "archived"
+	StatusUnread    = "unread"
+	StatusReading   = "reading"
+	StatusCompleted = "completed"
+	StatusArchived  = "archived"
 )
 
 // SourceType constants
@@ -86,5 +87,5 @@ const (
 
 // ValidateStatus checks if the given status is valid
 func ValidateStatus(status string) bool {
-	return status == StatusUnread || status == StatusRead || status == StatusArchived
+	return status == StatusUnread || status == StatusReading || status == StatusCompleted || status == StatusArchived
 }

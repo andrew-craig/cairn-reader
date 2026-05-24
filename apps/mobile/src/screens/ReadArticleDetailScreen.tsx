@@ -11,6 +11,9 @@ import { RootStackParamList } from '../types';
 import { StorageService, ReadService } from '../services';
 import { Colors } from '../constants';
 import { ArticleContent, BottomActionMenu } from '../components/common';
+import type { ScrollProgressInfo } from '../components/common/ArticleContent';
+
+const COMPLETED_PROGRESS_THRESHOLD = 0.95;
 
 type ReadArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 type ReadArticleDetailNavigationProp = StackNavigationProp<RootStackParamList, 'ArticleDetail'>;
@@ -24,13 +27,40 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const [article, setArticle] = useState(initialArticle);
   const scrollPositionRef = useRef(initialArticle.scrollPosition ?? 0);
   const hasScrolledRef = useRef(false);
+  const hasMarkedCompletedRef = useRef(initialArticle.isRead);
 
   const hasNextArticle = currentIndex >= 0 && currentIndex < articles.length - 1;
 
-  const handleScrollPositionChange = useCallback((position: number) => {
-    scrollPositionRef.current = position;
-    hasScrolledRef.current = true;
+  const markCompleted = useCallback((articleId: string) => {
+    if (hasMarkedCompletedRef.current) return;
+    hasMarkedCompletedRef.current = true;
+    const readAt = Date.now();
+    ReadService.updateUserContent(articleId, { status: 'completed' }).catch(
+      (err) => console.error('Failed to mark article completed:', err)
+    );
+    StorageService.updateArticle(articleId, { isRead: true, readAt }).catch(
+      (err) => console.error('Failed to persist completed locally:', err)
+    );
+    setArticle((prev) => ({ ...prev, isRead: true, readAt }));
   }, []);
+
+  const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
+    scrollPositionRef.current = info.offsetY;
+    hasScrolledRef.current = true;
+
+    if (hasMarkedCompletedRef.current || info.contentHeight <= 0) return;
+    const progress = (info.offsetY + info.layoutHeight) / info.contentHeight;
+    if (progress >= COMPLETED_PROGRESS_THRESHOLD) {
+      markCompleted(article.id);
+    }
+  }, [article.id, markCompleted]);
+
+  useEffect(() => {
+    if (initialArticle.isRead) return;
+    ReadService.updateUserContent(initialArticle.id, { status: 'reading' }).catch(
+      (err) => console.error('Failed to mark article reading:', err)
+    );
+  }, [initialArticle.id, initialArticle.isRead]);
 
   useEffect(() => {
     const articleId = article.id;
@@ -101,7 +131,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
       <ArticleContent
         article={article}
         colors={colors}
-        onScrollPositionChange={handleScrollPositionChange}
+        onScrollProgress={handleScrollProgress}
         initialScrollPosition={article.scrollPosition}
       />
 

@@ -41,8 +41,8 @@ func (a AddContentToUserRequest) Validate() error {
 		),
 		validation.Field(&a.Status,
 			validation.When(a.Status != "",
-				validation.In(models.StatusUnread, models.StatusRead, models.StatusArchived).
-					Error("Invalid status. Must be 'unread', 'read', or 'archived'"),
+				validation.In(models.StatusUnread, models.StatusReading, models.StatusCompleted, models.StatusArchived).
+					Error("Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'"),
 			),
 		),
 	)
@@ -83,8 +83,8 @@ func (u UpdateUserContentRequest) Validate() error {
 	return validation.ValidateStruct(&u,
 		validation.Field(&u.Status,
 			validation.When(u.Status != nil,
-				validation.In(models.StatusUnread, models.StatusRead, models.StatusArchived).
-					Error("Invalid status. Must be 'unread', 'read', or 'archived'"),
+				validation.In(models.StatusUnread, models.StatusReading, models.StatusCompleted, models.StatusArchived).
+					Error("Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'"),
 			),
 		),
 	)

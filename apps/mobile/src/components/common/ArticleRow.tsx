@@ -64,7 +64,12 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
     >
       <View style={styles.textCluster}>
         <Text
-          style={[styles.title, { color: colors.text }]}
+          style={[
+            styles.title,
+            article.isRead
+              ? { color: colors.textSecondary, fontFamily: FontFamily.default }
+              : { color: colors.text },
+          ]}
           numberOfLines={2}
         >
           {article.title}
