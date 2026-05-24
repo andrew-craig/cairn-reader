@@ -268,14 +268,14 @@ func TestListUserContents_WithFilters(t *testing.T) {
 	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
 
 	userID := uuid.New()
-	status := "read"
+	status := "completed"
 	isFavorite := true
 
 	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, &status, &isFavorite, 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return([]*models.UserContent{}, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(map[uuid.UUID]*models.Content{}, nil)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?status=read&is_favorite=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents?status=completed&is_favorite=true", nil)
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("user_id", userID.String())
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
@@ -558,7 +558,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 		ID:             ucID,
 		UserID:         userID,
 		ContentID:      contentID,
-		Status:         "read",
+		Status:         "completed",
 		ScrollPosition: 100,
 		IsFavorite:     true,
 		AddedAt:        time.Now(),
@@ -576,7 +576,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 		UpdatedAt:   time.Now(),
 	}
 
-	newStatus := "read"
+	newStatus := "completed"
 	newScroll := 100
 	newFavorite := true
 
@@ -586,7 +586,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
 
 	reqBody := map[string]interface{}{
-		"status":          "read",
+		"status":          "completed",
 		"scroll_position": 100,
 		"is_favorite":     true,
 	}
@@ -608,7 +608,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	data := response["data"].(map[string]interface{})
-	assert.Equal(t, "read", data["status"])
+	assert.Equal(t, "completed", data["status"])
 	assert.Equal(t, float64(100), data["scroll_position"])
 	assert.Equal(t, true, data["is_favorite"])
 	mockUserContentRepo.AssertExpectations(t)
@@ -627,7 +627,7 @@ func TestUpdateUserContent_NotFound(t *testing.T) {
 	mockUserContentRepo.On("GetByUserAndContent", mock.Anything, userID, contentID).Return(nil, nil)
 
 	reqBody := map[string]interface{}{
-		"status": "read",
+		"status": "completed",
 	}
 	body, _ := json.Marshal(reqBody)
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/users/"+userID.String()+"/contents/"+contentID.String(), bytes.NewReader(body))

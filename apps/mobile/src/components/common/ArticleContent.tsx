@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHTML, { CustomTextualRenderer } from 'react-native-render-html';
@@ -21,23 +22,42 @@ import { formatDate, extractDomain } from '../../utils';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../../constants';
 import { ReadService } from '../../services/read';
 
+export interface ScrollProgressInfo {
+  offsetY: number;
+  contentHeight: number;
+  layoutHeight: number;
+}
+
 interface ArticleContentProps {
   article: Article;
   colors: typeof Colors.light;
-  onScrollPositionChange?: (position: number) => void;
+  onScrollProgress?: (info: ScrollProgressInfo) => void;
   initialScrollPosition?: number;
 }
 
 export const ArticleContent: React.FC<ArticleContentProps> = ({
   article,
   colors,
-  onScrollPositionChange,
+  onScrollProgress,
   initialScrollPosition,
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const hasRestoredPosition = useRef(false);
+  const offsetYRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const layoutHeightRef = useRef(0);
+
+  const emitProgress = useCallback(() => {
+    if (!onScrollProgress) return;
+    if (contentHeightRef.current <= 0 || layoutHeightRef.current <= 0) return;
+    onScrollProgress({
+      offsetY: offsetYRef.current,
+      contentHeight: contentHeightRef.current,
+      layoutHeight: layoutHeightRef.current,
+    });
+  }, [onScrollProgress]);
 
   const handleLinkAction = useCallback(async (actionIndex: number, href: string) => {
     switch (actionIndex) {
@@ -101,15 +121,26 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   }), [handleLinkLongPress]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    onScrollPositionChange?.(Math.round(event.nativeEvent.contentOffset.y));
-  }, [onScrollPositionChange]);
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    offsetYRef.current = Math.round(contentOffset.y);
+    contentHeightRef.current = contentSize.height;
+    layoutHeightRef.current = layoutMeasurement.height;
+    emitProgress();
+  }, [emitProgress]);
 
-  const handleContentSizeChange = useCallback(() => {
+  const handleContentSizeChange = useCallback((_w: number, contentHeight: number) => {
+    contentHeightRef.current = contentHeight;
     if (!hasRestoredPosition.current && initialScrollPosition && initialScrollPosition > 0) {
       scrollViewRef.current?.scrollTo({ y: initialScrollPosition, animated: false });
       hasRestoredPosition.current = true;
     }
-  }, [initialScrollPosition]);
+    emitProgress();
+  }, [initialScrollPosition, emitProgress]);
+
+  const handleScrollViewLayout = useCallback((event: LayoutChangeEvent) => {
+    layoutHeightRef.current = event.nativeEvent.layout.height;
+    emitProgress();
+  }, [emitProgress]);
 
   // Calculate padding to account for safe areas and floating action menu
   const topPadding = insets.top + Spacing.md;
@@ -195,6 +226,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       onScroll={handleScroll}
       scrollEventThrottle={500}
       onContentSizeChange={handleContentSizeChange}
+      onLayout={handleScrollViewLayout}
     >
       <View style={styles.content}>
         {/* Article Header */}

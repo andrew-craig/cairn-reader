@@ -240,10 +240,10 @@ func TestValidateStatus_ValidStatuses(t *testing.T) {
 		expected bool
 	}{
 		{"unread", true},
-		{"read", true},
+		{"reading", true},
+		{"completed", true},
 		{"archived", true},
-		{"reading", false},   // Not a valid status
-		{"completed", false}, // Not a valid status
+		{"read", false}, // Replaced by 'reading'/'completed' in migration 000002
 		{"invalid", false},
 		{"", false},
 		{"UNREAD", false}, // Case sensitive

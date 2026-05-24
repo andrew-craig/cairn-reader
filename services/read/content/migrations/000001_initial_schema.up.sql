@@ -54,7 +54,7 @@ CREATE TABLE user_contents (
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
 
     -- User-specific metadata
-    status VARCHAR(20) NOT NULL DEFAULT 'unread', -- 'unread', 'read', 'archived'
+    status VARCHAR(20) NOT NULL DEFAULT 'unread', -- 'unread', 'read', 'archived' (see 000002 for richer vocabulary)
     scroll_position INTEGER NOT NULL DEFAULT 0, -- Character offset
     is_favorite BOOLEAN NOT NULL DEFAULT false,
 
