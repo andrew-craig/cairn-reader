@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text, StyleSheet, useColorScheme } from 'react-native';
 import { IconButton } from '../components/common/IconButton';
 import { HeaderPopover } from '../components/common/HeaderPopover';
 import { SubscriptionListScreen } from '../components/SubscriptionListScreen';
 import { Colors, FontSizes, FontFamily } from '../constants/theme';
 import { UnifiedSubscription } from '../types/read';
+import { ReadService } from '../services/read';
 
 const newslettersFilter = (s: UnifiedSubscription) => s.type === 'email';
 
 const getNewslettersSubtitle = (s: UnifiedSubscription): string | undefined =>
   s.email_data?.email_address ?? s.description;
 
-const AddNewsletterModal: React.FC<{ visible: boolean; onClose: () => void; emailAddress: string }> = ({
-  visible,
-  onClose,
-  emailAddress,
-}) => {
+const AddNewsletterModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  emailAddress: string | null;
+  error: string | null;
+}> = ({ visible, onClose, emailAddress, error }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
@@ -25,7 +27,7 @@ const AddNewsletterModal: React.FC<{ visible: boolean; onClose: () => void; emai
         Send or forward emails to
       </Text>
       <Text style={[styles.modalEmail, { color: colors.text }]}>
-        {emailAddress}
+        {error ?? emailAddress ?? 'Loading…'}
       </Text>
       <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
         New subscriptions will be automatically added to your reading list.
@@ -36,6 +38,25 @@ const AddNewsletterModal: React.FC<{ visible: boolean; onClose: () => void; emai
 
 export const NewslettersScreen: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [emailAddress, setEmailAddress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    ReadService.getOrCreateEmailAddress()
+      .then((address) => {
+        if (!cancelled) setEmailAddress(address);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('Failed to load newsletter address:', err);
+          setError('Unable to load address');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const headerActions = (
     <>
@@ -56,7 +77,8 @@ export const NewslettersScreen: React.FC = () => {
       <AddNewsletterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        emailAddress="rose-parrot-74@cairnreader.app"
+        emailAddress={emailAddress}
+        error={error}
       />
     </>
   );
