@@ -20,6 +20,7 @@ services:
       - JWT_PUBLIC_KEY_FILE=/data/keys/public.pem
       - JWT_AUTO_GENERATE=true
       - EMAIL_DOMAIN=${EMAIL_DOMAIN:-read.cairnapp.com}
+      - INGEST_API_KEY=${INGEST_API_KEY:-}
       # Feed list source. Defaults to /data/feeds/feeds.txt (inside the
       # cairn_data volume). Drop your own feeds.txt there to override; if
       # missing the service downloads FEED_LIST_URL at startup.
