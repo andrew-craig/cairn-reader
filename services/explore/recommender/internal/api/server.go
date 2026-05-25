@@ -64,6 +64,9 @@ func (s *Server) Routes() http.Handler {
 		// Protected recommendation route - user identified by JWT
 		r.With(s.authMiddleware.RequireAuth).Get("/recommendation", s.handleRecommendations)
 
+		// Protected shown route - batched mark-as-shown from clients
+		r.With(s.authMiddleware.RequireAuth).Post("/shown", s.handleMarkShown)
+
 		// Protected user routes - require authentication, user identified by JWT
 		r.Route("/user", func(r chi.Router) {
 			r.Use(s.authMiddleware.RequireAuth)

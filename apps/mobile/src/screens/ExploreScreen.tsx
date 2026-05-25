@@ -15,6 +15,13 @@ const MIN_LOOKAHEAD_ARTICLES = 5; // Minimum articles to keep ahead of current s
 const ESTIMATED_ARTICLE_HEIGHT = 95; // Estimated height of ArticleRow in pixels
 const BUFFER_MULTIPLIER = 1.5; // Load 1.5x screen height worth of articles
 
+// Shown-event batching: queue article IDs locally and POST in batches to
+// /api/v1/explore/shown. Flush triggers: queue reaches threshold, debounce
+// timer elapses, tab blur, or unmount.
+const SHOWN_BATCH_FLUSH_THRESHOLD = 10;
+const SHOWN_BATCH_DEBOUNCE_MS = 3000;
+const SHOWN_BATCH_MAX_SIZE = 100;
+
 /**
  * Calculate the minimum number of articles needed to fill the screen
  * based on device viewport height and estimated article row height.
@@ -43,6 +50,14 @@ export const ExploreScreen: React.FC = () => {
   const hasMoreRef = useRef(true);
   const articlesRef = useRef<Article[]>([]);
   const loadMoreRef = useRef<((minArticles?: number) => Promise<void>) | null>(null);
+
+  // Article-shown tracking. Gate firing on a real scroll interaction so that
+  // simply flicking between tabs does not count items as shown.
+  const hasUserScrolledRef = useRef(false);
+  const shownInSessionRef = useRef<Set<string>>(new Set());
+  const shownQueueRef = useRef<string[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushShownRef = useRef<() => void>(() => {});
 
   const markNoMore = useCallback(() => {
     hasMoreRef.current = false;
@@ -183,6 +198,30 @@ export const ExploreScreen: React.FC = () => {
     }
   }, [logout, markNoMore]);
 
+  const flushShown = useCallback(() => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (shownQueueRef.current.length === 0) return;
+    const batch = shownQueueRef.current.slice(0, SHOWN_BATCH_MAX_SIZE);
+    shownQueueRef.current = shownQueueRef.current.slice(batch.length);
+    void ExploreService.markShown(batch);
+    if (shownQueueRef.current.length > 0) {
+      flushTimerRef.current = setTimeout(() => {
+        flushShownRef.current();
+      }, SHOWN_BATCH_DEBOUNCE_MS);
+    }
+  }, []);
+
+  useEffect(() => {
+    flushShownRef.current = flushShown;
+  }, [flushShown]);
+
+  const handleScrollBeginDrag = useRef(() => {
+    hasUserScrolledRef.current = true;
+  }).current;
+
   // Keep refs updated with latest values
   useEffect(() => {
     articlesRef.current = articles;
@@ -196,12 +235,36 @@ export const ExploreScreen: React.FC = () => {
     loadExploreArticles();
   }, [loadExploreArticles]);
 
+  // Flush pending shown events when the user leaves the Explore tab, and
+  // require a fresh scroll interaction on return.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      flushShownRef.current();
+      hasUserScrolledRef.current = false;
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
+    return () => {
+      flushShownRef.current();
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleRefresh = () => {
+    flushShownRef.current();
     setRefreshing(true);
     setArticles([]);
     lastVisibleIndexRef.current = 0;
     hasMoreRef.current = true;
     setHasMore(true);
+    hasUserScrolledRef.current = false;
+    shownInSessionRef.current = new Set();
+    shownQueueRef.current = [];
     loadExploreArticles();
   };
 
@@ -215,25 +278,47 @@ export const ExploreScreen: React.FC = () => {
     viewableItems: ViewToken[];
     changed: ViewToken[];
   }) => {
-    if (info.viewableItems.length > 0) {
-      const lastVisible = info.viewableItems[info.viewableItems.length - 1];
-      // Use ref to get current articles array
-      const currentArticles = articlesRef.current;
-      const index = currentArticles.findIndex(a => a.id === lastVisible.item.id);
-      if (index !== -1) {
-        lastVisibleIndexRef.current = index;
+    if (info.viewableItems.length === 0) return;
 
-        // Check if we need to load more articles
-        const remainingArticles = currentArticles.length - index;
-        if (
-          remainingArticles < MIN_LOOKAHEAD_ARTICLES &&
-          !isFetchingRef.current &&
-          hasMoreRef.current
-        ) {
-          // Use ref to get current loadMore function
-          loadMoreRef.current?.();
-        }
+    const lastVisible = info.viewableItems[info.viewableItems.length - 1];
+    // Use ref to get current articles array
+    const currentArticles = articlesRef.current;
+    const index = currentArticles.findIndex(a => a.id === lastVisible.item.id);
+    if (index !== -1) {
+      lastVisibleIndexRef.current = index;
+
+      // Check if we need to load more articles
+      const remainingArticles = currentArticles.length - index;
+      if (
+        remainingArticles < MIN_LOOKAHEAD_ARTICLES &&
+        !isFetchingRef.current &&
+        hasMoreRef.current
+      ) {
+        // Use ref to get current loadMore function
+        loadMoreRef.current?.();
       }
+    }
+
+    // Shown-event detection: only after user has scrolled. Front-half of
+    // viewableItems approximates "above the viewport mid-point" since
+    // FlatList returns viewable tokens in top-to-bottom order.
+    if (!hasUserScrolledRef.current) return;
+
+    const topHalfCount = Math.ceil(info.viewableItems.length / 2);
+    for (let i = 0; i < topHalfCount; i++) {
+      const articleId = info.viewableItems[i].item.id;
+      if (!shownInSessionRef.current.has(articleId)) {
+        shownInSessionRef.current.add(articleId);
+        shownQueueRef.current.push(articleId);
+      }
+    }
+
+    if (shownQueueRef.current.length >= SHOWN_BATCH_FLUSH_THRESHOLD) {
+      flushShownRef.current();
+    } else if (shownQueueRef.current.length > 0 && !flushTimerRef.current) {
+      flushTimerRef.current = setTimeout(() => {
+        flushShownRef.current();
+      }, SHOWN_BATCH_DEBOUNCE_MS);
     }
   }).current;
 
@@ -305,6 +390,7 @@ export const ExploreScreen: React.FC = () => {
         emptyMessage={searchQuery ? 'No matching articles' : 'No articles available'}
         onEndReached={searchQuery ? undefined : handleEndReached}
         onViewableItemsChanged={searchQuery ? undefined : handleViewableItemsChanged}
+        onScrollBeginDrag={searchQuery ? undefined : handleScrollBeginDrag}
         loadingMore={searchQuery ? false : loadingMore}
         endOfListMessage={
           !searchQuery && !hasMore && articles.length > 0
