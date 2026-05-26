@@ -18,6 +18,7 @@ func (m MarkShownRequest) Validate() error {
 		validation.Field(&m.ArticleIDs,
 			validation.Required.Error("article_ids is required"),
 			validation.Length(1, 100).Error("article_ids must contain between 1 and 100 IDs"),
+			validation.Each(validation.Required.Error("article ID cannot be empty")),
 		),
 	)
 }

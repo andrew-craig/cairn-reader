@@ -220,6 +220,12 @@ func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
 
 	recorded := 0
 	for _, articleID := range payload.ArticleIDs {
+		if ctxErr := r.Context().Err(); ctxErr != nil {
+			slog.Warn("context canceled, stopping shown recording",
+				slog.String("user_id", userID),
+				slog.Any("error", ctxErr))
+			break
+		}
 		if err := s.articleRepo.RecordRecommendation(r.Context(), userID, articleID); err != nil {
 			slog.Warn("failed to record shown article",
 				slog.String("article_id", articleID),
