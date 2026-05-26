@@ -20,6 +20,7 @@ const (
 	// Request body size limits
 	maxArticlesBatchSize = 10 << 20 // 10MB for batch article submission
 	maxSimpleRequestSize = 1 << 10  // 1KB for simple JSON requests
+	maxShownRequestSize  = 16 << 10 // 16KB for shown batch (up to 100 article IDs)
 )
 
 // handleLiveness returns the liveness status (liveness probe)
@@ -169,6 +170,80 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 	pkgapi.WriteSuccess(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Article marked as read",
+	}, "v1")
+}
+
+// handleMarkShown records that a batch of articles was shown to the
+// authenticated user. Clients send this after the articles cross the
+// viewport mid-point following a scroll interaction.
+//
+// Phase A: this endpoint only records rows into `recommendations` (idempotent
+// via ON CONFLICT DO NOTHING). The `articles.recommends` counter is still
+// driven by the eager write in engine.GetRecommendations to avoid double
+// counting. Phase B will remove the eager write and move the counter
+// increment here.
+//
+// POST /api/v1/explore/shown
+func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+	userID := authenticatedUserID.String()
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxShownRequestSize)
+
+	var payload dto.MarkShownRequest
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			slog.Warn("request body too large", slog.Int64("limit", maxBytesErr.Limit))
+			pkgapi.WriteError(w, http.StatusRequestEntityTooLarge, pkgapi.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeBadRequest, "Invalid request body", nil, "v1")
+		return
+	}
+
+	if err := payload.Validate(); err != nil {
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, err.Error(), nil, "v1")
+		return
+	}
+
+	if err := s.userRepo.EnsureUserExists(r.Context(), userID); err != nil {
+		slog.Error("failed to ensure user exists", slog.String("user_id", userID), slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to record shown articles", nil, "v1")
+		return
+	}
+
+	recorded := 0
+	for _, articleID := range payload.ArticleIDs {
+		if ctxErr := r.Context().Err(); ctxErr != nil {
+			slog.Warn("context canceled, stopping shown recording",
+				slog.String("user_id", userID),
+				slog.Any("error", ctxErr))
+			break
+		}
+		if err := s.articleRepo.RecordRecommendation(r.Context(), userID, articleID); err != nil {
+			slog.Warn("failed to record shown article",
+				slog.String("article_id", articleID),
+				slog.String("user_id", userID),
+				slog.Any("error", err))
+			continue
+		}
+		recorded++
+	}
+
+	slog.Info("recorded shown articles",
+		slog.String("user_id", userID),
+		slog.Int("requested", len(payload.ArticleIDs)),
+		slog.Int("recorded", recorded))
+
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+		"status":   "success",
+		"recorded": recorded,
 	}, "v1")
 }
 

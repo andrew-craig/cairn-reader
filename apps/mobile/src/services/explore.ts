@@ -121,6 +121,29 @@ export class ExploreService {
     }
   }
 
+  // Best-effort batched "shown" reporting. Lost on network failure (no retry)
+  // — acceptable telemetry loss given the dedup row will be re-attempted on
+  // the next batch that includes the same ID after a refresh.
+  static async markShown(articleIds: string[]): Promise<void> {
+    if (articleIds.length === 0) return;
+    try {
+      const response = await this.fetchWithAuth(
+        `${getServerUrl()}/api/v1/explore/shown`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ article_ids: articleIds }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to mark articles as shown:', error);
+      }
+    } catch (error) {
+      console.error('Error marking articles as shown:', error);
+    }
+  }
+
   static async markAsRead(articleId: string): Promise<void> {
     try {
       const response = await this.fetchWithAuth(

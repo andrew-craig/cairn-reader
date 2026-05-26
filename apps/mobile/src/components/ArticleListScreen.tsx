@@ -31,6 +31,7 @@ interface ArticleListScreenProps {
     viewableItems: ViewToken[];
     changed: ViewToken[];
   }) => void;
+  onScrollBeginDrag?: () => void;
   loadingMore?: boolean;
   endOfListMessage?: string;
   searchQuery?: string;
@@ -50,6 +51,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   emptyMessage = 'No articles found',
   onEndReached,
   onViewableItemsChanged,
+  onScrollBeginDrag,
   loadingMore = false,
   endOfListMessage,
   searchQuery,
@@ -154,6 +156,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
+        onScrollBeginDrag={onScrollBeginDrag}
         viewabilityConfig={viewabilityConfigRef.current}
         contentContainerStyle={{ paddingBottom: bottomPadding }}
       />
