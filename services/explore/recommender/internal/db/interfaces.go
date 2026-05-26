@@ -35,8 +35,12 @@ type ArticleRepositoryInterface interface {
 	// IncrementRecommendCount increments the recommends counter for an article
 	IncrementRecommendCount(ctx context.Context, articleID string) error
 
-	// RecordRecommendation tracks that an article was recommended to a user
-	RecordRecommendation(ctx context.Context, userID string, articleID string) error
+	// RecordRecommendation tracks that an article was shown to a user.
+	// Returns inserted=true when a new row was written, and inserted=false
+	// when the (user, article) pair already existed (ON CONFLICT DO NOTHING).
+	// Callers use this to decide whether downstream side effects — such as
+	// incrementing articles.recommends — should fire for this call.
+	RecordRecommendation(ctx context.Context, userID string, articleID string) (inserted bool, err error)
 
 	// MarkOldArticlesAsDeleted sets deleted=true for articles older than N days
 	MarkOldArticlesAsDeleted(ctx context.Context, days int) (int, error)

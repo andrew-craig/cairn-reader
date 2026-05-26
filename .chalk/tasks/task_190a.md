@@ -2,14 +2,14 @@
 id: task_190a
 title: Remove eager trackRecommendation and move increment to handleMarkShown
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [explore,recommender]
 blocked_by: [task_b5bd,task_b054]
 parent: epic_c482
 remote_task_url: null
 created_at: 2026-05-26T11:18:42Z
-updated_at: 2026-05-26T11:18:42Z
+updated_at: 2026-05-26T11:54:11Z
 ---
 Code change that completes the cutover. Must land in a single commit so the system is never in a state where neither path increments articles.recommends.
 

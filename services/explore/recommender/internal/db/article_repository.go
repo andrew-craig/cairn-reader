@@ -292,21 +292,22 @@ func (r *articleRepository) IncrementRecommendCount(ctx context.Context, article
 	return nil
 }
 
-// RecordRecommendation tracks that an article was recommended to a user
-// Uses ON CONFLICT DO NOTHING to handle duplicate recommendations gracefully
-func (r *articleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) error {
+// RecordRecommendation tracks that an article was shown to a user.
+// Uses ON CONFLICT DO NOTHING so duplicate (user, article) pairs are
+// no-ops. Returns inserted=true only when a new row was written.
+func (r *articleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) (bool, error) {
 	query := `
 		INSERT INTO recommendations (user_id, article_id, recommended_at)
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (user_id, article_id) DO NOTHING
 	`
 
-	_, err := r.db.Exec(ctx, query, userID, articleID)
+	result, err := r.db.Exec(ctx, query, userID, articleID)
 	if err != nil {
-		return fmt.Errorf("failed to record recommendation: %w", err)
+		return false, fmt.Errorf("failed to record recommendation: %w", err)
 	}
 
-	return nil
+	return result.RowsAffected() == 1, nil
 }
 
 // MarkOldArticlesAsDeleted sets deleted=true for articles older than N days

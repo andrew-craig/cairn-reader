@@ -2,14 +2,14 @@
 id: task_b054
 title: Add integration tests for mobile-driven shown semantics
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [explore,recommender,test]
 blocked_by: []
 parent: epic_c482
 remote_task_url: null
 created_at: 2026-05-26T11:18:32Z
-updated_at: 2026-05-26T11:18:32Z
+updated_at: 2026-05-26T11:54:11Z
 ---
 Add integration tests under services/explore/recommender that capture the post-Phase-B contract. Tests should run against a real Postgres (testcontainers, following the pattern already used in services/explore/recommender/internal/db).
 

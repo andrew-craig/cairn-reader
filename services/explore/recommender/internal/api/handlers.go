@@ -175,13 +175,9 @@ func (s *Server) handleMarkAsRead(w http.ResponseWriter, r *http.Request) {
 
 // handleMarkShown records that a batch of articles was shown to the
 // authenticated user. Clients send this after the articles cross the
-// viewport mid-point following a scroll interaction.
-//
-// Phase A: this endpoint only records rows into `recommendations` (idempotent
-// via ON CONFLICT DO NOTHING). The `articles.recommends` counter is still
-// driven by the eager write in engine.GetRecommendations to avoid double
-// counting. Phase B will remove the eager write and move the counter
-// increment here.
+// viewport mid-point following a scroll interaction. It is the sole
+// writer of `recommendations` rows and the sole driver of the
+// `articles.recommends` counter — GetRecommendations is a pure read.
 //
 // POST /api/v1/explore/shown
 func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
@@ -226,8 +222,27 @@ func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
 				slog.Any("error", ctxErr))
 			break
 		}
-		if err := s.articleRepo.RecordRecommendation(r.Context(), userID, articleID); err != nil {
+		inserted, err := s.articleRepo.RecordRecommendation(r.Context(), userID, articleID)
+		if err != nil {
 			slog.Warn("failed to record shown article",
+				slog.String("article_id", articleID),
+				slog.String("user_id", userID),
+				slog.Any("error", err))
+			continue
+		}
+		if !inserted {
+			// Already recorded for this user — don't double-count the
+			// articles.recommends counter.
+			continue
+		}
+		if err := s.articleRepo.IncrementRecommendCount(r.Context(), articleID); err != nil {
+			if errors.Is(err, apperrors.ErrArticleNotFound) {
+				slog.Warn("shown article not found, skipping increment",
+					slog.String("article_id", articleID),
+					slog.String("user_id", userID))
+				continue
+			}
+			slog.Warn("failed to increment recommend count",
 				slog.String("article_id", articleID),
 				slog.String("user_id", userID),
 				slog.Any("error", err))
