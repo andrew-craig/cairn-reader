@@ -480,12 +480,17 @@ export class ReadService {
     const url = `${getServerUrl()}/api/v1/source/email/user/${userId}/address`;
 
     const response = await this.fetchWithAuth(url, { method: 'POST' });
-    const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Failed to get email address');
+      let message = 'Failed to get email address';
+      try {
+        const errJson = await response.json();
+        message = errJson.message || errJson.error || message;
+      } catch {}
+      throw new Error(message);
     }
 
+    const result = await response.json();
     return result.data.email_address;
   }
 
