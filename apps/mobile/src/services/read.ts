@@ -467,6 +467,34 @@ export class ReadService {
   }
 
   /**
+   * Get or create the current user's newsletter email address.
+   * The domain is determined by the backend's EMAIL_DOMAIN configuration.
+   */
+  static async getOrCreateEmailAddress(): Promise<string> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/source/email/user/${userId}/address`;
+
+    const response = await this.fetchWithAuth(url, { method: 'POST' });
+
+    if (!response.ok) {
+      let message = 'Failed to get email address';
+      try {
+        const errJson = await response.json();
+        message = errJson.message || errJson.error || message;
+      } catch {}
+      throw new Error(message);
+    }
+
+    const result = await response.json();
+    return result.data.email_address;
+  }
+
+  /**
    * Transform backend UserContentResponse to mobile Article format
    */
   static transformToArticle(userContent: UserContentResponse): Article {
