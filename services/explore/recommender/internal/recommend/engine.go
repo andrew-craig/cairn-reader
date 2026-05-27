@@ -162,4 +162,3 @@ func (e *Engine) calculateQualityScore(article models.Article) float64 {
 
 	return score
 }
-
