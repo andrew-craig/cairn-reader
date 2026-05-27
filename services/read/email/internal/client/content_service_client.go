@@ -165,9 +165,10 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, payload []EmailCon
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	if c.internalAPIKey != "" {
-		req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
+	if c.internalAPIKey == "" {
+		return nil, fmt.Errorf("HTTP 401: internal API key is required but not configured")
 	}
+	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

@@ -43,7 +43,7 @@ func TestContentServiceClient_DeliverContent_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 	id, err := client.DeliverContent(context.Background(), newTestPayload())
 	require.NoError(t, err)
 	assert.Equal(t, contentID, id)
@@ -60,7 +60,7 @@ func TestContentServiceClient_DeliverContent_ExistingItem(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 	id, err := client.DeliverContent(context.Background(), newTestPayload())
 	require.NoError(t, err)
 	assert.Equal(t, existingID, id)
@@ -70,6 +70,18 @@ func TestContentServiceClient_DeliverContent_EmptyPayload(t *testing.T) {
 	client := NewContentServiceClient(ContentServiceConfig{BaseURL: "http://unused"})
 	_, err := client.DeliverContent(context.Background(), nil)
 	assert.Error(t, err)
+}
+
+func TestContentServiceClient_DeliverContent_MissingAPIKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("server should not be called when API key is missing")
+	}))
+	defer srv.Close()
+
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	_, err := client.DeliverContent(context.Background(), newTestPayload())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP 401")
 }
 
 func TestContentServiceClient_DeliverContent_RetryOnServerError(t *testing.T) {
@@ -93,7 +105,7 @@ func TestContentServiceClient_DeliverContent_RetryOnServerError(t *testing.T) {
 	retryDelays = []time.Duration{1 * time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond}
 	defer func() { retryDelays = original }()
 
-	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 	id, err := client.DeliverContent(context.Background(), newTestPayload())
 	require.NoError(t, err)
 	assert.Equal(t, contentID, id)
@@ -109,7 +121,7 @@ func TestContentServiceClient_DeliverContent_NoRetryOn4xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 	_, err := client.DeliverContent(context.Background(), newTestPayload())
 	assert.Error(t, err)
 	// Should only be called once — no retry on 400
@@ -129,7 +141,7 @@ func TestContentServiceClient_CircuitBreaker_OpensAfterConsecutiveFailures(t *te
 	retryDelays = []time.Duration{} // no retries so failures are fast
 	defer func() { retryDelays = original }()
 
-	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
+	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 
 	// Drive 5 consecutive failures to open the circuit.
 	for i := 0; i < 5; i++ {
@@ -153,8 +165,9 @@ func TestContentServiceClient_ContextCancellation(t *testing.T) {
 	defer srv.Close()
 
 	client := NewContentServiceClient(ContentServiceConfig{
-		BaseURL: srv.URL,
-		Timeout: 5 * time.Second,
+		BaseURL:        srv.URL,
+		Timeout:        5 * time.Second,
+		InternalAPIKey: "test-key",
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
