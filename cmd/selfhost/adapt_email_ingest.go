@@ -35,6 +35,7 @@ func mountEmailIngest(ctx context.Context, cfg *Config, r chi.Router, publicKey 
 		EmailDomain:    cfg.EmailDomain,
 		ContentBaseURL: fmt.Sprintf("http://localhost:%s", cfg.Port),
 		IngestAPIKey:   cfg.EmailIngestAPIKey,
+		InternalAPIKey: cfg.InternalAPIKey,
 	}, r, publicKey, logger)
 	if err != nil {
 		return nil, err

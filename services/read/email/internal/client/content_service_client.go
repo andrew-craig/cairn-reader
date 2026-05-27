@@ -57,13 +57,15 @@ type failedItem struct {
 
 // ContentServiceConfig holds configuration for the client.
 type ContentServiceConfig struct {
-	BaseURL string
-	Timeout time.Duration // default 30s
+	BaseURL        string
+	Timeout        time.Duration // default 30s
+	InternalAPIKey string
 }
 
 // ContentServiceClient delivers processed email content to the Content Service.
 type ContentServiceClient struct {
 	baseURL        string
+	internalAPIKey string
 	httpClient     *http.Client
 	circuitBreaker *gobreaker.CircuitBreaker
 }
@@ -88,7 +90,8 @@ func NewContentServiceClient(cfg ContentServiceConfig) *ContentServiceClient {
 	}
 
 	return &ContentServiceClient{
-		baseURL: strings.TrimRight(cfg.BaseURL, "/"),
+		baseURL:        strings.TrimRight(cfg.BaseURL, "/"),
+		internalAPIKey: cfg.InternalAPIKey,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -162,6 +165,9 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, payload []EmailCon
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if c.internalAPIKey != "" {
+		req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
