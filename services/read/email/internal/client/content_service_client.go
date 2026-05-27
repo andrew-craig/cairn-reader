@@ -102,6 +102,9 @@ func NewContentServiceClient(cfg ContentServiceConfig) *ContentServiceClient {
 // DeliverContent posts the email content items to the Content Service internal
 // bulk endpoint and returns the content service ID of the first created item.
 func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
+	if c.internalAPIKey == "" {
+		return uuid.Nil, fmt.Errorf("internal API key is required but not configured")
+	}
 	if len(payload) == 0 {
 		return uuid.Nil, fmt.Errorf("payload must not be empty")
 	}
@@ -165,9 +168,6 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, payload []EmailCon
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	if c.internalAPIKey == "" {
-		return nil, fmt.Errorf("HTTP 401: internal API key is required but not configured")
-	}
 	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 
 	resp, err := c.httpClient.Do(req)

@@ -81,7 +81,7 @@ func TestContentServiceClient_DeliverContent_MissingAPIKey(t *testing.T) {
 	client := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL})
 	_, err := client.DeliverContent(context.Background(), newTestPayload())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "HTTP 401")
+	assert.Contains(t, err.Error(), "internal API key is required")
 }
 
 func TestContentServiceClient_DeliverContent_RetryOnServerError(t *testing.T) {
