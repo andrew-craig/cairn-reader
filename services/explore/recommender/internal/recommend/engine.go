@@ -4,7 +4,6 @@ package recommend
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"math"
 	"sort"
@@ -49,14 +48,10 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 
 	slog.Info("found eligible articles", slog.Int("count", len(articles)), slog.String("user_id", userID))
 
-	// If we have 5 or fewer articles, return what we have
+	// If we have 5 or fewer articles, return what we have.
+	// Tracking (articles.recommends + recommendations row) is driven by
+	// POST /api/v1/explore/shown from the client, not by this read path.
 	if len(articles) <= 5 {
-		// Still need to track recommendations and increment counters
-		for _, article := range articles {
-			if err := e.trackRecommendation(ctx, userID, article.ID); err != nil {
-				slog.Warn("failed to track recommendation", slog.String("article_id", article.ID), slog.Any("error", err))
-			}
-		}
 		return articles, nil
 	}
 
@@ -98,25 +93,11 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 		}
 	}
 
-	// Track recommendations and increment counters
-	successCount := 0
-	for _, article := range recommended {
-		if err := e.trackRecommendation(ctx, userID, article.ID); err != nil {
-			slog.Warn("failed to track recommendation",
-				slog.String("article_id", article.ID),
-				slog.String("user_id", userID),
-				slog.Any("error", err))
-		} else {
-			successCount++
-		}
-	}
-
 	slog.Info("successfully recommended articles",
 		slog.Int("total", len(recommended)),
 		slog.String("user_id", userID),
 		slog.Int("high_quality", len(highQuality)),
-		slog.Int("exploration", len(recommended)-len(highQuality)),
-		slog.Int("tracked", successCount))
+		slog.Int("exploration", len(recommended)-len(highQuality)))
 
 	// Log article IDs for debugging
 	articleIDs := make([]string, len(recommended))
@@ -180,20 +161,4 @@ func (e *Engine) calculateQualityScore(article models.Article) float64 {
 	score := numerator / float64(article.Recommends)
 
 	return score
-}
-
-// trackRecommendation records the recommendation event and increments counters
-func (e *Engine) trackRecommendation(ctx context.Context, userID string, articleID string) error {
-	// Increment recommend count
-	if err := e.articleRepo.IncrementRecommendCount(ctx, articleID); err != nil {
-		return fmt.Errorf("failed to increment recommend count: %w", err)
-	}
-
-	// Record in recommendations table
-	if err := e.articleRepo.RecordRecommendation(ctx, userID, articleID); err != nil {
-		return fmt.Errorf("failed to record recommendation: %w", err)
-	}
-
-	slog.Debug("successfully tracked recommendation", slog.String("article_id", articleID), slog.String("user_id", userID))
-	return nil
 }

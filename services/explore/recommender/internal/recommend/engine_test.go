@@ -292,16 +292,17 @@ func TestGetRecommendations_Integration_FiveOrFewerArticles(t *testing.T) {
 		t.Errorf("Expected 3 recommendations, got %d", len(recommendations))
 	}
 
-	// Verify all 3 articles had their recommend count incremented
+	// GetRecommendations is a pure read after Phase B — the recommends
+	// counter must NOT move until the client confirms via POST /shown.
 	for _, article := range articles {
 		retrieved, err := articleRepo.GetByID(ctx, article.ID)
 		if err != nil {
 			t.Errorf("failed to retrieve article %s: %v", article.ID, err)
 			continue
 		}
-		if retrieved.Recommends != article.Recommends+1 {
-			t.Errorf("Expected article %s recommends to be %d, got %d",
-				article.ID, article.Recommends+1, retrieved.Recommends)
+		if retrieved.Recommends != article.Recommends {
+			t.Errorf("Article %s recommends changed unexpectedly: was %d, got %d",
+				article.ID, article.Recommends, retrieved.Recommends)
 		}
 	}
 }
@@ -437,7 +438,13 @@ func TestGetRecommendations_Integration_FilterDeletedArticles(t *testing.T) {
 	}
 }
 
-func TestGetRecommendations_Integration_NoDuplicateRecommendations(t *testing.T) {
+// After Phase B, GetRecommendations is a pure read: it no longer writes
+// recommendations rows or increments the recommends counter. Two
+// consecutive calls for the same user must therefore overlap, and the
+// counter must not move. The mobile client's POST /shown call is what
+// promotes "fetched" to "actually seen" — that path is exercised in the
+// API-level integration tests (services/explore/recommender/integration_shown_test.go).
+func TestGetRecommendations_Integration_PureRead(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -452,7 +459,6 @@ func TestGetRecommendations_Integration_NoDuplicateRecommendations(t *testing.T)
 	userRepo := db.NewUserRepository(pool)
 	engine := NewEngine(articleRepo, userRepo)
 
-	// Create 10 articles
 	for i := 1; i <= 10; i++ {
 		article := createTestArticle(fmt.Sprintf("article%d", i), fmt.Sprintf("Article %d", i), 10, 0, 5)
 		if err := articleRepo.Create(ctx, article); err != nil {
@@ -460,85 +466,39 @@ func TestGetRecommendations_Integration_NoDuplicateRecommendations(t *testing.T)
 		}
 	}
 
-	// Get recommendations first time
 	firstRecs, err := engine.GetRecommendations(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetRecommendations() first call error = %v", err)
 	}
 
-	if len(firstRecs) != 5 {
-		t.Errorf("Expected 5 recommendations on first call, got %d", len(firstRecs))
-	}
-
-	// Get recommendations second time
 	secondRecs, err := engine.GetRecommendations(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetRecommendations() second call error = %v", err)
 	}
 
-	if len(secondRecs) != 5 {
-		t.Errorf("Expected 5 recommendations on second call, got %d", len(secondRecs))
-	}
-
-	// Verify no overlap between first and second recommendations
-	firstRecMap := make(map[string]bool)
+	firstSet := make(map[string]bool, len(firstRecs))
 	for _, rec := range firstRecs {
-		firstRecMap[rec.ID] = true
+		firstSet[rec.ID] = true
 	}
-
+	overlap := 0
 	for _, rec := range secondRecs {
-		if firstRecMap[rec.ID] {
-			t.Errorf("Article %s was recommended twice to the same user", rec.ID)
+		if firstSet[rec.ID] {
+			overlap++
 		}
 	}
-}
-
-func TestGetRecommendations_Integration_RecommendsCounterIncremented(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping integration test")
+	if overlap == 0 {
+		t.Errorf("expected overlap between consecutive recommendation calls, got none")
 	}
 
-	pool, cleanup := setupTestDB(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	userID := "550e8400-e29b-41d4-a716-446655440004" // Valid UUID
-
-	articleRepo := db.NewArticleRepository(pool)
-	userRepo := db.NewUserRepository(pool)
-	engine := NewEngine(articleRepo, userRepo)
-
-	// Create articles with specific recommends counts
-	articles := []models.Article{
-		createTestArticle("1", "Article 1", 10, 0, 5),
-		createTestArticle("2", "Article 2", 8, 0, 10),
-		createTestArticle("3", "Article 3", 5, 0, 15),
-	}
-
-	for _, article := range articles {
-		if err := articleRepo.Create(ctx, article); err != nil {
-			t.Fatalf("failed to create article: %v", err)
-		}
-	}
-
-	// Get recommendations
-	recommendations, err := engine.GetRecommendations(ctx, userID)
-	if err != nil {
-		t.Fatalf("GetRecommendations() error = %v", err)
-	}
-
-	// Verify recommends counter was incremented for each recommended article
-	for _, rec := range recommendations {
+	for _, rec := range firstRecs {
 		retrieved, err := articleRepo.GetByID(ctx, rec.ID)
 		if err != nil {
 			t.Errorf("failed to retrieve article %s: %v", rec.ID, err)
 			continue
 		}
-
-		expectedRecommends := rec.Recommends + 1
-		if retrieved.Recommends != expectedRecommends {
-			t.Errorf("Article %s recommends counter not incremented: expected %d, got %d",
-				rec.ID, expectedRecommends, retrieved.Recommends)
+		if retrieved.Recommends != rec.Recommends {
+			t.Errorf("Article %s recommends moved without /shown call: was %d, got %d",
+				rec.ID, rec.Recommends, retrieved.Recommends)
 		}
 	}
 }
