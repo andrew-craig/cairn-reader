@@ -34,6 +34,7 @@ services:
       - "${PORT:-8099}:8099"
     volumes:
       - cairn_data:/data
+      - ./feeds.txt:/data/feeds/feeds.txt:ro
     depends_on:
       cairn-db:
         condition: service_healthy
