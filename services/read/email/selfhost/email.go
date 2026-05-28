@@ -54,6 +54,9 @@ type EmailConfig struct {
 	// startup under the well-known name "selfhost-default" so that the
 	// selfhost binary can be configured purely from environment variables.
 	IngestAPIKey string
+	// InternalAPIKey is the service-to-service API key sent in the
+	// X-Internal-API-Key header when calling the Content Service.
+	InternalAPIKey string
 }
 
 // selfhostAPIKeyName is the key_name used for the API key seeded from the
@@ -142,9 +145,13 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 	emailCleaner := emailProcessor.NewEmailCleaner()
 	contentExtractor := emailProcessor.NewContentExtractor()
 
+	if cfg.InternalAPIKey == "" {
+		logger.Warn("InternalAPIKey is empty; service-to-service calls to Content Service will fail")
+	}
 	contentClient := emailClient.NewContentServiceClient(emailClient.ContentServiceConfig{
-		BaseURL: cfg.ContentBaseURL,
-		Timeout: 30 * time.Second,
+		BaseURL:        cfg.ContentBaseURL,
+		Timeout:        30 * time.Second,
+		InternalAPIKey: cfg.InternalAPIKey,
 	})
 
 	emailProcessorWorker := emailWorker.NewEmailProcessorWorker(
