@@ -16,11 +16,14 @@ import (
 // validContentURL accepts standard HTTP/HTTPS URLs and the email:// scheme used
 // by the email ingest service as a synthetic content identifier.
 func validContentURL(value interface{}) error {
-	s, _ := value.(string)
+	s, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("URL must be a string")
+	}
 	if strings.HasPrefix(s, "email://") && len(s) > len("email://") {
 		return nil
 	}
-	return is.URL.Validate(fmt.Sprintf("%v", value))
+	return is.URL.Validate(s)
 }
 
 // BulkContentItem represents a single content item in a bulk request

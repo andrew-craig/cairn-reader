@@ -194,7 +194,8 @@ func (c *ContentServiceClient) doDeliver(ctx context.Context, payload []EmailCon
 // Returns the content ID from the first created or existing item.
 func (c *ContentServiceClient) createContent(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
 	items := make([]bulkCreateItem, len(payload))
-	for i, p := range payload {
+	for i := range payload {
+		p := &payload[i]
 		item := bulkCreateItem{URL: p.URL, HTML: p.HTML, SourceType: p.SourceType}
 		if p.Title != "" {
 			item.Title = &p.Title
