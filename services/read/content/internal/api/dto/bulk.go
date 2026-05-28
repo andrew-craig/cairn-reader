@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -10,6 +12,19 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/processor"
 )
+
+// validContentURL accepts standard HTTP/HTTPS URLs and the email:// scheme used
+// by the email ingest service as a synthetic content identifier.
+func validContentURL(value interface{}) error {
+	s, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("URL must be a string")
+	}
+	if strings.HasPrefix(s, "email://") && len(s) > len("email://") {
+		return nil
+	}
+	return is.URL.Validate(s)
+}
 
 // BulkContentItem represents a single content item in a bulk request
 type BulkContentItem struct {
@@ -27,7 +42,7 @@ func (b BulkContentItem) Validate() error {
 	return validation.ValidateStruct(&b,
 		validation.Field(&b.URL,
 			validation.Required.Error("URL is required"),
-			is.URL.Error("URL must be a valid URL"),
+			validation.By(validContentURL),
 		),
 		validation.Field(&b.HTML,
 			validation.Required.Error("HTML is required"),

@@ -37,22 +37,55 @@ type EmailContentItem struct {
 	SourceType string    `json:"source_type"`
 }
 
-// deliverResponse is the shape returned by the internal bulk endpoint.
-type deliverResponse struct {
-	Created  []createdItem `json:"created"`
-	Existing []createdItem `json:"existing"`
-	Failed   []failedItem  `json:"failed"`
+// bulkCreateItem is the per-item shape for POST /api/v1/content/bulk.
+type bulkCreateItem struct {
+	URL        string  `json:"url"`
+	HTML       string  `json:"html"`
+	SourceType string  `json:"source_type"`
+	Title      *string `json:"title,omitempty"`
+	Author     *string `json:"author,omitempty"`
 }
 
+// bulkCreateRequest is the body sent to POST /api/v1/content/bulk.
+type bulkCreateRequest struct {
+	Contents []bulkCreateItem `json:"contents"`
+}
+
+// bulkAddItem is the per-item shape for POST /api/v1/internal/content/user/bulk.
+type bulkAddItem struct {
+	ContentID uuid.UUID `json:"content_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Status    string    `json:"status,omitempty"`
+}
+
+// bulkAddRequest is the body sent to POST /api/v1/internal/content/user/bulk.
+type bulkAddRequest struct {
+	Items []bulkAddItem `json:"items"`
+}
+
+// createdItem holds the ID returned by the content creation endpoint.
 type createdItem struct {
 	ID uuid.UUID `json:"id"`
 }
 
+// failedItem represents a failed item in a bulk operation.
 type failedItem struct {
 	Index   int    `json:"index"`
 	URL     string `json:"url"`
 	Error   string `json:"error"`
 	Message string `json:"message"`
+}
+
+// createResponseData is the payload inside the {"data": ...} envelope from POST /api/v1/content/bulk.
+type createResponseData struct {
+	Created  []createdItem `json:"created"`
+	Existing []createdItem `json:"existing"`
+	Failed   []failedItem  `json:"failed"`
+}
+
+// responseEnvelope unwraps the standard {"data": ..., "meta": ...} wrapper used by all services.
+type responseEnvelope struct {
+	Data json.RawMessage `json:"data"`
 }
 
 // ContentServiceConfig holds configuration for the client.
@@ -99,8 +132,8 @@ func NewContentServiceClient(cfg ContentServiceConfig) *ContentServiceClient {
 	}
 }
 
-// DeliverContent posts the email content items to the Content Service internal
-// bulk endpoint and returns the content service ID of the first created item.
+// DeliverContent creates the content on the Content Service then links it to the user.
+// Returns the content service ID on success.
 func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
 	if c.internalAPIKey == "" {
 		return uuid.Nil, fmt.Errorf("internal API key is required but not configured")
@@ -113,9 +146,8 @@ func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []Ema
 	// Initial attempt + one entry per retry delay.
 	for attempt := 0; attempt <= len(retryDelays); attempt++ {
 		if attempt > 0 {
-			delay := retryDelays[attempt-1]
 			select {
-			case <-time.After(delay):
+			case <-time.After(retryDelays[attempt-1]):
 			case <-ctx.Done():
 				return uuid.Nil, ctx.Err()
 			}
@@ -135,36 +167,104 @@ func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []Ema
 	return uuid.Nil, fmt.Errorf("max retries exceeded: %w", lastErr)
 }
 
-// attemptDeliver performs a single delivery attempt through the circuit breaker.
 func (c *ContentServiceClient) attemptDeliver(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
-	result, cbErr := c.circuitBreaker.Execute(func() (interface{}, error) {
-		return c.doRequest(ctx, payload)
+	result, err := c.circuitBreaker.Execute(func() (interface{}, error) {
+		return c.doDeliver(ctx, payload)
 	})
-	if cbErr != nil {
-		return uuid.Nil, cbErr
+	if err != nil {
+		return uuid.Nil, err
 	}
-	resp, ok := result.(*deliverResponse)
-	if !ok || len(resp.Created) == 0 {
-		// All items may already exist.
-		if len(resp.Existing) > 0 {
-			return resp.Existing[0].ID, nil
-		}
-		return uuid.Nil, fmt.Errorf("no content IDs returned")
-	}
-	return resp.Created[0].ID, nil
+	id, _ := result.(uuid.UUID)
+	return id, nil
 }
 
-// doRequest marshals the payload and executes the HTTP POST.
-func (c *ContentServiceClient) doRequest(ctx context.Context, payload []EmailContentItem) (*deliverResponse, error) {
-	body, err := json.Marshal(payload)
+// doDeliver performs the two-step delivery: create content, then link to user.
+func (c *ContentServiceClient) doDeliver(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
+	contentID, err := c.createContent(ctx, payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+		return uuid.Nil, err
+	}
+	if err := c.addContentToUsers(ctx, contentID, payload); err != nil {
+		return uuid.Nil, err
+	}
+	return contentID, nil
+}
+
+// createContent calls POST /api/v1/content/bulk to create or deduplicate the email content.
+// Returns the content ID from the first created or existing item.
+func (c *ContentServiceClient) createContent(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
+	items := make([]bulkCreateItem, len(payload))
+	for i := range payload {
+		p := &payload[i]
+		item := bulkCreateItem{URL: p.URL, HTML: p.HTML, SourceType: p.SourceType}
+		if p.Title != "" {
+			item.Title = &p.Title
+		}
+		if p.Author != "" {
+			item.Author = &p.Author
+		}
+		items[i] = item
 	}
 
-	url := c.baseURL + "/api/v1/internal/content/user/bulk"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	body, err := json.Marshal(bulkCreateRequest{Contents: items})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return uuid.Nil, fmt.Errorf("marshal content request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/content/bulk", bytes.NewBuffer(body))
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("build content request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("content create request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("read create response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return uuid.Nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var env responseEnvelope
+	if err := json.Unmarshal(respBody, &env); err != nil {
+		return uuid.Nil, fmt.Errorf("decode create envelope: %w", err)
+	}
+	var data createResponseData
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		return uuid.Nil, fmt.Errorf("decode create response: %w", err)
+	}
+
+	if len(data.Created) > 0 {
+		return data.Created[0].ID, nil
+	}
+	if len(data.Existing) > 0 {
+		return data.Existing[0].ID, nil
+	}
+	return uuid.Nil, fmt.Errorf("no content ID returned from create")
+}
+
+// addContentToUsers calls POST /api/v1/internal/content/user/bulk to link content to users.
+func (c *ContentServiceClient) addContentToUsers(ctx context.Context, contentID uuid.UUID, payload []EmailContentItem) error {
+	items := make([]bulkAddItem, len(payload))
+	for i, p := range payload {
+		items[i] = bulkAddItem{ContentID: contentID, UserID: p.UserID, Status: "unread"}
+	}
+
+	body, err := json.Marshal(bulkAddRequest{Items: items})
+	if err != nil {
+		return fmt.Errorf("marshal add-to-users request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/internal/content/user/bulk", bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("build add-to-users request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -172,24 +272,19 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, payload []EmailCon
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return fmt.Errorf("add-to-users request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return fmt.Errorf("read add-to-users response: %w", err)
 	}
-
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var result deliverResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-	return &result, nil
+	return nil
 }
 
 // isNonRetryable returns true for 4xx errors that won't be resolved by retrying.

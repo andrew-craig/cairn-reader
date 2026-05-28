@@ -238,19 +238,24 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
             {article.title}
           </Text>
           <Text style={[styles.publishedOn, { color: colors.textSecondary }]}>
-            Published on{' '}
-            <Text
-              style={[styles.publisherLink, { color: colors.textSecondary }]}
-              onPress={async () => {
-                try {
-                  await Linking.openURL(new URL(article.url).origin);
-                } catch {
-                  Linking.openURL(article.url).catch(() => {});
-                }
-              }}
-            >
-              {extractDomain(article.url)}
-            </Text>
+            {article.url.startsWith('email://') ? (
+              <Text style={[styles.publisherLink, { color: colors.textSecondary }]}>
+                {article.author || 'Email'}
+              </Text>
+            ) : (
+              <Text
+                style={[styles.publisherLink, { color: colors.textSecondary }]}
+                onPress={async () => {
+                  try {
+                    await Linking.openURL(new URL(article.url).origin);
+                  } catch {
+                    Linking.openURL(article.url).catch(() => {});
+                  }
+                }}
+              >
+                {article.author || extractDomain(article.url)}
+              </Text>
+            )}
             {article.addedAt && ` | ${formatDate(article.addedAt)}`}
           </Text>
         </View>
