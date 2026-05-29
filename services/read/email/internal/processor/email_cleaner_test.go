@@ -42,69 +42,6 @@ func TestEmailCleaner_TrackingPixelRemoval(t *testing.T) {
 	}
 }
 
-func TestEmailCleaner_UnsubscribeRemoval(t *testing.T) {
-	c := NewEmailCleaner()
-
-	tests := []struct {
-		name    string
-		input   string
-		removed string
-	}{
-		{
-			name:    "unsubscribe link",
-			input:   `<p>Newsletter body</p><a href="https://example.com/unsub">Unsubscribe</a>`,
-			removed: "Unsubscribe",
-		},
-		{
-			name:    "manage preferences link",
-			input:   `<p>Content</p><a href="https://example.com/prefs">Manage preferences</a>`,
-			removed: "Manage preferences",
-		},
-		{
-			name:    "unsubscribe in paragraph",
-			input:   `<p>Good content</p><p>Update your preferences or unsubscribe here.</p>`,
-			removed: "unsubscribe",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := c.Clean(tt.input)
-			require.NoError(t, err)
-			assert.NotContains(t, result, tt.removed)
-		})
-	}
-}
-
-func TestEmailCleaner_ViewInBrowserRemoval(t *testing.T) {
-	c := NewEmailCleaner()
-
-	tests := []struct {
-		name    string
-		input   string
-		removed string
-	}{
-		{
-			name:    "view in browser paragraph",
-			input:   `<p>View in browser</p><p>Newsletter content</p>`,
-			removed: "View in browser",
-		},
-		{
-			name:    "view this email in your browser",
-			input:   `<div>View this email in your browser</div><p>Content</p>`,
-			removed: "View this email in your browser",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := c.Clean(tt.input)
-			require.NoError(t, err)
-			assert.NotContains(t, result, tt.removed)
-		})
-	}
-}
-
 func TestEmailCleaner_PreservesContent(t *testing.T) {
 	c := NewEmailCleaner()
 

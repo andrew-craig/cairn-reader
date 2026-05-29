@@ -23,23 +23,6 @@ var trackerDomains = []string{
 	"convertkit.com",
 }
 
-// unsubscribeKeywords are text patterns that indicate unsubscribe/footer links.
-var unsubscribeKeywords = []string{
-	"unsubscribe",
-	"manage preferences",
-	"update your preferences",
-	"manage your subscription",
-	"email preferences",
-}
-
-// artifactKeywords are patterns for email client artifacts to remove.
-var artifactKeywords = []string{
-	"view in browser",
-	"view this email in your browser",
-	"view online",
-	"click here to view",
-}
-
 // EmailCleaner performs email-specific pre-cleaning before sanitization.
 type EmailCleaner struct{}
 
@@ -48,8 +31,8 @@ func NewEmailCleaner() *EmailCleaner {
 	return &EmailCleaner{}
 }
 
-// Clean strips tracking pixels, unsubscribe footers, and email client artifacts
-// from the provided HTML. It returns the cleaned HTML.
+// Clean strips tracking pixels and hidden preheader text from the provided
+// HTML. It returns the cleaned HTML.
 func (c *EmailCleaner) Clean(htmlBody string) (string, error) {
 	doc, err := html.Parse(strings.NewReader(htmlBody))
 	if err != nil {
@@ -82,8 +65,8 @@ func walkForRemoval(n *html.Node, remove *[]*html.Node) {
 	}
 }
 
-// shouldRemove returns true if the node represents a tracking pixel, an
-// unsubscribe element, an email client artifact, or hidden preheader text.
+// shouldRemove returns true if the node represents a tracking pixel or hidden
+// preheader text.
 func shouldRemove(n *html.Node) bool {
 	if n.Type != html.ElementNode {
 		return false
@@ -92,10 +75,9 @@ func shouldRemove(n *html.Node) bool {
 	switch strings.ToLower(n.Data) {
 	case "img":
 		return isTrackingPixel(n)
-	case "a":
-		return isUnsubscribeLink(n)
 	case "p", "div", "span", "td", "li", "table", "tr":
-		return isArtifactBlock(n)
+		// Hidden preheader text is junk regardless of size — remove the subtree.
+		return isHiddenPreheader(n)
 	}
 	return false
 }
@@ -129,63 +111,19 @@ func isTrackingPixel(n *html.Node) bool {
 	return false
 }
 
-// isUnsubscribeLink returns true when a link's visible text matches
-// unsubscribe/preferences patterns.
-func isUnsubscribeLink(n *html.Node) bool {
-	text := strings.ToLower(extractText(n))
-	for _, kw := range unsubscribeKeywords {
-		if strings.Contains(text, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-// isArtifactBlock returns true for block-level nodes whose text content matches
-// email client artifact patterns (e.g. "View in browser") or is a hidden
-// preheader (display:none / max-height:0 style).
-func isArtifactBlock(n *html.Node) bool {
-	// Check for hidden preheader: inline style with display:none or max-height:0
+// isHiddenPreheader returns true for block-level nodes hidden via inline style
+// (display:none / max-height:0), which hold inbox preview text.
+func isHiddenPreheader(n *html.Node) bool {
 	for _, a := range n.Attr {
 		if a.Key == "style" {
 			style := strings.ToLower(a.Val)
 			if strings.Contains(style, "display:none") ||
 				strings.Contains(style, "display: none") ||
 				strings.Contains(style, "max-height:0") ||
-				strings.Contains(style, "max-height: 0") ||
-				strings.Contains(style, "overflow:hidden") && strings.Contains(style, "max-height") {
+				strings.Contains(style, "max-height: 0") {
 				return true
 			}
 		}
 	}
-
-	text := strings.ToLower(strings.TrimSpace(extractText(n)))
-	if text == "" {
-		return false
-	}
-
-	for _, kw := range artifactKeywords {
-		if strings.Contains(text, kw) {
-			return true
-		}
-	}
-	// Unsubscribe text in a block element
-	for _, kw := range unsubscribeKeywords {
-		if strings.Contains(text, kw) {
-			return true
-		}
-	}
 	return false
-}
-
-// extractText returns the concatenated text content of a node and its descendants.
-func extractText(n *html.Node) string {
-	if n.Type == html.TextNode {
-		return n.Data
-	}
-	var buf strings.Builder
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		buf.WriteString(extractText(c))
-	}
-	return buf.String()
 }

@@ -1,0 +1,20 @@
+# Optional override: build the consolidated cairn-selfhost image from local
+# source instead of pulling the published GHCR image.
+#
+# The base docker-compose.yml default is unchanged — it pulls the image from
+# GHCR. This override is only applied when you pass it explicitly with -f, so
+# plain `docker compose up -d` still uses the remote image.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Or use the Makefile target: `make up-local`.
+#
+# The selfhost binary (cmd/selfhost) compiles every backend service —
+# including Email Ingest (services/read/email) via its local replace
+# directive — so building from source picks up local code changes to any of
+# them. Build context is the repo root, three levels up.
+services:
+  cairn:
+    build:
+      context: ../../..
+      dockerfile: infrastructure/docker/selfhost/Dockerfile

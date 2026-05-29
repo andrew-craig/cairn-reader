@@ -31,6 +31,28 @@ The single `cairn` container runs:
 
 All background workers (feed polling, outbox delivery, cleanup jobs) run as goroutines within the same process.
 
+## Building From Source
+
+By default the stack pulls the pre-built `cairn-selfhost` image from GHCR. To
+test local code changes before they are published, build the image from source
+with the `docker-compose.build.yml` override. The consolidated binary compiles
+every backend service, so a local build picks up changes anywhere in the repo
+(including the email-ingest pipeline).
+
+```bash
+make build-local   # build the cairn-selfhost image from local source
+make up-local      # build, then start the stack using the local image
+```
+
+Equivalent without the Makefile:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+The default `docker compose up -d` (and `make up`) is unchanged and still pulls
+the remote image.
+
 ## Architecture
 
 ```
