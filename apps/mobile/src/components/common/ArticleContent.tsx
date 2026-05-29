@@ -79,7 +79,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
     }
   }, []);
 
-  const handleLinkLongPress = useCallback(async (href: string) => {
+  const handleLinkPress = useCallback(async (href: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const options = ['Save to Reading List', 'Open in Browser', 'Copy Link', 'Cancel'];
@@ -112,13 +112,13 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
           tnode={tnode}
           textProps={{
             ...textProps,
-            onLongPress: href ? () => handleLinkLongPress(href) : undefined,
+            onPress: href ? () => handleLinkPress(href) : undefined,
           }}
           {...props}
         />
       );
     },
-  }), [handleLinkLongPress]);
+  }), [handleLinkPress]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
