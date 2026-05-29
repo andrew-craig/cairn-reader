@@ -133,6 +133,10 @@ export const ExploreScreen: React.FC = () => {
   }, [markNoMore]);
 
   const loadExploreArticles = useCallback(async () => {
+    // Claim the fetch lock so a FlatList-triggered loadMoreUntilBuffer can't
+    // run concurrently and corrupt the shared offsetRef during initial load.
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       offsetRef.current = 0;
       const recommendations = await ExploreService.getRecommendations(offsetRef.current);
@@ -192,6 +196,7 @@ export const ExploreScreen: React.FC = () => {
         await logout();
       }
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
