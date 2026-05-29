@@ -128,8 +128,13 @@ func (s *shownSuite) seedArticles(count int) []string {
 }
 
 func (s *shownSuite) getRecommendations(userID uuid.UUID) []models.Article {
+	return s.getRecommendationsPage(userID, 0)
+}
+
+func (s *shownSuite) getRecommendationsPage(userID uuid.UUID, offset int) []models.Article {
 	s.t.Helper()
-	req, err := http.NewRequest(http.MethodGet, s.server.URL+"/api/v1/explore/recommendation", nil)
+	url := fmt.Sprintf("%s/api/v1/explore/recommendation?offset=%d", s.server.URL, offset)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		s.t.Fatalf("failed to build request: %v", err)
 	}
@@ -276,6 +281,42 @@ func TestShown_MarkedIDsExcludedFromNextRecommendation(t *testing.T) {
 				t.Errorf("article %s was marked shown but still appeared in next recommendation", id)
 			}
 		}
+	}
+}
+
+// TestShown_OffsetPaginationReturnsFreshArticles is the regression guard for
+// the "feed frozen at 5" deadlock: paging through the feed via the offset
+// param must yield distinct articles within a scroll session, without relying
+// on POST /shown to advance the eligible set.
+func TestShown_OffsetPaginationReturnsFreshArticles(t *testing.T) {
+	suite := setupShownSuite(t)
+	defer suite.cleanup()
+
+	userID := uuid.New()
+	suite.seedArticles(25)
+
+	first := suite.getRecommendationsPage(userID, 0)
+	second := suite.getRecommendationsPage(userID, 10)
+	third := suite.getRecommendationsPage(userID, 20)
+
+	if len(first) != 10 || len(second) != 10 {
+		t.Fatalf("expected full pages of 10, got first=%d second=%d", len(first), len(second))
+	}
+	if len(third) != 5 {
+		t.Fatalf("expected final partial page of 5, got %d", len(third))
+	}
+
+	distinct := make(map[string]struct{}, 25)
+	for _, page := range [][]models.Article{first, second, third} {
+		for _, a := range page {
+			if _, dup := distinct[a.ID]; dup {
+				t.Errorf("article %s returned on more than one page", a.ID)
+			}
+			distinct[a.ID] = struct{}{}
+		}
+	}
+	if len(distinct) != 25 {
+		t.Errorf("expected 25 distinct articles across pages, got %d", len(distinct))
 	}
 }
 

@@ -228,12 +228,24 @@ paths:
         - Recommendations
       summary: Get personalized recommendations
       description: |
-        Returns 5 personalized article recommendations for the authenticated user.
-        The user is identified by the JWT token; no user ID parameter is required.
-        The algorithm returns 4 high-quality articles plus 1 new article with low recommend count.
+        Returns a page of up to 10 personalized article recommendations for the
+        authenticated user, ranked by quality score. The user is identified by
+        the JWT token; no user ID parameter is required.
+
+        Use the `offset` query parameter to page through the feed within a scroll
+        session. A page with fewer than 10 items indicates the end of the feed.
       operationId: getRecommendations
       security:
         - bearerAuth: []
+      parameters:
+        - name: offset
+          in: query
+          required: false
+          description: Number of ranked articles to skip before returning a page (default 0).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Recommendations retrieved successfully
@@ -251,7 +263,7 @@ paths:
                       $ref: '#/components/schemas/Article'
                   count:
                     type: integer
-                    example: 5
+                    example: 10
         '401':
           description: Unauthorized - missing or invalid JWT token
         '405':

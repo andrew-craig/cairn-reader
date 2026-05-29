@@ -131,8 +131,17 @@ func (s *Server) handleRecommendations(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := authenticatedUserID.String()
 
+	// Parse pagination offset (default 0). Clients advance the offset to page
+	// through the ranked feed within a scroll session.
+	offset := 0
+	if offsetParam := r.URL.Query().Get("offset"); offsetParam != "" {
+		if parsed, err := strconv.Atoi(offsetParam); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
 	// Get recommendations
-	recommendations, err := s.engine.GetRecommendations(r.Context(), userID)
+	recommendations, err := s.engine.GetRecommendations(r.Context(), userID, offset)
 	if err != nil {
 		slog.Error("failed to get recommendations", slog.String("user_id", userID), slog.Any("error", err))
 		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get recommendations", nil, "v1")

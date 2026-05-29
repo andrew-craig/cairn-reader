@@ -99,10 +99,10 @@ export class ExploreService {
     return response;
   }
 
-  static async getRecommendations(): Promise<Article[]> {
+  static async getRecommendations(offset = 0): Promise<Article[]> {
     try {
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/recommendation`
+        `${getServerUrl()}/api/v1/explore/recommendation?offset=${offset}`
       );
 
       const result = await response.json();

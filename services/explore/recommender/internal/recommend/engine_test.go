@@ -179,18 +179,17 @@ func TestCalculateQualityScore(t *testing.T) {
 	}
 }
 
-func TestSelectHighQualityArticles(t *testing.T) {
+func TestSortByQuality(t *testing.T) {
 	engine := &Engine{}
 
 	tests := []struct {
 		name        string
 		articles    []models.Article
-		count       int
 		wantIDs     []string
 		description string
 	}{
 		{
-			name: "select top 4 from sorted articles",
+			name: "sorts by quality score descending",
 			articles: []models.Article{
 				createTestArticle("1", "Article 1", 10, 1, 20), // Score: (10-3)/20 = 0.35
 				createTestArticle("2", "Article 2", 20, 0, 10), // Score: 20/10 = 2.0
@@ -198,54 +197,40 @@ func TestSelectHighQualityArticles(t *testing.T) {
 				createTestArticle("4", "Article 4", 15, 2, 30), // Score: (15-6)/30 = 0.3
 				createTestArticle("5", "Article 5", 8, 0, 10),  // Score: 8/10 = 0.8
 			},
-			count:       4,
-			wantIDs:     []string{"2", "5", "1", "4"}, // Sorted by score descending
-			description: "Should return top 4 articles by quality score",
+			wantIDs:     []string{"2", "5", "1", "4", "3"},
+			description: "Articles should be ordered by descending quality score",
 		},
 		{
-			name: "select fewer articles than available",
-			articles: []models.Article{
-				createTestArticle("1", "Article 1", 10, 0, 10),
-				createTestArticle("2", "Article 2", 5, 0, 10),
-			},
-			count:       3,
-			wantIDs:     []string{"1", "2"},
-			description: "Should return all articles when count exceeds available",
-		},
-		{
-			name: "new articles with no recommends get surfaced first",
+			name: "new articles with no recommends rank highest",
 			articles: []models.Article{
 				createTestArticle("1", "Article 1", 10, 0, 50), // Score: 10/50 = 0.2
 				createTestArticle("2", "Article 2", 5, 0, 0),   // Score: Inf (new with upvotes)
 				createTestArticle("3", "Article 3", 0, 0, 0),   // Score: 1000 (new no votes)
 				createTestArticle("4", "Article 4", 0, 0, 10),  // Score: 0
 			},
-			count:       3,
-			wantIDs:     []string{"2", "3", "1"},
+			wantIDs:     []string{"2", "3", "1", "4"},
 			description: "New articles should be prioritized",
 		},
 		{
 			name:        "empty article list",
 			articles:    []models.Article{},
-			count:       4,
 			wantIDs:     []string{},
-			description: "Should return empty list for no articles",
+			description: "Should handle empty list",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := engine.selectHighQualityArticles(tt.articles, tt.count)
+			engine.sortByQuality(tt.articles)
 
-			if len(result) != len(tt.wantIDs) {
-				t.Errorf("selectHighQualityArticles() returned %d articles, want %d - %s",
-					len(result), len(tt.wantIDs), tt.description)
-				return
+			if len(tt.articles) != len(tt.wantIDs) {
+				t.Fatalf("sortByQuality() produced %d articles, want %d - %s",
+					len(tt.articles), len(tt.wantIDs), tt.description)
 			}
 
-			for i, article := range result {
+			for i, article := range tt.articles {
 				if article.ID != tt.wantIDs[i] {
-					t.Errorf("selectHighQualityArticles()[%d] = %s, want %s - %s",
+					t.Errorf("sortByQuality()[%d] = %s, want %s - %s",
 						i, article.ID, tt.wantIDs[i], tt.description)
 				}
 			}
@@ -283,7 +268,7 @@ func TestGetRecommendations_Integration_FiveOrFewerArticles(t *testing.T) {
 		}
 	}
 
-	recommendations, err := engine.GetRecommendations(ctx, userID)
+	recommendations, err := engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("GetRecommendations() error = %v", err)
 	}
@@ -307,7 +292,7 @@ func TestGetRecommendations_Integration_FiveOrFewerArticles(t *testing.T) {
 	}
 }
 
-func TestGetRecommendations_Integration_ReturnsExplorationArticle(t *testing.T) {
+func TestGetRecommendations_Integration_Pagination(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
 	}
@@ -322,59 +307,53 @@ func TestGetRecommendations_Integration_ReturnsExplorationArticle(t *testing.T) 
 	userRepo := db.NewUserRepository(pool)
 	engine := NewEngine(articleRepo, userRepo)
 
-	// Create high quality articles
-	highQualityArticles := []models.Article{
-		createTestArticle("high1", "High Quality 1", 20, 0, 10), // Score: 2.0
-		createTestArticle("high2", "High Quality 2", 15, 1, 10), // Score: 1.2
-		createTestArticle("high3", "High Quality 3", 10, 0, 10), // Score: 1.0
-		createTestArticle("high4", "High Quality 4", 8, 0, 10),  // Score: 0.8
-		createTestArticle("high5", "High Quality 5", 5, 0, 10),  // Score: 0.5
-	}
-
-	for _, article := range highQualityArticles {
+	// Seed 15 articles with distinct quality scores. With recommends=1 the
+	// score equals upvotes, so higher upvotes rank first.
+	const total = 15
+	for i := 0; i < total; i++ {
+		article := createTestArticle(fmt.Sprintf("article%02d", i), fmt.Sprintf("Article %d", i), i, 0, 1)
 		if err := articleRepo.Create(ctx, article); err != nil {
 			t.Fatalf("failed to create article: %v", err)
 		}
 	}
 
-	// Create low exposure article
-	lowExposureArticle := createTestArticle("new1", "New Article", 0, 0, 1)
-	if err := articleRepo.Create(ctx, lowExposureArticle); err != nil {
-		t.Fatalf("failed to create low exposure article: %v", err)
-	}
-
-	recommendations, err := engine.GetRecommendations(ctx, userID)
+	firstPage, err := engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
-		t.Fatalf("GetRecommendations() error = %v", err)
+		t.Fatalf("GetRecommendations(offset=0) error = %v", err)
+	}
+	if len(firstPage) != recommendationPageSize {
+		t.Fatalf("expected %d articles on first page, got %d", recommendationPageSize, len(firstPage))
 	}
 
-	if len(recommendations) != 5 {
-		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
-	}
-
-	// Verify the low exposure article is in recommendations
-	hasLowExposure := false
-	for _, rec := range recommendations {
-		if rec.ID == "new1" {
-			hasLowExposure = true
-			break
+	// First page must be ordered by descending quality score.
+	for i := 1; i < len(firstPage); i++ {
+		if firstPage[i-1].Upvotes < firstPage[i].Upvotes {
+			t.Errorf("first page not sorted by quality: index %d (upvotes %d) before %d (upvotes %d)",
+				i-1, firstPage[i-1].Upvotes, i, firstPage[i].Upvotes)
 		}
 	}
 
-	if !hasLowExposure {
-		t.Error("Expected low exposure article 'new1' to be in recommendations")
+	secondPage, err := engine.GetRecommendations(ctx, userID, recommendationPageSize)
+	if err != nil {
+		t.Fatalf("GetRecommendations(offset=%d) error = %v", recommendationPageSize, err)
+	}
+	if len(secondPage) != total-recommendationPageSize {
+		t.Fatalf("expected %d articles on second page, got %d", total-recommendationPageSize, len(secondPage))
 	}
 
-	// Verify we got 4 high quality articles
-	highQualityCount := 0
-	for _, rec := range recommendations {
-		if rec.ID[:4] == "high" {
-			highQualityCount++
+	// The two pages must be disjoint and together cover every article.
+	seen := make(map[string]bool, total)
+	for _, a := range firstPage {
+		seen[a.ID] = true
+	}
+	for _, a := range secondPage {
+		if seen[a.ID] {
+			t.Errorf("article %s appeared on both pages", a.ID)
 		}
+		seen[a.ID] = true
 	}
-
-	if highQualityCount != 4 {
-		t.Errorf("Expected 4 high quality articles, got %d", highQualityCount)
+	if len(seen) != total {
+		t.Errorf("expected %d distinct articles across pages, got %d", total, len(seen))
 	}
 }
 
@@ -420,7 +399,7 @@ func TestGetRecommendations_Integration_FilterDeletedArticles(t *testing.T) {
 		t.Fatalf("failed to mark article as deleted: %v", err)
 	}
 
-	recommendations, err := engine.GetRecommendations(ctx, userID)
+	recommendations, err := engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("GetRecommendations() error = %v", err)
 	}
@@ -466,12 +445,12 @@ func TestGetRecommendations_Integration_PureRead(t *testing.T) {
 		}
 	}
 
-	firstRecs, err := engine.GetRecommendations(ctx, userID)
+	firstRecs, err := engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("GetRecommendations() first call error = %v", err)
 	}
 
-	secondRecs, err := engine.GetRecommendations(ctx, userID)
+	secondRecs, err := engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("GetRecommendations() second call error = %v", err)
 	}
