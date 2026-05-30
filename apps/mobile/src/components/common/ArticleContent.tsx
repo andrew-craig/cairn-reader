@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RenderHTML, { CustomTextualRenderer } from 'react-native-render-html';
+import RenderHTML from 'react-native-render-html';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../../types';
@@ -80,6 +80,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   }, []);
 
   const handleLinkPress = useCallback(async (href: string) => {
+    if (!href) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const options = ['Save to Reading List', 'Open in Browser', 'Copy Link', 'Cancel'];
@@ -104,21 +105,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
     }
   }, [handleLinkAction]);
 
-  const renderers = useMemo<{ a: CustomTextualRenderer }>(() => ({
-    a: function AnchorRenderer({ tnode, TDefaultRenderer, textProps, ...props }) {
-      const href = tnode.attributes.href;
-      return (
-        <TDefaultRenderer
-          tnode={tnode}
-          textProps={{
-            ...textProps,
-            onPress: href ? () => handleLinkPress(href) : undefined,
-          }}
-          {...props}
-        />
-      );
-    },
-  }), [handleLinkPress]);
+  const renderersProps = { a: { onPress: (_e: unknown, href: string) => handleLinkPress(href) } };
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -270,7 +257,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
               defaultTextProps={{
                 selectable: true,
               }}
-              renderers={renderers}
+              renderersProps={renderersProps}
             />
           ) : article.description ? (
             <Text style={[styles.bodyText, { color: colors.text }]}>
