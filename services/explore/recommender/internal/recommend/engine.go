@@ -26,11 +26,26 @@ func NewEngine(articleRepo db.ArticleRepositoryInterface, userRepo db.UserReposi
 	}
 }
 
-// GetRecommendations returns 5 recommended articles for a user
-// Algorithm: 4 high-quality articles (based on quality score) + 1 low-exposure article
-// Quality score formula: (upvotes - (downvotes * 3)) / recommends
-func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]models.Article, error) {
-	slog.Info("starting recommendation generation", slog.String("user_id", userID))
+// recommendationPageSize is the number of articles returned per recommendation
+// request. The client paginates through the ranked feed via the offset param.
+const recommendationPageSize = 10
+
+// recommendationPoolSize is how many eligible articles are ranked before a page
+// is sliced out. The offset window is served from within this pool.
+const recommendationPoolSize = 100
+
+// GetRecommendations returns a page of recommended articles for a user, ranked
+// by quality score. Callers paginate within a scroll session via offset; the
+// page size is fixed at recommendationPageSize.
+//
+// Quality score formula: (upvotes - (downvotes * 3)) / recommends. Articles
+// with recommends == 0 score highest, so low-exposure/new content naturally
+// surfaces near the top of the ranking.
+//
+// This is a pure read: tracking (articles.recommends + recommendations row) is
+// driven by POST /api/v1/explore/shown from the client, not by this path.
+func (e *Engine) GetRecommendations(ctx context.Context, userID string, offset int) ([]models.Article, error) {
+	slog.Info("starting recommendation generation", slog.String("user_id", userID), slog.Int("offset", offset))
 
 	// Ensure user exists
 	if err := e.userRepo.EnsureUserExists(ctx, userID); err != nil {
@@ -38,9 +53,10 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 		return nil, err
 	}
 
-	// Get articles eligible for recommendation (not deleted, not already recommended to this user)
-	// Request more than needed to allow for quality filtering
-	articles, err := e.articleRepo.GetForRecommendation(ctx, userID, 100)
+	// Get articles eligible for recommendation (not deleted, not already
+	// recommended to this user). The pool is over-fetched so the offset window
+	// has data to slice from.
+	articles, err := e.articleRepo.GetForRecommendation(ctx, userID, recommendationPoolSize)
 	if err != nil {
 		slog.Error("failed to get eligible articles", slog.String("user_id", userID), slog.Any("error", err))
 		return nil, err
@@ -48,94 +64,41 @@ func (e *Engine) GetRecommendations(ctx context.Context, userID string) ([]model
 
 	slog.Info("found eligible articles", slog.Int("count", len(articles)), slog.String("user_id", userID))
 
-	// If we have 5 or fewer articles, return what we have.
-	// Tracking (articles.recommends + recommendations row) is driven by
-	// POST /api/v1/explore/shown from the client, not by this read path.
-	if len(articles) <= 5 {
-		return articles, nil
+	// Rank the whole pool by quality, then slice out the requested page.
+	e.sortByQuality(articles)
+
+	if offset < 0 {
+		offset = 0
 	}
-
-	// Select 4 high-quality articles based on quality score
-	highQuality := e.selectHighQualityArticles(articles, 4)
-
-	// Get 1 low-exposure article (lowest recommends count)
-	// We'll use a separate query to ensure we get a truly low-exposure article
-	lowExposure, err := e.articleRepo.GetLowExposureArticles(ctx, userID, 10)
-	if err != nil {
-		return nil, err
+	if offset >= len(articles) {
+		return []models.Article{}, nil
 	}
-
-	// Find a low-exposure article that's not already in high-quality set
-	var explorationArticle *models.Article
-	highQualityIDs := make(map[string]bool)
-	for _, article := range highQuality {
-		highQualityIDs[article.ID] = true
+	end := offset + recommendationPageSize
+	if end > len(articles) {
+		end = len(articles)
 	}
+	page := articles[offset:end]
 
-	for _, article := range lowExposure {
-		if !highQualityIDs[article.ID] {
-			explorationArticle = &article
-			break
-		}
-	}
+	slog.Info("returning recommendation page",
+		slog.Int("offset", offset),
+		slog.Int("count", len(page)),
+		slog.String("user_id", userID))
 
-	// Build final recommendation list
-	recommended := make([]models.Article, 0, 5)
-	recommended = append(recommended, highQuality...)
-
-	// Add exploration article if we found one different from high-quality
-	if explorationArticle != nil {
-		recommended = append(recommended, *explorationArticle)
-	} else if len(highQuality) < 5 && len(lowExposure) > 0 {
-		// If we couldn't find a unique exploration article, add more from high quality
-		for i := 4; i < len(articles) && len(recommended) < 5; i++ {
-			recommended = append(recommended, articles[i])
-		}
-	}
-
-	slog.Info("successfully recommended articles",
-		slog.Int("total", len(recommended)),
-		slog.String("user_id", userID),
-		slog.Int("high_quality", len(highQuality)),
-		slog.Int("exploration", len(recommended)-len(highQuality)))
-
-	// Log article IDs for debugging
-	articleIDs := make([]string, len(recommended))
-	for i, article := range recommended {
-		articleIDs[i] = article.ID
-	}
-	slog.Debug("recommended article IDs", slog.Any("article_ids", articleIDs))
-
-	return recommended, nil
+	return page, nil
 }
 
-// selectHighQualityArticles selects the top N articles based on quality score.
-// It calculates quality scores for all articles and returns the top N by score.
-func (e *Engine) selectHighQualityArticles(articles []models.Article, count int) []models.Article {
-	type scoredArticle struct {
-		article models.Article
-		score   float64
-	}
-
-	// Calculate quality score for each article
-	scored := make([]scoredArticle, len(articles))
-	for i, article := range articles {
-		score := e.calculateQualityScore(article)
-		scored[i] = scoredArticle{article: article, score: score}
-	}
-
-	// Sort by score (descending) using sort.Slice (O(n log n))
-	sort.Slice(scored, func(i, j int) bool {
-		return scored[i].score > scored[j].score
+// sortByQuality sorts articles in place by descending quality score. Ties are
+// broken by article ID (descending) so the ordering is deterministic across
+// calls, which keeps offset-based pagination consistent.
+func (e *Engine) sortByQuality(articles []models.Article) {
+	sort.Slice(articles, func(i, j int) bool {
+		si := e.calculateQualityScore(articles[i])
+		sj := e.calculateQualityScore(articles[j])
+		if si != sj {
+			return si > sj
+		}
+		return articles[i].ID > articles[j].ID
 	})
-
-	// Extract top N articles
-	result := make([]models.Article, 0, count)
-	for i := 0; i < count && i < len(scored); i++ {
-		result = append(result, scored[i].article)
-	}
-
-	return result
 }
 
 // calculateQualityScore computes the quality score for an article

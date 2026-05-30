@@ -22,6 +22,11 @@ const SHOWN_BATCH_FLUSH_THRESHOLD = 10;
 const SHOWN_BATCH_DEBOUNCE_MS = 3000;
 const SHOWN_BATCH_MAX_SIZE = 100;
 
+// Server page size for the recommendation feed. Each fetch advances the offset
+// by the number of articles returned; a short page (fewer than this) means the
+// backend has no more articles. Must match recommendationPageSize on the server.
+const RECOMMENDATION_PAGE_SIZE = 10;
+
 /**
  * Calculate the minimum number of articles needed to fill the screen
  * based on device viewport height and estimated article row height.
@@ -48,6 +53,7 @@ export const ExploreScreen: React.FC = () => {
   const lastVisibleIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
   const hasMoreRef = useRef(true);
+  const offsetRef = useRef(0);
   const articlesRef = useRef<Article[]>([]);
   const loadMoreRef = useRef<((minArticles?: number) => Promise<void>) | null>(null);
 
@@ -97,28 +103,23 @@ export const ExploreScreen: React.FC = () => {
           break;
         }
 
-        const newRecommendations = await ExploreService.getRecommendations();
+        const offset = offsetRef.current;
+        const newRecommendations = await ExploreService.getRecommendations(offset);
+        offsetRef.current = offset + newRecommendations.length;
 
-        if (newRecommendations.length === 0) {
-          // No more articles available from backend
-          markNoMore();
-          break;
-        }
-
-        // Filter out duplicates and add new articles
-        let addedCount = 0;
+        // Append new articles, de-duplicating as a safety net against any
+        // overlap from the eligible pool shrinking mid-scroll.
         await new Promise<void>((resolve) => {
           setArticles(prev => {
             const existingIds = new Set(prev.map(a => a.id));
             const uniqueNew = newRecommendations.filter(a => !existingIds.has(a.id));
-            addedCount = uniqueNew.length;
             resolve();
             return [...prev, ...uniqueNew];
           });
         });
 
-        // If we didn't get any new unique articles, break to avoid infinite loop
-        if (addedCount === 0) {
+        // A short page means the backend has no more articles for now.
+        if (newRecommendations.length < RECOMMENDATION_PAGE_SIZE) {
           markNoMore();
           break;
         }
@@ -132,8 +133,14 @@ export const ExploreScreen: React.FC = () => {
   }, [markNoMore]);
 
   const loadExploreArticles = useCallback(async () => {
+    // Claim the fetch lock so a FlatList-triggered loadMoreUntilBuffer can't
+    // run concurrently and corrupt the shared offsetRef during initial load.
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
-      const recommendations = await ExploreService.getRecommendations();
+      offsetRef.current = 0;
+      const recommendations = await ExploreService.getRecommendations(offsetRef.current);
+      offsetRef.current += recommendations.length;
 
       // Calculate how many articles we need
       const minInitialArticles = calculateInitialArticleCount();
@@ -144,34 +151,30 @@ export const ExploreScreen: React.FC = () => {
       // Also update ref immediately so loadMoreUntilBuffer can see current count
       articlesRef.current = recommendations;
 
-      // If the initial batch was empty, the backend has nothing for us
-      if (recommendations.length === 0) {
+      // A short first page means the backend has nothing more for us.
+      const reachedEnd = recommendations.length < RECOMMENDATION_PAGE_SIZE;
+      if (reachedEnd) {
         markNoMore();
       }
 
-      // If we need more articles, fetch them
-      if (recommendations.length < minInitialArticles) {
-        // Fetch more batches until we have enough
+      // If we need more articles and there are more to fetch, page through them.
+      if (!reachedEnd && recommendations.length < minInitialArticles) {
         let allArticles = [...recommendations];
 
         while (allArticles.length < minInitialArticles) {
-          const moreRecommendations = await ExploreService.getRecommendations();
+          const moreRecommendations = await ExploreService.getRecommendations(offsetRef.current);
+          offsetRef.current += moreRecommendations.length;
 
-          if (moreRecommendations.length === 0) {
-            markNoMore();
-            break;
-          }
-
-          // Filter duplicates
+          // Filter duplicates (safety net against pool-shrink overlap)
           const existingIds = new Set(allArticles.map(a => a.id));
           const uniqueNew = moreRecommendations.filter(a => !existingIds.has(a.id));
+          allArticles = [...allArticles, ...uniqueNew];
 
-          if (uniqueNew.length === 0) {
+          // A short page means the backend has no more articles.
+          if (moreRecommendations.length < RECOMMENDATION_PAGE_SIZE) {
             markNoMore();
             break;
           }
-
-          allArticles = [...allArticles, ...uniqueNew];
         }
 
         // Set all articles at once
@@ -193,6 +196,7 @@ export const ExploreScreen: React.FC = () => {
         await logout();
       }
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -260,6 +264,7 @@ export const ExploreScreen: React.FC = () => {
     setRefreshing(true);
     setArticles([]);
     lastVisibleIndexRef.current = 0;
+    offsetRef.current = 0;
     hasMoreRef.current = true;
     setHasMore(true);
     hasUserScrolledRef.current = false;
