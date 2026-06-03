@@ -112,13 +112,13 @@ func (h *SenderHandler) ListSendersInternal(w http.ResponseWriter, r *http.Reque
 			ID:          s.ID.String(),
 			SenderEmail: s.SenderEmail,
 			EmailCount:  s.EmailCount,
-			CreatedAt:   s.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			CreatedAt:   s.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
 		}
 		if s.SenderName != nil {
 			sr.SenderName = *s.SenderName
 		}
 		if s.LastReceivedAt != nil {
-			sr.LastReceivedAt = s.LastReceivedAt.Format("2006-01-02T15:04:05Z")
+			sr.LastReceivedAt = s.LastReceivedAt.UTC().Format("2006-01-02T15:04:05Z")
 		}
 		resp.Data = append(resp.Data, sr)
 	}

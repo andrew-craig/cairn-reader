@@ -60,9 +60,13 @@ func (c *EmailIngestClient) ListUserSenders(ctx context.Context, userID string) 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
+	const maxSize = 1024 * 1024 // 1MB
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if int64(len(body)) > maxSize {
+		return nil, fmt.Errorf("response body exceeded maximum size of %d bytes", maxSize)
 	}
 
 	if resp.StatusCode != http.StatusOK {

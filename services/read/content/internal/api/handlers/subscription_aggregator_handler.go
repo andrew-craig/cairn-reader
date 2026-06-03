@@ -176,6 +176,9 @@ func (h *SubscriptionAggregatorHandler) fetchEmailSubscriptions(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
+	if sendersResponse == nil {
+		return nil, errors.New("nil response from email ingest client")
+	}
 
 	unified := make([]dto.UnifiedSubscription, 0, len(sendersResponse.Senders))
 	for _, sender := range sendersResponse.Senders {
