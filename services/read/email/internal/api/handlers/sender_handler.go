@@ -78,3 +78,50 @@ func (h *SenderHandler) ListSenders(w http.ResponseWriter, r *http.Request) {
 
 	api.WriteSuccess(w, http.StatusOK, resp.Data, "v1")
 }
+
+// ListSendersInternal handles GET /api/v1/internal/source/email/user/{user_id}/senders
+// It is protected by internal API key and used by the Content Service subscription aggregator.
+func (h *SenderHandler) ListSendersInternal(w http.ResponseWriter, r *http.Request) {
+	userID, err := uuid.Parse(chi.URLParam(r, "user_id"))
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	senders, err := h.senderService.ListByUser(r.Context(), userID, limit, offset)
+	if err != nil {
+		slog.Error("failed to list senders (internal)", "error", err, "user_id", userID)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to list senders", nil, "v1")
+		return
+	}
+
+	resp := dto.ListSendersResponse{
+		Data: make([]dto.SenderResponse, 0, len(senders)),
+	}
+	for _, s := range senders {
+		sr := dto.SenderResponse{
+			ID:          s.ID.String(),
+			SenderEmail: s.SenderEmail,
+			EmailCount:  s.EmailCount,
+			CreatedAt:   s.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+		if s.SenderName != nil {
+			sr.SenderName = *s.SenderName
+		}
+		if s.LastReceivedAt != nil {
+			sr.LastReceivedAt = s.LastReceivedAt.Format("2006-01-02T15:04:05Z")
+		}
+		resp.Data = append(resp.Data, sr)
+	}
+
+	api.WriteSuccess(w, http.StatusOK, resp.Data, "v1")
+}

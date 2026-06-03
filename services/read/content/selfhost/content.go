@@ -32,13 +32,15 @@ func envInt(key string, fallback int) int {
 
 // ContentConfig holds configuration for the content service.
 type ContentConfig struct {
-	DBHost              string
-	DBPort              int
-	DBUser              string
-	DBPassword          string
-	DBName              string
-	DBSSLMode           string
-	IngestRSSServiceURL string
+	DBHost                string
+	DBPort                int
+	DBUser                string
+	DBPassword            string
+	DBName                string
+	DBSSLMode             string
+	IngestRSSServiceURL   string
+	EmailIngestServiceURL string
+	InternalAPIKey        string
 }
 
 // RunMigrations runs embedded migrations for the content database.
@@ -75,7 +77,7 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 		return nil, nil, fmt.Errorf("content db: %w", err)
 	}
 
-	contentRouter := contentAPI.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware, internalAuthMiddleware)
+	contentRouter := contentAPI.NewRouter(db, cfg.IngestRSSServiceURL, cfg.EmailIngestServiceURL, cfg.InternalAPIKey, authMiddleware, internalAuthMiddleware)
 	r.Handle("/api/v1/content", contentRouter)
 	r.Handle("/api/v1/content/*", contentRouter)
 	r.Handle("/api/v1/internal", contentRouter)

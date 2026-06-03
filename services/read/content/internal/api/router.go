@@ -17,7 +17,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware) http.Handler {
+func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceURL string, internalAPIKey string, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply global middleware
@@ -34,13 +34,14 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, authMiddleware *auth
 	contentService := service.NewContentService(contentRepo, db.DB)
 	urlDetector := service.NewURLDetector()
 	ingestRSSClient := service.NewIngestRSSClient(ingestRSSServiceURL)
+	emailIngestClient := service.NewEmailIngestClient(emailIngestServiceURL, internalAPIKey)
 
 	// Initialize handlers
 	contentHandler := handlers.NewContentHandler(contentService)
 	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, contentService, urlDetector, ingestRSSClient)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 	detectionHandler := handlers.NewDetectionHandler(urlDetector)
-	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient)
+	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient, emailIngestClient)
 
 	// Health check endpoints (Kubernetes-compatible)
 	// Liveness probe - indicates if the process is running

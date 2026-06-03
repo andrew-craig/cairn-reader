@@ -35,8 +35,9 @@ type Config struct {
 	Database            sharedconfig.DatabaseConfig
 	Logging             sharedconfig.LoggingConfig
 	Vault               VaultConfig
-	IngestRSSServiceURL string
-	InternalAPIKey      string
+	IngestRSSServiceURL   string
+	EmailIngestServiceURL string
+	InternalAPIKey        string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -53,7 +54,8 @@ func Load() (*Config, error) {
 			AuthPath:      sharedconfig.GetString("VAULT_AUTH_PATH", "approle"),
 			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 		},
-		IngestRSSServiceURL: sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
+		IngestRSSServiceURL:   sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
+		EmailIngestServiceURL: sharedconfig.GetString("EMAIL_INGEST_SERVICE_URL", "http://localhost:8087"),
 		InternalAPIKey:      sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
