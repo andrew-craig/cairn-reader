@@ -4,6 +4,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
@@ -14,12 +15,13 @@ import (
 
 // RouterDeps holds all dependencies for the HTTP router.
 type RouterDeps struct {
-	DB             *database.DB
-	IngestHandler  *handlers.IngestHandler
-	AddressHandler *handlers.AddressHandler
-	SenderHandler  *handlers.SenderHandler
-	APIKeyAuth     *middleware.APIKeyAuth
-	JWTAuth        *middleware.JWTAuth
+	DB                     *database.DB
+	IngestHandler          *handlers.IngestHandler
+	AddressHandler         *handlers.AddressHandler
+	SenderHandler          *handlers.SenderHandler
+	APIKeyAuth             *middleware.APIKeyAuth
+	JWTAuth                *middleware.JWTAuth
+	InternalAuthMiddleware *auth.InternalAuthMiddleware
 }
 
 // NewRouter creates and configures the HTTP router
@@ -55,6 +57,15 @@ func NewRouter(deps RouterDeps) http.Handler {
 			r.Get("/user/{user_id}/senders", deps.SenderHandler.ListSenders)
 		})
 	})
+
+	// Internal service-to-service routes (internal API key protected)
+	if deps.InternalAuthMiddleware != nil {
+		r.Route("/api/v1/internal/source/email", func(r chi.Router) {
+			r.Use(sharedmw.RequireHTTPS)
+			r.Use(deps.InternalAuthMiddleware.RequireInternalAPIKey)
+			r.Get("/user/{user_id}/senders", deps.SenderHandler.ListSendersInternal)
+		})
+	}
 
 	return r
 }

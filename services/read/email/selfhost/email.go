@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	emailAPI "github.com/cairn-app/cairn-reader/services/read/email/internal/api"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
 	emailMW "github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
@@ -129,14 +130,20 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 	addressHandler := handlers.NewAddressHandler(addressService, emailCfg)
 	senderHandler := handlers.NewSenderHandler(senderService)
 
+	var internalAuthMW *auth.InternalAuthMiddleware
+	if cfg.InternalAPIKey != "" {
+		internalAuthMW = auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
+	}
+
 	// Mount email API routes
 	emailRouter := emailAPI.NewRouter(emailAPI.RouterDeps{
-		DB:             db,
-		IngestHandler:  ingestHandler,
-		AddressHandler: addressHandler,
-		SenderHandler:  senderHandler,
-		APIKeyAuth:     apiKeyAuth,
-		JWTAuth:        jwtAuth,
+		DB:                     db,
+		IngestHandler:          ingestHandler,
+		AddressHandler:         addressHandler,
+		SenderHandler:          senderHandler,
+		APIKeyAuth:             apiKeyAuth,
+		JWTAuth:                jwtAuth,
+		InternalAuthMiddleware: internalAuthMW,
 	})
 	r.Handle("/api/v1/source/email", emailRouter)
 	r.Handle("/api/v1/source/email/*", emailRouter)

@@ -7,6 +7,7 @@ type SenderResponse struct {
 	SenderEmail    string `json:"sender_email"`
 	SenderName     string `json:"sender_name,omitempty"`
 	EmailCount     int    `json:"email_count"`
+	CreatedAt      string `json:"created_at,omitempty"`
 	LastReceivedAt string `json:"last_received_at,omitempty"`
 }
 

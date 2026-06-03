@@ -31,12 +31,13 @@ func (c *VaultConfig) HasTokenAuth() bool {
 
 // Config holds all configuration for the content service
 type Config struct {
-	Server              sharedconfig.ServerConfig
-	Database            sharedconfig.DatabaseConfig
-	Logging             sharedconfig.LoggingConfig
-	Vault               VaultConfig
-	IngestRSSServiceURL string
-	InternalAPIKey      string
+	Server                sharedconfig.ServerConfig
+	Database              sharedconfig.DatabaseConfig
+	Logging               sharedconfig.LoggingConfig
+	Vault                 VaultConfig
+	IngestRSSServiceURL   string
+	EmailIngestServiceURL string
+	InternalAPIKey        string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -53,8 +54,9 @@ func Load() (*Config, error) {
 			AuthPath:      sharedconfig.GetString("VAULT_AUTH_PATH", "approle"),
 			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 		},
-		IngestRSSServiceURL: sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
-		InternalAPIKey:      sharedconfig.GetString("INTERNAL_API_KEY", ""),
+		IngestRSSServiceURL:   sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
+		EmailIngestServiceURL: sharedconfig.GetString("EMAIL_INGEST_SERVICE_URL", "http://localhost:8087"),
+		InternalAPIKey:        sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
 	if err := cfg.Validate(); err != nil {

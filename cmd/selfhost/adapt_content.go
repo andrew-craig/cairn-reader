@@ -25,16 +25,18 @@ func runContentMigrations(cfg *Config) error {
 }
 
 func mountContentService(ctx context.Context, cfg *Config, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
-	ingestRSSServiceURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
+	selfhostBaseURL := fmt.Sprintf("http://localhost:%s", cfg.Port)
 
 	sqlDB, closer, err := contentSelfhost.Mount(contentSelfhost.ContentConfig{
-		DBHost:              cfg.DB.Host,
-		DBPort:              cfg.DB.Port,
-		DBUser:              cfg.DB.User,
-		DBPassword:          cfg.DB.Password,
-		DBName:              cfg.DBNameContent,
-		DBSSLMode:           cfg.DB.SSLMode,
-		IngestRSSServiceURL: ingestRSSServiceURL,
+		DBHost:                cfg.DB.Host,
+		DBPort:                cfg.DB.Port,
+		DBUser:                cfg.DB.User,
+		DBPassword:            cfg.DB.Password,
+		DBName:                cfg.DBNameContent,
+		DBSSLMode:             cfg.DB.SSLMode,
+		IngestRSSServiceURL:   selfhostBaseURL,
+		EmailIngestServiceURL: selfhostBaseURL,
+		InternalAPIKey:        cfg.InternalAPIKey,
 	}, r, authMiddleware, internalAuthMiddleware, logger)
 	if err != nil {
 		return nil, err

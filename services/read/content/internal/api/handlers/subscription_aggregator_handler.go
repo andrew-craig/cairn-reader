@@ -16,18 +16,18 @@ import (
 
 // SubscriptionAggregatorHandler aggregates subscriptions from multiple sources
 type SubscriptionAggregatorHandler struct {
-	ingestRSSClient *service.IngestRSSClient
-	// Future: add other subscription service clients
-	// socialClient  *service.SocialClient
-	// emailClient   *service.EmailClient
+	ingestRSSClient   *service.IngestRSSClient
+	emailIngestClient *service.EmailIngestClient
 }
 
 // NewSubscriptionAggregatorHandler creates a new SubscriptionAggregatorHandler
 func NewSubscriptionAggregatorHandler(
 	ingestRSSClient *service.IngestRSSClient,
+	emailIngestClient *service.EmailIngestClient,
 ) *SubscriptionAggregatorHandler {
 	return &SubscriptionAggregatorHandler{
-		ingestRSSClient: ingestRSSClient,
+		ingestRSSClient:   ingestRSSClient,
+		emailIngestClient: emailIngestClient,
 	}
 }
 
@@ -77,13 +77,15 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 	//     allSubscriptions = append(allSubscriptions, socialSubscriptions...)
 	// }
 
-	// 3. Future: Fetch email subscriptions
-	// emailSubscriptions, err := h.fetchEmailSubscriptions(r.Context(), userID.String())
-	// if err != nil {
-	//     slog.Error("Failed to fetch email subscriptions", "error", err)
-	// } else {
-	//     allSubscriptions = append(allSubscriptions, emailSubscriptions...)
-	// }
+	// 3. Fetch email newsletter subscriptions
+	if h.emailIngestClient != nil {
+		emailSubscriptions, err := h.fetchEmailSubscriptions(r.Context(), userID.String())
+		if err != nil {
+			slog.Error("Failed to fetch email subscriptions", "error", err)
+		} else {
+			allSubscriptions = append(allSubscriptions, emailSubscriptions...)
+		}
+	}
 
 	// Build response
 	response := dto.ListSubscriptionsResponse{
@@ -167,34 +169,33 @@ func (h *SubscriptionAggregatorHandler) fetchRSSSubscriptions(ctx context.Contex
 	return unified, nil
 }
 
-// Future: Add methods for other subscription sources
-//
-// func (h *SubscriptionAggregatorHandler) fetchSocialSubscriptions(ctx context.Context, userID string) ([]dto.UnifiedSubscription, error) {
-//     // Call social service
-//     socialResponse, err := h.socialClient.ListUserSubscriptions(ctx, userID)
-//     if err != nil {
-//         return nil, err
-//     }
-//
-//     // Transform to unified format
-//     unified := make([]dto.UnifiedSubscription, 0, len(socialResponse.Subscriptions))
-//     for _, socialSub := range socialResponse.Subscriptions {
-//         unified = append(unified, dto.UnifiedSubscription{
-//             ID:           socialSub.ID,
-//             Type:         dto.SubscriptionTypeSocial,
-//             Title:        socialSub.DisplayName,
-//             SubscribedAt: socialSub.SubscribedAt,
-//             SocialData: &dto.SocialSubscriptionData{
-//                 Platform: socialSub.Platform,
-//                 Handle:   socialSub.Handle,
-//             },
-//         })
-//     }
-//
-//     return unified, nil
-// }
-//
-// func (h *SubscriptionAggregatorHandler) fetchEmailSubscriptions(ctx context.Context, userID string) ([]dto.UnifiedSubscription, error) {
-//     // Similar implementation for email subscriptions
-//     return nil, nil
-// }
+// fetchEmailSubscriptions fetches and transforms email senders from the Email Ingest service.
+// Each unique sender represents a newsletter the user has subscribed to.
+func (h *SubscriptionAggregatorHandler) fetchEmailSubscriptions(ctx context.Context, userID string) ([]dto.UnifiedSubscription, error) {
+	sendersResponse, err := h.emailIngestClient.ListUserSenders(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if sendersResponse == nil {
+		return nil, errors.New("nil response from email ingest client")
+	}
+
+	unified := make([]dto.UnifiedSubscription, 0, len(sendersResponse.Senders))
+	for _, sender := range sendersResponse.Senders {
+		title := sender.SenderName
+		if title == "" {
+			title = sender.SenderEmail
+		}
+		unified = append(unified, dto.UnifiedSubscription{
+			ID:           sender.ID,
+			Type:         dto.SubscriptionTypeEmail,
+			Title:        title,
+			SubscribedAt: sender.CreatedAt,
+			EmailData: &dto.EmailSubscriptionData{
+				EmailAddress: sender.SenderEmail,
+			},
+		})
+	}
+
+	return unified, nil
+}

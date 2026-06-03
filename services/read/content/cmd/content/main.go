@@ -125,7 +125,7 @@ func main() {
 	internalAuthMiddleware := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
 
 	// Create router
-	router := api.NewRouter(db, cfg.IngestRSSServiceURL, authMiddleware, internalAuthMiddleware)
+	router := api.NewRouter(db, cfg.IngestRSSServiceURL, cfg.EmailIngestServiceURL, cfg.InternalAPIKey, authMiddleware, internalAuthMiddleware)
 
 	// Create HTTP server
 	server := &http.Server{
