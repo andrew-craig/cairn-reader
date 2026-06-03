@@ -15,13 +15,13 @@ import (
 
 // RouterDeps holds all dependencies for the HTTP router.
 type RouterDeps struct {
-	DB                      *database.DB
-	IngestHandler           *handlers.IngestHandler
-	AddressHandler          *handlers.AddressHandler
-	SenderHandler           *handlers.SenderHandler
-	APIKeyAuth              *middleware.APIKeyAuth
-	JWTAuth                 *middleware.JWTAuth
-	InternalAuthMiddleware  *auth.InternalAuthMiddleware
+	DB                     *database.DB
+	IngestHandler          *handlers.IngestHandler
+	AddressHandler         *handlers.AddressHandler
+	SenderHandler          *handlers.SenderHandler
+	APIKeyAuth             *middleware.APIKeyAuth
+	JWTAuth                *middleware.JWTAuth
+	InternalAuthMiddleware *auth.InternalAuthMiddleware
 }
 
 // NewRouter creates and configures the HTTP router
