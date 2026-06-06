@@ -43,7 +43,7 @@ Read the following documentation as necessary for each task. do not read a docum
 - [Email Ingest Service](/services/read/email/CLAUDE.md) - Email-to-article ingestion
 
 
-## API Documentation
+### API Documentation
 
 Each service has an OpenAPI spec and endpoint documentation in its CLAUDE.md:
 - [services/explore/api/openapi.yaml](/services/explore/api/openapi.yaml)
