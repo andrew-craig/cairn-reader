@@ -28,6 +28,19 @@ export interface ScrollProgressInfo {
   layoutHeight: number;
 }
 
+/**
+ * Whether a saved scroll offset can actually be reached given the currently
+ * measured content and viewport heights. HTML content (especially emails) lays
+ * out progressively, so early size measurements understate the final height and
+ * a scrollTo to the target would be clamped short. We only consider restoration
+ * final once the content has grown tall enough to reach the target.
+ */
+export const isScrollTargetReachable = (
+  contentHeight: number,
+  layoutHeight: number,
+  target: number
+): boolean => layoutHeight > 0 && contentHeight - layoutHeight >= target;
+
 interface ArticleContentProps {
   article: Article;
   colors: typeof Colors.light;
@@ -117,12 +130,24 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 
   const handleContentSizeChange = useCallback((_w: number, contentHeight: number) => {
     contentHeightRef.current = contentHeight;
+    // Re-apply the saved position on every size change while the content keeps
+    // growing, latching only once the target is actually reachable. A single
+    // early scrollTo would be clamped near the top for progressively-rendered
+    // HTML (e.g. emails) and never retried.
     if (!hasRestoredPosition.current && initialScrollPosition && initialScrollPosition > 0) {
       scrollViewRef.current?.scrollTo({ y: initialScrollPosition, animated: false });
-      hasRestoredPosition.current = true;
+      if (isScrollTargetReachable(contentHeight, layoutHeightRef.current, initialScrollPosition)) {
+        hasRestoredPosition.current = true;
+      }
     }
     emitProgress();
   }, [initialScrollPosition, emitProgress]);
+
+  // Once the user takes control by dragging, stop trying to restore so we never
+  // yank them away from where they scrolled.
+  const handleScrollBeginDrag = useCallback(() => {
+    hasRestoredPosition.current = true;
+  }, []);
 
   const handleScrollViewLayout = useCallback((event: LayoutChangeEvent) => {
     layoutHeightRef.current = event.nativeEvent.layout.height;
@@ -212,6 +237,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       showsVerticalScrollIndicator={false}
       onScroll={handleScroll}
       scrollEventThrottle={100}
+      onScrollBeginDrag={handleScrollBeginDrag}
       onContentSizeChange={handleContentSizeChange}
       onLayout={handleScrollViewLayout}
     >
