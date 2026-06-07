@@ -2,14 +2,14 @@
 id: task_2a40
 title: Audit 1: API contract consistency & stability
 type: task
-status: open
+status: closed
 priority: 1
 labels: [audit,api]
 blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:06:15Z
-updated_at: 2026-06-06T05:06:15Z
+updated_at: 2026-06-07T05:34:32Z
 ---
 MOST TIME-SENSITIVE: these contracts freeze when the public beta starts. Audit the HTTP API surface across users/read/explore (incl. email ingest) for consistency and long-term stability.
 
@@ -54,3 +54,19 @@ Drift went undetected because:
 - Unit tests use the spec-style wrong paths and still pass (user_content_handler_test.go builds its own chi route context instead of routing through the production router); only integration_test.go:105 uses the correct /api/v1/content/user/%s. The test suite does NOT guard against this drift.
 
 Recommendation (decision needed): client already ships the singular form, so the cheapest correct pre-freeze move is to make the SPEC match the implementation (singular /api/v1/content/user/..., check-duplicate), then fix the contradictory handler comments and re-point the unit tests through the real router so drift is caught going forward. Changing the server to the REST-conventional /users/{id}/contents form would break the shipped client and is the more expensive path. Must land before signups open — both forms can't be supported cheaply post-freeze.
+
+## REVIEW (2026-06-07)
+
+Findings section delivered: `docs/architecture/audit/01_api_contract.md` (feeds Audit 7 consolidation).
+
+Outcome — 7 findings, classified beta-blocking / fast-follow / cosmetic:
+- F-1 (BETA-BLOCKING): Original lead on error envelopes is STALE. Handlers already converged on the shared `pkg/api` envelope (`{error,message,details,meta}` / `{data,meta}`). Real residual divergence is at the middleware layer — auth 401 `{error,message}` (no meta), panic 500 `{error,request_id}` (error is a sentence, not a code), and content's Content-Type 400 (local no-meta DTO). Route all three through `pkg/api`.
+- F-2 (FAST-FOLLOW): Health checks — email returns plain text `OK` with no Content-Type; explore/fetcher adds a non-standard `timestamp`. Not client-frozen (internal probes). Standardise on JSON `{status,checks}`.
+- F-3 (BETA-BLOCKING naming / FAST-FOLLOW scale): Pagination mixed — content uses cursor (lead said offset; now stale), email/explore use offset, fetcher/users none. Lock param+response shape per endpoint before freeze; unbounded subscriptions-aggregator + votes pagination defer to Audit 2/3.
+- F-4 (BETA-BLOCKING): Confirmed read CONTENT spec drift (carried from verified findings). Make spec match impl.
+- F-5 (BETA-BLOCKING, NEW): Read FETCHER (RSS) spec also drifts — spec `/api/v1/users/{id}/feeds*` vs router+both clients `/api/v1/source/rss/user/{id}/subscription`. Make spec match impl.
+- F-6 (BETA-BLOCKING): users/explore/fetcher specs document an outdated/partial error schema; email spec is correct — use it as the template.
+- F-7 (FAST-FOLLOW): Undocumented routes (explore `/shown`, email internal senders); explore spec conflates recommender+fetcher.
+- Versioning (item 5): PASS — all public endpoints under `/api/v1`.
+
+Document ends with an API-freeze checklist for Audit 7.
