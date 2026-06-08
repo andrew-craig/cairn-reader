@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [audit,docs]
-blocked_by: [task_e695,task_1eaa,task_659b,task_ed30,task_1d08]
+blocked_by: [task_1eaa,task_659b,task_ed30,task_1d08]
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:07:07Z
-updated_at: 2026-06-07T05:34:32Z
+updated_at: 2026-06-08T05:22:41Z
 ---
 Synthesise the six audit workstreams into a single decision-ready document: docs/architecture/PRE_BETA_AUDIT.md.
 
