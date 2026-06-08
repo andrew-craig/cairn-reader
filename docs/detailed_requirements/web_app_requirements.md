@@ -2,33 +2,24 @@
 
 ## Overview
 
-This document specifies requirements for a **desktop web application** for Cairn, a
-read-it-later product. The web app delivers the same core experience as the existing
-React Native/Expo mobile app (`apps/mobile`) — saving, reading, and discovering
-long-form content — optimized for desktop browsers and larger viewports.
+This document specifies requirements for a **desktop web application** for Cairn, a read-it-later product. The web app delivers the same core experience as the existing React Native/Expo mobile app (`apps/mobile`) — saving, reading, and discovering long-form content — optimized for desktop browsers and larger viewports.
 
-The guiding principle is **maximum reuse of the mobile app**: its feature set,
-backend service contracts, data models, service-layer logic, design tokens, and
-information architecture should be carried over directly. The web app is a new
-**presentation layer** over the same backend, not a new product.
+The guiding principle is **maximum reuse of the mobile app**: its feature set, backend service contracts, data models, service-layer logic, design tokens, and information architecture should be carried over directly. The web app is a new **presentation layer** over the same backend, not a new product.
 
 ### Goals
 
-- Provide a full-featured reading experience in the browser on desktop (and degrade
-  gracefully to tablet/mobile widths).
+- Provide a full-featured reading experience in the browser on desktop (and degrade gracefully to tablet/mobile widths).
 - Reach feature parity with the mobile app's authenticated experience.
-- Reuse the mobile app's backend integration contracts and data transforms verbatim
-  wherever possible, so a single backend serves both clients.
-- Match the mobile app's visual identity (typography, color, spacing) so the two
-  clients feel like one product.
+- Reuse the mobile app's backend integration contracts and data transforms verbatim wherever possible, so a single backend serves both clients.
+- Match the mobile app's visual identity (typography, color, spacing) so the two clients feel like one product.
 
 ### Non-Goals (initial release)
 
-- Offline-first / PWA installability (may be a fast follow — see Future Work).
-- Push notifications.
+- Offline-first / PWA installability
+- Push notifications
 - A separate web backend or BFF — the web app talks to the **existing** services.
 - Reimplementing or changing any backend service. This is a frontend-only effort.
-- Device-ID anonymous login (see Authentication — not viable on web).
+- Device-ID anonymous login (not viable on web).
 
 ## Reuse Strategy (Borrow From Mobile)
 
@@ -50,34 +41,17 @@ What carries over to the web app, and how:
 
 ### Shared code recommendation
 
-Extract the framework-agnostic layers — `types/`, the API/service logic, and the
-theme token values — into a location both apps can consume, to avoid drift. Two
-acceptable approaches:
-
-1. **Shared package** (preferred): a `packages/shared` (or `apps/shared`) workspace
-   containing types, service logic (parameterized over a storage adapter), and theme
-   tokens, imported by both `apps/mobile` and `apps/web`.
-2. **Copy-and-adapt** (faster to start): duplicate the service/type/theme files into
-   `apps/web` initially, with a follow-up task to converge on a shared package.
-
-The decision should be made before implementation begins (see Open Questions). The
-requirements below are written to be valid under either approach.
+Extract the framework-agnostic layers — `types/`, the API/service logic, and the theme token values — into **Shared package**: a `apps/shared` workspace containing types, service logic (parameterized over a storage adapter), and theme tokens, imported by both `apps/mobile` and `apps/web`.
 
 ## Technology Stack
 
 - **Framework**: React (matches mobile's React/TSX skill set and component model).
 - **Language**: TypeScript, strict mode (matches mobile conventions).
-- **Build/dev**: Vite (fast dev server, simple SPA build). Next.js is an alternative
-  only if SSR/SEO of public pages becomes a requirement — not needed for an
-  authenticated reader.
+- **Build/dev**: Vite (fast dev server, simple SPA build). Next.js is an alternative only if SSR/SEO of public pages becomes a requirement — not needed for an authenticated reader.
 - **Routing**: A standard client-side router (e.g. React Router) replacing React
   Navigation. The screen graph below maps 1:1 to routes.
-- **Styling**: Reuse the mobile theme token *values*. Implementation may use CSS
-  Modules, vanilla-extract, or a CSS-in-JS lib — the requirement is that the tokens
-  (color, spacing, font, radius) match `constants/theme.ts`, not a specific tool.
-- **HTML article rendering**: Render `cleaned_html` directly in the DOM (the web's
-  native strength), replacing the mobile `react-native-render-html` / WebView
-  approach. Content **must be sanitized** before injection (see Security).
+- **Styling**: Reuse the mobile theme token *values*. implemented in CSS. the requirement is that the tokens (color, spacing, font, radius) match `constants/theme.ts`
+- **HTML article rendering**: Render `cleaned_html` directly in the DOM, replacing the mobile `react-native-render-html` / WebView approach. Content **must be sanitized** before injection (see Security).
 - **Fonts**: Inter (body/UI) and Crimson Pro (headings), matching mobile.
 
 The app is a **single-page authenticated client** that calls the existing Cairn
@@ -101,38 +75,24 @@ Desktop Browser (React SPA)
 
 ### CORS dependency
 
-Browsers enforce CORS; the mobile app (native `fetch`) does not. The backend
-services **must** return appropriate `Access-Control-Allow-Origin` (and related)
-headers for the web app's origin(s), and handle preflight `OPTIONS` for the
-authenticated `Authorization`-header requests. If CORS is not already configured for
-a browser origin, that is a backend prerequisite and must be tracked as a dependency
-(see Dependencies). This is the single most likely integration blocker.
+Browsers enforce CORS; the mobile app (native `fetch`) does not. The backend services **must** return appropriate `Access-Control-Allow-Origin` (and related) headers for the web app's origin(s), and handle preflight `OPTIONS` for the authenticated `Authorization`-header requests. If CORS is not already configured for a browser origin, that is a backend prerequisite and must be tracked as a dependency (see Dependencies). This is the single most likely integration blocker.
 
 ## Authentication Requirements
 
-The web app reuses the mobile `AuthService` logic and the same User Service
-endpoints, with one deliberate difference: **no device-ID login**.
+The web app reuses the mobile `AuthService` logic and the same User Service endpoints, with one deliberate difference: **no device-ID login**.
 
 ### Supported flows
 
 1. **Email/password login** — `POST /api/v1/auth/login`.
 2. **Email/password registration** — `POST /api/v1/auth/register`.
-3. **Token refresh** — `POST /api/v1/auth/refresh`, proactive (5-minute expiry
-   buffer) plus reactive on 401, mirroring `AuthService.ensureValidToken` /
-   `refreshAccessToken`.
-4. **Logout** — `POST /api/v1/auth/logout` (revokes refresh token), then clear
-   local tokens.
+3. **Token refresh** — `POST /api/v1/auth/refresh`, proactive (5-minute expiry buffer) plus reactive on 401, mirroring `AuthService.ensureValidToken` / `refreshAccessToken`.
+4. **Logout** — `POST /api/v1/auth/logout` (revokes refresh token), then clear local tokens.
 5. **Change password** — `PUT /api/v1/user/{id}/password`.
 
 ### Explicitly excluded
 
-- **Device-ID / anonymous login** (`/auth/login/mobile`, `/auth/register/mobile`).
-  These depend on `expo-application` device identifiers that don't exist in a
-  browser. Web users authenticate with email/password only.
-- **Account upgrade** (`POST /api/v1/user/{id}/upgrade`, device→email) is not
-  applicable since web has no anonymous accounts. A web user who started anonymously
-  on mobile can sign in on web once they have upgraded their mobile account to
-  email/password.
+- **Device-ID / anonymous login** (`/auth/login/mobile`, `/auth/register/mobile`). These depend on `expo-application` device identifiers that don't exist in a browser. Web users authenticate with email/password only.
+- **Account upgrade** (`POST /api/v1/user/{id}/upgrade`, device→email) is not applicable since web has no anonymous accounts. A web user who started anonymously on mobile can sign in on web once they have upgraded their mobile account to email/password.
 
 ### Token storage
 
@@ -159,14 +119,15 @@ authenticated routes redirect to login when there is no valid session.
 
 The mobile app uses a bottom tab bar (`Read`, `Explore`, `You`) plus a stack of
 detail/secondary screens. The web app preserves the **same screen graph** but maps
-the primary navigation to a desktop-appropriate pattern.
+the primary navigation to a persistent **left sidebar** (or top nav bar) with the three primary destinations: **Read**, **Explore**, **You**. This replaces `CustomTabBar`.
 
-### Primary navigation (replaces bottom tab bar)
+The top quick actions bars (add, search) will remain at the top of the list
+- There will be a near full width search bar across the width of the read article list
+- Non-search actions will be buttons (in the same style) to the right of the search box
 
-- A persistent **left sidebar** (or top nav bar) with the three primary
-  destinations: **Read**, **Explore**, **You**. This replaces `CustomTabBar`.
-- A persistent **Add link** affordance (the mobile header `+` action) and a
-  **Search** affordance, available from the Read view.
+The sub-sections of the You page (Account, Feeds, Newsletters), will be shown as sub-items in the left navigation menu. 
+- Clicking the You item in the left nav will expand this list
+- Clicking on an individual item (e.g. Account) will open a page for that account
 
 ### Route map
 
@@ -186,9 +147,7 @@ the primary navigation to a desktop-appropriate pattern.
 | Add-link modal | `AddArticleScreen` / `AddLinkModal` | Add a URL (page or feed) |
 | Search modal | `SearchModal` | Search saved content |
 
-Detail screens that present as full-screen "cards" on mobile should present as
-**routed full-page views** on web (with browser back/forward working naturally).
-Add-link and Search present as **modal/overlay** on web, matching mobile.
+Add-link and Search present as **modal/overlay** on web, matching mobile. Implementation of these should be light-weight as they will be improved as a fast follow.
 
 ## Functional Requirements
 
@@ -272,17 +231,17 @@ web app reuses the same request/response handling and `Article` transforms.
 - Optimistic UI for vote toggles is acceptable, matching the responsive feel of
   mobile.
 
-### FR-7: You (Account Hub)
+### FR-7: You (Left Nav)
 
-- Mirror `YouScreen`: a menu with **Account**, **Feeds**, **Newsletters**,
-  **Bookmarks**, **Votes**, and **Log out**, each showing a live count/subtitle.
+- Clicking You in the Left nav will show the `YouScreen` items as a sub-menu **Account**, **Feeds**, **Newsletters**, **Bookmarks**, **Votes**, and **Log out**.
+- Where appropriate, these items will have a count next to them in the sidebar
 - Counts are fetched in parallel with **independent failure tolerance**
   (`Promise.allSettled`), so one failing endpoint doesn't hide the others:
   - Vote stats — `ExploreService.getUserVoteStats`.
   - Subscriptions (feeds vs newsletters split by `type === 'email'`) —
     `ReadService.listAllSubscriptions` (`GET /api/v1/content/user/{userId}/subscriptions`).
   - Bookmarks total — `ReadService.listUserContents({ limit: 1 })` total count.
-- Refresh counts when returning to the hub.
+- Refresh counts when re-opening the sub-menu
 
 ### FR-8: Feeds (Subscriptions)
 
@@ -398,9 +357,8 @@ instead must:
 ### Responsive design
 
 - **Primary target**: desktop browsers (≥1024px), the focus of this effort.
-- Must remain usable down to tablet (~768px) and acceptable on mobile widths (the
-  layout collapses to a single column; the native app remains the primary mobile
-  experience).
+- Must remain usable down to tablet (~768px)
+- At mobile widths, mirror the mobile app more closely. Note this will require a `You` page or modal that is only shown at mobile widths
 - Latest evergreen browsers (Chrome, Firefox, Safari, Edge).
 
 ### Performance
@@ -504,4 +462,3 @@ tokens move to `packages/shared` and both apps import them.
 4. **Default landing route**: `/read` (parity with mobile's primary list) — confirm.
 5. **Reader navigation**: replicate mobile's pass-the-list prev/next, or fetch
    neighbors on demand from the reader route?
-```

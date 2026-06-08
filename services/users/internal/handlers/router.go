@@ -43,6 +43,9 @@ func Router(config RouterConfig) http.Handler {
 	// Apply only recovery and logging globally (needed for all routes including health checks)
 	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(config.Logger))
+	// CORS is applied globally (before route/method resolution) so it also covers
+	// the public /health/* endpoints and reliably answers browser preflight OPTIONS.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 
 	// Initialize handlers
 	healthHandler := NewHealthHandler(config.DB, config.VaultClient)
@@ -72,7 +75,6 @@ func Router(config RouterConfig) http.Handler {
 
 	// API v1 routes with security middleware
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 		r.Use(sharedmw.RequireHTTPS)
 		r.Use(sharedmw.SecureHeadersRelaxed)
 

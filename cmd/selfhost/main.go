@@ -78,6 +78,10 @@ func main() {
 			next.ServeHTTP(w, req)
 		})
 	})
+	// CORS at the master-router level covers the aggregated /health/* endpoints and
+	// every mounted service in single-binary mode, and reliably answers browser
+	// preflight OPTIONS before route/method resolution.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 
 	// Health checker for aggregated health endpoints
 	health := newHealthChecker()
