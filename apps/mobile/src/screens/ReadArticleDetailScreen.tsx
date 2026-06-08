@@ -45,7 +45,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
   }, []);
 
   const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
-    scrollPositionRef.current = info.offsetY;
+    scrollPositionRef.current = info.contentHeight > 0
+      ? info.offsetY / info.contentHeight
+      : 0;
     hasScrolledRef.current = true;
 
     if (hasMarkedCompletedRef.current || info.contentHeight <= 0) return;
