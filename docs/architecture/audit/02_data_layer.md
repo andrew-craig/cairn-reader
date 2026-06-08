@@ -56,7 +56,7 @@ side.
 
 **Why it's beta-blocking:** the fix is a **list-vs-detail split** — the list/search DTO drops
 `cleaned_html` (and likely `description`) and the client fetches the body via
-`GET /api/v1/content/{content_id}` when a article is opened. That changes the frozen list-response
+`GET /api/v1/content/{content_id}` when an article is opened. That changes the frozen list-response
 shape, so it must be decided **before** the contract freezes. The DB-side change is a projection
 (select only list columns), not a schema change.
 
@@ -144,8 +144,11 @@ worth adding.
 > id)`). So no `updated_at` index is warranted. `status` is used as a *filter*, addressed above.
 
 **Recommendation (FAST-FOLLOW):** add `CREATE INDEX idx_user_contents_user_status_added ON
-user_contents(user_id, status, added_at DESC)` and drop the now-redundant `idx_user_contents_status`
-(the new index is a left-prefix superset). Treat the `feed_items` recheck index as optional.
+user_contents(user_id, status, added_at DESC, id DESC)` and drop the now-redundant
+`idx_user_contents_status` (the new index is a left-prefix superset). The trailing `id DESC` matches
+the keyset tiebreaker in `ListByUserWithCursor`/`SearchWithCursor` (`ORDER BY added_at DESC, id DESC`
+over `(added_at, id) < ($n, $n+1)`), so the index fully serves the cursor scan with no sort step.
+Treat the `feed_items` recheck index as optional.
 
 ---
 
