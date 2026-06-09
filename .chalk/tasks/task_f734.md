@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_1318]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:32:37Z
-updated_at: 2026-06-09T22:25:24Z
+updated_at: 2026-06-09T22:28:19Z
 ---
 Bootstrap apps/web as a Vite + React + TypeScript SPA with React Router and the full route graph from the requirements doc.
 
