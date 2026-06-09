@@ -130,24 +130,20 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 
   const handleContentSizeChange = useCallback((_w: number, contentHeight: number) => {
     contentHeightRef.current = contentHeight;
-    if (!hasRestoredPosition.current && initialScrollPosition && initialScrollPosition > 0) {
-      if (initialScrollPosition <= 1) {
-        // Fractional position: the target scales with the content height, so we
-        // re-apply it on every size change as progressively-rendered HTML (e.g.
-        // emails) grows and never latch on size. Latching early would freeze the
-        // user near the top, since a half-rendered article reports a much smaller
-        // height. Control is handed over once the user starts dragging.
-        const targetY = Math.round(initialScrollPosition * contentHeight);
-        scrollViewRef.current?.scrollTo({ y: targetY, animated: false });
-      } else {
-        // Legacy absolute pixel position: scroll to it and latch once it is
-        // actually reachable. The resulting scroll event persists the new
-        // fractional value, migrating the saved progress on the next open.
-        scrollViewRef.current?.scrollTo({ y: initialScrollPosition, animated: false });
-        if (isScrollTargetReachable(contentHeight, layoutHeightRef.current, initialScrollPosition)) {
-          hasRestoredPosition.current = true;
-        }
-      }
+    // Only fractional positions (0-1) are restored. The target scales with the
+    // content height, so we re-apply it on every size change as progressively-
+    // rendered HTML (e.g. emails) grows and never latch on size. Latching early
+    // would freeze the user near the top, since a half-rendered article reports
+    // a much smaller height. Control is handed over once the user starts
+    // dragging. Legacy absolute pixel values (> 1) are ignored.
+    if (
+      !hasRestoredPosition.current &&
+      initialScrollPosition &&
+      initialScrollPosition > 0 &&
+      initialScrollPosition <= 1
+    ) {
+      const targetY = Math.round(initialScrollPosition * contentHeight);
+      scrollViewRef.current?.scrollTo({ y: targetY, animated: false });
     }
     emitProgress();
   }, [initialScrollPosition, emitProgress]);
