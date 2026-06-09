@@ -130,15 +130,20 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 
   const handleContentSizeChange = useCallback((_w: number, contentHeight: number) => {
     contentHeightRef.current = contentHeight;
-    // Re-apply the saved position on every size change while the content keeps
-    // growing, latching only once the target is actually reachable. A single
-    // early scrollTo would be clamped near the top for progressively-rendered
-    // HTML (e.g. emails) and never retried.
-    if (!hasRestoredPosition.current && initialScrollPosition && initialScrollPosition > 0) {
-      scrollViewRef.current?.scrollTo({ y: initialScrollPosition, animated: false });
-      if (isScrollTargetReachable(contentHeight, layoutHeightRef.current, initialScrollPosition)) {
-        hasRestoredPosition.current = true;
-      }
+    // Only fractional positions (0-1) are restored. The target scales with the
+    // content height, so we re-apply it on every size change as progressively-
+    // rendered HTML (e.g. emails) grows and never latch on size. Latching early
+    // would freeze the user near the top, since a half-rendered article reports
+    // a much smaller height. Control is handed over once the user starts
+    // dragging. Legacy absolute pixel values (> 1) are ignored.
+    if (
+      !hasRestoredPosition.current &&
+      initialScrollPosition &&
+      initialScrollPosition > 0 &&
+      initialScrollPosition <= 1
+    ) {
+      const targetY = Math.round(initialScrollPosition * contentHeight);
+      scrollViewRef.current?.scrollTo({ y: targetY, animated: false });
     }
     emitProgress();
   }, [initialScrollPosition, emitProgress]);
