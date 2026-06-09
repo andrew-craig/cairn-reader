@@ -23,6 +23,9 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	// Apply global middleware
 	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(slog.Default()))
+	// CORS is applied globally (before route/method resolution) so it covers health
+	// checks and reliably answers browser preflight OPTIONS for Authorization requests.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 	r.Use(sharedmw.SecureHeadersRelaxed)
 	r.Use(middleware.ValidateJSON)
 

@@ -33,6 +33,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Logger)
 	r.Use(sharedmw.Recovery)
+	// CORS is applied globally (before route/method resolution) so it covers health
+	// checks and reliably answers browser preflight OPTIONS for Authorization requests.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health checks

@@ -46,6 +46,9 @@ func (s *Server) Routes() http.Handler {
 	// Global middleware
 	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(s.logger))
+	// CORS is applied globally (before route/method resolution) so it covers health
+	// checks and reliably answers browser preflight OPTIONS for Authorization requests.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health check endpoints (Kubernetes-compatible) - public
