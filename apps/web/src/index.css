@@ -1,0 +1,15 @@
+/* Baseline reset only. The full design system (tokens, Inter/Crimson Pro fonts,
+   dark/light mode) is implemented in a later task (task_07ff). */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
