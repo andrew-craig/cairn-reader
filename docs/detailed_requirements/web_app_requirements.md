@@ -41,7 +41,7 @@ What carries over to the web app, and how:
 
 ### Shared code recommendation
 
-Extract the framework-agnostic layers — `types/`, the API/service logic, and the theme token values — into **Shared package**: a `apps/shared` workspace containing types, service logic (parameterized over a storage adapter), and theme tokens, imported by both `apps/mobile` and `apps/web`.
+Extract the framework-agnostic layers — `types/`, the API/service logic, and the theme token values — into a **shared package**: an `apps/shared` workspace containing types, service logic (parameterized over a storage adapter), and theme tokens, imported by both `apps/mobile` and `apps/web`.
 
 ## Technology Stack
 
@@ -50,7 +50,7 @@ Extract the framework-agnostic layers — `types/`, the API/service logic, and t
 - **Build/dev**: Vite (fast dev server, simple SPA build). Next.js is an alternative only if SSR/SEO of public pages becomes a requirement — not needed for an authenticated reader.
 - **Routing**: A standard client-side router (e.g. React Router) replacing React
   Navigation. The screen graph below maps 1:1 to routes.
-- **Styling**: Reuse the mobile theme token *values*. implemented in CSS. the requirement is that the tokens (color, spacing, font, radius) match `constants/theme.ts`
+- **Styling**: Reuse the mobile theme token *values*. Implemented in CSS. The requirement is that the tokens (color, spacing, font, radius) match `constants/theme.ts`.
 - **HTML article rendering**: Render `cleaned_html` directly in the DOM, replacing the mobile `react-native-render-html` / WebView approach. Content **must be sanitized** before injection (see Security).
 - **Fonts**: Inter (body/UI) and Crimson Pro (headings), matching mobile.
 
@@ -121,13 +121,13 @@ The mobile app uses a bottom tab bar (`Read`, `Explore`, `You`) plus a stack of
 detail/secondary screens. The web app preserves the **same screen graph** but maps
 the primary navigation to a persistent **left sidebar** (or top nav bar) with the three primary destinations: **Read**, **Explore**, **You**. This replaces `CustomTabBar`.
 
-The top quick actions bars (add, search) will remain at the top of the list
-- There will be a near full width search bar across the width of the read article list
-- Non-search actions will be buttons (in the same style) to the right of the search box
+The top quick-actions bar (add, search) will remain at the top of the list:
+- There will be a near full width search bar across the width of the read article list.
+- Non-search actions will be buttons (in the same style) to the right of the search box.
 
-The sub-sections of the You page (Account, Feeds, Newsletters), will be shown as sub-items in the left navigation menu. 
-- Clicking the You item in the left nav will expand this list
-- Clicking on an individual item (e.g. Account) will open a page for that account
+The sub-sections of the You page (Account, Feeds, Newsletters) will be shown as sub-items in the left navigation menu.
+- Clicking the You item in the left nav will expand this list.
+- Clicking on an individual item (e.g. Account) will open a page for that account.
 
 ### Route map
 
@@ -147,7 +147,7 @@ The sub-sections of the You page (Account, Feeds, Newsletters), will be shown as
 | Add-link modal | `AddArticleScreen` / `AddLinkModal` | Add a URL (page or feed) |
 | Search modal | `SearchModal` | Search saved content |
 
-Add-link and Search present as **modal/overlay** on web, matching mobile. Implementation of these should be light-weight as they will be improved as a fast follow.
+Add-link and Search present as **modal/overlay** on web, matching mobile. Implementation of these should be lightweight as they will be improved as a fast follow.
 
 ## Functional Requirements
 
@@ -233,15 +233,15 @@ web app reuses the same request/response handling and `Article` transforms.
 
 ### FR-7: You (Left Nav)
 
-- Clicking You in the Left nav will show the `YouScreen` items as a sub-menu **Account**, **Feeds**, **Newsletters**, **Bookmarks**, **Votes**, and **Log out**.
-- Where appropriate, these items will have a count next to them in the sidebar
+- Clicking You in the left nav will show the `YouScreen` items as a sub-menu: **Account**, **Feeds**, **Newsletters**, **Bookmarks**, **Votes**, and **Log out**.
+- Where appropriate, these items will have a count next to them in the sidebar.
 - Counts are fetched in parallel with **independent failure tolerance**
   (`Promise.allSettled`), so one failing endpoint doesn't hide the others:
   - Vote stats — `ExploreService.getUserVoteStats`.
   - Subscriptions (feeds vs newsletters split by `type === 'email'`) —
     `ReadService.listAllSubscriptions` (`GET /api/v1/content/user/{userId}/subscriptions`).
   - Bookmarks total — `ReadService.listUserContents({ limit: 1 })` total count.
-- Refresh counts when re-opening the sub-menu
+- Refresh counts when re-opening the sub-menu.
 
 ### FR-8: Feeds (Subscriptions)
 
@@ -357,8 +357,8 @@ instead must:
 ### Responsive design
 
 - **Primary target**: desktop browsers (≥1024px), the focus of this effort.
-- Must remain usable down to tablet (~768px)
-- At mobile widths, mirror the mobile app more closely. Note this will require a `You` page or modal that is only shown at mobile widths
+- Must remain usable down to tablet (~768px).
+- At mobile widths, mirror the mobile app more closely. Note this will require a `You` page or modal that is only shown at mobile widths.
 - Latest evergreen browsers (Chrome, Firefox, Safari, Edge).
 
 ### Performance
