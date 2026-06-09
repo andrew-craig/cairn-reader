@@ -13,6 +13,17 @@ export interface StorageAdapter {
 export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 const SERVER_URL_KEY = '@cairn:server_url';
 
+// Persisted session keys. Tokens are issued by (and valid for) a specific backend
+// instance, so switching servers must clear them to avoid leaking credentials
+// across instances. Exported so the auth layer (task_f61e) reuses the same keys
+// rather than duplicating these strings.
+export const SESSION_STORAGE_KEYS = [
+  '@cairn:access_token',
+  '@cairn:refresh_token',
+  '@cairn:token_expires_at',
+  '@cairn:user',
+] as const;
+
 let storage: StorageAdapter | null = null;
 let currentServerUrl: string = DEFAULT_SERVER_URL;
 
@@ -56,11 +67,17 @@ export async function loadServerUrl(): Promise<string> {
 
 export async function setServerUrl(url: string): Promise<string> {
   const normalized = normalizeServerUrl(url);
+  const hasChanged = currentServerUrl !== normalized;
   if (normalized === DEFAULT_SERVER_URL) {
     await getStorage().removeItem(SERVER_URL_KEY);
   } else {
     await getStorage().setItem(SERVER_URL_KEY, normalized);
   }
   currentServerUrl = normalized;
+  // Pointing at a different backend invalidates the current session — clear it,
+  // but only on a real change so a no-op save doesn't sign the user out.
+  if (hasChanged) {
+    await Promise.all(SESSION_STORAGE_KEYS.map((key) => getStorage().removeItem(key)));
+  }
   return normalized;
 }
