@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_f61e,task_07ff]
+blocked_by: [task_07ff]
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:09Z
-updated_at: 2026-06-08T11:33:09Z
+updated_at: 2026-06-10T21:59:33Z
 ---
 Build the persistent sidebar layout that replaces mobile's bottom tab bar. This is the chrome inside which all authenticated screens render.
 

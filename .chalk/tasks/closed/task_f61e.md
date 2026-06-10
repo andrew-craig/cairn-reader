@@ -2,14 +2,14 @@
 id: task_f61e
 title: Web: Authentication — login/register screen, AuthContext, token refresh
 type: task
-status: in_progress
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:32:58Z
-updated_at: 2026-06-10T21:52:57Z
+updated_at: 2026-06-10T21:59:33Z
 ---
 Implement the full authentication layer: login/register UI, AuthContext, localStorage token storage, proactive + reactive refresh, and logout.
 
