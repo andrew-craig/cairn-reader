@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: []
-blocked_by: [task_f734]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:32:58Z
-updated_at: 2026-06-08T11:32:58Z
+updated_at: 2026-06-09T22:47:21Z
 ---
 Implement the full authentication layer: login/register UI, AuthContext, localStorage token storage, proactive + reactive refresh, and logout.
 

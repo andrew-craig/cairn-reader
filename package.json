@@ -1,0 +1,8 @@
+{
+  "name": "cairn-web-workspace",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/shared"
+  ]
+}

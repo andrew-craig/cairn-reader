@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_f734]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:32:47Z
-updated_at: 2026-06-08T11:32:47Z
+updated_at: 2026-06-09T22:47:21Z
 ---
 Implement the Cairn design system as CSS custom properties, matching the token values in apps/mobile/constants/theme.ts exactly.
 
