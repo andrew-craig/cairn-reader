@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AppLayout from './components/AppLayout';
 import Login from './routes/Login';
 import Read from './routes/Read';
 import ReadArticle from './routes/ReadArticle';
@@ -43,16 +44,18 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route element={<RequireAuth />}>
-            <Route path="/read" element={<Read />} />
-            <Route path="/read/:id" element={<ReadArticle />} />
-            <Route path="/explore" element={<Explore />} />
-            <Route path="/explore/:id" element={<ExploreArticle />} />
-            <Route path="/you" element={<You />} />
-            <Route path="/you/account" element={<Account />} />
-            <Route path="/you/feeds" element={<Feeds />} />
-            <Route path="/you/newsletters" element={<Newsletters />} />
-            <Route path="/you/bookmarks" element={<Bookmarks />} />
-            <Route path="/you/votes" element={<Votes />} />
+            <Route element={<AppLayout />}>
+              <Route path="/read" element={<Read />} />
+              <Route path="/read/:id" element={<ReadArticle />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/explore/:id" element={<ExploreArticle />} />
+              <Route path="/you" element={<You />} />
+              <Route path="/you/account" element={<Account />} />
+              <Route path="/you/feeds" element={<Feeds />} />
+              <Route path="/you/newsletters" element={<Newsletters />} />
+              <Route path="/you/bookmarks" element={<Bookmarks />} />
+              <Route path="/you/votes" element={<Votes />} />
+            </Route>
           </Route>
           <Route path="*" element={<RootRedirect />} />
         </Routes>

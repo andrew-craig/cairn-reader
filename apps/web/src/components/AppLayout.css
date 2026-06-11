@@ -1,0 +1,187 @@
+/* Authenticated app shell: persistent left sidebar + main content column.
+   Built on the shared design tokens (src/index.css). */
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---- Sidebar ---- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 260px;
+  padding: var(--spacing-md) var(--spacing-sm);
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-card);
+}
+
+.sidebar__brand {
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-lg);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.sidebar__nav,
+.sidebar__subnav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar__subnav {
+  margin: var(--spacing-xs) 0 var(--spacing-xs) var(--spacing-md);
+  padding-left: var(--spacing-sm);
+  border-left: 1px solid var(--color-border);
+}
+
+/* Shared row styling for nav links and the You toggle/log-out buttons so they
+   line up regardless of underlying element. */
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: 10px var(--spacing-sm);
+  margin-bottom: 2px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sidebar__item:hover {
+  background-color: var(--color-hover);
+}
+
+.sidebar__item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Active route highlight — react-router NavLink adds `.active`; the You toggle
+   sets `--active` itself since it isn't a link. */
+.sidebar__item.active,
+.sidebar__item--active {
+  background-color: var(--color-hover);
+  font-weight: 600;
+}
+
+.sidebar__item--sub {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.sidebar__item--sub.active {
+  color: var(--color-text);
+}
+
+.sidebar__chevron {
+  color: var(--color-text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.sidebar__chevron--open {
+  transform: rotate(90deg);
+}
+
+.sidebar__badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* ---- Main content ---- */
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.read-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.read-toolbar__search {
+  flex: 1;
+  min-width: 0;
+  padding: 10px var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.read-toolbar__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--spacing-sm);
+}
+
+.read-toolbar__action {
+  padding: 10px var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.read-toolbar__action:hover {
+  background-color: var(--color-hover);
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-lg);
+}
+
+/* ---- Responsive ---- */
+/* Below the desktop breakpoint the sidebar narrows to an icon-free compact rail;
+   the full responsive/collapsed treatment lands in the responsive-layout task.
+   This just guarantees the sidebar never breaks the layout at narrow widths. */
+@media (max-width: 1023px) {
+  .sidebar {
+    width: 200px;
+  }
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    width: 160px;
+  }
+
+  .read-toolbar {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .app-content {
+    padding: var(--spacing-md);
+  }
+}
