@@ -2,14 +2,14 @@
 id: task_58b2
 title: Web: App shell + sidebar navigation
 type: task
-status: in_progress
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:09Z
-updated_at: 2026-06-11T22:15:22Z
+updated_at: 2026-06-11T22:28:13Z
 ---
 Build the persistent sidebar layout that replaces mobile's bottom tab bar. This is the chrome inside which all authenticated screens render.
 
