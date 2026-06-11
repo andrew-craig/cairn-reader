@@ -1,12 +1,10 @@
-/* Minimal self-contained styling for the auth screen. The full design system
-   (shared tokens, Inter/Crimson Pro fonts, dark mode) lands in task_07ff; these
-   rules only need to make the login/register form usable and presentable. */
+/* Auth screen styling, built on the shared design tokens (src/index.css). */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 24px;
+  padding: var(--spacing-lg);
 }
 
 .login-card {
@@ -25,60 +23,63 @@
 }
 
 .login-subtitle {
-  margin: 0 0 16px;
+  margin: 0 0 var(--spacing-md);
   text-align: center;
-  color: #696563;
+  color: var(--color-text-secondary);
 }
 
 .login-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
 .login-tab {
   flex: 1;
   padding: 10px;
-  border: 1px solid #f1efee;
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   background: transparent;
-  font-size: 16px;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
   cursor: pointer;
 }
 
 .login-tab--active {
-  background: #0f0c0b;
-  color: #fdfcfc;
-  border-color: #0f0c0b;
+  background: var(--color-primary);
+  color: var(--color-background);
+  border-color: var(--color-primary);
 }
 
 .login-label {
-  font-size: 14px;
-  color: #696563;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
 .login-input {
   padding: 12px;
-  border: 1px solid #f1efee;
-  border-radius: 12px;
-  font-size: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
   min-height: 48px;
 }
 
 .login-error {
   margin: 0;
-  color: #c63e06;
-  font-size: 14px;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
 }
 
 .login-submit {
-  margin-top: 8px;
+  margin-top: var(--spacing-sm);
   padding: 14px;
   border: none;
-  border-radius: 12px;
-  background: #0f0c0b;
-  color: #fdfcfc;
-  font-size: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  color: var(--color-background);
+  font-size: var(--font-size-md);
   cursor: pointer;
 }
 
