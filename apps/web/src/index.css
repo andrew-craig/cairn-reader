@@ -70,6 +70,15 @@
   box-sizing: border-box;
 }
 
+/* Form controls don't inherit font-family from body in most browsers, so opt
+   them into the Inter body font for a consistent UI. */
+input,
+button,
+select,
+textarea {
+  font-family: inherit;
+}
+
 body {
   margin: 0;
   background-color: var(--color-background);
