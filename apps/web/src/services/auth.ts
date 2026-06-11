@@ -35,6 +35,11 @@ export class AuthService {
 
   private static async parseJsonResponse(response: Response): Promise<unknown> {
     const text = await response.text();
+    // A successful empty body (e.g. 204 No Content from changePassword) is valid;
+    // only treat unparseable non-empty bodies as a server-unreachable error.
+    if (!text) {
+      return {};
+    }
     try {
       return JSON.parse(text);
     } catch {
@@ -315,28 +320,26 @@ export class AuthService {
       throw new Error('Not authenticated');
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-        ...options.headers,
-      },
-    });
+    // Build headers via the Headers API so any valid HeadersInit (plain object,
+    // Headers instance, or entry array) from callers merges correctly. We always
+    // own Authorization; callers may still set their own Content-Type.
+    const buildHeaders = (token: string): Headers => {
+      const headers = new Headers(options.headers);
+      if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      headers.set('Authorization', `Bearer ${token}`);
+      return headers;
+    };
+
+    const response = await fetch(url, { ...options, headers: buildHeaders(accessToken) });
 
     // Reactive fallback: refresh once on 401 and retry the request.
     if (response.status === 401) {
       try {
         await this.refreshAccessToken();
         const newAccessToken = await this.getAccessToken();
-        return await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${newAccessToken}`,
-            ...options.headers,
-          },
-        });
+        return await fetch(url, { ...options, headers: buildHeaders(newAccessToken ?? '') });
       } catch {
         await this.clearTokens();
         throw new Error('Session expired. Please log in again.');

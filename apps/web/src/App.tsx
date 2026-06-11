@@ -15,7 +15,13 @@ import Votes from './routes/Votes';
 // Landing redirect: authenticated users go to their reading list, everyone else
 // to login (mirrors the mobile RootNavigator's authenticated/unauthenticated split).
 function RootRedirect() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  // Wait for the session check before redirecting, otherwise an authenticated
+  // user landing on "/" is sent to /login (isAuthenticated is false until the
+  // check resolves) and stranded there.
+  if (isLoading) {
+    return null;
+  }
   return <Navigate to={isAuthenticated ? '/read' : '/login'} replace />;
 }
 

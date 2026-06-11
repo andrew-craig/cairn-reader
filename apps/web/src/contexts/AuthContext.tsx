@@ -49,6 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Proactively refresh an expired/expiring token before trusting the session.
         const isValid = await AuthService.ensureValidToken();
         setUser(isValid ? await AuthService.getUser() : null);
+      } else {
+        // No token: ensure any prior user state is cleared (keeps re-runs idempotent).
+        setUser(null);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
