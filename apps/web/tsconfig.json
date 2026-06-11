@@ -22,8 +22,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    /* Resolve the shared workspace package to its TypeScript source */
-    "baseUrl": ".",
+    /* Resolve the shared workspace package to its TypeScript source. Path values
+       are relative to this tsconfig's directory, so no baseUrl is needed
+       (baseUrl is deprecated in TS 6 and removed in TS 7). */
     "paths": {
       "@cairn/shared": ["../shared/src/index.ts"]
     }
