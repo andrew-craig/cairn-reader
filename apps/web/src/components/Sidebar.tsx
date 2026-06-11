@@ -57,7 +57,7 @@ export default function Sidebar() {
         console.error('Error fetching vote stats:', voteResult.reason);
       }
       if (subscriptionsResult.status === 'fulfilled') {
-        const subs = subscriptionsResult.value.subscriptions;
+        const subs = subscriptionsResult.value?.subscriptions ?? [];
         next.feeds = subs.filter((s) => s.type !== 'email').length;
         next.newsletters = subs.filter((s) => s.type === 'email').length;
       } else {

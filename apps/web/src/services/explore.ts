@@ -22,9 +22,10 @@ export class ExploreService {
       throw new Error(result.message || result.error || 'Failed to get vote stats');
     }
 
-    const data: UserVotesResponse = result.data;
-    const upvotes = data.votes.filter((v) => v.vote_type === 'upvote').length;
-    const downvotes = data.votes.filter((v) => v.vote_type === 'downvote').length;
+    const data: UserVotesResponse = result?.data ?? { votes: [] };
+    const votes = Array.isArray(data.votes) ? data.votes : [];
+    const upvotes = votes.filter((v) => v.vote_type === 'upvote').length;
+    const downvotes = votes.filter((v) => v.vote_type === 'downvote').length;
     return { upvotes, downvotes };
   }
 }
