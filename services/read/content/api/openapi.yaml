@@ -929,7 +929,7 @@ components:
         author:
           type: string
           description: Article author
-        source_url:
+        original_url:
           type: string
           format: uri
           description: Original article URL
@@ -947,6 +947,18 @@ components:
           type: string
           format: date-time
           description: Publication date
+        description:
+          type: string
+          description: Short article description or summary
+        image_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Image URLs extracted from the content (lead image first)
+        source_type:
+          type: string
+          description: How the content was added (e.g. rss, manual, web)
         source_feed_id:
           type: string
           format: uuid
