@@ -23,7 +23,7 @@ export default function Read() {
   const cursorRef = useRef('');
   const hasMoreRef = useRef(true);
   const inFlightRef = useRef(false);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   // Fetch one page. reset=true starts from the first page (cursor cleared);
   // otherwise it appends the next page using the stored cursor.
@@ -57,7 +57,8 @@ export default function Read() {
   const handleRefresh = useCallback(() => {
     if (inFlightRef.current) return;
     setRefreshing(true);
-    setArticles([]); // clear, then reload from the first page
+    // Keep the current list visible; fetchPage(true) replaces it with the first
+    // page once it loads, avoiding an empty-state flash mid-refresh.
     fetchPage(true).finally(() => setRefreshing(false));
   }, [fetchPage]);
 
@@ -67,19 +68,27 @@ export default function Read() {
     fetchPage(false).finally(() => setLoadingMore(false));
   }, [fetchPage]);
 
-  // Infinite scroll: load the next page when the sentinel nears the viewport.
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) handleLoadMore();
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [handleLoadMore, loading]);
+  // Infinite scroll: a callback ref binds the IntersectionObserver as the
+  // sentinel mounts and disconnects it when it unmounts. (A plain ref + effect
+  // would miss empty→populated transitions, e.g. after a refresh or retry,
+  // since updating ref.current neither re-renders nor re-runs the effect.)
+  const sentinelRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      if (node) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) handleLoadMore();
+          },
+          { rootMargin: '200px' },
+        );
+        observer.observe(node);
+        observerRef.current = observer;
+      }
+    },
+    [handleLoadMore],
+  );
 
   const handleSelect = useCallback(
     (article: Article) => {
