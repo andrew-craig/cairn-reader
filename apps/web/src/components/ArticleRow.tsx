@@ -6,15 +6,10 @@ interface ArticleRowProps {
   onSelect: (article: Article) => void;
 }
 
-// A single reading-list entry: title, source/author, excerpt, optional lead
-// image and reading time. Mirrors mobile's ArticleRow (muted once read) while
-// adding the excerpt + reading-time the web list calls for.
+// A single reading-list entry: title, source/author, excerpt and an optional
+// lead image. Mirrors mobile's ArticleRow (muted once read) while adding the
+// excerpt the web list calls for.
 export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
-  const meta = [article.author || 'Unknown'];
-  if (article.readingTime) {
-    meta.push(`${article.readingTime} min read`);
-  }
-
   return (
     <li className="article-row">
       <button
@@ -24,7 +19,7 @@ export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
       >
         <div className="article-row__text">
           <h2 className="article-row__title">{article.title}</h2>
-          <p className="article-row__meta">{meta.join(' · ')}</p>
+          <p className="article-row__meta">{article.author || 'Unknown'}</p>
           {article.description && (
             <p className="article-row__excerpt">{article.description}</p>
           )}
