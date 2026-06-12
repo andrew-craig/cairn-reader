@@ -7,6 +7,7 @@ import {
   getServerUrl,
   type Article,
   type ListContentsParams,
+  type UpdateUserContentRequest,
   type UserContentResponse,
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
@@ -119,5 +120,76 @@ export class ReadService {
     }
 
     return result?.data;
+  }
+
+  /**
+   * Update user content metadata (status, favorite, scroll position).
+   * PATCH /api/v1/content/user/{userId}/{contentId}. Mirrors mobile.
+   */
+  static async updateUserContent(
+    contentId: string,
+    updates: UpdateUserContentRequest,
+  ): Promise<UserContentResponse> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`;
+    const response = await AuthService.fetchWithAuth(url, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to update content');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Remove content from the user's reading list.
+   * DELETE /api/v1/content/user/{userId}/{contentId}. Mirrors mobile.
+   */
+  static async deleteUserContent(contentId: string): Promise<void> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`;
+    const response = await AuthService.fetchWithAuth(url, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to delete content: ${error}`);
+    }
+  }
+
+  /**
+   * Fetch a single saved article by content id, as an Article.
+   *
+   * The Read Service exposes no protected per-user get-by-id route — the user
+   * routes are list, search, PATCH and DELETE only (see
+   * services/read/content/internal/api/router.go). So this pages through the
+   * user's list to find the matching item, which also carries the per-user
+   * metadata (status, favorite, scroll position) the reader needs. Used only
+   * as a fallback when the reader is opened without navigation state (direct
+   * URL / hard refresh).
+   */
+  static async getUserContent(contentId: string): Promise<Article> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.listUserContents({ limit: PAGE_SIZE, cursor });
+      const match = page.contents.find((c) => c.content_id === contentId);
+      if (match) {
+        return this.transformToArticle(match);
+      }
+      cursor = page.has_more ? page.cursor : undefined;
+    } while (cursor);
+
+    throw new Error('Article not found');
   }
 }
