@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_6305]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:41Z
-updated_at: 2026-06-08T11:33:41Z
+updated_at: 2026-06-12T13:08:32Z
 ---
 Implement the search modal/overlay for searching saved content.
 
