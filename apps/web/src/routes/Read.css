@@ -1,0 +1,62 @@
+/* Reading-list screen. Built on the shared design tokens (src/index.css). */
+
+.read {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.read__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+}
+
+.read__title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.read__refresh {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.read__refresh:hover:not(:disabled) {
+  background-color: var(--color-hover);
+}
+
+.read__refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.read__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.read__sentinel {
+  height: 1px;
+}
+
+.read__status {
+  padding: var(--spacing-lg) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  text-align: center;
+}
+
+.read__error {
+  margin: 0 0 var(--spacing-md);
+  color: var(--color-error);
+}

@@ -1,11 +1,13 @@
 // Web Read service. Ports the subset of apps/mobile/src/services/read.ts needed
-// so far — the count queries the sidebar's You section reads (bookmarks total and
-// subscription split). Built on AuthService.fetchWithAuth (proactive refresh +
-// 401 retry), mirroring mobile. Later tasks extend this with the full reading-list,
-// search, and add-link methods.
+// so far — the reading list (listUserContents + transformToArticle) and the
+// sidebar You-section counts (bookmarks total and subscription split). Built on
+// AuthService.fetchWithAuth (proactive refresh + 401 retry), mirroring mobile.
+// Later tasks extend this with search and add-link methods.
 import {
   getServerUrl,
+  type Article,
   type ListContentsParams,
+  type UserContentResponse,
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
 } from '@cairn/shared';
@@ -13,7 +15,55 @@ import { AuthService } from './auth';
 
 const PAGE_SIZE_DEFAULT = 20;
 
+/** Reading-list page size, mirroring mobile's PAGE_SIZE. */
+export const PAGE_SIZE = 20;
+
 export class ReadService {
+  /**
+   * Transform a backend UserContentResponse into the UI Article shape.
+   * Mirrors apps/mobile/src/services/read.ts. Reading time is intentionally
+   * omitted: the backend does not compute word_count (see task to add reading
+   * time across backend + apps), so it would never populate here.
+   */
+  static transformToArticle(userContent: UserContentResponse): Article {
+    const content = userContent.content;
+
+    if (!content) {
+      // Fallback when the list response omits the nested content.
+      return {
+        id: userContent.content_id,
+        url: '',
+        title: 'Unknown Article',
+        description: '',
+        tags: [],
+        isRead: userContent.status === 'completed',
+        isFavorite: userContent.is_favorite,
+        addedAt: new Date(userContent.added_at).getTime(),
+        scrollPosition: userContent.scroll_position || undefined,
+      };
+    }
+
+    return {
+      id: content.id,
+      url: content.original_url,
+      title: content.title,
+      description: content.description || content.excerpt,
+      content: content.cleaned_html,
+      imageUrl: content.lead_image_url,
+      author: content.author || content.site_name,
+      publishedDate: content.published_at,
+      tags: [],
+      isRead: userContent.status === 'completed',
+      isFavorite: userContent.is_favorite,
+      addedAt: new Date(userContent.added_at).getTime(),
+      readAt:
+        userContent.status === 'completed'
+          ? new Date(userContent.updated_at).getTime()
+          : undefined,
+      scrollPosition: userContent.scroll_position || undefined,
+    };
+  }
+
   /** List the current user's saved content (cursor-paginated). */
   static async listUserContents(
     params?: ListContentsParams,
