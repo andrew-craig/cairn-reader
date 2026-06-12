@@ -72,6 +72,10 @@ export default function Read() {
   // sentinel mounts and disconnects it when it unmounts. (A plain ref + effect
   // would miss empty→populated transitions, e.g. after a refresh or retry,
   // since updating ref.current neither re-renders nor re-runs the effect.)
+  // `articles` is a dep so each page append rebinds the observer: a fresh
+  // observer reports the current intersection state, re-arming the check when
+  // the sentinel stays visible (short content / tall viewport) — IO otherwise
+  // only fires on intersection *changes*, which would stall the scroll.
   const sentinelRef = useCallback(
     (node: HTMLDivElement | null) => {
       observerRef.current?.disconnect();
@@ -87,7 +91,10 @@ export default function Read() {
         observerRef.current = observer;
       }
     },
-    [handleLoadMore],
+    // `articles` is intentional even though the body doesn't read it: changing it
+    // must rebind the observer (see comment above). eslint can't see that intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [handleLoadMore, articles],
   );
 
   const handleSelect = useCallback(
