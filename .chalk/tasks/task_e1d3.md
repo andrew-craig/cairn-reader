@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: [task_58b2]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:42Z
-updated_at: 2026-06-08T11:34:42Z
+updated_at: 2026-06-11T22:28:13Z
 ---
 Make the app usable at tablet (≥768px) and mobile (<768px) widths, where the sidebar collapses.
 

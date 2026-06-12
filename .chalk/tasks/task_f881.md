@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 3
 labels: []
-blocked_by: [task_58b2]
+blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:53Z
-updated_at: 2026-06-08T11:34:53Z
+updated_at: 2026-06-11T22:28:13Z
 ---
 Ensure the web app meets baseline accessibility requirements: keyboard navigability, visible focus states, semantic HTML, and screen-reader compatibility.
 
