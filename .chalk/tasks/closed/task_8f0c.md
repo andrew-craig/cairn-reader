@@ -2,14 +2,14 @@
 id: task_8f0c
 title: Web: Add link modal (FR-3) — URL detection, feed discovery, save
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:50Z
-updated_at: 2026-06-12T13:08:32Z
+updated_at: 2026-06-13T12:24:10Z
 ---
 Implement the Add Link modal: URL input with type detection and save, reusing mobile's AddLinkModal flow.
 

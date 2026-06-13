@@ -6,7 +6,12 @@
 import {
   getServerUrl,
   type Article,
+  type AddURLRequest,
+  type AddURLResponse,
+  type DetectURLResponse,
+  type DiscoverFeedResponse,
   type ListContentsParams,
+  type SearchParams,
   type UpdateUserContentRequest,
   type UserContentResponse,
   type UserContentsListResponse,
@@ -104,6 +109,40 @@ export class ReadService {
     };
   }
 
+  /** Search the current user's saved content. Mirrors mobile's searchUserContents. */
+  static async searchUserContents(
+    params: SearchParams,
+  ): Promise<UserContentsListResponse> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.append('q', params.q);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
+
+    const response = await AuthService.fetchWithAuth(url);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to search contents');
+    }
+
+    const contents = Array.isArray(result.data) ? result.data : [];
+    const pagination = result.pagination || {};
+    return {
+      contents,
+      total_count: pagination.total || 0,
+      limit: pagination.limit || params.limit || PAGE_SIZE_DEFAULT,
+      cursor: pagination.cursor || '',
+      has_more: pagination.has_more === true,
+    };
+  }
+
   /** List all subscriptions across sources (RSS, social, email). */
   static async listAllSubscriptions(): Promise<UnifiedSubscriptionsResponse> {
     const userId = await AuthService.getUserId();
@@ -166,6 +205,80 @@ export class ReadService {
       const error = await response.text();
       throw new Error(`Failed to delete content: ${error}`);
     }
+  }
+
+  /**
+   * Detect whether a URL is a feed or page. Non-authenticated; 10 s timeout.
+   * On timeout or network error returns { url, type: 'unknown', title: null }
+   * matching mobile behavior.
+   */
+  static async detectURL(url: string): Promise<DetectURLResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(`${getServerUrl()}/api/v1/content/detect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Detection failed');
+      }
+      return result.data as DetectURLResponse;
+    } catch {
+      clearTimeout(timeoutId);
+      return { url, type: 'unknown', title: null };
+    }
+  }
+
+  /**
+   * Discover RSS/Atom feeds associated with a URL. Non-authenticated; 15 s timeout.
+   * On error/timeout returns { feeds: [] } matching mobile behavior.
+   */
+  static async discoverFeed(url: string): Promise<DiscoverFeedResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(`${getServerUrl()}/api/v1/content/discover-feed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const result = await response.json();
+      if (!response.ok) {
+        return { feeds: [] };
+      }
+      return (result.data as DiscoverFeedResponse) ?? { feeds: [] };
+    } catch {
+      clearTimeout(timeoutId);
+      return { feeds: [] };
+    }
+  }
+
+  /**
+   * Add a URL (page or feed) to the current user's reading list / subscriptions.
+   * POST /api/v1/content/user/{userId}. Mirrors mobile.
+   */
+  static async addURL(request: AddURLRequest): Promise<AddURLResponse> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}`;
+    const response = await AuthService.fetchWithAuth(url, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to add URL');
+    }
+    return result.data as AddURLResponse;
   }
 
   /**

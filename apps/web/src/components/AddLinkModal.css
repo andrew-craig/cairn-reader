@@ -1,0 +1,163 @@
+/* AddLinkModal — web equivalent of the mobile AddLinkModal. Built on shared
+   design tokens (src/index.css). */
+
+/* Full-viewport overlay stacked above all content */
+.add-link-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+
+/* Semi-transparent backdrop sits behind the modal card */
+.add-link-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Modal card */
+.add-link-modal {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.add-link-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+}
+
+/* URL input */
+.add-link-modal__input {
+  width: 100%;
+  padding: 12px var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  min-height: 48px;
+}
+
+.add-link-modal__input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+.add-link-modal__input--error {
+  border-color: var(--color-error);
+}
+
+.add-link-modal__error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+/* Multiple-feed picker */
+.add-link-modal__feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.add-link-modal__feed-item {
+  display: block;
+  width: 100%;
+  padding: 10px var(--spacing-md);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-link-modal__feed-item:last-child {
+  border-bottom: none;
+}
+
+.add-link-modal__feed-item:hover {
+  background-color: var(--color-hover);
+}
+
+/* Action buttons row */
+.add-link-modal__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.add-link-modal__btn {
+  flex: 1;
+  padding: 12px var(--spacing-md);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.add-link-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.add-link-modal__btn--primary {
+  border: none;
+  background-color: var(--color-primary);
+  color: var(--color-background);
+}
+
+.add-link-modal__btn--primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.add-link-modal__btn--secondary {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.add-link-modal__btn--secondary:hover:not(:disabled) {
+  background-color: var(--color-hover);
+}
+
+.add-link-modal__btn--cancel {
+  border: 1px solid var(--color-border);
+  background-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.add-link-modal__btn--cancel:hover:not(:disabled) {
+  background-color: var(--color-hover);
+}
+
+@media (max-width: 520px) {
+  .add-link-overlay {
+    padding-top: var(--spacing-xl);
+    align-items: flex-start;
+  }
+
+  .add-link-modal {
+    margin: 0 var(--spacing-sm);
+  }
+
+  .add-link-modal__actions {
+    flex-direction: column;
+  }
+}
