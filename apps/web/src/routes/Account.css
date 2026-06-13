@@ -1,0 +1,84 @@
+/* Account screen styling — mirrors Login.css conventions. */
+.account-page {
+  padding: var(--spacing-lg);
+  max-width: 480px;
+}
+
+.account-email {
+  margin: 0 0 var(--spacing-lg);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+}
+
+.account-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-section-title {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.account-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.account-input {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  min-height: 48px;
+}
+
+.account-error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+}
+
+.account-success {
+  margin: 0;
+  color: var(--color-success, #22863a);
+  font-size: var(--font-size-sm);
+}
+
+.account-btn {
+  padding: 12px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  text-align: left;
+  min-height: 48px;
+}
+
+.account-btn--primary {
+  background: var(--color-primary);
+  color: var(--color-background);
+  border-color: var(--color-primary);
+}
+
+.account-btn--danger {
+  color: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.account-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.account-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--spacing-lg) 0;
+}

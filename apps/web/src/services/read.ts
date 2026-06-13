@@ -282,6 +282,49 @@ export class ReadService {
   }
 
   /**
+   * Unsubscribe the current user from an RSS feed.
+   * DELETE /api/v1/content/user/{userId}/subscriptions/rss/{feedId}.
+   * Ported from apps/mobile/src/services/read.ts. Existing articles in the
+   * reading list are preserved; only future deliveries are stopped.
+   */
+  static async unsubscribeFromRSSFeed(feedId: string): Promise<void> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions/rss/${feedId}`;
+    const response = await AuthService.fetchWithAuth(url, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.message || result.error || 'Failed to unsubscribe');
+    }
+  }
+
+  /**
+   * Get or create the current user's newsletter ingest email address.
+   * POST /api/v1/source/email/user/{userId}/address (idempotent — returns the
+   * same address on repeated calls). Ported from mobile.
+   */
+  static async getOrCreateEmailAddress(): Promise<string> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/source/email/user/${userId}/address`;
+    const response = await AuthService.fetchWithAuth(url, { method: 'POST' });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to get email address');
+    }
+
+    return result.data.email_address as string;
+  }
+
+  /**
    * Fetch a single saved article by content id, as an Article.
    *
    * The Read Service exposes no protected per-user get-by-id route — the user

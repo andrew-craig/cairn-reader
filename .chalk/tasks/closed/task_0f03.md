@@ -2,14 +2,14 @@
 id: task_0f03
 title: Web: Account screen (FR-11) — profile, change password, logout
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:09Z
-updated_at: 2026-06-11T22:28:13Z
+updated_at: 2026-06-13T22:19:04Z
 ---
 Implement /you/account: the user's profile screen.
 

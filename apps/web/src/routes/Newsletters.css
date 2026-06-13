@@ -1,0 +1,121 @@
+/* Shared styles for the Feeds and Newsletters list items. */
+
+.feeds__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feeds__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.feeds__item:last-child {
+  border-bottom: none;
+}
+
+.feeds__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.feeds__title {
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feeds__url {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feeds__unsubscribe {
+  flex-shrink: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-error, #c0392b);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.feeds__unsubscribe:hover:not(:disabled) {
+  background-color: var(--color-hover);
+}
+
+.feeds__unsubscribe:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Newsletters address card */
+
+.newsletters__address-card {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+}
+
+.newsletters__label {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.newsletters__address-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.newsletters__address {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.newsletters__copy {
+  flex-shrink: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 64px;
+  text-align: center;
+}
+
+.newsletters__copy:hover {
+  background-color: var(--color-hover);
+}
+
+.newsletters__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
