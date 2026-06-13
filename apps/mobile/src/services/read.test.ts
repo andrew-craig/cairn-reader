@@ -20,9 +20,8 @@ describe('ReadService.transformToArticle', () => {
       author: 'John Doe',
       published_at: '2025-01-10T08:00:00Z',
       description: 'A test description',
-      excerpt: 'A test excerpt',
-      site_name: 'Example',
-      lead_image_url: 'https://example.com/image.jpg',
+      image_urls: ['https://example.com/image.jpg'],
+      source_type: 'rss',
       word_count: 1000,
       created_at: '2025-01-15T09:00:00Z',
       updated_at: '2025-01-15T09:00:00Z',
@@ -81,7 +80,7 @@ describe('ReadService.transformToArticle', () => {
     expect(article.addedAt).toBe(new Date('2025-01-15T10:00:00Z').getTime());
   });
 
-  it('uses description, falls back to excerpt', () => {
+  it('maps description from content.description', () => {
     const article = ReadService.transformToArticle(baseUserContent);
     expect(article.description).toBe('A test description');
 
@@ -89,17 +88,29 @@ describe('ReadService.transformToArticle', () => {
       ...baseUserContent,
       content: { ...baseUserContent.content!, description: undefined },
     };
-    const fallback = ReadService.transformToArticle(noDesc);
-    expect(fallback.description).toBe('A test excerpt');
+    const missing = ReadService.transformToArticle(noDesc);
+    expect(missing.description).toBeUndefined();
   });
 
-  it('uses author, falls back to site_name', () => {
+  it('maps imageUrl from the first image_urls entry', () => {
+    const article = ReadService.transformToArticle(baseUserContent);
+    expect(article.imageUrl).toBe('https://example.com/image.jpg');
+
+    const noImages = {
+      ...baseUserContent,
+      content: { ...baseUserContent.content!, image_urls: undefined },
+    };
+    const missing = ReadService.transformToArticle(noImages);
+    expect(missing.imageUrl).toBeUndefined();
+  });
+
+  it('leaves author undefined when content.author is absent', () => {
     const noAuthor = {
       ...baseUserContent,
       content: { ...baseUserContent.content!, author: undefined },
     };
     const article = ReadService.transformToArticle(noAuthor);
-    expect(article.author).toBe('Example');
+    expect(article.author).toBeUndefined();
   });
 
   it('handles missing content (fallback path)', () => {

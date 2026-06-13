@@ -2,14 +2,14 @@
 id: task_e0f7
 title: Web: Article reader (FR-4) — sanitized HTML, scroll persistence, reader actions
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:33Z
-updated_at: 2026-06-12T13:08:32Z
+updated_at: 2026-06-12T22:24:55Z
 ---
 Implement /read/:id: the full article reader with sanitized HTML rendering, scroll persistence, and all reader actions.
 

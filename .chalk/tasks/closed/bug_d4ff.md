@@ -2,14 +2,14 @@
 id: bug_d4ff
 title: Reconcile ContentResponse type/transform drift with backend (image_urls, source_type)
 type: bug
-status: open
+status: closed
 priority: 2
 labels: [read-service,web,mobile,shared]
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-12T13:46:30Z
-updated_at: 2026-06-12T13:46:30Z
+updated_at: 2026-06-12T22:16:18Z
 ---
 The frontend ContentResponse type and the transformToArticle mappings don't match what the Read/Content service actually returns, so several mapped fields are permanently inert — most visibly, lead images never render in the reading list.
 

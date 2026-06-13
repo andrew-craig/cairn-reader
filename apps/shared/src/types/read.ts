@@ -11,10 +11,8 @@ interface ContentResponse {
   author?: string;
   published_at?: string;
   description?: string;
-  excerpt?: string;
-  site_name?: string;
-  favicon_url?: string;
-  lead_image_url?: string;
+  image_urls?: string[];
+  source_type: string;
   word_count?: number;
   created_at: string;
   updated_at: string;
