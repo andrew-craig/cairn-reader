@@ -40,28 +40,14 @@ function ExploreCard({
   const isUp = voteState.vote === 'upvote';
   const isDown = voteState.vote === 'downvote';
 
-  const handleUpvote = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isUp) {
-      onRemoveVote(article.id);
-    } else {
-      onVote(article.id, 'upvote');
-    }
-  };
-
-  const handleDownvote = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isDown) {
-      onRemoveVote(article.id);
-    } else {
-      onVote(article.id, 'downvote');
-    }
-  };
+  const handleUpvote = () => (isUp ? onRemoveVote(article.id) : onVote(article.id, 'upvote'));
+  const handleDownvote = () =>
+    isDown ? onRemoveVote(article.id) : onVote(article.id, 'downvote');
 
   return (
     <li className="explore-card" ref={(node) => observeRef(article.id, node)}>
-      {/* The card body is the click-target for navigation; vote buttons sit
-          inside it but stop propagation so they don't also trigger navigation. */}
+      {/* The card body is the navigation click-target. Vote controls are
+          siblings (not nested) so we don't put a <button> inside a <button>. */}
       <button
         type="button"
         className="explore-card__button"
@@ -73,26 +59,6 @@ function ExploreCard({
           {article.description && (
             <p className="explore-card__excerpt">{article.description}</p>
           )}
-          <div className="explore-card__votes">
-            <button
-              type="button"
-              className={`explore-card__vote-btn${isUp ? ' explore-card__vote-btn--active-up' : ''}`}
-              onClick={handleUpvote}
-              aria-pressed={isUp}
-              aria-label="Upvote"
-            >
-              ▲ Up
-            </button>
-            <button
-              type="button"
-              className={`explore-card__vote-btn${isDown ? ' explore-card__vote-btn--active-down' : ''}`}
-              onClick={handleDownvote}
-              aria-pressed={isDown}
-              aria-label="Downvote"
-            >
-              ▼ Down
-            </button>
-          </div>
         </div>
         {article.imageUrl && (
           <div className="explore-card__image-frame">
@@ -105,6 +71,26 @@ function ExploreCard({
           </div>
         )}
       </button>
+      <div className="explore-card__votes">
+        <button
+          type="button"
+          className={`explore-card__vote-btn${isUp ? ' explore-card__vote-btn--active-up' : ''}`}
+          onClick={handleUpvote}
+          aria-pressed={isUp}
+          aria-label="Upvote"
+        >
+          ▲ Up
+        </button>
+        <button
+          type="button"
+          className={`explore-card__vote-btn${isDown ? ' explore-card__vote-btn--active-down' : ''}`}
+          onClick={handleDownvote}
+          aria-pressed={isDown}
+          aria-label="Downvote"
+        >
+          ▼ Down
+        </button>
+      </div>
     </li>
   );
 }

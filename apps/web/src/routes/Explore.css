@@ -65,6 +65,7 @@
 
 .explore-card {
   list-style: none;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .explore-card__button {
@@ -72,9 +73,8 @@
   align-items: flex-start;
   gap: var(--spacing-lg);
   width: 100%;
-  padding: var(--spacing-lg) 0;
+  padding: var(--spacing-lg) 0 0;
   border: none;
-  border-bottom: 1px solid var(--color-border);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -142,12 +142,13 @@
   object-fit: cover;
 }
 
-/* Vote controls sit below the card text, separated from the click target. */
+/* Vote controls sit below the card body, outside the navigation click target. */
 .explore-card__votes {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  margin-top: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+  padding-bottom: var(--spacing-lg);
 }
 
 .explore-card__vote-btn {
