@@ -6,11 +6,16 @@ import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import './ReadArticle.css';
 
-// Navigation state passed from the Explore feed. The single article is always
-// present; articles/index allow the reader to offer "next" without a refetch.
+// An explore article in the reader may carry the user's existing vote when it
+// arrives from the Votes screen (a VotedArticleWithType); the Explore feed
+// passes a plain Article (voteType undefined).
+type ReaderArticle = Article & { voteType?: 'upvote' | 'downvote' };
+
+// Navigation state passed from the Explore feed or the Votes screen. The single
+// article is always present; articles/index allow the reader to offer "next".
 interface ExploreNavState {
-  article?: Article;
-  articles?: Article[];
+  article?: ReaderArticle;
+  articles?: ReaderArticle[];
   index?: number;
 }
 
@@ -41,11 +46,14 @@ export default function ExploreArticle() {
   const index = navState?.index ?? -1;
   const hasList = Array.isArray(articles) && index >= 0;
 
-  const [article, setArticle] = useState<Article | undefined>(initialArticle);
+  const [article, setArticle] = useState<ReaderArticle | undefined>(initialArticle);
 
-  // Vote state: seeded to null (unknown) — we don't prefetch vote status from
-  // the feed. On first vote interaction the optimistic update takes over.
-  const [vote, setVote] = useState<'upvote' | 'downvote' | null>(null);
+  // Vote state: seeded from the article's voteType when it arrives from the
+  // Votes screen, otherwise null (the Explore feed doesn't prefetch vote status).
+  // Optimistic updates take over on the first vote interaction.
+  const [vote, setVote] = useState<'upvote' | 'downvote' | null>(
+    initialArticle?.voteType ?? null,
+  );
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -56,12 +64,15 @@ export default function ExploreArticle() {
 
   const hasNext = hasList && index + 1 < (articles?.length ?? 0);
 
-  // Reset per-article UI state whenever the displayed article changes.
+  // Reset per-article UI state whenever the displayed article changes. isSaving
+  // is reset too so a save left in flight during a "next" navigation doesn't
+  // strand the new article's button in the "Saving…" state.
   useEffect(() => {
     if (!article) return;
     articleIdRef.current = article.id;
-    setVote(null);
+    setVote(article.voteType ?? null);
     setIsSaved(false);
+    setIsSaving(false);
     setSaveError(null);
   }, [article]);
 
@@ -114,23 +125,28 @@ export default function ExploreArticle() {
   );
 
   // Save to reading list via ReadService.addURL. One-way (no unsave here).
+  // State writes are guarded by the article id captured at call time so a save
+  // that resolves after a "next" navigation can't mark a different article saved.
   const handleSave = useCallback(async () => {
     if (!article || isSaving || isSaved) return;
+    const targetId = article.id;
     setIsSaving(true);
     setSaveError(null);
     try {
       await ReadService.addURL({ url: article.url });
-      setIsSaved(true);
+      if (articleIdRef.current === targetId) setIsSaved(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save article.';
-      // 409 Conflict means it was already saved — reflect that.
-      if (msg.includes('409') || msg.toLowerCase().includes('already')) {
-        setIsSaved(true);
-      } else {
-        setSaveError(msg);
+      if (articleIdRef.current === targetId) {
+        // 409 Conflict means it was already saved — reflect that.
+        if (msg.includes('409') || msg.toLowerCase().includes('already')) {
+          setIsSaved(true);
+        } else {
+          setSaveError(msg);
+        }
       }
     } finally {
-      setIsSaving(false);
+      if (articleIdRef.current === targetId) setIsSaving(false);
     }
   }, [article, isSaving, isSaved]);
 
