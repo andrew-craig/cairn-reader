@@ -22,9 +22,8 @@ export const PAGE_SIZE = 20;
 export class ReadService {
   /**
    * Transform a backend UserContentResponse into the UI Article shape.
-   * Mirrors apps/mobile/src/services/read.ts. Reading time is intentionally
-   * omitted: the backend does not compute word_count (see task to add reading
-   * time across backend + apps), so it would never populate here.
+   * Mirrors apps/mobile/src/services/read.ts, including the reading-time
+   * estimate from word_count (undefined until the backend emits word_count).
    */
   static transformToArticle(userContent: UserContentResponse): Article {
     const content = userContent.content;
@@ -53,6 +52,7 @@ export class ReadService {
       imageUrl: content.image_urls?.[0],
       author: content.author,
       publishedDate: content.published_at,
+      readingTime: content.word_count ? Math.ceil(content.word_count / 200) : undefined,
       tags: [],
       isRead: userContent.status === 'completed',
       isFavorite: userContent.is_favorite,

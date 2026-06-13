@@ -29,4 +29,10 @@ describe('sanitizeArticleHtml', () => {
     expect(clean).toContain('target="_blank"');
     expect(clean).toContain('rel="noopener noreferrer"');
   });
+
+  it('leaves in-page anchor links untouched', () => {
+    const clean = sanitizeArticleHtml('<a href="#footnote-1">jump</a>');
+    expect(clean).toContain('href="#footnote-1"');
+    expect(clean).not.toContain('target="_blank"');
+  });
 });

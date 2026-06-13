@@ -117,10 +117,10 @@ export default function ReadArticle() {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !article) return;
+    // Always set scrollTop (0 for unread/new articles) so navigating to an
+    // article doesn't inherit the previous one's scroll position.
     const fraction = article.scrollPosition ?? 0;
-    if (fraction > 0) {
-      el.scrollTop = fraction * (el.scrollHeight - el.clientHeight);
-    }
+    el.scrollTop = fraction * (el.scrollHeight - el.clientHeight);
   }, [sanitizedHtml, article]);
 
   const markCompleted = useCallback((contentId: string) => {
@@ -149,7 +149,13 @@ export default function ReadArticle() {
     saveTimerRef.current = setTimeout(() => {
       ReadService.updateUserContent(articleId, {
         scroll_position: scrollFractionRef.current,
-      }).catch((err) => console.error('Failed to save scroll position:', err));
+      })
+        // Clear the dirty flag so the unmount/switch cleanup doesn't re-send the
+        // same position; a later scroll sets it true again.
+        .then(() => {
+          hasScrolledRef.current = false;
+        })
+        .catch((err) => console.error('Failed to save scroll position:', err));
     }, SCROLL_SAVE_DEBOUNCE_MS);
   }, [articleId, markCompleted]);
 
@@ -173,9 +179,11 @@ export default function ReadArticle() {
         state: { articles, index: targetIndex },
         replace: true,
       });
-      // Swap the displayed article in place (route stays on the reader).
+      // Swap the displayed article in place (route stays on the reader). The
+      // scroll-restore effect resets scrollTop for the new article; scrolling
+      // here synchronously would fire handleScroll against the old article id
+      // and flush a 0 scroll position, wiping its saved progress.
       setArticle(target);
-      scrollRef.current?.scrollTo({ top: 0 });
     },
     [articles, navigate],
   );

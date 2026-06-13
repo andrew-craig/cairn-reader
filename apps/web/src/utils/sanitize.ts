@@ -4,7 +4,10 @@ import DOMPurify from 'dompurify';
 // sanitized article can't reach back into the opener (reverse-tabnabbing) or
 // leak a referrer. Registered once at module load; DOMPurify hooks are global.
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-  if (node.tagName === 'A' && node.getAttribute('href')) {
+  // Skip in-page anchors (#footnote, TOC links): forcing target=_blank on them
+  // would open a blank new tab instead of scrolling to the target element.
+  const href = node.getAttribute('href');
+  if (node.tagName === 'A' && href && !href.startsWith('#')) {
     node.setAttribute('target', '_blank');
     node.setAttribute('rel', 'noopener noreferrer');
   }
