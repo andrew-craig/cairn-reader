@@ -50,6 +50,13 @@ export default function ReadArticle() {
   const [loading, setLoading] = useState(!initialArticle);
   const [error, setError] = useState<string | null>(null);
 
+  // Mutable UI state tracked separately from the article object so async updates
+  // are scoped to the displayed article. Seeded from the article and resynced
+  // when the displayed article changes (see effect below). Completion (isRead)
+  // is tracked via hasMarkedCompletedRef rather than state because nothing
+  // renders it — only the favorite toggle is reflected in the toolbar.
+  const [isFavorite, setIsFavorite] = useState(initialArticle?.isFavorite ?? false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll fraction in [0,1] — offsetY / contentHeight, matching mobile and the
   // backend's NUMERIC(5,4) scroll_position column (commit c67a17d).
@@ -57,6 +64,9 @@ export default function ReadArticle() {
   const hasScrolledRef = useRef(false);
   const hasMarkedCompletedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the currently displayed article id so async callbacks can detect a
+  // swap (prev/next) and avoid mutating UI state for a different article.
+  const articleIdRef = useRef<string | undefined>(initialArticle?.id);
 
   const prevIndex = hasList ? index - 1 : -1;
   const nextIndex = hasList ? index + 1 : -1;
@@ -87,13 +97,16 @@ export default function ReadArticle() {
     };
   }, [id, initialArticle]);
 
-  // Reset per-article progress refs and seed them from the article's saved state
-  // whenever the displayed article changes (open, prev/next, or fetch resolve).
+  // Reset per-article progress refs and seed the mutable UI state from the
+  // article's saved state whenever the displayed article changes (open,
+  // prev/next, or fetch resolve).
   useEffect(() => {
     if (!article) return;
+    articleIdRef.current = article.id;
     scrollFractionRef.current = article.scrollPosition ?? 0;
     hasScrolledRef.current = false;
     hasMarkedCompletedRef.current = article.isRead;
+    setIsFavorite(article.isFavorite);
   }, [article]);
 
   // On open, mark as reading if not already read. Mirrors mobile.
@@ -129,7 +142,6 @@ export default function ReadArticle() {
     ReadService.updateUserContent(contentId, { status: 'completed' }).catch((err) =>
       console.error('Failed to mark article completed:', err),
     );
-    setArticle((prev) => (prev ? { ...prev, isRead: true } : prev));
   }, []);
 
   const handleScroll = useCallback(() => {
@@ -190,16 +202,18 @@ export default function ReadArticle() {
 
   const handleToggleFavorite = useCallback(() => {
     if (!article) return;
-    const newIsFavorite = !article.isFavorite;
-    setArticle({ ...article, isFavorite: newIsFavorite });
-    ReadService.updateUserContent(article.id, { is_favorite: newIsFavorite }).catch(
+    const targetId = article.id;
+    const newIsFavorite = !isFavorite;
+    setIsFavorite(newIsFavorite);
+    ReadService.updateUserContent(targetId, { is_favorite: newIsFavorite }).catch(
       (err) => {
         console.error('Failed to toggle favorite:', err);
-        // Roll back the optimistic icon update on failure.
-        setArticle((prev) => (prev ? { ...prev, isFavorite: !newIsFavorite } : prev));
+        // Roll back the optimistic icon update on failure, but only if the same
+        // article is still displayed — otherwise we'd flip the wrong article.
+        if (articleIdRef.current === targetId) setIsFavorite(!newIsFavorite);
       },
     );
-  }, [article]);
+  }, [article, isFavorite]);
 
   const handleArchive = useCallback(async () => {
     if (!article) return;
@@ -268,11 +282,11 @@ export default function ReadArticle() {
           </button>
           <button
             type="button"
-            className={`reader__action${article.isFavorite ? ' reader__action--active' : ''}`}
+            className={`reader__action${isFavorite ? ' reader__action--active' : ''}`}
             onClick={handleToggleFavorite}
-            aria-pressed={article.isFavorite}
+            aria-pressed={isFavorite}
           >
-            {article.isFavorite ? '★ Favorited' : '☆ Favorite'}
+            {isFavorite ? '★ Favorited' : '☆ Favorite'}
           </button>
           <button type="button" className="reader__action" onClick={handleArchive}>
             Archive

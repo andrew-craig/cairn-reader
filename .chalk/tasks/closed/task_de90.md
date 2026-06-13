@@ -2,14 +2,14 @@
 id: task_de90
 title: Reader screens: track mutable UI state (favorite/read) in dedicated state, not the article object
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-13T01:37:28Z
-updated_at: 2026-06-13T01:37:28Z
+updated_at: 2026-06-13T03:41:33Z
 ---
 
 
@@ -30,3 +30,22 @@ VERIFICATION:
 - Type-check, lint, build pass on both apps.
 - Favoriting article A then quickly navigating to B does not flip B's favorite state.
 - Existing reader behavior (scroll persistence, status transitions, prev/next) unchanged.
+
+REVIEW:
+Implemented across both reader screens, kept consistent.
+- Web (apps/web/src/routes/ReadArticle.tsx): isFavorite moved to dedicated useState, seeded
+  from the article and reseeded in the [article] resync effect; articleIdRef guards the
+  optimistic-favorite rollback; removed the setArticle isRead mutation (isRead tracked via
+  hasMarkedCompletedRef, not rendered). article state retained for in-place prev/next swap.
+- Mobile (apps/mobile/src/screens/ReadArticleDetailScreen.tsx): dropped setArticle entirely —
+  article read straight from route.params (next-article uses navigation.replace, line 105);
+  isFavorite in dedicated useState; articleIdRef + [article] resync effect mirror web; rollback
+  gated on articleIdRef.current === targetId. isRead/readAt only used in refs/persistence,
+  never rendered, so safe to drop from state.
+- Platform divergence is intentional: web swaps in place (keeps article state) vs mobile
+  remounts via replace (reads params). Both carry the resync effect + id-guard.
+
+VERIFIED (independently re-run):
+- web: tsc --noEmit clean; vite build ok; vitest 5/5.
+- mobile: tsc --noEmit clean; jest 8 suites / 77 tests pass.
+- lint: only pre-existing warnings in unrelated files; none in the touched files.
