@@ -89,3 +89,6 @@ services/read/email/email_ingest_worker
 
 # Dolt database runtime files
 .beads/
+
+# Chalk auto-generated files
+.chalk/task_list.md
