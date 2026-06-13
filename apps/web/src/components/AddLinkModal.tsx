@@ -13,8 +13,10 @@ function isValidUrl(urlString: string): boolean {
   if (!trimmed) return false;
   const urlToTest = /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
-    new URL(urlToTest);
-    return true;
+    const parsed = new URL(urlToTest);
+    // Reject single-label hosts (e.g. "not-a-url", "asdf") that have no TLD —
+    // they pass URL parsing but will never resolve publicly.
+    return parsed.hostname.includes('.');
   } catch {
     return false;
   }
@@ -98,7 +100,7 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
         // Feed subscription confirmed by the refreshed /you/feeds count
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message : '';
       if (msg.includes('already subscribed')) {
         setError('Already subscribed to this feed');
       } else if (msg.includes('Failed to subscribe')) {
@@ -106,7 +108,9 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
       } else if (msg.includes('Failed to add')) {
         setError('Failed to add article');
       } else {
-        setError(msg);
+        // Don't surface raw backend errors (e.g. Go dial/DNS messages) to the user.
+        console.error('Add link failed:', err);
+        setError("Couldn't add that link — check the URL and try again.");
       }
     } finally {
       setLoading(false);

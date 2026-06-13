@@ -7,7 +7,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
-- **task_0f03** · P2 · open · Web: Account screen (FR-11) — profile, change password, logout  (parent: epic_f54e)
 - **task_1d08** · P2 · open · Audit 6: Infrastructure reliability & scaling  (parent: epic_9c21)
 - **task_1eaa** · P2 · open · Audit 3: Mobile client/server efficiency  (parent: epic_9c21)
 - **task_5860** · P2 · open · Web: Migrate apps/mobile onto @cairn/shared (converge shared code)  (parent: epic_f54e)
@@ -40,7 +39,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4afd** · P3 · open · Review and harden OptionalAuth middleware behavior
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
-- **task_6010** · P3 · open · Web: Add Link — friendly error for unreachable/invalid URLs (FR-3 polish)  (parent: epic_f54e)
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
