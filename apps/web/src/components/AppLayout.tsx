@@ -22,11 +22,6 @@ export default function AppLayout() {
               placeholder="Search your reading list"
               aria-label="Search your reading list"
             />
-            <div className="read-toolbar__actions">
-              <button type="button" className="read-toolbar__action">
-                Add link
-              </button>
-            </div>
           </div>
         )}
         <div className="app-content">
