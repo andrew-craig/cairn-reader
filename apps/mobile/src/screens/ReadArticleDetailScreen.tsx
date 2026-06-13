@@ -23,13 +23,31 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const navigation = useNavigation<ReadArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const { article: initialArticle, articles = [], currentIndex = -1 } = route.params;
-  const [article, setArticle] = useState(initialArticle);
-  const scrollPositionRef = useRef(initialArticle.scrollPosition ?? 0);
+  const { article, articles = [], currentIndex = -1 } = route.params;
+
+  // Mutable UI state tracked separately from the article object so async updates
+  // are scoped to the displayed article. Seeded from the article and resynced
+  // when the displayed article changes (see effect below). isRead drives the
+  // completion guard; isFavorite is reflected in the action menu.
+  const [isFavorite, setIsFavorite] = useState(article.isFavorite);
+  const scrollPositionRef = useRef(article.scrollPosition ?? 0);
   const hasScrolledRef = useRef(false);
-  const hasMarkedCompletedRef = useRef(initialArticle.isRead);
+  const hasMarkedCompletedRef = useRef(article.isRead);
+  // Tracks the currently displayed article id so async callbacks can detect a
+  // swap (next article) and avoid mutating UI state for a different article.
+  const articleIdRef = useRef(article.id);
 
   const hasNextArticle = currentIndex >= 0 && currentIndex < articles.length - 1;
+
+  // Reset per-article progress refs and reseed the mutable UI state whenever the
+  // displayed article changes (next article reuses this screen via replace()).
+  useEffect(() => {
+    articleIdRef.current = article.id;
+    scrollPositionRef.current = article.scrollPosition ?? 0;
+    hasScrolledRef.current = false;
+    hasMarkedCompletedRef.current = article.isRead;
+    setIsFavorite(article.isFavorite);
+  }, [article]);
 
   const markCompleted = useCallback((articleId: string) => {
     if (hasMarkedCompletedRef.current) return;
@@ -41,7 +59,6 @@ export const ReadArticleDetailScreen: React.FC = () => {
     StorageService.updateArticle(articleId, { isRead: true, readAt }).catch(
       (err) => console.error('Failed to persist completed locally:', err)
     );
-    setArticle((prev) => ({ ...prev, isRead: true, readAt }));
   }, []);
 
   const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
@@ -58,11 +75,11 @@ export const ReadArticleDetailScreen: React.FC = () => {
   }, [article.id, markCompleted]);
 
   useEffect(() => {
-    if (initialArticle.isRead) return;
-    ReadService.updateUserContent(initialArticle.id, { status: 'reading' }).catch(
+    if (article.isRead) return;
+    ReadService.updateUserContent(article.id, { status: 'reading' }).catch(
       (err) => console.error('Failed to mark article reading:', err)
     );
-  }, [initialArticle.id, initialArticle.isRead]);
+  }, [article.id, article.isRead]);
 
   useEffect(() => {
     const articleId = article.id;
@@ -93,23 +110,28 @@ export const ReadArticleDetailScreen: React.FC = () => {
   };
 
   const handleToggleFavorite = async () => {
+    const targetId = article.id;
+    const newIsFavorite = !isFavorite;
+    // Optimistically reflect the new state in the action menu.
+    setIsFavorite(newIsFavorite);
     try {
-      const newIsFavorite = !article.isFavorite;
       // Update both local storage and backend
-      await StorageService.updateArticle(article.id, {
+      await StorageService.updateArticle(targetId, {
         isFavorite: newIsFavorite,
       });
       try {
-        await ReadService.updateUserContent(article.id, {
+        await ReadService.updateUserContent(targetId, {
           is_favorite: newIsFavorite,
         });
       } catch (backendError) {
         console.error('Failed to sync favorite status to backend:', backendError);
         // Continue anyway - local update was successful
       }
-      setArticle({ ...article, isFavorite: newIsFavorite });
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
+      // Roll back the optimistic update on failure, but only if the same
+      // article is still displayed — otherwise we'd flip the wrong article.
+      if (articleIdRef.current === targetId) setIsFavorite(!newIsFavorite);
     }
   };
 
@@ -151,7 +173,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
           {
             icon: 'bookmark',
             onPress: handleToggleFavorite,
-            active: article.isFavorite,
+            active: isFavorite,
           },
           {
             icon: 'archive',
