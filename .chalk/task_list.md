@@ -10,7 +10,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_0f03** · P2 · open · Web: Account screen (FR-11) — profile, change password, logout  (parent: epic_f54e)
 - **task_1d08** · P2 · open · Audit 6: Infrastructure reliability & scaling  (parent: epic_9c21)
 - **task_1eaa** · P2 · open · Audit 3: Mobile client/server efficiency  (parent: epic_9c21)
-- **task_567e** · P2 · open · Web: Explore tab (FR-5, FR-6) — recommendations feed and voting  (parent: epic_f54e)
 - **task_5860** · P2 · open · Web: Migrate apps/mobile onto @cairn/shared (converge shared code)  (parent: epic_f54e)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)

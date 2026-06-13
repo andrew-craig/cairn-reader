@@ -2,14 +2,14 @@
 id: task_567e
 title: Web: Explore tab (FR-5, FR-6) — recommendations feed and voting
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:02Z
-updated_at: 2026-06-11T22:28:13Z
+updated_at: 2026-06-13T22:05:32Z
 ---
 Implement /explore and /explore/:id: the discovery feed with up/down voting.
 
