@@ -2,14 +2,14 @@
 id: task_3b3c
 title: Web: Search modal (FR-2)
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:33:41Z
-updated_at: 2026-06-12T13:08:32Z
+updated_at: 2026-06-13T12:24:10Z
 ---
 Implement the search modal/overlay for searching saved content.
 
