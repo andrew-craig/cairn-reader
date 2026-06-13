@@ -2,14 +2,14 @@
 id: task_ea51
 title: Web: Feeds screen (FR-8) — RSS subscription list and unsubscribe
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:16Z
-updated_at: 2026-06-11T22:28:13Z
+updated_at: 2026-06-13T22:15:28Z
 ---
 Implement /you/feeds: the user's RSS feed subscriptions.
 
