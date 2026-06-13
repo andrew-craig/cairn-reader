@@ -11,6 +11,7 @@ import {
   type DetectURLResponse,
   type DiscoverFeedResponse,
   type ListContentsParams,
+  type SearchParams,
   type UpdateUserContentRequest,
   type UserContentResponse,
   type UserContentsListResponse,
@@ -103,6 +104,40 @@ export class ReadService {
       contents,
       total_count: pagination.total || 0,
       limit: pagination.limit || params?.limit || PAGE_SIZE_DEFAULT,
+      cursor: pagination.cursor || '',
+      has_more: pagination.has_more === true,
+    };
+  }
+
+  /** Search the current user's saved content. Mirrors mobile's searchUserContents. */
+  static async searchUserContents(
+    params: SearchParams,
+  ): Promise<UserContentsListResponse> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.append('q', params.q);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.cursor) queryParams.append('cursor', params.cursor);
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
+
+    const response = await AuthService.fetchWithAuth(url);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to search contents');
+    }
+
+    const contents = Array.isArray(result.data) ? result.data : [];
+    const pagination = result.pagination || {};
+    return {
+      contents,
+      total_count: pagination.total || 0,
+      limit: pagination.limit || params.limit || PAGE_SIZE_DEFAULT,
       cursor: pagination.cursor || '',
       has_more: pagination.has_more === true,
     };

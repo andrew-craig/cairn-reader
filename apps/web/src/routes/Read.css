@@ -12,11 +12,21 @@
   margin-bottom: var(--spacing-sm);
 }
 
-.read__title {
-  margin: 0;
-  font-family: var(--font-heading);
-  font-size: var(--font-size-xl);
-  font-weight: 600;
+.read__search-bar {
+  flex: 1;
+  min-width: 0;
+  padding: 10px var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-md);
+  text-align: left;
+  cursor: text;
+}
+
+.read__search-bar:hover {
+  border-color: var(--color-text-secondary);
 }
 
 .read__actions {

@@ -4,6 +4,7 @@ import type { Article } from '@cairn/shared';
 import { PAGE_SIZE, ReadService } from '../services/read';
 import ArticleRow from '../components/ArticleRow';
 import AddLinkModal from '../components/AddLinkModal';
+import SearchModal from '../components/SearchModal';
 import './Read.css';
 
 // The reading list (/read): the user's saved content, cursor-paginated from the
@@ -19,6 +20,7 @@ export default function Read() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddLink, setShowAddLink] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   // Pagination cursor + guards kept in refs so the IntersectionObserver
   // callback reads current values without re-subscribing on every page.
@@ -111,7 +113,14 @@ export default function Read() {
   return (
     <div className="read">
       <header className="read__header">
-        <h1 className="read__title">Read</h1>
+        <button
+          type="button"
+          className="read__search-bar"
+          onClick={() => setShowSearch(true)}
+          aria-label="Search your reading list"
+        >
+          Search your reading list
+        </button>
         <div className="read__actions">
           <button
             type="button"
@@ -137,6 +146,8 @@ export default function Read() {
           onSuccess={handleRefresh}
         />
       )}
+
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
 
       {loading ? (
         <p className="read__status">Loading your reading list…</p>
