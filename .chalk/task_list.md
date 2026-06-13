@@ -45,7 +45,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6010** · P3 · open · Web: Add Link — friendly error for unreachable/invalid URLs (FR-3 polish)  (parent: epic_f54e)
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
-- **task_d0fd** · P3 · open · Web: Bookmarks and Votes screens (FR-10, FR-7)  (parent: epic_f54e)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_f881** · P3 · open · Web: Accessibility — keyboard navigation, focus management, ARIA  (parent: epic_f54e)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
