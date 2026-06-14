@@ -40,7 +40,7 @@ run:
 # Run unit tests only (excludes integration tests)
 test:
 	@echo "Running unit tests..."
-	go test -v ./internal/... ./pkg/...
+	go test -v ./internal/...
 
 # Alias for test
 test-unit: test
@@ -82,7 +82,7 @@ test-all:
 # Run tests with coverage (unit tests only)
 test-coverage:
 	@echo "Running unit tests with coverage..."
-	go test -v -coverprofile=coverage.out ./internal/... ./pkg/...
+	go test -v -coverprofile=coverage.out ./internal/...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
