@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -27,18 +28,25 @@ func mountWebUI(r chi.Router, dir string) {
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
 		// API and health namespaces own their own 404s — never shadow them with
 		// the SPA shell, which would return HTML for a missing JSON endpoint.
-		if strings.HasPrefix(req.URL.Path, "/api/") || strings.HasPrefix(req.URL.Path, "/health/") {
+		if req.URL.Path == "/api" || strings.HasPrefix(req.URL.Path, "/api/") ||
+			req.URL.Path == "/health" || strings.HasPrefix(req.URL.Path, "/health/") {
 			http.NotFound(w, req)
 			return
 		}
 
 		// Serve the requested asset if it exists; otherwise fall back to
 		// index.html so client-side routes (e.g. /reading) resolve to the SPA.
-		clean := filepath.Clean(req.URL.Path)
-		if clean != "/" {
-			if _, statErr := os.Stat(filepath.Join(dir, clean)); statErr == nil {
-				fileServer.ServeHTTP(w, req)
-				return
+		// path.Clean (not filepath.Clean) is used because URL paths always use
+		// forward slashes; FromSlash + a Rel check keep the lookup inside dir,
+		// and directories fall through to index.html rather than being listed.
+		clean := path.Clean(req.URL.Path)
+		if clean != "/" && clean != "." {
+			target := filepath.Join(dir, filepath.FromSlash(clean))
+			if rel, relErr := filepath.Rel(dir, target); relErr == nil && !strings.HasPrefix(rel, "..") {
+				if stat, statErr := os.Stat(target); statErr == nil && !stat.IsDir() {
+					fileServer.ServeHTTP(w, req)
+					return
+				}
 			}
 		}
 		http.ServeFile(w, req, index)
