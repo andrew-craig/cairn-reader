@@ -28,6 +28,7 @@ func (h *healthChecker) livenessHandler(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "cairn-selfhost",
+		"version": version,
 	})
 }
 

@@ -28,6 +28,7 @@ const YOU_ITEMS: Array<{ to: string; label: string; countKey?: keyof YouCounts }
   { to: '/you/newsletters', label: 'Newsletters', countKey: 'newsletters' },
   { to: '/you/bookmarks', label: 'Bookmarks', countKey: 'bookmarks' },
   { to: '/you/votes', label: 'Votes', countKey: 'votes' },
+  { to: '/you/about', label: 'About' },
 ];
 
 export default function Sidebar() {

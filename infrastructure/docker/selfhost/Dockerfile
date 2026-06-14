@@ -20,6 +20,10 @@ FROM golang:1.24-alpine AS builder
 
 ENV GOTOOLCHAIN=auto
 
+# Build version, injected into the binary via -ldflags. Defaults to "dev";
+# the Build Selfhost workflow passes the resolved image version (e.g. 1.2.3).
+ARG VERSION=dev
+
 WORKDIR /app
 
 # Copy root go.mod (needed for module resolution)
@@ -37,7 +41,8 @@ WORKDIR /app/cmd/selfhost
 RUN go mod download
 
 # Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o cairn-selfhost .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-X main.version=${VERSION}" -o cairn-selfhost .
 
 # Final stage
 FROM alpine:latest

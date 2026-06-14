@@ -9,6 +9,7 @@ const YOU_ITEMS = [
   { to: '/you/newsletters', label: 'Newsletters' },
   { to: '/you/bookmarks', label: 'Bookmarks' },
   { to: '/you/votes', label: 'Votes' },
+  { to: '/you/about', label: 'About' },
 ];
 
 // The You index route (/you). On desktop/tablet this is never reached because
