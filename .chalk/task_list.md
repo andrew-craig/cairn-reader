@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_88ce** · P1 · in_progress · Visual polish for web app implementation
 - **epic_9c21** · P1 · open · Pre-beta architecture audit
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
