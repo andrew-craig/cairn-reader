@@ -64,6 +64,11 @@
   cursor: default;
 }
 
+.feeds__unsubscribe:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 /* Newsletters address card */
 
 .newsletters__address-card {
@@ -112,6 +117,11 @@
 
 .newsletters__copy:hover {
   background-color: var(--color-hover);
+}
+
+.newsletters__copy:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .newsletters__hint {

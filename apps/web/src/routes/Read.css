@@ -29,6 +29,11 @@
   border-color: var(--color-text-secondary);
 }
 
+.read__search-bar:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .read__actions {
   display: flex;
   align-items: center;
@@ -55,6 +60,12 @@
 .read__refresh:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.read__refresh:focus-visible,
+.read__add-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .read__list {

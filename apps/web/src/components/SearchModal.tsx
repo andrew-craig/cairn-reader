@@ -9,21 +9,62 @@ interface SearchModalProps {
   onClose: () => void;
 }
 
+const FOCUSABLE_SELECTORS =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// Trap focus within `containerRef` so Tab/Shift+Tab cycle only within the modal.
+function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    container.addEventListener('keydown', handleKeyDown);
+    return () => container.removeEventListener('keydown', handleKeyDown);
+  }, [containerRef]);
+}
+
 // Search overlay for the reading list. Debounces the query and calls
 // ReadService.searchUserContents. Results render in the same ArticleRow
 // layout as the main reading list.
 export default function SearchModal({ onClose }: SearchModalProps) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  // Capture the element that had focus when the modal opened so we can restore
+  // it on close — required by ARIA modal best practices.
+  const triggerRef = useRef<Element | null>(document.activeElement);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
 
-  // Focus the input on mount.
+  useFocusTrap(modalRef);
+
+  // Focus the input on mount; restore focus to the trigger on unmount.
   useEffect(() => {
     inputRef.current?.focus();
+    const trigger = triggerRef.current;
+    return () => {
+      if (trigger instanceof HTMLElement) trigger.focus();
+    };
   }, []);
 
   // Escape key closes the modal.
@@ -90,7 +131,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
 
   return (
     <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search your reading list">
-      <div className="search-modal">
+      <div className="search-modal" ref={modalRef}>
         <div className="search-modal__header">
           <div className="search-modal__input-wrap">
             <input

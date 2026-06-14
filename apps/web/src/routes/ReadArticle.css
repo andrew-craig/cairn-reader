@@ -49,6 +49,11 @@
   cursor: default;
 }
 
+.reader__action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .reader__action--active {
   border-color: var(--color-warning);
   color: var(--color-warning);

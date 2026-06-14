@@ -112,7 +112,7 @@ export default function Sidebar() {
             onClick={() => setYouExpanded((open) => !open)}
           >
             <span>You</span>
-            <span className={`sidebar__chevron${youExpanded ? ' sidebar__chevron--open' : ''}`} aria-hidden>
+            <span className={`sidebar__chevron${youExpanded ? ' sidebar__chevron--open' : ''}`} aria-hidden="true">
               ›
             </span>
           </button>

@@ -3,6 +3,36 @@ import type { DetectURLResponse, DiscoverFeedResponse } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import './AddLinkModal.css';
 
+const FOCUSABLE_SELECTORS =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    container.addEventListener('keydown', handleKeyDown);
+    return () => container.removeEventListener('keydown', handleKeyDown);
+  }, [containerRef]);
+}
+
 interface AddLinkModalProps {
   onClose: () => void;
   onSuccess?: () => void;
@@ -37,10 +67,20 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
   // Multiple feeds discovered: show inline picker
   const [feedChoices, setFeedChoices] = useState<DiscoverFeedResponse['feeds']>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  // Capture the element that had focus when the modal opened so we can restore
+  // it on close — required by ARIA modal best practices.
+  const triggerRef = useRef<Element | null>(document.activeElement);
 
-  // Focus the input on mount
+  useFocusTrap(modalRef);
+
+  // Focus the input on mount; restore focus to the trigger on unmount.
   useEffect(() => {
     inputRef.current?.focus();
+    const trigger = triggerRef.current;
+    return () => {
+      if (trigger instanceof HTMLElement) trigger.focus();
+    };
   }, []);
 
   // Debounced URL detection when the URL changes
@@ -178,13 +218,14 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
   return (
     // Overlay backdrop
     <div className="add-link-overlay" role="dialog" aria-modal="true" aria-label="Add link">
-      <div className="add-link-modal" onKeyDown={handleKeyDown}>
+      <div className="add-link-modal" ref={modalRef} onKeyDown={handleKeyDown}>
         <div className="add-link-modal__body">
           <input
             ref={inputRef}
             type="url"
             className={`add-link-modal__input${error ? ' add-link-modal__input--error' : ''}`}
             placeholder="Add link"
+            aria-label="URL to add"
             value={url}
             onChange={(e) => handleUrlChange(e.target.value)}
             disabled={loading}

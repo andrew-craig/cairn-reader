@@ -60,6 +60,11 @@
   background-color: var(--color-hover);
 }
 
+.votes__refresh:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 /* Vote row — same flex layout as ArticleRow but with a badge instead of image. */
 
 .vote-row {
