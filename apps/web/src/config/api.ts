@@ -28,8 +28,15 @@ export const SESSION_STORAGE_KEYS = [
   '@cairn:user',
 ] as const;
 
-/** The origin the app is served from — the default backend for same-origin deployments. */
+/**
+ * The default backend the app talks to. In production the SPA is served from the
+ * same origin as the API, so that origin is the default. For local development
+ * (where the dev server's origin has no API) set `VITE_API_URL` in apps/web/.env
+ * to point at a backend. Either can still be overridden at runtime via setServerUrl.
+ */
 export function getDefaultServerUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '');
+  if (envUrl) return envUrl;
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
