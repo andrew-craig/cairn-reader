@@ -53,13 +53,13 @@ All changes are in `apps/web/`. No mobile app changes.
 **Files**: `AppLayout.css`, `AppLayout.tsx`
 - Change `.sidebar` width from 260px to 160px
 - Set `.app-content` to `max-width: 700px`
-- Wrap sidebar+main in a centered container with `max-width: 860px` (160+700), `margin: 0 auto`
+- Wrap sidebar+main in a centered container with `max-width: 860px` (160+700), `margin: 0 auto`, `display: flex` so children stay side-by-side
 - Padding around the outer container, not between sidebar and content
 - [ ] Done
 
 ### 4. Remove sub-item indent under You
 **Files**: `AppLayout.css`
-- Remove `margin` and `padding-left` from `.sidebar__subnav`
+- Zero out only `margin-left` (preserve `var(--spacing-xs)` top/bottom vertical spacing) and remove `padding-left` from `.sidebar__subnav`
 - Remove `border-left` from `.sidebar__subnav`
 - [ ] Done
 
@@ -82,6 +82,8 @@ All changes are in `apps/web/`. No mobile app changes.
 - [ ] Done
 
 ### 8. Remove section titles
-**Files**: `Explore.tsx`, `You.tsx` and their CSS
-- Delete `<h1>` titles and CSS
+**Files**: `Explore.tsx`, `You.tsx` and their CSS, `index.css`
+- Visually hide `<h1>` titles using a `.sr-only` utility class (keep in DOM for screen reader accessibility)
+- Add `.sr-only` class to `index.css`
+- Remove the now-unnecessary visual CSS for the titles
 - [ ] Done
