@@ -1,4 +1,4 @@
-import type { StorageAdapter } from '@cairn/shared';
+import type { StorageAdapter } from '../config/api';
 
 // localStorage-backed implementation of the shared StorageAdapter. The shared
 // config/service layer is async (mirroring AsyncStorage on mobile); localStorage

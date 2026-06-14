@@ -47,6 +47,9 @@ type Config struct {
 	// Email
 	EmailDomain string
 
+	// Web UI — directory of the bundled static SPA served as a fallback.
+	WebDir string
+
 	// Logging
 	LogLevel  string
 	LogFormat string
@@ -114,6 +117,8 @@ func loadConfig() *Config {
 		ArticleRetentionDays: getEnvInt("ARTICLE_RETENTION_DAYS", 90),
 
 		EmailDomain: getEnv("EMAIL_DOMAIN", "read.cairnapp.com"),
+
+		WebDir: getEnv("WEB_DIR", "/app/web"),
 
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: getEnv("LOG_FORMAT", "text"),

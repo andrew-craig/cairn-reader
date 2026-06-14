@@ -81,9 +81,12 @@ http://:8080 {
 	}
 
 	# ──────────────────────────────────────────────
-	# Default — reject unmatched paths
+	# Web App — Static React SPA (serves "/" and all non-API routes)
 	# ──────────────────────────────────────────────
+	# The API rules above match first; everything else (the SPA shell, its
+	# assets, and client-side routes) is served by the web container, which
+	# applies its own history fallback to index.html.
 	handle {
-		respond "Not Found" 404
+		reverse_proxy web:8080
 	}
 }
