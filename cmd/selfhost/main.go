@@ -154,6 +154,9 @@ func main() {
 	r.Get("/health/ready", health.readinessHandler)
 	r.Head("/health/ready", health.readinessHandler)
 
+	// Serve the bundled web UI (if present) as a fallback for non-API routes.
+	mountWebUI(r, cfg.WebDir)
+
 	// Start HTTP server
 	server := &http.Server{
 		Addr:         ":" + cfg.Port,

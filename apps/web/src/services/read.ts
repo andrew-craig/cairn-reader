@@ -4,7 +4,6 @@
 // AuthService.fetchWithAuth (proactive refresh + 401 retry), mirroring mobile.
 // Later tasks extend this with search and add-link methods.
 import {
-  getServerUrl,
   type Article,
   type AddURLRequest,
   type AddURLResponse,
@@ -17,6 +16,7 @@ import {
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
 } from '@cairn/shared';
+import { getServerUrl } from '../config/api';
 import { AuthService } from './auth';
 
 const PAGE_SIZE_DEFAULT = 20;

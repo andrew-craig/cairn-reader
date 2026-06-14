@@ -1,0 +1,27 @@
+# Serves the static web SPA on plain HTTP port 8080. TLS and routing of /api/*
+# are handled by the front reverse proxy (Caddy) in the prod stack; this server
+# only serves the built assets with SPA history fallback.
+:8080 {
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Lightweight endpoint for container healthchecks.
+	@healthz path /healthz
+	handle @healthz {
+		respond "OK" 200
+	}
+
+	# Everything else: serve the requested file, falling back to index.html so
+	# client-side routes (e.g. /reading) resolve to the SPA entry point.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

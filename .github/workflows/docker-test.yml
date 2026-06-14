@@ -8,6 +8,10 @@ on:
       - 'cmd/**'
       - 'pkg/**'
       - 'services/**'
+      - 'apps/web/**'
+      - 'apps/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
       - 'infrastructure/docker/**'
       - '.github/workflows/docker-*.yml'
 
@@ -22,6 +26,7 @@ jobs:
       explore: ${{ steps.filter.outputs.explore == 'true' || steps.filter.outputs.infra == 'true' }}
       read-content: ${{ steps.filter.outputs.read-content == 'true' || steps.filter.outputs.infra == 'true' }}
       read-fetcher: ${{ steps.filter.outputs.read-fetcher == 'true' || steps.filter.outputs.infra == 'true' }}
+      web: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.infra == 'true' }}
       selfhost: ${{ steps.filter.outputs.selfhost == 'true' || steps.filter.outputs.infra == 'true' }}
     steps:
       - uses: actions/checkout@v5
@@ -43,10 +48,19 @@ jobs:
               - 'services/read/internal/**'
               - 'services/read/go.mod'
               - 'services/read/go.sum'
+            web:
+              - 'apps/web/**'
+              - 'apps/shared/**'
+              - 'package.json'
+              - 'package-lock.json'
             selfhost:
               - 'cmd/selfhost/**'
               - 'pkg/**'
               - 'services/**'
+              - 'apps/web/**'
+              - 'apps/shared/**'
+              - 'package.json'
+              - 'package-lock.json'
               - 'infrastructure/docker/selfhost/**'
             infra:
               - 'infrastructure/docker/**'
@@ -240,6 +254,46 @@ jobs:
           docker run --rm cairn-ingest-rss-worker:test --help || \
           docker run --rm cairn-ingest-rss-worker:test --version || \
           echo "Image built successfully"
+
+  # ── Web App ───────────────────────────────────────────────────────────
+
+  build-web:
+    name: Docker build (web)
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          load: true
+          tags: cairn-web:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Test image serves the SPA
+        run: |
+          docker run -d --rm --name cairn-web-test -p 8080:8080 cairn-web:test
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null 2>&1; then
+              echo "web is serving"
+              curl -fsS http://localhost:8080/ | head -c 200
+              docker stop cairn-web-test
+              exit 0
+            fi
+            echo "waiting for web... ($i/30)"
+            sleep 1
+          done
+          echo "web did not become ready in time"
+          docker logs cairn-web-test
+          docker stop cairn-web-test
+          exit 1
 
   # ── Selfhost (consolidated binary) ────────────────────────────────────
 

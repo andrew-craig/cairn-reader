@@ -5,13 +5,13 @@
 //      so web users authenticate with email/password only.
 // Token keys, refresh logic, and the 401-retry interceptor mirror mobile verbatim.
 import {
-  getServerUrl,
   type LoginResponse,
   type LoginRequest,
   type RegisterRequest,
   type AuthTokens,
   type User,
 } from '@cairn/shared';
+import { getServerUrl } from '../config/api';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';

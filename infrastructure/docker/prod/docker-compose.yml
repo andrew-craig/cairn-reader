@@ -29,6 +29,8 @@ services:
         condition: service_healthy
       email-ingest:
         condition: service_healthy
+      web:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:2019/config/"]
       interval: 10s
@@ -471,6 +473,22 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    restart: unless-stopped
+    networks:
+      - cairn-network
+
+  # Web App — Static React SPA served by Caddy
+  # Using published image from GitHub Container Registry. The SPA is
+  # environment-agnostic (it talks to the API on its own origin via the front
+  # Caddy proxy), so it needs no environment configuration.
+  web:
+    image: ghcr.io/${GITHUB_ORG:-cairn-app}/cairn-web:${IMAGE_TAG:-latest}
+    # No host port — traffic routed through the front Caddy reverse proxy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
     networks:
       - cairn-network

@@ -1,4 +1,4 @@
-name: Build Selfhost
+name: Build Web
 
 on:
   push:
@@ -7,34 +7,26 @@ on:
     tags:
       - 'v*'
     paths:
-      - 'cmd/selfhost/**'
-      - 'pkg/**'
-      - 'services/**'
       - 'apps/web/**'
       - 'apps/shared/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'infrastructure/docker/selfhost/**'
-      - '.github/workflows/docker-build-selfhost.yml'
+      - '.github/workflows/docker-build-web.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'cmd/selfhost/**'
-      - 'pkg/**'
-      - 'services/**'
       - 'apps/web/**'
       - 'apps/shared/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'infrastructure/docker/selfhost/**'
-      - '.github/workflows/docker-build-selfhost.yml'
+      - '.github/workflows/docker-build-web.yml'
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/cairn
-  SERVICE_NAME: selfhost
+  SERVICE_NAME: web
 
 jobs:
   build-and-push:
@@ -76,7 +68,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: infrastructure/docker/selfhost/Dockerfile
+          file: apps/web/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

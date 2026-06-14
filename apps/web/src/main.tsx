@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { configureStorage } from '@cairn/shared';
+import { configureStorage } from './config/api';
 import { localStorageAdapter } from './services/storage';
 import App from './App';
 import './index.css';
