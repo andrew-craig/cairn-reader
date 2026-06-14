@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
@@ -13,13 +12,13 @@ import (
 var version = "dev"
 
 // handleVersionFlag prints the version and exits when -version/--version is
-// passed. It runs before any other startup work so `cairn-selfhost --version`
-// is cheap and free of side effects.
+// passed. It scans os.Args directly (rather than using the flag package) so it
+// stays free of side effects and never interferes with the global flag set.
 func handleVersionFlag() {
-	showVersion := flag.Bool("version", false, "print the cairn-selfhost version and exit")
-	flag.Parse()
-	if *showVersion {
-		fmt.Println(version)
-		os.Exit(0)
+	for _, arg := range os.Args[1:] {
+		if arg == "-version" || arg == "--version" {
+			fmt.Println(version)
+			os.Exit(0)
+		}
 	}
 }

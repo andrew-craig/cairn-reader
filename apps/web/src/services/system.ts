@@ -15,6 +15,6 @@ export class SystemService {
       throw new Error('Failed to fetch server version');
     }
     const data = await response.json();
-    return typeof data.version === 'string' ? data.version : null;
+    return data && typeof data === 'object' && typeof data.version === 'string' ? data.version : null;
   }
 }
