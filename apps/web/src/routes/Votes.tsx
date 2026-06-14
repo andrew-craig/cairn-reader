@@ -82,7 +82,7 @@ export default function Votes() {
   return (
     <div className="votes">
       <header className="votes__header">
-        <h1 className="votes__title">Votes</h1>
+        <h1 className="votes__title sr-only">Votes</h1>
       </header>
 
       {loading ? (

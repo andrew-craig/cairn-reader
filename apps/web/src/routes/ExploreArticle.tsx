@@ -4,6 +4,7 @@ import type { Article } from '@cairn/shared';
 import { ExploreService } from '../services/explore';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
+import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 
 // An explore article in the reader may carry the user's existing vote when it
@@ -174,46 +175,6 @@ export default function ExploreArticle() {
 
   return (
     <div className="reader">
-      <div className="reader__toolbar">
-        <button type="button" className="reader__action" onClick={() => navigate('/explore')}>
-          Back
-        </button>
-        <div className="reader__toolbar-group">
-          {hasNext && (
-            <button type="button" className="reader__action" onClick={handleNext}>
-              Next
-            </button>
-          )}
-          <button
-            type="button"
-            className={`reader__action${isUp ? ' reader__action--active' : ''}`}
-            onClick={() => handleVote('upvote')}
-            aria-pressed={isUp}
-          >
-            {isUp ? '▲ Upvoted' : '▲ Upvote'}
-          </button>
-          <button
-            type="button"
-            className={`reader__action${isDown ? ' reader__action--active' : ''}`}
-            onClick={() => handleVote('downvote')}
-            aria-pressed={isDown}
-          >
-            {isDown ? '▼ Downvoted' : '▼ Downvote'}
-          </button>
-          <button
-            type="button"
-            className={`reader__action${isSaved ? ' reader__action--active' : ''}`}
-            onClick={handleSave}
-            disabled={isSaving || isSaved}
-          >
-            {isSaved ? '✓ Saved' : isSaving ? 'Saving…' : 'Save to reading list'}
-          </button>
-          <button type="button" className="reader__action" onClick={handleOpenOriginal}>
-            Open original
-          </button>
-        </div>
-      </div>
-
       {saveError && (
         <p className="reader__status reader__error" role="alert">
           {saveError}
@@ -239,6 +200,16 @@ export default function ExploreArticle() {
           <p className="reader__status">No content available for this article.</p>
         )}
       </article>
+      <FloatingActionBar
+        actions={[
+          { icon: 'return', label: 'Back', onClick: () => navigate('/explore') },
+          { icon: 'thumbs-up', label: 'Upvote', active: isUp, onClick: () => handleVote('upvote') },
+          { icon: 'thumbs-down', label: 'Downvote', active: isDown, onClick: () => handleVote('downvote') },
+          { icon: 'next-article', label: 'Next', disabled: !hasNext, onClick: handleNext },
+          { icon: 'save', label: 'Save to reading list', active: isSaved, disabled: isSaving || isSaved, onClick: handleSave },
+          { icon: 'open-original', label: 'Open original', onClick: handleOpenOriginal },
+        ]}
+      />
     </div>
   );
 }

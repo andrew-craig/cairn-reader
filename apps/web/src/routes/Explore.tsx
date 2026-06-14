@@ -13,41 +13,17 @@ const RECOMMENDATION_PAGE_SIZE = 10;
 const SHOWN_BATCH_FLUSH_THRESHOLD = 10;
 const SHOWN_BATCH_DEBOUNCE_MS = 3000;
 
-// Per-card vote state layered on top of the Article (which carries no vote).
-interface VoteState {
-  vote: 'upvote' | 'downvote' | null;
-}
-
-// Explore recommendation card: title, source, excerpt, optional image, and
-// up/down vote controls. Clicking the card body navigates to the reader.
+// Explore recommendation card: title, source, excerpt, optional image.
+// Clicking the card body navigates to the reader.
 interface ExploreCardProps {
   article: Article;
-  voteState: VoteState;
   onSelect: (article: Article) => void;
-  onVote: (articleId: string, type: 'upvote' | 'downvote') => void;
-  onRemoveVote: (articleId: string) => void;
   observeRef: (id: string, node: HTMLLIElement | null) => void;
 }
 
-function ExploreCard({
-  article,
-  voteState,
-  onSelect,
-  onVote,
-  onRemoveVote,
-  observeRef,
-}: ExploreCardProps) {
-  const isUp = voteState.vote === 'upvote';
-  const isDown = voteState.vote === 'downvote';
-
-  const handleUpvote = () => (isUp ? onRemoveVote(article.id) : onVote(article.id, 'upvote'));
-  const handleDownvote = () =>
-    isDown ? onRemoveVote(article.id) : onVote(article.id, 'downvote');
-
+function ExploreCard({ article, onSelect, observeRef }: ExploreCardProps) {
   return (
     <li className="explore-card" ref={(node) => observeRef(article.id, node)}>
-      {/* The card body is the navigation click-target. Vote controls are
-          siblings (not nested) so we don't put a <button> inside a <button>. */}
       <button
         type="button"
         className="explore-card__button"
@@ -71,26 +47,6 @@ function ExploreCard({
           </div>
         )}
       </button>
-      <div className="explore-card__votes">
-        <button
-          type="button"
-          className={`explore-card__vote-btn${isUp ? ' explore-card__vote-btn--active-up' : ''}`}
-          onClick={handleUpvote}
-          aria-pressed={isUp}
-          aria-label="Upvote"
-        >
-          ▲ Up
-        </button>
-        <button
-          type="button"
-          className={`explore-card__vote-btn${isDown ? ' explore-card__vote-btn--active-down' : ''}`}
-          onClick={handleDownvote}
-          aria-pressed={isDown}
-          aria-label="Downvote"
-        >
-          ▼ Down
-        </button>
-      </div>
     </li>
   );
 }
@@ -101,10 +57,8 @@ function ExploreCard({
 export default function Explore() {
   const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
-  const [votes, setVotes] = useState<Record<string, VoteState>>({});
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -209,7 +163,6 @@ export default function Explore() {
 
       if (reset) {
         setArticles(page);
-        setVotes({});
         shownInSessionRef.current = new Set();
         shownQueueRef.current = [];
       } else {
@@ -235,8 +188,7 @@ export default function Explore() {
 
   const handleRefresh = useCallback(() => {
     if (inFlightRef.current) return;
-    setRefreshing(true);
-    fetchPage(true).finally(() => setRefreshing(false));
+    void fetchPage(true);
   }, [fetchPage]);
 
   const handleLoadMore = useCallback(() => {
@@ -279,44 +231,9 @@ export default function Explore() {
     [articles, navigate],
   );
 
-  // Optimistic voting: update local state immediately, revert on API failure.
-  const handleVote = useCallback(
-    (articleId: string, type: 'upvote' | 'downvote') => {
-      const previous = votes[articleId]?.vote ?? null;
-      setVotes((prev) => ({ ...prev, [articleId]: { vote: type } }));
-      ExploreService.voteOnArticle(articleId, type).catch((err) => {
-        console.error('Failed to vote:', err);
-        setVotes((prev) => ({ ...prev, [articleId]: { vote: previous } }));
-      });
-    },
-    [votes],
-  );
-
-  const handleRemoveVote = useCallback(
-    (articleId: string) => {
-      const previous = votes[articleId]?.vote ?? null;
-      setVotes((prev) => ({ ...prev, [articleId]: { vote: null } }));
-      ExploreService.removeVote(articleId).catch((err) => {
-        console.error('Failed to remove vote:', err);
-        setVotes((prev) => ({ ...prev, [articleId]: { vote: previous } }));
-      });
-    },
-    [votes],
-  );
-
   return (
     <div className="explore">
-      <header className="explore__header">
-        <h1 className="explore__title">Explore</h1>
-        <button
-          type="button"
-          className="explore__refresh"
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </header>
+      <h1 className="explore__title sr-only">Explore</h1>
 
       {loading ? (
         <p className="explore__status">Loading recommendations…</p>
@@ -336,10 +253,7 @@ export default function Explore() {
               <ExploreCard
                 key={article.id}
                 article={article}
-                voteState={votes[article.id] ?? { vote: null }}
                 onSelect={handleSelect}
-                onVote={handleVote}
-                onRemoveVote={handleRemoveVote}
                 observeRef={observeCard}
               />
             ))}

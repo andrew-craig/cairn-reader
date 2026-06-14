@@ -57,9 +57,7 @@ export default function Feeds() {
   return (
     <div className="read">
       <header className="read__header">
-        <h1 style={{ margin: 0, fontFamily: 'var(--font-heading)', fontSize: 'var(--font-size-xl)', fontWeight: 600 }}>
-          Feeds
-        </h1>
+        <h1 className="sr-only">Feeds</h1>
       </header>
 
       {loading ? (

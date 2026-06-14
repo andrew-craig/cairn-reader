@@ -2,14 +2,14 @@
 id: task_88ce
 title: Visual polish for web app implementation
 type: task
-status: open
+status: in_progress
 priority: 1
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-06-14T11:09:34Z
-updated_at: 2026-06-14T11:09:34Z
+updated_at: 2026-06-14T22:45:12Z
 ---
 
 1. Re-use the floating quick action bar at the bottom of an article from mobile. Do not add the top bar across the top of the app
@@ -87,3 +87,26 @@ All changes are in `apps/web/`. No mobile app changes.
 - Add `.sr-only` class to `index.css`
 - Remove the now-unnecessary visual CSS for the titles
 - [ ] Done
+
+## Review (completed 2026-06-14)
+All 8 items implemented in `apps/web/` (no mobile changes) and verified against
+cairn.seatrain.net with the seeded web test account via Playwright:
+
+1. ✅ Floating action bar — new `FloatingActionBar` component; replaces the top
+   toolbar in `ReadArticle` (back/favorite/archive/next/delete/open-original) and
+   `ExploreArticle` (back/upvote/downvote/next/save/open-original). Sits above the
+   mobile BottomNav.
+2. ✅ Vote buttons removed from the Explore list (card + dead state/handlers).
+3. ✅ Layout: sidebar 160px, content max 700px, both docked inside a centered
+   860px container with padding on the outer edges only.
+4. ✅ Sub-item indent removed under You (no margin-left/padding-left/border-left).
+5. ✅ Headings switched to Inter; `Cairn` wordmark pinned to Crimson Pro via
+   `--font-brand`.
+6. ✅ Refresh buttons removed (only Read + Explore had them; others were
+   error-state "Try again", left intact).
+7. ✅ Mobile Read/Explore/You icons added left of the labels; tablet rail shows
+   the icons instead of letter abbreviations.
+8. ✅ Redundant section titles hidden with a new `.sr-only` utility (kept in DOM).
+
+Verification: `tsc --noEmit` clean, `vite build` clean, eslint clean (one
+pre-existing unrelated warning). Visual smoke test passed at desktop/tablet/mobile.

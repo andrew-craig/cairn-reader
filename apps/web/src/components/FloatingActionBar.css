@@ -1,0 +1,94 @@
+/* Floating action bar — fixed pill at bottom-center of the viewport.
+   Mirrors the mobile app's BottomActionMenu (blur pill, 54px tall, gap 16px).
+   The bar sits above the mobile BottomNav (<768px) and uses a 24px margin
+   at desktop. Uses CSS tokens from src/index.css. */
+
+.fab {
+  position: fixed;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  /* Stay above the BottomNav (z-index 100) and regular content */
+  z-index: 200;
+  /* Let pointer events pass through the full-width container but not the pill */
+  pointer-events: none;
+}
+
+/* On mobile (<768px) the BottomNav is fixed at the bottom (min-height 56px +
+   safe-area-inset-bottom). Position the bar above it. */
+@media (max-width: 767px) {
+  .fab {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+
+.fab__pill {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  height: 54px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px;
+  border-radius: 32px;
+  /* Light: rgba(251,250,249,0.85) — mirrors mobile BottomActionMenu */
+  background-color: rgba(251, 250, 249, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* Shadow: 0px 2px 4px rgba(15,23,42,0.2) — from Figma design */
+  box-shadow: 0px 2px 4px rgba(15, 23, 42, 0.2);
+  pointer-events: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fab__pill {
+    /* Dark: rgba(28,28,30,0.85) — mirrors mobile BottomActionMenu dark tint */
+    background-color: rgba(28, 28, 30, 0.85);
+  }
+}
+
+/* Individual icon buttons: 42x42, border-radius 21px, transparent BG */
+.fab__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 21px;
+  border: none;
+  background-color: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0;
+  /* Smooth color transition for active/disabled state changes */
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.fab__btn:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  .fab__btn:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.fab__btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Active: use --color-primary (mirrors QuickAccessButton's active color) */
+.fab__btn--active {
+  color: var(--color-primary);
+}
+
+/* Disabled: reduced opacity, no pointer */
+.fab__btn--disabled,
+.fab__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

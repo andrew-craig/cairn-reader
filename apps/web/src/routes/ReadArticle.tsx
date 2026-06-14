@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { Article } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
+import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 
 // Scrolled this far through the article (fraction of scrollable height) marks it
@@ -68,9 +69,7 @@ export default function ReadArticle() {
   // swap (prev/next) and avoid mutating UI state for a different article.
   const articleIdRef = useRef<string | undefined>(initialArticle?.id);
 
-  const prevIndex = hasList ? index - 1 : -1;
   const nextIndex = hasList ? index + 1 : -1;
-  const hasPrev = hasList && prevIndex >= 0;
   const hasNext = hasList && nextIndex < (articles?.length ?? 0);
 
   // When opened without nav state, fetch the single article (paging the list,
@@ -259,47 +258,6 @@ export default function ReadArticle() {
 
   return (
     <div className="reader" ref={scrollRef} onScroll={handleScroll}>
-      <div className="reader__toolbar">
-        <button type="button" className="reader__action" onClick={() => navigate('/read')}>
-          Back
-        </button>
-        <div className="reader__toolbar-group">
-          <button
-            type="button"
-            className="reader__action"
-            onClick={() => goToAdjacent(prevIndex)}
-            disabled={!hasPrev}
-          >
-            Previous
-          </button>
-          <button
-            type="button"
-            className="reader__action"
-            onClick={() => goToAdjacent(nextIndex)}
-            disabled={!hasNext}
-          >
-            Next
-          </button>
-          <button
-            type="button"
-            className={`reader__action${isFavorite ? ' reader__action--active' : ''}`}
-            onClick={handleToggleFavorite}
-            aria-pressed={isFavorite}
-          >
-            {isFavorite ? '★ Favorited' : '☆ Favorite'}
-          </button>
-          <button type="button" className="reader__action" onClick={handleArchive}>
-            Archive
-          </button>
-          <button type="button" className="reader__action" onClick={handleDelete}>
-            Delete
-          </button>
-          <button type="button" className="reader__action" onClick={handleOpenOriginal}>
-            Open original
-          </button>
-        </div>
-      </div>
-
       <article className="reader__article">
         <header className="reader__header">
           <h1 className="reader__title">{article.title}</h1>
@@ -319,6 +277,16 @@ export default function ReadArticle() {
           <p className="reader__status">No content available for this article.</p>
         )}
       </article>
+      <FloatingActionBar
+        actions={[
+          { icon: 'return', label: 'Back', onClick: () => navigate('/read') },
+          { icon: 'bookmark', label: 'Favorite', active: isFavorite, onClick: handleToggleFavorite },
+          { icon: 'archive', label: 'Archive', onClick: handleArchive },
+          { icon: 'next-article', label: 'Next', disabled: !hasNext, onClick: () => goToAdjacent(nextIndex) },
+          { icon: 'delete', label: 'Delete', onClick: handleDelete },
+          { icon: 'open-original', label: 'Open original', onClick: handleOpenOriginal },
+        ]}
+      />
     </div>
   );
 }

@@ -31,7 +31,7 @@ export default function You() {
 
   return (
     <div className="you-page">
-      <h1 className="you-page__title">You</h1>
+      <h1 className="you-page__title sr-only">You</h1>
 
       <ul className="you-page__list">
         {YOU_ITEMS.map(({ to, label }) => (
