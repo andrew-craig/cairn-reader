@@ -8,5 +8,6 @@ export * from './LoginScreen';
 export * from './BookmarksScreen';
 export * from './VotesScreen';
 export * from './AccountScreen';
+export * from './AboutScreen';
 export * from './FeedsScreen';
 export * from './NewslettersScreen';

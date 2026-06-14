@@ -12,6 +12,7 @@ import Feeds from './routes/Feeds';
 import Newsletters from './routes/Newsletters';
 import Bookmarks from './routes/Bookmarks';
 import Votes from './routes/Votes';
+import About from './routes/About';
 
 // Landing redirect: authenticated users go to their reading list, everyone else
 // to login (mirrors the mobile RootNavigator's authenticated/unauthenticated split).
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="/you/newsletters" element={<Newsletters />} />
               <Route path="/you/bookmarks" element={<Bookmarks />} />
               <Route path="/you/votes" element={<Votes />} />
+              <Route path="/you/about" element={<About />} />
             </Route>
           </Route>
           <Route path="*" element={<RootRedirect />} />

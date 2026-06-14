@@ -1,0 +1,25 @@
+/* About screen styling — mirrors Account.css conventions. */
+.about-page {
+  padding: var(--spacing-lg);
+  max-width: 480px;
+}
+
+.about-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.about-label {
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.about-value {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+}

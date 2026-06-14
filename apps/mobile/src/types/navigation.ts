@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Bookmarks: undefined;
   Votes: undefined;
   Account: undefined;
+  About: undefined;
   Feeds: undefined;
   Newsletters: undefined;
 };

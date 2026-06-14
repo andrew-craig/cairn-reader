@@ -145,6 +145,10 @@ export const YouScreen: React.FC = () => {
     navigation.navigate('Votes');
   };
 
+  const handleAboutPress = () => {
+    navigation.navigate('About');
+  };
+
   const handleLogoutPress = async () => {
     try {
       await logout();
@@ -217,6 +221,11 @@ export const YouScreen: React.FC = () => {
             isDark={isDark}
           />
           <Spacer isDark={isDark} />
+          <MenuItem
+            title="About"
+            onPress={handleAboutPress}
+            isDark={isDark}
+          />
           <MenuItem
             title="Log out"
             onPress={handleLogoutPress}
