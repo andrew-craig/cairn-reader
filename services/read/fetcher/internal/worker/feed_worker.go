@@ -38,6 +38,8 @@ type FeedWorker struct {
 	feedQueue chan *models.Feed
 	stopCh    chan struct{}
 	wg        sync.WaitGroup
+	mu        sync.Mutex
+	stopped   bool
 }
 
 // NewFeedWorker creates a new feed worker pool
@@ -72,32 +74,31 @@ func (fw *FeedWorker) Start() {
 
 // Stop gracefully stops the worker pool
 func (fw *FeedWorker) Stop() {
-	close(fw.stopCh)
-	// Close the feed queue to signal workers to finish
+	fw.mu.Lock()
+	if fw.stopped {
+		fw.mu.Unlock()
+		return
+	}
+	fw.stopped = true
 	close(fw.feedQueue)
+	fw.mu.Unlock()
 	fw.wg.Wait()
 	slog.Info("Feed worker pool stopped")
 }
 
 // Submit submits a feed for processing
 func (fw *FeedWorker) Submit(feed *models.Feed) {
-	// Check if stopped first to avoid sending on closed channel.
-	// stopCh is closed before feedQueue in Stop(), so checking it
-	// first prevents the race where select picks the send case
-	// on an already-closed feedQueue.
-	select {
-	case <-fw.stopCh:
+	fw.mu.Lock()
+	defer fw.mu.Unlock()
+
+	if fw.stopped {
 		slog.Warn("Worker pool is stopping, skipping feed", "feed_id", feed.ID)
 		return
-	default:
 	}
 
 	select {
 	case fw.feedQueue <- feed:
 		// Feed submitted successfully
-	case <-fw.stopCh:
-		// Worker is stopping, don't block
-		slog.Warn("Worker pool is stopping, skipping feed", "feed_id", feed.ID)
 	default:
 		// Queue is full, log warning
 		slog.Warn("Feed queue is full, skipping feed", "feed_id", feed.ID)
