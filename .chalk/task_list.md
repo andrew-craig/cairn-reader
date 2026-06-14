@@ -18,7 +18,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_b783** · P2 · open · Audit 7: Consolidate findings into proposed next-steps document  (parent: epic_9c21)
 - **task_ed30** · P2 · open · Audit 5: Observability & operational readiness  (parent: epic_9c21)
-- **task_f881** · P3 · in_progress · Web: Accessibility — keyboard navigation, focus management, ARIA  (parent: epic_f54e)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
