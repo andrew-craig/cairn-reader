@@ -39,6 +39,11 @@
   cursor: default;
 }
 
+.explore__refresh:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .explore__list {
   list-style: none;
   margin: 0;
@@ -175,6 +180,11 @@
 .explore-card__vote-btn--active-down {
   border-color: var(--color-error);
   color: var(--color-error);
+}
+
+.explore-card__vote-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 @media (max-width: 767px) {

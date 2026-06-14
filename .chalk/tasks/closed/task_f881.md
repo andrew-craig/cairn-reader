@@ -2,14 +2,14 @@
 id: task_f881
 title: Web: Accessibility — keyboard navigation, focus management, ARIA
 type: task
-status: open
+status: closed
 priority: 3
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:53Z
-updated_at: 2026-06-11T22:28:13Z
+updated_at: 2026-06-14T03:36:37Z
 ---
 Ensure the web app meets baseline accessibility requirements: keyboard navigability, visible focus states, semantic HTML, and screen-reader compatibility.
 

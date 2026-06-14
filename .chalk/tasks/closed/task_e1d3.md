@@ -2,14 +2,14 @@
 id: task_e1d3
 title: Web: Responsive layout — tablet and mobile breakpoints
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-08T11:34:42Z
-updated_at: 2026-06-11T22:28:13Z
+updated_at: 2026-06-14T03:29:38Z
 ---
 Make the app usable at tablet (≥768px) and mobile (<768px) widths, where the sidebar collapses.
 

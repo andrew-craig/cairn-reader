@@ -1,0 +1,67 @@
+/* You hub page (/you) — the mobile-first menu of sub-destinations.
+   On desktop/tablet this page is rarely reached (the sidebar sub-nav handles
+   it), but it renders cleanly at all widths. */
+
+.you-page {
+  max-width: 480px;
+}
+
+.you-page__title {
+  margin: 0 0 var(--spacing-lg);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+}
+
+.you-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.you-page__item {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.you-page__item:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.you-page__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-sm);
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.you-page__link::after {
+  content: '›';
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+}
+
+.you-page__link:hover {
+  background-color: var(--color-hover);
+}
+
+.you-page__link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.you-page__link--logout {
+  color: var(--color-error);
+}
+
+.you-page__link--logout::after {
+  content: '';
+}

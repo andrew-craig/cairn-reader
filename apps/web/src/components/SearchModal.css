@@ -87,6 +87,12 @@
   color: var(--color-text);
 }
 
+.search-modal__clear:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 /* Cancel / close button */
 .search-modal__close {
   flex-shrink: 0;
@@ -103,6 +109,11 @@
 
 .search-modal__close:hover {
   background-color: var(--color-hover);
+}
+
+.search-modal__close:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 /* Results / status area */

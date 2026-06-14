@@ -94,24 +94,25 @@ export default function Sidebar() {
 
       <ul className="sidebar__nav">
         <li>
-          <NavLink to="/read" className="sidebar__item">
-            Read
+          <NavLink to="/read" className="sidebar__item" data-label="R">
+            <span>Read</span>
           </NavLink>
         </li>
         <li>
-          <NavLink to="/explore" className="sidebar__item">
-            Explore
+          <NavLink to="/explore" className="sidebar__item" data-label="E">
+            <span>Explore</span>
           </NavLink>
         </li>
         <li>
           <button
             type="button"
             className={`sidebar__item sidebar__item--button${onYouRoute ? ' sidebar__item--active' : ''}`}
+            data-label="Y"
             aria-expanded={youExpanded}
             onClick={() => setYouExpanded((open) => !open)}
           >
             <span>You</span>
-            <span className={`sidebar__chevron${youExpanded ? ' sidebar__chevron--open' : ''}`} aria-hidden>
+            <span className={`sidebar__chevron${youExpanded ? ' sidebar__chevron--open' : ''}`} aria-hidden="true">
               ›
             </span>
           </button>

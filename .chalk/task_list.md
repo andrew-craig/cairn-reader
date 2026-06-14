@@ -17,7 +17,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_b783** · P2 · open · Audit 7: Consolidate findings into proposed next-steps document  (parent: epic_9c21)
-- **task_e1d3** · P2 · open · Web: Responsive layout — tablet and mobile breakpoints  (parent: epic_f54e)
 - **task_ed30** · P2 · open · Audit 5: Observability & operational readiness  (parent: epic_9c21)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
@@ -42,7 +41,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
-- **task_f881** · P3 · open · Web: Accessibility — keyboard navigation, focus management, ARIA  (parent: epic_f54e)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support
 - **feature_a85d** · P4 · open · Add recent URLs history in AddLinkModal

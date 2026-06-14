@@ -96,6 +96,11 @@
   background-color: var(--color-hover);
 }
 
+.add-link-modal__feed-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 /* Action buttons row */
 .add-link-modal__actions {
   display: flex;
@@ -145,6 +150,11 @@
 
 .add-link-modal__btn--cancel:hover:not(:disabled) {
   background-color: var(--color-hover);
+}
+
+.add-link-modal__btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 @media (max-width: 520px) {

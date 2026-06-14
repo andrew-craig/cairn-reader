@@ -87,3 +87,14 @@
   opacity: 0.6;
   cursor: default;
 }
+
+.login-tab:focus-visible,
+.login-submit:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.login-input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
