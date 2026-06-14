@@ -75,8 +75,12 @@ func (fw *FeedWorker) Start() {
 // Stop gracefully stops the worker pool
 func (fw *FeedWorker) Stop() {
 	fw.mu.Lock()
+	if fw.stopped {
+		fw.mu.Unlock()
+		return
+	}
 	fw.stopped = true
-	close(fw.stopCh)
+	close(fw.feedQueue)
 	fw.mu.Unlock()
 	fw.wg.Wait()
 	slog.Info("Feed worker pool stopped")
