@@ -69,28 +69,50 @@ func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// OptionalAuth is middleware that validates JWT token if present, but allows
-// request to continue if token is missing. Use IsAuthenticated() to check auth status.
+// OptionalAuth is middleware for endpoints where credentials are optional —
+// authenticated callers receive a personalized response, anonymous callers a
+// public one. Use IsAuthenticated() in the handler to branch on auth state.
+//
+// Semantics (fail-closed when credentials are presented):
+//   - No Authorization header: continue unauthenticated.
+//   - Authorization header present but malformed or carrying an invalid token
+//     (expired, bad signature, wrong issuer/audience, etc.): respond 401.
+//
+// The "optional" part is whether credentials are presented, not whether they
+// are valid. Silently dropping an invalid token would hide token-abuse
+// attempts and let a stale session pretend to be anonymous.
 func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract token from Authorization header
 		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		token, err := ExtractTokenFromHeader(authHeader)
 		if err != nil {
-			// No token or invalid format - continue without authentication
-			next.ServeHTTP(w, r)
+			slog.Warn("auth: rejected request on optional-auth endpoint: malformed Authorization header",
+				"error", err.Error(),
+				"method", r.Method,
+				"path", r.URL.Path,
+				"remote_addr", r.RemoteAddr,
+			)
+			m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
 			return
 		}
 
-		// Validate token
 		claims, err := m.validator.ValidateToken(token)
 		if err != nil {
-			// Invalid token - continue without authentication
-			next.ServeHTTP(w, r)
+			slog.Warn("auth: rejected request on optional-auth endpoint: token validation failed",
+				"error", err.Error(),
+				"method", r.Method,
+				"path", r.URL.Path,
+				"remote_addr", r.RemoteAddr,
+			)
+			m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
 			return
 		}
 
-		// Store user ID in context
 		ctx := SetUserIDInContext(r.Context(), claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

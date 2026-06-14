@@ -74,7 +74,9 @@ func handleProtected(w http.ResponseWriter, r *http.Request) {
 func handlePublic(w http.ResponseWriter, r *http.Request) {
 	var response map[string]interface{}
 
-	// Check if request is authenticated
+	// OptionalAuth has already rejected any presented-but-invalid token with
+	// 401 before reaching here. So this request is either anonymous or
+	// fully authenticated — never "tried to authenticate and failed".
 	if auth.IsAuthenticated(r.Context()) {
 		userID, _ := auth.GetUserIDFromContext(r.Context())
 		response = map[string]interface{}{

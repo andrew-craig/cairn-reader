@@ -65,7 +65,10 @@ func main() {
     })
 
     publicHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Check if authenticated (optional auth)
+        // Check if authenticated (optional auth). At this point the request is
+        // either anonymous (no Authorization header was sent) or carries a
+        // fully-validated token — OptionalAuth has already rejected invalid
+        // tokens with 401 before the handler runs.
         if auth.IsAuthenticated(r.Context()) {
             userID, _ := auth.GetUserIDFromContext(r.Context())
             fmt.Fprintf(w, "Authenticated user: %s", userID)
@@ -97,7 +100,9 @@ mux := http.NewServeMux()
 mux.Handle("/api/v1/recommendations/", middleware.RequireAuth(recommendationsHandler))
 mux.Handle("/api/v1/articles/read", middleware.RequireAuth(markReadHandler))
 
-// Optional auth - useful for endpoints that work with or without auth
+// Optional auth - useful for endpoints that work with or without auth.
+// Anonymous when no Authorization header is sent; 401 when a header is
+// present but the token is invalid.
 mux.Handle("/api/v1/articles/", middleware.OptionalAuth(articlesHandler))
 
 // Public routes - no auth required
@@ -163,9 +168,31 @@ middleware := auth.NewMiddleware(validator)
 // Require authentication - returns 401 if invalid/missing token
 protectedHandler := middleware.RequireAuth(handler)
 
-// Optional authentication - continues even if no token present
+// Optional authentication - anonymous when no Authorization header is sent,
+// but returns 401 if a header is present and the token is malformed,
+// expired, or otherwise invalid (fail-closed when credentials are presented).
 optionalHandler := middleware.OptionalAuth(handler)
 ```
+
+#### OptionalAuth security model
+
+`OptionalAuth` is fail-closed when credentials are presented:
+
+| Authorization header           | Result                                                  |
+|--------------------------------|---------------------------------------------------------|
+| absent                         | request continues anonymously                           |
+| present, malformed             | `401 Unauthorized` (Warn-logged with method/path/IP)    |
+| present, token invalid/expired | `401 Unauthorized` (Warn-logged with method/path/IP)    |
+| present, token valid           | request continues with `user_id` in context             |
+
+Clients that want anonymous access **must omit the `Authorization` header**.
+Sending a stale or tampered token does not silently fall back to anonymous —
+it returns `401` so the client can refresh or drop credentials and so
+abuse attempts surface in logs. Token contents are never logged.
+
+OpenAPI specs for endpoints behind `OptionalAuth` should declare
+`security: [{}, {bearerAuth: []}]` (both anonymous and bearer accepted) and
+document a `401` response for invalid credentials.
 
 ### Context Utilities
 
