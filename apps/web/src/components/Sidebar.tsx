@@ -95,12 +95,12 @@ export default function Sidebar() {
       <ul className="sidebar__nav">
         <li>
           <NavLink to="/read" className="sidebar__item" data-label="R">
-            Read
+            <span>Read</span>
           </NavLink>
         </li>
         <li>
           <NavLink to="/explore" className="sidebar__item" data-label="E">
-            Explore
+            <span>Explore</span>
           </NavLink>
         </li>
         <li>
