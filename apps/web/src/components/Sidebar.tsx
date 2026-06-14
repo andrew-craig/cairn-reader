@@ -94,12 +94,12 @@ export default function Sidebar() {
 
       <ul className="sidebar__nav">
         <li>
-          <NavLink to="/read" className="sidebar__item">
+          <NavLink to="/read" className="sidebar__item" data-label="R">
             Read
           </NavLink>
         </li>
         <li>
-          <NavLink to="/explore" className="sidebar__item">
+          <NavLink to="/explore" className="sidebar__item" data-label="E">
             Explore
           </NavLink>
         </li>
@@ -107,6 +107,7 @@ export default function Sidebar() {
           <button
             type="button"
             className={`sidebar__item sidebar__item--button${onYouRoute ? ' sidebar__item--active' : ''}`}
+            data-label="Y"
             aria-expanded={youExpanded}
             onClick={() => setYouExpanded((open) => !open)}
           >
