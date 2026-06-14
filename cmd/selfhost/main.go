@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	handleVersionFlag()
+
 	_ = godotenv.Load()
 
 	cfg := loadConfig()
@@ -28,7 +30,7 @@ func main() {
 	})
 	logging.SetDefault(logger)
 
-	slog.Info("starting cairn self-hosted server", slog.String("port", cfg.Port))
+	slog.Info("starting cairn self-hosted server", slog.String("version", version), slog.String("port", cfg.Port))
 
 	// Load JWT keys (file-based, auto-generate if needed)
 	slog.Info("loading JWT keys")

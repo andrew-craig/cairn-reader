@@ -75,6 +75,7 @@ All settings go in `.env`. Only `DB_PASSWORD` is required. See `.env.example` fo
 |----------|---------|-------------|
 | `DB_PASSWORD` | *(required)* | PostgreSQL password |
 | `DB_USER` | `cairn` | PostgreSQL user |
+| `CAIRN_VERSION` | `latest` | Published image tag to run (see [Versioning & Releases](#versioning--releases)) |
 | `PORT` | `8099` | HTTP port |
 | `EMAIL_DOMAIN` | `read.cairnapp.com` | Domain for email ingestion |
 | `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
@@ -177,6 +178,38 @@ All services share port 8099:
 | `/health/live` | Liveness check |
 | `/health/ready` | Readiness check (includes DB) |
 
+## Versioning & Releases
+
+Published images are tagged from git tags using [SemVer](https://semver.org/).
+Pushing a `vMAJOR.MINOR.PATCH` tag triggers the **Build Selfhost** workflow,
+which publishes the image to GHCR with these tags:
+
+| Git tag | Image tags produced |
+|---------|---------------------|
+| `v1.2.3` | `1.2.3`, `1.2`, `1`, `latest`, `sha-<commit>` |
+| *(push to `main`)* | `main`, `latest`, `sha-<commit>` |
+
+Pin `CAIRN_VERSION` in `.env` to control how aggressively you upgrade:
+
+- `CAIRN_VERSION=1.2.3` — exact release, never moves
+- `CAIRN_VERSION=1.2` — latest patch within the 1.2 line
+- `CAIRN_VERSION=1` — latest minor+patch within v1
+- `CAIRN_VERSION=latest` (default) — newest build, including `main`
+
+The running version is baked into the binary and reported at `/health/live`
+(and via `cairn-selfhost --version`):
+
+```bash
+curl -s http://localhost:8099/health/live | jq .version   # e.g. "1.2.3"
+```
+
+**Cutting a release** (maintainers):
+
+```bash
+git tag -a v1.2.3 -m "Cairn v1.2.3"
+git push origin v1.2.3
+```
+
 ## Upgrading
 
 ```bash
@@ -184,6 +217,9 @@ docker compose pull   # if using published images
 # or
 docker compose up -d --build  # if building from source
 ```
+
+To move to a specific release, set `CAIRN_VERSION` in `.env` first, then
+`docker compose pull && docker compose up -d`.
 
 Database migrations run automatically on startup.
 

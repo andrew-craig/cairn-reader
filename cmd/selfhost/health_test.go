@@ -32,6 +32,9 @@ func TestHealthChecker_Liveness(t *testing.T) {
 	if body["service"] != "cairn-selfhost" {
 		t.Errorf("service field = %q, want cairn-selfhost", body["service"])
 	}
+	if body["version"] != version {
+		t.Errorf("version field = %q, want %q", body["version"], version)
+	}
 }
 
 func TestHealthChecker_Readiness_NoChecks(t *testing.T) {
