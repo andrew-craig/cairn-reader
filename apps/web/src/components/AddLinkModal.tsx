@@ -70,16 +70,18 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
   const modalRef = useRef<HTMLDivElement>(null);
   // Capture the element that had focus when the modal opened so we can restore
   // it on close — required by ARIA modal best practices.
-  const triggerRef = useRef<Element | null>(document.activeElement);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   useFocusTrap(modalRef);
 
   // Focus the input on mount; restore focus to the trigger on unmount.
   useEffect(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      triggerRef.current = document.activeElement;
+    }
     inputRef.current?.focus();
-    const trigger = triggerRef.current;
     return () => {
-      if (trigger instanceof HTMLElement) trigger.focus();
+      triggerRef.current?.focus();
     };
   }, []);
 

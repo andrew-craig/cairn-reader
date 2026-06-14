@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom';
-import { NavLink } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './You.css';
 

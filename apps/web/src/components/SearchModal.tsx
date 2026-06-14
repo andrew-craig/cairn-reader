@@ -49,7 +49,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   // Capture the element that had focus when the modal opened so we can restore
   // it on close — required by ARIA modal best practices.
-  const triggerRef = useRef<Element | null>(document.activeElement);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,10 +60,12 @@ export default function SearchModal({ onClose }: SearchModalProps) {
 
   // Focus the input on mount; restore focus to the trigger on unmount.
   useEffect(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      triggerRef.current = document.activeElement;
+    }
     inputRef.current?.focus();
-    const trigger = triggerRef.current;
     return () => {
-      if (trigger instanceof HTMLElement) trigger.focus();
+      triggerRef.current?.focus();
     };
   }, []);
 
