@@ -32,6 +32,10 @@ export default function About() {
   return (
     <div className="about-page">
       <div className="about-row">
+        <span className="about-label">App version</span>
+        <span className="about-value">{__APP_VERSION__}</span>
+      </div>
+      <div className="about-row">
         <span className="about-label">Server version</span>
         <span className="about-value">{versionValue}</span>
       </div>

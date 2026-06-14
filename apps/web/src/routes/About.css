@@ -10,8 +10,11 @@
   justify-content: space-between;
   gap: var(--spacing-md);
   padding: var(--spacing-md) 0;
-  border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
+}
+
+.about-row:first-child {
+  border-top: 1px solid var(--color-border);
 }
 
 .about-label {

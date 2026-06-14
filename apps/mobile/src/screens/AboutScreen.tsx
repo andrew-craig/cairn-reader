@@ -7,8 +7,13 @@ import { ScreenHeader } from '../components/common/ScreenHeader';
 import { SystemService } from '../services/system';
 import { Colors, Spacing, FontSizes, FontFamily } from '../constants/theme';
 import { RootStackParamList } from '../types';
+import appConfig from '../../app.json';
 
 type AboutScreenNavigationProp = StackNavigationProp<RootStackParamList, 'About'>;
+
+// The app's own version, from the Expo manifest (source of truth for the
+// shipped build).
+const appVersion = appConfig.expo.version;
 
 export const AboutScreen: React.FC = () => {
   const colorScheme = useColorScheme();
@@ -56,6 +61,10 @@ export const AboutScreen: React.FC = () => {
         <ScreenHeader title="About" onBack={() => navigation.goBack()} />
 
         <View style={styles.content}>
+          <View style={[styles.row, styles.rowFirst, { borderColor: colors.border }]}>
+            <Text style={[styles.label, { color: colors.text }]}>App version</Text>
+            <Text style={[styles.value, { color: colors.textSecondary }]}>{appVersion}</Text>
+          </View>
           <View style={[styles.row, { borderColor: colors.border }]}>
             <Text style={[styles.label, { color: colors.text }]}>Server version</Text>
             <Text style={[styles.value, { color: colors.textSecondary }]}>{versionValue}</Text>
@@ -85,8 +94,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: Spacing.md,
-    borderTopWidth: 1,
     borderBottomWidth: 1,
+  },
+  rowFirst: {
+    borderTopWidth: 1,
   },
   label: {
     fontSize: FontSizes.md,
