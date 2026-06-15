@@ -42,7 +42,8 @@
   /* Font families */
   --font-body:
     'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-heading: 'Crimson Pro', Georgia, 'Times New Roman', serif;
+  --font-heading: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-brand: 'Crimson Pro', Georgia, 'Times New Roman', serif;
 
   /* Hint to the UA so form controls, scrollbars, etc. adapt to the scheme. */
   color-scheme: light;
@@ -96,4 +97,24 @@ h4,
 h5,
 h6 {
   font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.sidebar__brand,
+.login-title {
+  font-family: var(--font-brand);
+}
+
+/* Visually hidden but available to screen readers. Used for section titles that
+   are redundant with the nav but kept in the DOM for accessibility. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

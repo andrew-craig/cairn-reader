@@ -43,9 +43,7 @@ export default function Newsletters() {
   return (
     <div className="read">
       <header className="read__header">
-        <h1 style={{ margin: 0, fontFamily: 'var(--font-heading)', fontSize: 'var(--font-size-xl)', fontWeight: 600 }}>
-          Newsletters
-        </h1>
+        <h1 className="sr-only">Newsletters</h1>
       </header>
 
       {loading ? (

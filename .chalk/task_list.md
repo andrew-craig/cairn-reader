@@ -36,7 +36,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
-- **task_4afd** · P3 · open · Review and harden OptionalAuth middleware behavior
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)

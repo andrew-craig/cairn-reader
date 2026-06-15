@@ -16,7 +16,6 @@ export default function Read() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true); // first page
   const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddLink, setShowAddLink] = useState(false);
@@ -60,10 +59,9 @@ export default function Read() {
 
   const handleRefresh = useCallback(() => {
     if (inFlightRef.current) return;
-    setRefreshing(true);
     // Keep the current list visible; fetchPage(true) replaces it with the first
     // page once it loads, avoiding an empty-state flash mid-refresh.
-    fetchPage(true).finally(() => setRefreshing(false));
+    void fetchPage(true);
   }, [fetchPage]);
 
   const handleLoadMore = useCallback(() => {
@@ -122,14 +120,6 @@ export default function Read() {
           Search your reading list
         </button>
         <div className="read__actions">
-          <button
-            type="button"
-            className="read__refresh"
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
           <button
             type="button"
             className="read__add-link"

@@ -7,28 +7,6 @@
   overflow-y: auto;
 }
 
-.reader__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: var(--spacing-sm) 0;
-  margin-bottom: var(--spacing-lg);
-  background-color: var(--color-background);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.reader__toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-}
-
 .reader__action {
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-border);
@@ -59,11 +37,14 @@
   color: var(--color-warning);
 }
 
-/* Reading column — capped at a comfortable measure (~70ch) and centered. */
+/* Reading column — capped at a comfortable measure (~70ch) and centered.
+   Extra bottom padding ensures the floating action bar (54px pill + offset)
+   doesn't obscure the final lines of content. */
 .reader__article {
   max-width: 70ch;
   margin: 0 auto;
-  padding-bottom: var(--spacing-xxl);
+  /* 48px (--spacing-xxl) + 80px for the FAB = 128px total */
+  padding-bottom: calc(var(--spacing-xxl) + 80px);
 }
 
 .reader__header {

@@ -9,12 +9,14 @@ import './AppLayout.css';
 export default function AppLayout() {
   return (
     <div className="app-shell">
-      <Sidebar />
-      <main className="app-main">
-        <div className="app-content">
-          <Outlet />
-        </div>
-      </main>
+      <div className="app-shell__inner">
+        <Sidebar />
+        <main className="app-main">
+          <div className="app-content">
+            <Outlet />
+          </div>
+        </main>
+      </div>
       <BottomNav />
     </div>
   );
