@@ -152,7 +152,7 @@ export default function Sidebar() {
 
       <ul className="sidebar__nav">
         <li>
-          <NavLink to="/read" className="sidebar__item">
+          <NavLink to="/read" className="sidebar__item" aria-label="Read">
             <span className="sidebar__item-leading">
               <span className="sidebar__icon"><ReadIcon /></span>
               <span>Read</span>
@@ -160,7 +160,7 @@ export default function Sidebar() {
           </NavLink>
         </li>
         <li>
-          <NavLink to="/explore" className="sidebar__item">
+          <NavLink to="/explore" className="sidebar__item" aria-label="Explore">
             <span className="sidebar__item-leading">
               <span className="sidebar__icon"><ExploreIcon /></span>
               <span>Explore</span>
@@ -172,6 +172,7 @@ export default function Sidebar() {
             type="button"
             className={`sidebar__item sidebar__item--button${onYouRoute ? ' sidebar__item--active' : ''}`}
             aria-expanded={youExpanded}
+            aria-label="You"
             onClick={() => setYouExpanded((open) => !open)}
           >
             <span className="sidebar__item-leading">

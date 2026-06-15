@@ -11,7 +11,9 @@
 .app-shell__inner {
   display: flex;
   flex: 1;
-  max-width: 860px;
+  /* 860px content band (160px sidebar + 700px content) plus the outer padding,
+     so border-box padding doesn't eat into the content column's 700px cap. */
+  max-width: calc(860px + 2 * var(--spacing-lg));
   width: 100%;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
