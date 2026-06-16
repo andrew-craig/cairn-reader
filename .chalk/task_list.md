@@ -4,20 +4,20 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_9c21** · P1 · open · Pre-beta architecture audit
+- **task_1d08** · P2 · in_progress · Audit 6: Infrastructure reliability & scaling  (parent: epic_9c21)
+- **task_1eaa** · P2 · in_progress · Audit 3: Mobile client/server efficiency  (parent: epic_9c21)
+- **task_659b** · P2 · in_progress · Audit 4: Security & auth hardening  (parent: epic_9c21)
+- **task_ed30** · P2 · in_progress · Audit 5: Observability & operational readiness  (parent: epic_9c21)
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
-- **task_1d08** · P2 · open · Audit 6: Infrastructure reliability & scaling  (parent: epic_9c21)
-- **task_1eaa** · P2 · open · Audit 3: Mobile client/server efficiency  (parent: epic_9c21)
 - **task_5860** · P2 · open · Web: Migrate apps/mobile onto @cairn/shared (converge shared code)  (parent: epic_f54e)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
-- **task_659b** · P2 · open · Audit 4: Security & auth hardening  (parent: epic_9c21)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_b783** · P2 · open · Audit 7: Consolidate findings into proposed next-steps document  (parent: epic_9c21)
-- **task_ed30** · P2 · open · Audit 5: Observability & operational readiness  (parent: epic_9c21)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)

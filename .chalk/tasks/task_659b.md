@@ -2,14 +2,14 @@
 id: task_659b
 title: Audit 4: Security & auth hardening
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [audit,security]
 blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:06:39Z
-updated_at: 2026-06-06T05:06:39Z
+updated_at: 2026-06-16T10:23:34Z
 ---
 Audit auth/authorization/security posture for a PUBLIC-facing service. services/users/internal/{auth,handlers,services,middleware}, pkg/auth, pkg/middleware, pkg/rss/sanitize.
 
