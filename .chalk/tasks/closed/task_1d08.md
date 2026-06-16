@@ -2,14 +2,14 @@
 id: task_1d08
 title: Audit 6: Infrastructure reliability & scaling
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [audit,infra,reliability]
 blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:06:57Z
-updated_at: 2026-06-16T10:23:34Z
+updated_at: 2026-06-16T10:32:53Z
 ---
 Audit infra for reliability and the path from single-instance to scaled public beta. infrastructure/docker/{prod,selfhost,dev}, Caddyfile, vault-config, infrastructure/cloudflare/email-worker, docs/DEPLOYMENT.md.
 

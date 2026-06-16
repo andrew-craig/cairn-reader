@@ -4,10 +4,16 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_9c21** · P1 · open · Pre-beta architecture audit
-- **task_1d08** · P2 · in_progress · Audit 6: Infrastructure reliability & scaling  (parent: epic_9c21)
-- **task_1eaa** · P2 · in_progress · Audit 3: Mobile client/server efficiency  (parent: epic_9c21)
-- **task_659b** · P2 · in_progress · Audit 4: Security & auth hardening  (parent: epic_9c21)
-- **task_ed30** · P2 · in_progress · Audit 5: Observability & operational readiness  (parent: epic_9c21)
+- **task_0502** · P1 · open · Add explore server-side search endpoint (replace client-side-only filter)  (parent: epic_9c21)
+- **task_065e** · P1 · open · API freeze: reconcile OpenAPI specs with routes and unify error envelope  (parent: epic_9c21)
+- **task_0b27** · P1 · open · Add statement_timeout to all API DB connection pools  (parent: epic_9c21)
+- **task_12e0** · P1 · open · Add explore vote-stats aggregate endpoint (replace limit=10000 client count)  (parent: epic_9c21)
+- **task_2c1f** · P1 · open · RFC email validation and email verification flow  (parent: epic_9c21)
+- **task_7683** · P1 · open · Set Postgres max_connections and cap connection pools in prod compose  (parent: epic_9c21)
+- **task_bfad** · P1 · open · Split content list vs detail payload (drop cleaned_html from list/search responses)  (parent: epic_9c21)
+- **task_f416** · P1 · open · Add per-account failed-login tracking and account lockout  (parent: epic_9c21)
+- **task_fc2f** · P1 · open · Set HTTP Read/Write/Idle timeouts on user-service  (parent: epic_9c21)
+- **task_fe44** · P1 · open · Add forgot-password / reset-password flow  (parent: epic_9c21)
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -17,7 +23,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
-- **task_b783** · P2 · open · Audit 7: Consolidate findings into proposed next-steps document  (parent: epic_9c21)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
@@ -34,11 +39,17 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
+- **task_126b** · P3 · open · Security fast-follow: Redis-backed rate limiter, auth audit log, Vault startup retry  (parent: epic_9c21)
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
+- **task_396d** · P3 · open · Standardise health-check JSON and document undocumented routes in specs  (parent: epic_9c21)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
+- **task_5229** · P3 · open · Mobile resilience: focus-refetch TTL, retry/backoff, offline stale-fallback  (parent: epic_9c21)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
+- **task_9208** · P3 · open · Data-layer fast-follow: indexes, pool unification, bulk insert, drop unused view, migration CI  (parent: epic_9c21)
+- **task_9b71** · P3 · open · Propagate X-Request-ID across service-to-service HTTP calls  (parent: epic_9c21)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
+- **task_c542** · P3 · open · Infra fast-follow: document single-instance topology, sslmode note, email API key rotation  (parent: epic_9c21)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support

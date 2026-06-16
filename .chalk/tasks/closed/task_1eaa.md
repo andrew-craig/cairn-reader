@@ -2,14 +2,14 @@
 id: task_1eaa
 title: Audit 3: Mobile client/server efficiency
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [audit,mobile]
 blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:06:32Z
-updated_at: 2026-06-16T10:23:34Z
+updated_at: 2026-06-16T10:32:52Z
 ---
 Audit how the React Native client consumes the API for over-fetching, wasted calls, and resilience. apps/mobile/src/services/{auth,read,explore}.ts and screens (ExploreScreen, ReadScreen, ReadArticleDetailScreen).
 
