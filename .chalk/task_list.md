@@ -4,7 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_5378** · P1 · open · Pre-beta audit remediation
-- **epic_9c21** · P1 · open · Pre-beta architecture audit
 - **task_0502** · P1 · open · Add explore server-side search endpoint (replace client-side-only filter)  (parent: epic_5378)
 - **task_065e** · P1 · open · API freeze: reconcile OpenAPI specs with routes and unify error envelope  (parent: epic_5378)
 - **task_0b27** · P1 · open · Add statement_timeout to all API DB connection pools  (parent: epic_5378)
