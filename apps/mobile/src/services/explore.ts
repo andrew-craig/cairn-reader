@@ -42,6 +42,16 @@ interface UserVotesResponse {
   count: number;
 }
 
+interface SearchResponse {
+  articles: BackendArticle[];
+  count: number;
+  pagination: {
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+}
+
 export interface VotedArticleWithType extends Article {
   voteType: 'upvote' | 'downvote';
 }
@@ -278,6 +288,28 @@ export class ExploreService {
       return { upvotes: data.upvotes, downvotes: data.downvotes };
     } catch (error) {
       console.error('Error fetching user vote stats:', error);
+      throw error;
+    }
+  }
+
+  static async searchArticles(q: string, limit = 20, offset = 0): Promise<Article[]> {
+    try {
+      const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+      const response = await this.fetchWithAuth(
+        `${getServerUrl()}/api/v1/explore/search?${params.toString()}`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to search articles');
+      }
+
+      const data: SearchResponse = result.data;
+
+      return data.articles.map((article) => this.transformArticle(article));
+    } catch (error) {
+      console.error('Error searching articles:', error);
       throw error;
     }
   }

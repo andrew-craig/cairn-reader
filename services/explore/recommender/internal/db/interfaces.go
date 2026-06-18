@@ -42,6 +42,10 @@ type ArticleRepositoryInterface interface {
 	// incrementing articles.recommends — should fire for this call.
 	RecordRecommendation(ctx context.Context, userID string, articleID string) (inserted bool, err error)
 
+	// Search returns non-deleted articles whose title, description, or author
+	// contain q (case-insensitive), paginated with limit/offset.
+	Search(ctx context.Context, q string, limit, offset int) ([]models.Article, error)
+
 	// MarkOldArticlesAsDeleted sets deleted=true for articles older than N days
 	MarkOldArticlesAsDeleted(ctx context.Context, days int) (int, error)
 
