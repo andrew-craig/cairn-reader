@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 )
 
@@ -65,6 +66,7 @@ func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []model
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

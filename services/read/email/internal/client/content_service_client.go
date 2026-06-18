@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/google/uuid"
 	"github.com/sony/gobreaker"
 )
@@ -217,6 +218,7 @@ func (c *ContentServiceClient) createContent(ctx context.Context, payload []Emai
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -269,6 +271,7 @@ func (c *ContentServiceClient) addContentToUsers(ctx context.Context, contentID 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

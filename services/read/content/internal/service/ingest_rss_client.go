@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 )
 
 // ErrSubscriptionNotFound is returned when an unsubscribe targets a subscription
@@ -101,6 +103,7 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -156,6 +159,7 @@ func (c *IngestRSSClient) UnsubscribeUserFromFeed(ctx context.Context, userID, f
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -192,6 +196,7 @@ func (c *IngestRSSClient) ListUserSubscriptions(ctx context.Context, userID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
