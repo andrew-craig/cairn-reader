@@ -76,6 +76,9 @@ func (s *Server) Routes() http.Handler {
 
 			// Get all articles the authenticated user has voted on
 			r.Get("/votes", s.handleGetUserVotedArticles)
+
+			// Get aggregate vote counts for the authenticated user
+			r.Get("/vote-stats", s.handleGetUserVoteStats)
 		})
 
 		// Protected article routes - require authentication

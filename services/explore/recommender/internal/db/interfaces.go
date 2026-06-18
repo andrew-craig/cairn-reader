@@ -76,6 +76,9 @@ type VoteRepositoryInterface interface {
 
 	// GetUserVotedArticles returns all articles a user has voted on with their vote types
 	GetUserVotedArticles(ctx context.Context, userID string, limit int, offset int) ([]VotedArticle, error)
+
+	// GetUserVoteStats returns aggregate upvote/downvote counts for a user without fetching rows
+	GetUserVoteStats(ctx context.Context, userID string) (upvotes int, downvotes int, err error)
 }
 
 // UserRepositoryInterface defines the contract for user database operations

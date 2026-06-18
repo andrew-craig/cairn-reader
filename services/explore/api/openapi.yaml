@@ -450,6 +450,42 @@ paths:
         '500':
           description: Failed to get vote counts
 
+  /api/v1/explore/user/vote-stats:
+    get:
+      tags:
+        - Votes
+      summary: Get user's aggregate vote stats
+      description: |
+        Returns total upvote and downvote counts for the authenticated user.
+        Computed server-side with a single aggregate query — no row fetching.
+        The user is identified by the JWT token; no user ID parameter is required.
+      operationId: getUserVoteStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vote stats retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upvotes:
+                    type: integer
+                    description: Total number of upvotes cast by the user
+                    example: 42
+                  downvotes:
+                    type: integer
+                    description: Total number of downvotes cast by the user
+                    example: 7
+                required:
+                  - upvotes
+                  - downvotes
+        '401':
+          description: Unauthorized - missing or invalid JWT token
+        '500':
+          description: Failed to get vote stats
+
   /api/v1/explore/user/votes:
     get:
       tags:

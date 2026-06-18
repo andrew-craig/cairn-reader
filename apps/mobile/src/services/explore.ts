@@ -264,9 +264,8 @@ export class ExploreService {
 
   static async getUserVoteStats(): Promise<{ upvotes: number; downvotes: number }> {
     try {
-      // Fetch all votes with a high limit to get complete counts
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/user/votes?limit=10000&offset=0`
+        `${getServerUrl()}/api/v1/explore/user/vote-stats`
       );
 
       const result = await response.json();
@@ -275,13 +274,8 @@ export class ExploreService {
         throw new Error(result.message || result.error || 'Failed to get vote stats');
       }
 
-      const data: UserVotesResponse = result.data;
-
-      // Count upvotes and downvotes
-      const upvotes = data.votes.filter((v) => v.vote_type === 'upvote').length;
-      const downvotes = data.votes.filter((v) => v.vote_type === 'downvote').length;
-
-      return { upvotes, downvotes };
+      const data = result.data as { upvotes: number; downvotes: number };
+      return { upvotes: data.upvotes, downvotes: data.downvotes };
     } catch (error) {
       console.error('Error fetching user vote stats:', error);
       throw error;

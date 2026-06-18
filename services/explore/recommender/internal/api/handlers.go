@@ -409,6 +409,31 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
+// handleGetUserVoteStats returns aggregate upvote/downvote counts for the authenticated user
+// GET /api/v1/explore/user/vote-stats
+func (s *Server) handleGetUserVoteStats(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from JWT token context
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+	userID := authenticatedUserID.String()
+
+	upvotes, downvotes, err := s.voteRepo.GetUserVoteStats(r.Context(), userID)
+	if err != nil {
+		slog.Error("failed to get user vote stats", slog.String("user_id", userID), slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get vote stats", nil, "v1")
+		return
+	}
+
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+		"upvotes":   upvotes,
+		"downvotes": downvotes,
+	}, "v1")
+}
+
 // handleGetUserVotedArticles returns all articles the authenticated user has voted on
 // GET /api/v1/explore/user/votes
 func (s *Server) handleGetUserVotedArticles(w http.ResponseWriter, r *http.Request) {
