@@ -196,8 +196,12 @@ func main() {
 
 	// Create HTTP server
 	srv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: router,
+		Addr:              ":" + cfg.Server.Port,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// Start server in a goroutine
