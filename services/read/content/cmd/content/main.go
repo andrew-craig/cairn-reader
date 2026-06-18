@@ -60,12 +60,13 @@ func main() {
 	// Prepare database config
 	port, _ := strconv.Atoi(cfg.Database.Port)
 	dbConfig := database.Config{
-		Host:     cfg.Database.Host,
-		Port:     port,
-		User:     cfg.Database.User,
-		Password: cfg.Database.Password,
-		DBName:   cfg.Database.DBName,
-		SSLMode:  cfg.Database.SSLMode,
+		Host:             cfg.Database.Host,
+		Port:             port,
+		User:             cfg.Database.User,
+		Password:         cfg.Database.Password,
+		DBName:           cfg.Database.DBName,
+		SSLMode:          cfg.Database.SSLMode,
+		StatementTimeout: cfg.Database.StatementTimeout,
 	}
 
 	if err := database.RunMigrations(&dbConfig, migrationsPath); err != nil {

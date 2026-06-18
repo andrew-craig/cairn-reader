@@ -26,12 +26,13 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection settings
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host             string
+	Port             string
+	User             string
+	Password         string
+	DBName           string
+	SSLMode          string
+	StatementTimeout time.Duration
 }
 
 // EmailConfig holds email-specific settings
@@ -82,12 +83,13 @@ func Load() (*Config, error) {
 			ShutdownTimeout: 30 * time.Second,
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "cairn_user_email"),
-			Password: getEnv("DB_PASSWORD", ""),
-			DBName:   getEnv("DB_NAME", "ingest_email"),
-			SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+			Host:             getEnv("DB_HOST", "localhost"),
+			Port:             getEnv("DB_PORT", "5432"),
+			User:             getEnv("DB_USER", "cairn_user_email"),
+			Password:         getEnv("DB_PASSWORD", ""),
+			DBName:           getEnv("DB_NAME", "ingest_email"),
+			SSLMode:          getEnv("DB_SSL_MODE", "disable"),
+			StatementTimeout: getEnvDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 		},
 		Email: EmailConfig{
 			Domain: getEnv("EMAIL_DOMAIN", "read.cairnapp.com"),

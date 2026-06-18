@@ -91,15 +91,16 @@ func main() {
 	}
 
 	dbConfig := &database.Config{
-		Host:            cfg.Database.Host,
-		Port:            cfg.Database.Port,
-		User:            cfg.Database.User,
-		Password:        cfg.Database.Password,
-		Database:        cfg.Database.Database,
-		SSLMode:         cfg.Database.SSLMode,
-		MaxOpenConns:    int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns:    int32(cfg.Database.MaxIdleConns),
-		ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+		Host:             cfg.Database.Host,
+		Port:             cfg.Database.Port,
+		User:             cfg.Database.User,
+		Password:         cfg.Database.Password,
+		Database:         cfg.Database.Database,
+		SSLMode:          cfg.Database.SSLMode,
+		MaxOpenConns:     int32(cfg.Database.MaxOpenConns),
+		MaxIdleConns:     int32(cfg.Database.MaxIdleConns),
+		ConnMaxLifetime:  cfg.Database.ConnMaxLifetime,
+		StatementTimeout: cfg.Database.StatementTimeout,
 	}
 
 	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil {
@@ -269,15 +270,16 @@ func initializeVault(cfg *config.Config) (*auth.VaultClient, error) {
 // initializeDatabase creates and configures the database connection
 func initializeDatabase(cfg *config.Config) (*database.DB, error) {
 	dbConfig := &database.Config{
-		Host:            cfg.Database.Host,
-		Port:            cfg.Database.Port,
-		User:            cfg.Database.User,
-		Password:        cfg.Database.Password,
-		Database:        cfg.Database.Database,
-		SSLMode:         cfg.Database.SSLMode,
-		MaxOpenConns:    int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns:    int32(cfg.Database.MaxIdleConns),
-		ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+		Host:             cfg.Database.Host,
+		Port:             cfg.Database.Port,
+		User:             cfg.Database.User,
+		Password:         cfg.Database.Password,
+		Database:         cfg.Database.Database,
+		SSLMode:          cfg.Database.SSLMode,
+		MaxOpenConns:     int32(cfg.Database.MaxOpenConns),
+		MaxIdleConns:     int32(cfg.Database.MaxIdleConns),
+		ConnMaxLifetime:  cfg.Database.ConnMaxLifetime,
+		StatementTimeout: cfg.Database.StatementTimeout,
 	}
 
 	db, err := database.New(dbConfig)

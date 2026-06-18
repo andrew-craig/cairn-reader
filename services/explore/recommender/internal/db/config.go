@@ -20,6 +20,15 @@ func envInt32(key string, fallback int32) int32 {
 	return fallback
 }
 
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return fallback
+}
+
 // Config holds database configuration
 type Config struct {
 	Host     string
@@ -52,6 +61,15 @@ func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	config.MinConns = envInt32("DB_MIN_CONNS", 5)
 	config.MaxConnLifetime = 5 * time.Minute
 	config.MaxConnIdleTime = 5 * time.Minute
+
+	// Statement timeout: prevent slow queries from exhausting the pool.
+	// Overridable via DB_STATEMENT_TIMEOUT (e.g. "30s", "60s").
+	if timeout := envDuration("DB_STATEMENT_TIMEOUT", 30*time.Second); timeout > 0 {
+		if config.ConnConfig.RuntimeParams == nil {
+			config.ConnConfig.RuntimeParams = make(map[string]string)
+		}
+		config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%d", timeout.Milliseconds())
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
