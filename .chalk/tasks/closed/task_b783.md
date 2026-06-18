@@ -2,14 +2,14 @@
 id: task_b783
 title: Audit 7: Consolidate findings into proposed next-steps document
 type: task
-status: open
+status: closed
 priority: 2
 labels: [audit,docs]
-blocked_by: [task_1eaa,task_659b,task_ed30,task_1d08]
+blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:07:07Z
-updated_at: 2026-06-08T05:22:41Z
+updated_at: 2026-06-16T10:32:58Z
 ---
 Synthesise the six audit workstreams into a single decision-ready document: docs/architecture/PRE_BETA_AUDIT.md.
 

@@ -2,14 +2,14 @@
 id: epic_9c21
 title: Pre-beta architecture audit
 type: epic
-status: open
+status: closed
 priority: 1
 labels: [audit,pre-beta,architecture]
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-06-06T05:06:01Z
-updated_at: 2026-06-06T05:06:01Z
+updated_at: 2026-06-18T22:44:56Z
 ---
 Complete architecture audit before opening Cairn to public beta. Goal: assess the system for efficiency, optimisation, consistency, scalability, and operational readiness while API/contract changes are still cheap to make. The audit is split into workstreams (API contract, data layer, mobile client, security, observability/ops, infra reliability). Each workstream produces findings; a final task consolidates everything into a single proposed-next-steps document (docs/architecture/PRE_BETA_AUDIT.md) that ranks remediation work as beta-blocking vs fast-follow vs roadmap.
 

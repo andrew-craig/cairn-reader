@@ -2,14 +2,14 @@
 id: task_ed30
 title: Audit 5: Observability & operational readiness
 type: task
-status: open
+status: closed
 priority: 2
 labels: [audit,observability,ops]
 blocked_by: []
 parent: epic_9c21
 remote_task_url: null
 created_at: 2026-06-06T05:06:48Z
-updated_at: 2026-06-06T05:06:48Z
+updated_at: 2026-06-16T10:32:53Z
 ---
 Audit ability to OPERATE the system in public beta. pkg/logging, pkg/config, pkg/env, health handlers, infrastructure/docker/{prod,selfhost}, .github/workflows.
 
