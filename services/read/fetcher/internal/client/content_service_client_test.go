@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -514,6 +515,67 @@ func TestIsNonRetryableError(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// TestRequestIDPropagation verifies that X-Request-ID from the context is
+// forwarded on outbound calls to the Content Service.
+func TestRequestIDPropagation(t *testing.T) {
+	const wantID = "trace-id-12345"
+
+	var gotID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotID = r.Header.Get(logging.HeaderXRequestID)
+		writeEnvelope(w, http.StatusOK, ContentResponse{
+			ID:    uuid.New(),
+			Title: "Test",
+		})
+	}))
+	defer server.Close()
+
+	client := NewContentServiceClient(ContentServiceConfig{
+		BaseURL:    server.URL,
+		MaxRetries: 0,
+	})
+
+	ctx := logging.WithRequestID(context.Background(), wantID)
+	htmlContent := "<html><body>Test</body></html>"
+	_, err := client.CreateContent(ctx, CreateContentRequest{
+		URL:        "https://example.com/article",
+		HTML:       &htmlContent,
+		SourceType: "rss",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, wantID, gotID, "X-Request-ID should be forwarded to downstream service")
+}
+
+// TestRequestIDPropagation_Generated verifies that a request ID is generated
+// when none is present in the context.
+func TestRequestIDPropagation_Generated(t *testing.T) {
+	var gotID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotID = r.Header.Get(logging.HeaderXRequestID)
+		writeEnvelope(w, http.StatusOK, ContentResponse{
+			ID:    uuid.New(),
+			Title: "Test",
+		})
+	}))
+	defer server.Close()
+
+	client := NewContentServiceClient(ContentServiceConfig{
+		BaseURL:    server.URL,
+		MaxRetries: 0,
+	})
+
+	htmlContent := "<html><body>Test</body></html>"
+	_, err := client.CreateContent(context.Background(), CreateContentRequest{
+		URL:        "https://example.com/article",
+		HTML:       &htmlContent,
+		SourceType: "rss",
+	})
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, gotID, "X-Request-ID should be set even when not in context")
 }
 
 // customError is a simple error type for testing

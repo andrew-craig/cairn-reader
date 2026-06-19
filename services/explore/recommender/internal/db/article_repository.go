@@ -190,6 +190,29 @@ func (r *articleRepository) GetRecent(ctx context.Context, limit int) ([]models.
 	return r.scanArticles(rows)
 }
 
+// Search returns non-deleted articles whose title, description, or author
+// match the query string (case-insensitive ILIKE), ordered by published DESC.
+func (r *articleRepository) Search(ctx context.Context, q string, limit, offset int) ([]models.Article, error) {
+	query := `
+		SELECT id, title, link, description, content, author, published, feed_url, feed_title, categories, feed_id,
+		       upvotes, downvotes, recommends, deleted, created_at, updated_at
+		FROM articles
+		WHERE deleted = false
+		  AND (title ILIKE $1 OR description ILIKE $1 OR author ILIKE $1)
+		ORDER BY published DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	pattern := "%" + q + "%"
+	rows, err := r.db.Query(ctx, query, pattern, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search articles: %w", err)
+	}
+	defer rows.Close()
+
+	return r.scanArticles(rows)
+}
+
 // GetUnreadForUser retrieves unread articles for a user
 func (r *articleRepository) GetUnreadForUser(ctx context.Context, userID string, limit int) ([]models.Article, error) {
 	query := `

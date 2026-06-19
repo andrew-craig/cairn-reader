@@ -252,6 +252,23 @@ func (r *voteRepository) GetUserVote(ctx context.Context, userID string, article
 	return voteType, nil
 }
 
+// GetUserVoteStats returns aggregate upvote/downvote counts for the user using a single
+// COUNT ... FILTER query — no row fetching, no client-side counting.
+func (r *voteRepository) GetUserVoteStats(ctx context.Context, userID string) (upvotes int, downvotes int, err error) {
+	query := `
+		SELECT
+			COUNT(*) FILTER (WHERE vote_type = 'upvote')   AS upvotes,
+			COUNT(*) FILTER (WHERE vote_type = 'downvote') AS downvotes
+		FROM votes
+		WHERE user_id = $1
+	`
+	err = r.db.QueryRow(ctx, query, userID).Scan(&upvotes, &downvotes)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get user vote stats: %w", err)
+	}
+	return upvotes, downvotes, nil
+}
+
 // GetUserVotedArticles returns all articles a user has voted on with their vote types
 // Results are ordered by vote creation time (most recent first)
 func (r *voteRepository) GetUserVotedArticles(ctx context.Context, userID string, limit int, offset int) ([]VotedArticle, error) {

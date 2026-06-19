@@ -199,6 +199,7 @@ func loadConfig() Config {
 	maxIdleConns := getEnvAsInt("DB_MAX_IDLE_CONNS", 5)
 	connMaxLifetime := getEnvAsDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute)
 	connMaxIdleTime := getEnvAsDuration("DB_CONN_MAX_IDLE_TIME", 2*time.Minute)
+	statementTimeout := getEnvAsDuration("DB_STATEMENT_TIMEOUT", 30*time.Second)
 
 	// Content Service configuration
 	contentServiceURL := getEnv("CONTENT_SERVICE_URL", "http://localhost:8080")
@@ -221,16 +222,17 @@ func loadConfig() Config {
 
 	return Config{
 		DB: database.Config{
-			Host:            dbHost,
-			Port:            dbPort,
-			User:            dbUser,
-			Password:        dbPassword,
-			DBName:          dbName,
-			SSLMode:         dbSSLMode,
-			MaxOpenConns:    maxOpenConns,
-			MaxIdleConns:    maxIdleConns,
-			ConnMaxLifetime: connMaxLifetime,
-			ConnMaxIdleTime: connMaxIdleTime,
+			Host:             dbHost,
+			Port:             dbPort,
+			User:             dbUser,
+			Password:         dbPassword,
+			DBName:           dbName,
+			SSLMode:          dbSSLMode,
+			MaxOpenConns:     maxOpenConns,
+			MaxIdleConns:     maxIdleConns,
+			ConnMaxLifetime:  connMaxLifetime,
+			ConnMaxIdleTime:  connMaxIdleTime,
+			StatementTimeout: statementTimeout,
 		},
 		ContentService: client.ContentServiceConfig{
 			BaseURL:        contentServiceURL,

@@ -409,6 +409,73 @@ func (s *Server) handleGetVotes(w http.ResponseWriter, r *http.Request) {
 	pkgapi.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
+// handleGetUserVoteStats returns aggregate upvote/downvote counts for the authenticated user
+// GET /api/v1/explore/user/vote-stats
+func (s *Server) handleGetUserVoteStats(w http.ResponseWriter, r *http.Request) {
+	// Extract authenticated user ID from JWT token context
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+	userID := authenticatedUserID.String()
+
+	upvotes, downvotes, err := s.voteRepo.GetUserVoteStats(r.Context(), userID)
+	if err != nil {
+		slog.Error("failed to get user vote stats", slog.String("user_id", userID), slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to get vote stats", nil, "v1")
+		return
+	}
+
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+		"upvotes":   upvotes,
+		"downvotes": downvotes,
+	}, "v1")
+}
+
+// handleSearch searches articles by query string
+// GET /api/v1/explore/search?q=...&limit=...&offset=...
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		pkgapi.WriteError(w, http.StatusBadRequest, pkgapi.ErrCodeValidation, "q parameter is required", nil, "v1")
+		return
+	}
+
+	limit := 20
+	offset := 0
+
+	if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
+		if parsed, err := strconv.Atoi(limitParam); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	if offsetParam := r.URL.Query().Get("offset"); offsetParam != "" {
+		if parsed, err := strconv.Atoi(offsetParam); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	articles, err := s.articleRepo.Search(r.Context(), q, limit, offset)
+	if err != nil {
+		slog.Error("failed to search articles", slog.String("q", q), slog.Any("error", err))
+		pkgapi.WriteError(w, http.StatusInternalServerError, pkgapi.ErrCodeInternal, "Failed to search articles", nil, "v1")
+		return
+	}
+
+	pkgapi.WriteSuccess(w, http.StatusOK, map[string]interface{}{
+		"articles": articles,
+		"count":    len(articles),
+		"pagination": map[string]interface{}{
+			"limit":    limit,
+			"offset":   offset,
+			"has_more": len(articles) == limit,
+		},
+	}, "v1")
+}
+
 // handleGetUserVotedArticles returns all articles the authenticated user has voted on
 // GET /api/v1/explore/user/votes
 func (s *Server) handleGetUserVotedArticles(w http.ResponseWriter, r *http.Request) {

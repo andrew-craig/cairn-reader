@@ -32,15 +32,16 @@ type ServerConfig struct {
 
 // DatabaseConfig contains database connection configuration
 type DatabaseConfig struct {
-	Host            string
-	Port            string
-	User            string
-	Password        string
-	Database        string
-	SSLMode         string
-	MaxOpenConns    int
-	MaxIdleConns    int
-	ConnMaxLifetime time.Duration
+	Host             string
+	Port             string
+	User             string
+	Password         string
+	Database         string
+	SSLMode          string
+	MaxOpenConns     int
+	MaxIdleConns     int
+	ConnMaxLifetime  time.Duration
+	StatementTimeout time.Duration // Per-connection statement timeout (0 = no timeout)
 }
 
 // VaultConfig contains HashiCorp Vault configuration
@@ -82,15 +83,16 @@ func Load() (*Config, error) {
 			ShutdownTimeout: env.GetDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
 		},
 		Database: DatabaseConfig{
-			Host:            env.GetString("DB_HOST", "localhost"),
-			Port:            env.GetString("DB_PORT", "5432"),
-			User:            env.GetString("DB_USER", ""),
-			Password:        env.GetString("DB_PASSWORD", ""),
-			Database:        env.GetString("DB_NAME", "cairn_users"),
-			SSLMode:         env.GetString("DB_SSLMODE", "disable"),
-			MaxOpenConns:    env.GetInt("DB_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:    env.GetInt("DB_MAX_IDLE_CONNS", 5),
-			ConnMaxLifetime: env.GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+			Host:             env.GetString("DB_HOST", "localhost"),
+			Port:             env.GetString("DB_PORT", "5432"),
+			User:             env.GetString("DB_USER", ""),
+			Password:         env.GetString("DB_PASSWORD", ""),
+			Database:         env.GetString("DB_NAME", "cairn_users"),
+			SSLMode:          env.GetString("DB_SSLMODE", "disable"),
+			MaxOpenConns:     env.GetInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:     env.GetInt("DB_MAX_IDLE_CONNS", 5),
+			ConnMaxLifetime:  env.GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+			StatementTimeout: env.GetDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 		},
 		Vault: VaultConfig{
 			Address:              env.GetString("VAULT_ADDR", "http://localhost:8200"),

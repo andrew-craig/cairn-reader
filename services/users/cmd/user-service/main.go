@@ -91,15 +91,16 @@ func main() {
 	}
 
 	dbConfig := &database.Config{
-		Host:            cfg.Database.Host,
-		Port:            cfg.Database.Port,
-		User:            cfg.Database.User,
-		Password:        cfg.Database.Password,
-		Database:        cfg.Database.Database,
-		SSLMode:         cfg.Database.SSLMode,
-		MaxOpenConns:    int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns:    int32(cfg.Database.MaxIdleConns),
-		ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+		Host:             cfg.Database.Host,
+		Port:             cfg.Database.Port,
+		User:             cfg.Database.User,
+		Password:         cfg.Database.Password,
+		Database:         cfg.Database.Database,
+		SSLMode:          cfg.Database.SSLMode,
+		MaxOpenConns:     int32(cfg.Database.MaxOpenConns),
+		MaxIdleConns:     int32(cfg.Database.MaxIdleConns),
+		ConnMaxLifetime:  cfg.Database.ConnMaxLifetime,
+		StatementTimeout: cfg.Database.StatementTimeout,
 	}
 
 	if err := database.RunMigrations(dbConfig, migrationsPath); err != nil {
@@ -195,10 +196,7 @@ func main() {
 	slog.Info("HTTP router configured")
 
 	// Create HTTP server
-	srv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: router,
-	}
+	srv := newHTTPServer(":"+cfg.Server.Port, router)
 
 	// Start server in a goroutine
 	go func() {
@@ -238,6 +236,20 @@ func main() {
 	slog.Info("server exited gracefully")
 }
 
+// newHTTPServer builds the user-service HTTP server with the Read/Write/Idle
+// timeouts that mitigate slow-loris connection exhaustion (audit O-5). It is a
+// standalone constructor so the timeout configuration can be asserted in tests.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+}
+
 // initializeVault creates and configures the Vault client
 func initializeVault(cfg *config.Config) (*auth.VaultClient, error) {
 	vaultCfg := &auth.VaultConfig{
@@ -265,15 +277,16 @@ func initializeVault(cfg *config.Config) (*auth.VaultClient, error) {
 // initializeDatabase creates and configures the database connection
 func initializeDatabase(cfg *config.Config) (*database.DB, error) {
 	dbConfig := &database.Config{
-		Host:            cfg.Database.Host,
-		Port:            cfg.Database.Port,
-		User:            cfg.Database.User,
-		Password:        cfg.Database.Password,
-		Database:        cfg.Database.Database,
-		SSLMode:         cfg.Database.SSLMode,
-		MaxOpenConns:    int32(cfg.Database.MaxOpenConns),
-		MaxIdleConns:    int32(cfg.Database.MaxIdleConns),
-		ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+		Host:             cfg.Database.Host,
+		Port:             cfg.Database.Port,
+		User:             cfg.Database.User,
+		Password:         cfg.Database.Password,
+		Database:         cfg.Database.Database,
+		SSLMode:          cfg.Database.SSLMode,
+		MaxOpenConns:     int32(cfg.Database.MaxOpenConns),
+		MaxIdleConns:     int32(cfg.Database.MaxIdleConns),
+		ConnMaxLifetime:  cfg.Database.ConnMaxLifetime,
+		StatementTimeout: cfg.Database.StatementTimeout,
 	}
 
 	db, err := database.New(dbConfig)

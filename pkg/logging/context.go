@@ -4,6 +4,9 @@ package logging
 import (
 	"context"
 	"log/slog"
+	"net/http"
+
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -11,6 +14,9 @@ type contextKey string
 const (
 	loggerKey    contextKey = "logger"
 	requestIDKey contextKey = "request_id"
+
+	// HeaderXRequestID is the canonical header name for cross-service request tracing.
+	HeaderXRequestID = "X-Request-ID"
 )
 
 // WithLogger adds a logger to the context
@@ -37,4 +43,15 @@ func GetRequestIDFromContext(ctx context.Context) string {
 		return requestID
 	}
 	return ""
+}
+
+// SetRequestIDHeader copies the X-Request-ID from ctx onto req.
+// If ctx contains no request ID a new UUID is generated and used.
+// Call this before executing any outbound service-to-service HTTP request.
+func SetRequestIDHeader(ctx context.Context, req *http.Request) {
+	id := GetRequestIDFromContext(ctx)
+	if id == "" {
+		id = uuid.New().String()
+	}
+	req.Header.Set(HeaderXRequestID, id)
 }

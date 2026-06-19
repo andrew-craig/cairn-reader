@@ -16,15 +16,16 @@ import (
 
 // DatabaseConfig contains database connection configuration
 type DatabaseConfig struct {
-	Host            string
-	Port            string
-	User            string
-	Password        string
-	DBName          string
-	SSLMode         string
-	MaxOpenConns    int
-	MaxIdleConns    int
-	ConnMaxLifetime time.Duration
+	Host             string
+	Port             string
+	User             string
+	Password         string
+	DBName           string
+	SSLMode          string
+	MaxOpenConns     int
+	MaxIdleConns     int
+	ConnMaxLifetime  time.Duration
+	StatementTimeout time.Duration // Per-connection statement timeout (0 = no timeout)
 }
 
 // Validate checks if the database configuration is valid
@@ -49,7 +50,7 @@ func (c *DatabaseConfig) Validate() error {
 
 // GetConnectionString returns the PostgreSQL connection string
 func (c *DatabaseConfig) GetConnectionString() string {
-	return fmt.Sprintf(
+	s := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host,
 		c.Port,
@@ -58,11 +59,17 @@ func (c *DatabaseConfig) GetConnectionString() string {
 		c.DBName,
 		c.SSLMode,
 	)
+	if c.StatementTimeout > 0 {
+		// The options value contains a space, so it must be single-quoted for
+		// libpq's key=value DSN parser to read it as one value.
+		s += fmt.Sprintf(" options='-c statement_timeout=%d'", c.StatementTimeout.Milliseconds())
+	}
+	return s
 }
 
 // GetPostgresURL returns the PostgreSQL URL connection string
 func (c *DatabaseConfig) GetPostgresURL() string {
-	return fmt.Sprintf(
+	s := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.User,
 		c.Password,
@@ -71,6 +78,10 @@ func (c *DatabaseConfig) GetPostgresURL() string {
 		c.DBName,
 		c.SSLMode,
 	)
+	if c.StatementTimeout > 0 {
+		s += fmt.Sprintf("&options=-c%%20statement_timeout%%3D%d", c.StatementTimeout.Milliseconds())
+	}
+	return s
 }
 
 // ServerConfig contains HTTP server configuration
@@ -176,15 +187,16 @@ func MustGetString(key string) string {
 // LoadDatabaseConfig loads database configuration from environment variables
 func LoadDatabaseConfig(userDefault, passwordDefault, dbnameDefault string) DatabaseConfig {
 	return DatabaseConfig{
-		Host:            GetString("DB_HOST", "localhost"),
-		Port:            GetString("DB_PORT", "5432"),
-		User:            GetString("DB_USER", userDefault),
-		Password:        GetString("DB_PASSWORD", passwordDefault),
-		DBName:          GetString("DB_NAME", dbnameDefault),
-		SSLMode:         GetString("DB_SSLMODE", "require"),
-		MaxOpenConns:    GetInt("DB_MAX_OPEN_CONNS", 25),
-		MaxIdleConns:    GetInt("DB_MAX_IDLE_CONNS", 5),
-		ConnMaxLifetime: GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+		Host:             GetString("DB_HOST", "localhost"),
+		Port:             GetString("DB_PORT", "5432"),
+		User:             GetString("DB_USER", userDefault),
+		Password:         GetString("DB_PASSWORD", passwordDefault),
+		DBName:           GetString("DB_NAME", dbnameDefault),
+		SSLMode:          GetString("DB_SSLMODE", "require"),
+		MaxOpenConns:     GetInt("DB_MAX_OPEN_CONNS", 25),
+		MaxIdleConns:     GetInt("DB_MAX_IDLE_CONNS", 5),
+		ConnMaxLifetime:  GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+		StatementTimeout: GetDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 	}
 }
 

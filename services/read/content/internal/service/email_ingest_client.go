@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 )
 
 // EmailSenderInfo represents a single sender from the email ingest service.
@@ -53,6 +54,7 @@ func (c *EmailIngestClient) ListUserSenders(ctx context.Context, userID string) 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set(auth.InternalAPIKeyHeader, c.apiKey)
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

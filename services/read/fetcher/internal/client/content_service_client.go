@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/google/uuid"
 	"github.com/sony/gobreaker"
 )
@@ -337,6 +338,7 @@ func (c *ContentServiceClient) doRequest(ctx context.Context, method, path strin
 	if c.internalAPIKey != "" {
 		req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 	}
+	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

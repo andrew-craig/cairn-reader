@@ -17,11 +17,11 @@ func ChiRequestLogger(logger *slog.Logger) func(next http.Handler) http.Handler 
 			start := time.Now()
 
 			// Generate or extract request ID
-			requestID := r.Header.Get("X-Request-ID")
+			requestID := r.Header.Get(HeaderXRequestID)
 			if requestID == "" {
 				requestID = uuid.New().String()
 			}
-			w.Header().Set("X-Request-ID", requestID)
+			w.Header().Set(HeaderXRequestID, requestID)
 
 			// Create request-scoped logger
 			reqLogger := logger.With(

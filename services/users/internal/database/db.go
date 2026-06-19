@@ -20,15 +20,16 @@ type DB struct {
 // Config holds PostgreSQL database connection configuration.
 // All fields except SSLMode are required for a successful connection.
 type Config struct {
-	Host            string        // Database server hostname or IP address
-	Port            string        // Database server port (typically "5432")
-	User            string        // Database username
-	Password        string        // Database password
-	Database        string        // Database name to connect to
-	SSLMode         string        // SSL mode: "disable", "require", "verify-ca", "verify-full"
-	MaxOpenConns    int32         // Maximum number of open connections in the pool
-	MaxIdleConns    int32         // Minimum number of idle connections maintained in the pool
-	ConnMaxLifetime time.Duration // Maximum lifetime of a connection before it's closed and replaced
+	Host             string        // Database server hostname or IP address
+	Port             string        // Database server port (typically "5432")
+	User             string        // Database username
+	Password         string        // Database password
+	Database         string        // Database name to connect to
+	SSLMode          string        // SSL mode: "disable", "require", "verify-ca", "verify-full"
+	MaxOpenConns     int32         // Maximum number of open connections in the pool
+	MaxIdleConns     int32         // Minimum number of idle connections maintained in the pool
+	ConnMaxLifetime  time.Duration // Maximum lifetime of a connection before it's closed and replaced
+	StatementTimeout time.Duration // Per-connection statement timeout (0 = no timeout)
 }
 
 // New creates a new database connection
@@ -46,6 +47,14 @@ func New(cfg *Config) (*DB, error) {
 	config.MaxConns = cfg.MaxOpenConns
 	config.MinConns = cfg.MaxIdleConns
 	config.MaxConnLifetime = cfg.ConnMaxLifetime
+
+	// Statement timeout: prevent slow queries from exhausting the pool.
+	if cfg.StatementTimeout > 0 {
+		if config.ConnConfig.RuntimeParams == nil {
+			config.ConnConfig.RuntimeParams = make(map[string]string)
+		}
+		config.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%d", cfg.StatementTimeout.Milliseconds())
+	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {

@@ -42,6 +42,16 @@ interface UserVotesResponse {
   count: number;
 }
 
+interface SearchResponse {
+  articles: BackendArticle[];
+  count: number;
+  pagination: {
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  };
+}
+
 export interface VotedArticleWithType extends Article {
   voteType: 'upvote' | 'downvote';
 }
@@ -264,9 +274,8 @@ export class ExploreService {
 
   static async getUserVoteStats(): Promise<{ upvotes: number; downvotes: number }> {
     try {
-      // Fetch all votes with a high limit to get complete counts
       const response = await this.fetchWithAuth(
-        `${getServerUrl()}/api/v1/explore/user/votes?limit=10000&offset=0`
+        `${getServerUrl()}/api/v1/explore/user/vote-stats`
       );
 
       const result = await response.json();
@@ -275,15 +284,32 @@ export class ExploreService {
         throw new Error(result.message || result.error || 'Failed to get vote stats');
       }
 
-      const data: UserVotesResponse = result.data;
-
-      // Count upvotes and downvotes
-      const upvotes = data.votes.filter((v) => v.vote_type === 'upvote').length;
-      const downvotes = data.votes.filter((v) => v.vote_type === 'downvote').length;
-
-      return { upvotes, downvotes };
+      const data = result.data as { upvotes: number; downvotes: number };
+      return { upvotes: data.upvotes, downvotes: data.downvotes };
     } catch (error) {
       console.error('Error fetching user vote stats:', error);
+      throw error;
+    }
+  }
+
+  static async searchArticles(q: string, limit = 20, offset = 0): Promise<Article[]> {
+    try {
+      const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
+      const response = await this.fetchWithAuth(
+        `${getServerUrl()}/api/v1/explore/search?${params.toString()}`
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to search articles');
+      }
+
+      const data: SearchResponse = result.data;
+
+      return data.articles.map((article) => this.transformArticle(article));
+    } catch (error) {
+      console.error('Error searching articles:', error);
       throw error;
     }
   }

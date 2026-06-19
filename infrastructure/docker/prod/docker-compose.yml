@@ -136,8 +136,27 @@ services:
 
   # Consolidated PostgreSQL Database
   # Single container hosting all service databases (separate logical DBs)
+  #
+  # Connection budget (I-6 fix — see docs/architecture/audit/06_infra.md):
+  #   user-service         15
+  #   explore-recommender  15
+  #   explore-fetcher      15
+  #   content-service      15
+  #   ingest-rss           15
+  #   email-ingest         15
+  #   content-worker        5
+  #   ingest-rss-worker    10
+  #   email-ingest-worker   5
+  #   ────────────────────────
+  #   Total               110  vs max_connections 200 (197 user slots after superuser_reserved=3)
   cairn-db:
     image: postgres:18-alpine
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-cairn_admin}
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
@@ -188,6 +207,7 @@ services:
       - DB_USER=${POSTGRES_USER_USERS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_USERS}
       - DB_NAME=${POSTGRES_DB_USERS}
+      - DB_MAX_OPEN_CONNS=15
       # Vault AppRole authentication (scoped to user-service policy)
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID=${USER_SERVICE_ROLE_ID}
@@ -228,6 +248,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}
       - DB_NAME=${POSTGRES_DB_RECOMMENDER}
       - DB_SSLMODE=disable
+      - DB_MAX_CONNS=15
       - ARTICLE_RETENTION_DAYS=90
       # Vault AppRole authentication (scoped to explore-recommender policy - public key only)
       - VAULT_ADDR=http://vault:8200
@@ -268,6 +289,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
       - DB_NAME=${POSTGRES_DB_FETCHER}
       - DB_SSLMODE=disable
+      - DB_MAX_CONNS=15
       # Feed list source: a file at FEED_LIST_PATH wins, otherwise the
       # service downloads FEED_LIST_URL (the repository's default list)
       # at startup. Mount your own curated list as a volume to override.
@@ -300,6 +322,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSLMODE=disable
+      - DB_MAX_OPEN_CONNS=15
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       # Vault AppRole authentication (scoped to content-service policy)
@@ -337,6 +360,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSLMODE=disable
+      - DB_MAX_OPEN_CONNS=5
       - CLEANUP_CRON=0 2 * * *
       - HEALTH_PORT=8084
     depends_on:
@@ -365,6 +389,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSLMODE=disable
+      - DB_MAX_OPEN_CONNS=15
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -389,6 +414,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSLMODE=disable
+      - DB_MAX_OPEN_CONNS=10
       - CONTENT_SERVICE_URL=http://content-service:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - HEALTH_PORT=8086
@@ -422,6 +448,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
       - DB_SSL_MODE=disable
+      - DB_MAX_OPEN_CONNS=15
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - VAULT_ADDR=http://vault:8200
       - VAULT_ROLE_ID=${EMAIL_INGEST_ROLE_ID}
@@ -458,6 +485,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
       - DB_SSL_MODE=disable
+      - DB_MAX_OPEN_CONNS=5
       - CONTENT_SERVICE_URL=http://content-service:8080
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - EMAIL_DOMAIN=read.cairnapp.com

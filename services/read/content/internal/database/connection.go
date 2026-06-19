@@ -24,6 +24,9 @@ type Config struct {
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
 	ConnMaxIdleTime time.Duration
+
+	// StatementTimeout sets the per-connection statement timeout (0 = no timeout).
+	StatementTimeout time.Duration
 }
 
 // DB wraps the sql.DB with additional functionality
@@ -43,6 +46,9 @@ func NewConnection(cfg Config) (*DB, error) {
 		cfg.DBName,
 		cfg.SSLMode,
 	)
+	if cfg.StatementTimeout > 0 {
+		connStr += fmt.Sprintf(" options='-c statement_timeout=%d'", cfg.StatementTimeout.Milliseconds())
+	}
 
 	// Open database connection
 	db, err := sql.Open("postgres", connStr)

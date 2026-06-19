@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dimensions, ViewToken } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -50,6 +50,9 @@ export const ExploreScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<Article[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastVisibleIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -329,8 +332,8 @@ export const ExploreScreen: React.FC = () => {
 
   const handleArticlePress = async (article: Article) => {
     // Navigate to the Explore article detail screen
-    const currentIndex = filteredArticles.findIndex(a => a.id === article.id);
-    navigation.navigate('ExploreArticleDetail', { article, articles: filteredArticles, currentIndex });
+    const currentIndex = displayedArticles.findIndex(a => a.id === article.id);
+    navigation.navigate('ExploreArticleDetail', { article, articles: displayedArticles, currentIndex });
 
     // Mark as read in the backend
     try {
@@ -365,18 +368,47 @@ export const ExploreScreen: React.FC = () => {
 
   const clearSearch = () => {
     setSearchQuery(null);
+    setSearchResults([]);
   };
 
-  const filteredArticles = useMemo(() => {
-    if (!searchQuery) return articles;
-    const q = searchQuery.toLowerCase();
-    return articles.filter(
-      (a) =>
-        a.title.toLowerCase().includes(q) ||
-        a.description?.toLowerCase().includes(q) ||
-        a.author?.toLowerCase().includes(q)
-    );
-  }, [articles, searchQuery]);
+  // Debounced backend search: fires 300ms after the query stops changing.
+  useEffect(() => {
+    let active = true;
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    if (!searchQuery) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await ExploreService.searchArticles(searchQuery);
+        if (active) {
+          setSearchResults(results);
+        }
+      } catch (error) {
+        console.error('Error searching articles:', error);
+        if (active) {
+          setSearchResults([]);
+        }
+      } finally {
+        if (active) {
+          setSearchLoading(false);
+        }
+      }
+    }, 300);
+    return () => {
+      active = false;
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  const displayedArticles = searchQuery ? searchResults : articles;
 
   const headerActions = (
     <IconButton icon="search-outline" onPress={handleSearchPress} />
@@ -386,8 +418,8 @@ export const ExploreScreen: React.FC = () => {
     <>
       <ArticleListScreen
         title="Explore"
-        articles={filteredArticles}
-        loading={loading}
+        articles={displayedArticles}
+        loading={loading || searchLoading}
         headerActions={headerActions}
         onArticlePress={handleArticlePress}
         onRefresh={handleRefresh}
