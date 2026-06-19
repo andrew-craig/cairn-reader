@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// TestSearch_EmptyQuery exercises the Search path when a DB is available.
+// TestSearch_ReturnsResults exercises the Search path when a DB is available.
 // It skips silently when no test Postgres is reachable (same pattern as the
 // other tests in this package).
 func TestSearch_ReturnsResults(t *testing.T) {

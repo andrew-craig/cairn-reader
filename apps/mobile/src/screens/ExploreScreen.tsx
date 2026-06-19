@@ -373,6 +373,7 @@ export const ExploreScreen: React.FC = () => {
 
   // Debounced backend search: fires 300ms after the query stops changing.
   useEffect(() => {
+    let active = true;
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
@@ -385,15 +386,22 @@ export const ExploreScreen: React.FC = () => {
     searchDebounceRef.current = setTimeout(async () => {
       try {
         const results = await ExploreService.searchArticles(searchQuery);
-        setSearchResults(results);
+        if (active) {
+          setSearchResults(results);
+        }
       } catch (error) {
         console.error('Error searching articles:', error);
-        setSearchResults([]);
+        if (active) {
+          setSearchResults([]);
+        }
       } finally {
-        setSearchLoading(false);
+        if (active) {
+          setSearchLoading(false);
+        }
       }
     }, 300);
     return () => {
+      active = false;
       if (searchDebounceRef.current) {
         clearTimeout(searchDebounceRef.current);
       }

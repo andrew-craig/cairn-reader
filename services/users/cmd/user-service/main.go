@@ -196,14 +196,7 @@ func main() {
 	slog.Info("HTTP router configured")
 
 	// Create HTTP server
-	srv := &http.Server{
-		Addr:              ":" + cfg.Server.Port,
-		Handler:           router,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	srv := newHTTPServer(":"+cfg.Server.Port, router)
 
 	// Start server in a goroutine
 	go func() {
@@ -241,6 +234,20 @@ func main() {
 	}
 
 	slog.Info("server exited gracefully")
+}
+
+// newHTTPServer builds the user-service HTTP server with the Read/Write/Idle
+// timeouts that mitigate slow-loris connection exhaustion (audit O-5). It is a
+// standalone constructor so the timeout configuration can be asserted in tests.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 }
 
 // initializeVault creates and configures the Vault client

@@ -567,17 +567,29 @@ paths:
               schema:
                 type: object
                 properties:
-                  upvotes:
-                    type: integer
-                    description: Total number of upvotes cast by the user
-                    example: 42
-                  downvotes:
-                    type: integer
-                    description: Total number of downvotes cast by the user
-                    example: 7
-                required:
-                  - upvotes
-                  - downvotes
+                  data:
+                    type: object
+                    properties:
+                      upvotes:
+                        type: integer
+                        description: Total number of upvotes cast by the user
+                        example: 42
+                      downvotes:
+                        type: integer
+                        description: Total number of downvotes cast by the user
+                        example: 7
+                    required:
+                      - upvotes
+                      - downvotes
+                  meta:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+                      version:
+                        type: string
+                        example: v1
         '401':
           description: Unauthorized - missing or invalid JWT token
         '500':

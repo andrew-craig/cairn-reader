@@ -35,7 +35,7 @@ func TestGetUserVoteStats_Aggregate(t *testing.T) {
 
 	userID := "test-vote-stats-user"
 
-	// Cast: 2 upvotes, 1 downvote
+	// Cast: 1 upvote, 1 downvote
 	if err := voteRepo.RecordVote(ctx, userID, art1.ID, "upvote"); err != nil {
 		t.Fatalf("RecordVote upvote art1: %v", err)
 	}

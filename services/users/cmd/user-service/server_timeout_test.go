@@ -6,16 +6,11 @@ import (
 	"time"
 )
 
-// TestServerTimeouts verifies that the expected timeout values are non-zero,
-// guarding against accidental removal of the slow-loris mitigations (O-5).
+// TestServerTimeouts verifies that the server constructed by newHTTPServer (the
+// same constructor main uses) has the expected timeouts, guarding against
+// accidental removal of the slow-loris mitigations (O-5).
 func TestServerTimeouts(t *testing.T) {
-	srv := &http.Server{
-		Addr:              ":8082",
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	srv := newHTTPServer(":8082", http.NewServeMux())
 
 	if srv.ReadHeaderTimeout == 0 {
 		t.Error("ReadHeaderTimeout must be non-zero (slow-loris mitigation)")
