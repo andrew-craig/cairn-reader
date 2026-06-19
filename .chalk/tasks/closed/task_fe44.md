@@ -1,14 +1,14 @@
 ---
-id: task_f416
-title: Add per-account failed-login tracking and account lockout
+id: task_fe44
+title: Add forgot-password / reset-password flow
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_5378
 remote_task_url: null
 created_at: 2026-06-16T10:31:00Z
-updated_at: 2026-06-18T22:44:12Z
+updated_at: 2026-06-19T18:33:37Z
 ---
 
