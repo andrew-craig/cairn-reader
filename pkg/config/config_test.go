@@ -17,7 +17,7 @@ func TestGetConnectionString_StatementTimeout(t *testing.T) {
 	}
 
 	s := cfg.GetConnectionString()
-	want := "host=localhost port=5432 user=user password=pass dbname=db sslmode=disable options=-c statement_timeout=30000"
+	want := "host=localhost port=5432 user=user password=pass dbname=db sslmode=disable options='-c statement_timeout=30000'"
 	if s != want {
 		t.Errorf("GetConnectionString() = %q, want %q", s, want)
 	}

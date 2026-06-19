@@ -25,7 +25,7 @@ func (m *mockArticleRepo) Search(_ context.Context, _ string, _ int, _ int) ([]m
 	return m.searchResults, m.searchErr
 }
 
-func newTestServer(articleRepo db.ArticleRepositoryInterface) *Server {
+func newSearchTestServer(articleRepo db.ArticleRepositoryInterface) *Server {
 	return &Server{
 		articleRepo: articleRepo,
 		// voteRepo, userRepo, engine, authMiddleware, logger left nil;
@@ -40,7 +40,7 @@ func requestWithUser(r *http.Request) *http.Request {
 }
 
 func TestHandleSearch_MissingQ(t *testing.T) {
-	s := newTestServer(&mockArticleRepo{})
+	s := newSearchTestServer(&mockArticleRepo{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/explore/search", nil)
 	req = requestWithUser(req)
@@ -62,7 +62,7 @@ func TestHandleSearch_MissingQ(t *testing.T) {
 }
 
 func TestHandleSearch_EmptyResults(t *testing.T) {
-	s := newTestServer(&mockArticleRepo{searchResults: []models.Article{}})
+	s := newSearchTestServer(&mockArticleRepo{searchResults: []models.Article{}})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/explore/search?q=golang", nil)
 	req = requestWithUser(req)
@@ -90,7 +90,7 @@ func TestHandleSearch_EmptyResults(t *testing.T) {
 
 func TestHandleSearch_PaginationDefaults(t *testing.T) {
 	repo := &mockArticleRepo{searchResults: []models.Article{}}
-	s := newTestServer(repo)
+	s := newSearchTestServer(repo)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/explore/search?q=test", nil)
 	req = requestWithUser(req)
@@ -118,7 +118,7 @@ func TestHandleSearch_PaginationDefaults(t *testing.T) {
 
 func TestHandleSearch_CustomPagination(t *testing.T) {
 	repo := &mockArticleRepo{searchResults: []models.Article{}}
-	s := newTestServer(repo)
+	s := newSearchTestServer(repo)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/explore/search?q=test&limit=5&offset=10", nil)
 	req = requestWithUser(req)

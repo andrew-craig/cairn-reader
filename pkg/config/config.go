@@ -60,7 +60,9 @@ func (c *DatabaseConfig) GetConnectionString() string {
 		c.SSLMode,
 	)
 	if c.StatementTimeout > 0 {
-		s += fmt.Sprintf(" options=-c statement_timeout=%d", c.StatementTimeout.Milliseconds())
+		// The options value contains a space, so it must be single-quoted for
+		// libpq's key=value DSN parser to read it as one value.
+		s += fmt.Sprintf(" options='-c statement_timeout=%d'", c.StatementTimeout.Milliseconds())
 	}
 	return s
 }

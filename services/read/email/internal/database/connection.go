@@ -66,7 +66,7 @@ func NewConnection(cfg *Config) (*DB, error) {
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
 	)
 	if cfg.StatementTimeout > 0 {
-		connStr += fmt.Sprintf(" options=-c statement_timeout=%d", cfg.StatementTimeout.Milliseconds())
+		connStr += fmt.Sprintf(" options='-c statement_timeout=%d'", cfg.StatementTimeout.Milliseconds())
 	}
 
 	// Open database connection

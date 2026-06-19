@@ -257,11 +257,10 @@ func (r *voteRepository) GetUserVote(ctx context.Context, userID string, article
 func (r *voteRepository) GetUserVoteStats(ctx context.Context, userID string) (upvotes int, downvotes int, err error) {
 	query := `
 		SELECT
-			COUNT(*) FILTER (WHERE v.vote_type = 'upvote')   AS upvotes,
-			COUNT(*) FILTER (WHERE v.vote_type = 'downvote') AS downvotes
-		FROM votes v
-		JOIN users u ON v.user_id = u.id
-		WHERE u.user_id = $1
+			COUNT(*) FILTER (WHERE vote_type = 'upvote')   AS upvotes,
+			COUNT(*) FILTER (WHERE vote_type = 'downvote') AS downvotes
+		FROM votes
+		WHERE user_id = $1
 	`
 	err = r.db.QueryRow(ctx, query, userID).Scan(&upvotes, &downvotes)
 	if err != nil {
