@@ -44,6 +44,13 @@ type UserRepository interface {
 
 	// UpdateLastLoginAt updates the last login timestamp for a user
 	UpdateLastLoginAt(ctx context.Context, id uuid.UUID) error
+
+	// RecordFailedLogin increments failed_login_attempts, sets last_failed_login_at,
+	// and locks the account if the threshold is reached.
+	RecordFailedLogin(ctx context.Context, id uuid.UUID, lockoutThreshold int, lockoutDuration time.Duration) error
+
+	// ResetFailedLogins clears failed login tracking on a successful login.
+	ResetFailedLogins(ctx context.Context, id uuid.UUID) error
 }
 
 // userRepository is the concrete implementation of UserRepository
@@ -75,7 +82,8 @@ func (r *userRepository) CreateUser(ctx context.Context, email, passwordHash str
 	query := `
 		INSERT INTO users (id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		          failed_login_attempts, locked_until, last_failed_login_at
 	`
 
 	err := r.db.Pool.QueryRow(
@@ -96,6 +104,9 @@ func (r *userRepository) CreateUser(ctx context.Context, email, passwordHash str
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -129,7 +140,8 @@ func (r *userRepository) CreateMobileUser(ctx context.Context, expoDeviceID stri
 	query := `
 		INSERT INTO users (id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		          failed_login_attempts, locked_until, last_failed_login_at
 	`
 
 	err := r.db.Pool.QueryRow(
@@ -150,6 +162,9 @@ func (r *userRepository) CreateMobileUser(ctx context.Context, expoDeviceID stri
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -169,7 +184,8 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models
 	user := &models.User{}
 
 	query := `
-		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		       failed_login_attempts, locked_until, last_failed_login_at
 		FROM users
 		WHERE id = $1
 	`
@@ -182,6 +198,9 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*models
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -203,7 +222,8 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 	user := &models.User{}
 
 	query := `
-		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		       failed_login_attempts, locked_until, last_failed_login_at
 		FROM users
 		WHERE email = $1
 	`
@@ -216,6 +236,9 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*mod
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -237,7 +260,8 @@ func (r *userRepository) GetUserByExpoDeviceID(ctx context.Context, expoDeviceID
 	user := &models.User{}
 
 	query := `
-		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		SELECT id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		       failed_login_attempts, locked_until, last_failed_login_at
 		FROM users
 		WHERE expo_device_id = $1
 	`
@@ -250,6 +274,9 @@ func (r *userRepository) GetUserByExpoDeviceID(ctx context.Context, expoDeviceID
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -282,7 +309,8 @@ func (r *userRepository) UpdateUser(ctx context.Context, id uuid.UUID, email *st
 		UPDATE users
 		SET email = $1, updated_at = $2
 		WHERE id = $3
-		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		          failed_login_attempts, locked_until, last_failed_login_at
 	`
 
 	err = r.db.Pool.QueryRow(
@@ -299,6 +327,9 @@ func (r *userRepository) UpdateUser(ctx context.Context, id uuid.UUID, email *st
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -338,7 +369,8 @@ func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email
 		UPDATE users
 		SET email = $1, password_hash = $2, updated_at = $3
 		WHERE id = $4
-		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		          failed_login_attempts, locked_until, last_failed_login_at
 	`
 
 	err = r.db.Pool.QueryRow(
@@ -356,6 +388,9 @@ func (r *userRepository) UpgradeAccount(ctx context.Context, id uuid.UUID, email
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -382,7 +417,8 @@ func (r *userRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, p
 		UPDATE users
 		SET password_hash = $1, updated_at = $2
 		WHERE id = $3
-		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at
+		RETURNING id, email, password_hash, expo_device_id, created_at, updated_at, last_login_at,
+		          failed_login_attempts, locked_until, last_failed_login_at
 	`
 
 	user := &models.User{}
@@ -400,6 +436,9 @@ func (r *userRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, p
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.LastLoginAt,
+		&user.FailedLoginAttempts,
+		&user.LockedUntil,
+		&user.LastFailedLoginAt,
 	)
 
 	if err != nil {
@@ -441,6 +480,62 @@ func (r *userRepository) UpdateLastLoginAt(ctx context.Context, id uuid.UUID) er
 	result, err := r.db.Pool.Exec(ctx, query, now, now, id)
 	if err != nil {
 		return fmt.Errorf("failed to update last login: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return apperrors.ErrUserNotFound
+	}
+
+	return nil
+}
+
+// RecordFailedLogin increments the failed login counter and sets last_failed_login_at.
+// If the new count reaches lockoutThreshold, the account is locked for lockoutDuration.
+func (r *userRepository) RecordFailedLogin(ctx context.Context, id uuid.UUID, lockoutThreshold int, lockoutDuration time.Duration) error {
+	now := time.Now().UTC()
+	lockUntil := now.Add(lockoutDuration)
+
+	// Increment the counter. If the new value hits the threshold, also set locked_until.
+	query := `
+		UPDATE users
+		SET failed_login_attempts = failed_login_attempts + 1,
+		    last_failed_login_at  = $1,
+		    locked_until = CASE
+		        WHEN failed_login_attempts + 1 >= $2 THEN $3
+		        ELSE locked_until
+		    END,
+		    updated_at = $1
+		WHERE id = $4
+	`
+
+	result, err := r.db.Pool.Exec(ctx, query, now, lockoutThreshold, lockUntil, id)
+	if err != nil {
+		return fmt.Errorf("failed to record failed login: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return apperrors.ErrUserNotFound
+	}
+
+	return nil
+}
+
+// ResetFailedLogins clears failed login tracking after a successful login.
+func (r *userRepository) ResetFailedLogins(ctx context.Context, id uuid.UUID) error {
+	now := time.Now().UTC()
+
+	query := `
+		UPDATE users
+		SET failed_login_attempts = 0,
+		    locked_until           = NULL,
+		    last_failed_login_at   = NULL,
+		    updated_at             = $1
+		WHERE id = $2
+	`
+
+	result, err := r.db.Pool.Exec(ctx, query, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to reset failed logins: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {

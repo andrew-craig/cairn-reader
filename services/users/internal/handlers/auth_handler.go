@@ -181,6 +181,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
+		if errors.Is(err, services.ErrAccountLocked) {
+			api.WriteError(w, http.StatusTooManyRequests, api.ErrCodeTooManyRequests, err.Error(), nil, "v1")
+			return
+		}
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid email or password", nil, "v1")
 			return
@@ -223,6 +227,10 @@ func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
+		if errors.Is(err, services.ErrAccountLocked) {
+			api.WriteError(w, http.StatusTooManyRequests, api.ErrCodeTooManyRequests, err.Error(), nil, "v1")
+			return
+		}
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid device ID", nil, "v1")
 			return

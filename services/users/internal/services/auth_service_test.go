@@ -701,6 +701,158 @@ func TestAuthService_LogoutAll(t *testing.T) {
 	})
 }
 
+// setupTestAuthServiceWithLockout creates a test auth service with custom lockout settings
+func setupTestAuthServiceWithLockout(t *testing.T, threshold int, duration time.Duration) (AuthService, *database.DB) {
+	db := setupTestDB(t)
+
+	passwordHasher := auth.NewPasswordHasher(10)
+	privateKey, publicKey := generateTestRSAKeys(t)
+	jwtManager := auth.NewJWTManagerWithConfig(auth.JWTManagerConfig{
+		PrivateKey: privateKey,
+		PublicKey:  publicKey,
+		Expiry:     60 * time.Minute,
+		Issuer:     "test-issuer",
+		Audience:   "test-audience",
+	})
+	refreshTokenRepo := database.NewRefreshTokenRepository(db)
+	refreshTokenService := auth.NewRefreshTokenService(refreshTokenRepo, 30*24*time.Hour)
+	userRepo := database.NewUserRepository(db)
+
+	service := NewAuthService(AuthServiceConfig{
+		UserRepo:            userRepo,
+		RefreshTokenService: refreshTokenService,
+		JWTManager:          jwtManager,
+		PasswordHasher:      passwordHasher,
+		PasswordMinLength:   8,
+		RequireComplexity:   true,
+		LockoutThreshold:    threshold,
+		LockoutDuration:     duration,
+	})
+
+	return service, db
+}
+
+func TestAuthService_AccountLockout(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("5 failed attempts locks the account", func(t *testing.T) {
+		service, db := setupTestAuthServiceWithLockout(t, 5, 15*time.Minute)
+		defer db.Close()
+
+		email := "lockout5@example.com"
+		password := "ValidPass123!"
+		defer cleanupTestUserByEmail(t, db, email)
+
+		_, err := service.Register(ctx, email, password)
+		require.NoError(t, err)
+
+		// 4 failures should not lock
+		for i := 0; i < 4; i++ {
+			_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+			assert.ErrorIs(t, err, ErrInvalidCredentials)
+		}
+
+		// 5th failure triggers lockout; the error is still ErrInvalidCredentials
+		_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+		assert.ErrorIs(t, err, ErrInvalidCredentials)
+
+		// Now the account should be locked
+		_, err = service.Login(ctx, email, password, "", "")
+		assert.ErrorIs(t, err, ErrAccountLocked)
+	})
+
+	t.Run("successful login resets the counter", func(t *testing.T) {
+		service, db := setupTestAuthServiceWithLockout(t, 5, 15*time.Minute)
+		defer db.Close()
+
+		email := "reset@example.com"
+		password := "ValidPass123!"
+		defer cleanupTestUserByEmail(t, db, email)
+
+		_, err := service.Register(ctx, email, password)
+		require.NoError(t, err)
+
+		// 3 failures
+		for i := 0; i < 3; i++ {
+			_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+			assert.ErrorIs(t, err, ErrInvalidCredentials)
+		}
+
+		// Successful login resets counter
+		resp, err := service.Login(ctx, email, password, "", "")
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+
+		// 4 more failures should not lock (counter was reset, so we need 5 new ones)
+		for i := 0; i < 4; i++ {
+			_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+			assert.ErrorIs(t, err, ErrInvalidCredentials)
+		}
+
+		// Account still accessible with correct password
+		resp2, err := service.Login(ctx, email, password, "", "")
+		require.NoError(t, err)
+		assert.NotNil(t, resp2)
+	})
+
+	t.Run("locked account is rejected before password check", func(t *testing.T) {
+		service, db := setupTestAuthServiceWithLockout(t, 2, 15*time.Minute)
+		defer db.Close()
+
+		email := "precheck@example.com"
+		password := "ValidPass123!"
+		defer cleanupTestUserByEmail(t, db, email)
+
+		_, err := service.Register(ctx, email, password)
+		require.NoError(t, err)
+
+		// Trigger lockout with 2 failures
+		for i := 0; i < 2; i++ {
+			_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+			assert.ErrorIs(t, err, ErrInvalidCredentials)
+		}
+
+		// Lock should be set now — correct password still rejected
+		_, err = service.Login(ctx, email, password, "", "")
+		assert.ErrorIs(t, err, ErrAccountLocked)
+
+		// Wrong password also returns ErrAccountLocked, not ErrInvalidCredentials
+		_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+		assert.ErrorIs(t, err, ErrAccountLocked)
+	})
+
+	t.Run("lockout expires after time window", func(t *testing.T) {
+		// Use a very short lockout for this test
+		service, db := setupTestAuthServiceWithLockout(t, 2, 1*time.Second)
+		defer db.Close()
+
+		email := "expire@example.com"
+		password := "ValidPass123!"
+		defer cleanupTestUserByEmail(t, db, email)
+
+		_, err := service.Register(ctx, email, password)
+		require.NoError(t, err)
+
+		// Trigger lockout
+		for i := 0; i < 2; i++ {
+			_, err = service.Login(ctx, email, "WrongPass123!", "", "")
+			assert.ErrorIs(t, err, ErrInvalidCredentials)
+		}
+
+		// Confirm locked
+		_, err = service.Login(ctx, email, password, "", "")
+		assert.ErrorIs(t, err, ErrAccountLocked)
+
+		// Wait for lockout to expire
+		time.Sleep(1100 * time.Millisecond)
+
+		// Should now be able to login
+		resp, err := service.Login(ctx, email, password, "", "")
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
+}
+
 func TestAuthService_GenerateAuthResponse(t *testing.T) {
 	service, db, jwtManager := setupTestAuthService(t)
 	defer db.Close()

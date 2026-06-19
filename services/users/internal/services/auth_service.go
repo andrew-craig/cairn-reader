@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"time"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
@@ -32,6 +34,16 @@ var (
 
 	// ErrInvalidInput is returned when input validation fails
 	ErrInvalidInput = errors.New("invalid input")
+
+	// ErrAccountLocked is returned when the account has been temporarily locked
+	ErrAccountLocked = errors.New("account temporarily locked")
+)
+
+const (
+	// defaultLockoutThreshold is the number of consecutive failures before locking
+	defaultLockoutThreshold = 5
+	// defaultLockoutDuration is how long an account remains locked
+	defaultLockoutDuration = 15 * time.Minute
 )
 
 // AuthService defines the interface for authentication operations
@@ -74,6 +86,8 @@ type authService struct {
 	passwordHasher      *auth.PasswordHasher
 	passwordMinLength   int
 	requireComplexity   bool
+	lockoutThreshold    int
+	lockoutDuration     time.Duration
 }
 
 // AuthServiceConfig holds configuration for the authentication service
@@ -82,8 +96,10 @@ type AuthServiceConfig struct {
 	RefreshTokenService *auth.RefreshTokenService
 	JWTManager          *auth.JWTManager
 	PasswordHasher      *auth.PasswordHasher
-	PasswordMinLength   int  // Default: 8
-	RequireComplexity   bool // Default: true
+	PasswordMinLength   int           // Default: 8
+	RequireComplexity   bool          // Default: true
+	LockoutThreshold    int           // Default: 5 — consecutive failures before lockout
+	LockoutDuration     time.Duration // Default: 15 minutes
 }
 
 // NewAuthService creates a new authentication service
@@ -91,6 +107,12 @@ func NewAuthService(config AuthServiceConfig) AuthService {
 	// Set defaults
 	if config.PasswordMinLength == 0 {
 		config.PasswordMinLength = 8
+	}
+	if config.LockoutThreshold == 0 {
+		config.LockoutThreshold = defaultLockoutThreshold
+	}
+	if config.LockoutDuration == 0 {
+		config.LockoutDuration = defaultLockoutDuration
 	}
 
 	return &authService{
@@ -100,6 +122,8 @@ func NewAuthService(config AuthServiceConfig) AuthService {
 		passwordHasher:      config.PasswordHasher,
 		passwordMinLength:   config.PasswordMinLength,
 		requireComplexity:   config.RequireComplexity,
+		lockoutThreshold:    config.LockoutThreshold,
+		lockoutDuration:     config.LockoutDuration,
 	}
 }
 
@@ -179,6 +203,12 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
+	// Check account lockout before verifying password
+	if user.IsLocked() {
+		minutesRemaining := int(math.Ceil(time.Until(*user.LockedUntil).Minutes()))
+		return nil, fmt.Errorf("%w: try again after %d minute(s)", ErrAccountLocked, minutesRemaining)
+	}
+
 	// Verify user can login with email
 	if !user.CanLoginWithEmail() {
 		return nil, ErrInvalidCredentials
@@ -186,7 +216,22 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 
 	// Verify password
 	if err := s.passwordHasher.ComparePassword(*user.PasswordHash, password); err != nil {
+		// Record failed attempt; ignore secondary error so primary error is returned
+		if recordErr := s.userRepo.RecordFailedLogin(ctx, user.ID, s.lockoutThreshold, s.lockoutDuration); recordErr != nil {
+			slog.Warn("failed to record failed login attempt",
+				slog.String("user_id", user.ID.String()),
+				slog.Any("error", recordErr),
+			)
+		}
 		return nil, ErrInvalidCredentials
+	}
+
+	// Successful login: reset failed-login tracking
+	if err := s.userRepo.ResetFailedLogins(ctx, user.ID); err != nil {
+		slog.Warn("failed to reset failed login counter",
+			slog.String("user_id", user.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Update last login timestamp
@@ -227,9 +272,23 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
+	// Check account lockout before proceeding
+	if user.IsLocked() {
+		minutesRemaining := int(math.Ceil(time.Until(*user.LockedUntil).Minutes()))
+		return nil, fmt.Errorf("%w: try again after %d minute(s)", ErrAccountLocked, minutesRemaining)
+	}
+
 	// Verify user can login with device (must be mobile-only, not hybrid)
 	if !user.CanLoginWithDevice() {
 		return nil, ErrHybridAccountDeviceLogin
+	}
+
+	// Successful login: reset failed-login tracking
+	if err := s.userRepo.ResetFailedLogins(ctx, user.ID); err != nil {
+		slog.Warn("failed to reset failed login counter",
+			slog.String("user_id", user.ID.String()),
+			slog.Any("error", err),
+		)
 	}
 
 	// Update last login timestamp
