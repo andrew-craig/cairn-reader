@@ -1278,15 +1278,38 @@ Planned Prometheus metrics:
 
 ---
 
+## Deployment Topology
+
+### Single-Instance Constraint
+
+The current architecture is designed for **single-instance deployment** (one container per service). The primary constraint is the in-memory rate limiter in the User Service (`pkg/middleware/rate_limit.go`):
+
+- Uses an in-process `sync.RWMutex`-protected map — not shared across processes
+- Auth endpoints are rate-limited per-IP based on local state only
+- Running multiple User Service instances would bypass the rate limit (each instance holds an independent counter)
+
+**Planned**: Replace with a Redis-backed rate limiter to support horizontal scaling of the User Service.
+
+Workers (RSS Fetcher Worker, Email Ingest Worker) also use in-process schedulers and must run as single instances until distributed locking is added.
+
+See [docs/DEPLOYMENT.md](DEPLOYMENT.md#single-instance-topology) for operational guidance.
+
+---
+
 ## Scalability Considerations
 
 ### Horizontal Scaling
 
-**Services that can be scaled horizontally**:
-- User Service API (stateless)
+**Services that can be scaled horizontally today** (no in-memory state that affects correctness):
 - Explore Service APIs (stateless)
 - Read Service - Content Service API (stateless)
 - Read Service - RSS Fetcher Service API (stateless)
+- Email Ingest Service API (stateless)
+
+**Services that require changes before scaling**:
+- User Service API — in-memory rate limiter must be replaced with a Redis-backed one
+- RSS Fetcher Worker — requires distributed locks to avoid duplicate feed fetches
+- Email Ingest Worker — requires distributed locks to avoid duplicate email processing
 
 **Services that need coordination**:
 - RSS Fetcher Worker (use distributed locks)
