@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 )
@@ -40,9 +41,14 @@ func Recovery(next http.Handler) http.Handler {
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error":      "an unexpected error occurred, please try again later",
-					"request_id": requestID,
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"error":   "internal_error",
+					"message": "an unexpected error occurred, please try again later",
+					"details": map[string]string{"request_id": requestID},
+					"meta": map[string]string{
+						"timestamp": time.Now().UTC().Format(time.RFC3339),
+						"version":   "v1",
+					},
 				})
 			}
 		}()

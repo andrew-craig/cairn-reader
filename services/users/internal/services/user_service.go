@@ -234,6 +234,10 @@ func (s *userService) ChangePassword(ctx context.Context, requestingUserID, targ
 		return fmt.Errorf("failed to update password: %w", err)
 	}
 
+	auditEvent("password_changed",
+		slog.String("user_id", targetUserID.String()),
+	)
+
 	return nil
 }
 

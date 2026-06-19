@@ -65,7 +65,7 @@ func NewConnection(cfg Config) (*DB, error) {
 		cfg.MaxIdleConns = 10
 	}
 	if cfg.ConnMaxLifetime == 0 {
-		cfg.ConnMaxLifetime = 5 * time.Minute
+		cfg.ConnMaxLifetime = 30 * time.Minute
 	}
 	if cfg.ConnMaxIdleTime == 0 {
 		cfg.ConnMaxIdleTime = 2 * time.Minute

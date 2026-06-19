@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -11,6 +11,7 @@ import { ReadService } from '../services/read';
 type BookmarksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Bookmarks'>;
 
 const PAGE_SIZE = 20;
+const FOCUS_REFETCH_TTL_MS = 30_000;
 
 export const BookmarksScreen: React.FC = () => {
   const navigation = useNavigation<BookmarksScreenNavigationProp>();
@@ -22,6 +23,8 @@ export const BookmarksScreen: React.FC = () => {
   const [cursor, setCursor] = useState<string>('');
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+
+  const lastFetchedAtRef = useRef<number | null>(null);
 
   const loadBookmarks = useCallback(async (reset = false) => {
     try {
@@ -51,6 +54,9 @@ export const BookmarksScreen: React.FC = () => {
 
       setHasMore(response.has_more);
       setCursor(response.cursor);
+      if (reset) {
+        lastFetchedAtRef.current = Date.now();
+      }
     } catch (error) {
       console.error('Error loading bookmarks:', error);
     } finally {

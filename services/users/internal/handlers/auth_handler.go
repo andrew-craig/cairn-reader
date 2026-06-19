@@ -11,17 +11,20 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	"github.com/cairn-app/cairn-reader/services/users/internal/validation"
 )
 
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
-	authService services.AuthService
+	authService              services.AuthService
+	emailVerificationService services.EmailVerificationService
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(authService services.AuthService) *AuthHandler {
+func NewAuthHandler(authService services.AuthService, emailVerificationService services.EmailVerificationService) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
+		authService:              authService,
+		emailVerificationService: emailVerificationService,
 	}
 }
 
@@ -57,6 +60,17 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// ForgotPasswordRequest represents the request body for forgot-password
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ResetPasswordRequest represents the request body for reset-password
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
 // ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error string `json:"error"`
@@ -77,8 +91,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Basic email validation
-	if !strings.Contains(req.Email, "@") {
+	// RFC 5322 email validation
+	if err := validation.ValidateEmail(req.Email); err != nil {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid email format", nil, "v1")
 		return
 	}
@@ -408,6 +422,137 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 
 	api.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message": "successfully logged out from all devices",
+	}, "v1")
+}
+
+// VerifyEmailRequest represents the request body for email verification
+type VerifyEmailRequest struct {
+	Token string `json:"token"`
+}
+
+// ResendVerificationRequest represents the request body for resending verification email
+type ResendVerificationRequest struct {
+	UserID string `json:"user_id"`
+}
+
+// VerifyEmail handles POST /auth/verify-email
+// Accepts a verification token and marks the user's email as verified
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req VerifyEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	if req.Token == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "token is required", nil, "v1")
+		return
+	}
+
+	user, err := h.emailVerificationService.VerifyEmail(r.Context(), req.Token)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidVerificationToken) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid or expired verification token", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrInvalidInput) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to verify email", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, user, "v1")
+}
+
+// ResendVerification handles POST /auth/resend-verification
+// Generates a new verification token and logs the verification URL.
+// Requires authentication — users can only resend verification for their own account.
+func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	userID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "authentication required", nil, "v1")
+		return
+	}
+
+	if err := h.emailVerificationService.SendVerificationEmail(r.Context(), userID); err != nil {
+		if errors.Is(err, services.ErrEmailAlreadyVerified) {
+			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "email is already verified", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrInvalidInput) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "account does not have an email address", nil, "v1")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to resend verification email", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "verification email sent",
+	}, "v1")
+}
+
+// ForgotPassword handles POST /auth/forgot-password.
+// Always returns 200 OK to avoid leaking whether the email is registered.
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req ForgotPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	if req.Email == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "email is required", nil, "v1")
+		return
+	}
+
+	if err := h.authService.ForgotPassword(r.Context(), req.Email); err != nil {
+		if errors.Is(err, services.ErrInvalidInput) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			return
+		}
+		slog.Error("forgot password: internal error", slog.String("error", err.Error()))
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "if an account with that email exists, a password reset link has been sent",
+	}, "v1")
+}
+
+// ResetPassword handles POST /auth/reset-password.
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req ResetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		return
+	}
+
+	if req.Token == "" || req.NewPassword == "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "token and new_password are required", nil, "v1")
+		return
+	}
+
+	if err := h.authService.ResetPassword(r.Context(), req.Token, req.NewPassword); err != nil {
+		if errors.Is(err, services.ErrInvalidOrExpiredToken) {
+			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired reset token", nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrWeakPassword) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+			return
+		}
+		if errors.Is(err, services.ErrInvalidInput) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
+			return
+		}
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to reset password", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]string{
+		"message": "password has been reset successfully",
 	}, "v1")
 }
 

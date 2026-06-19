@@ -55,10 +55,10 @@ type AddFeedResponse struct {
 	Subscription FeedSubscriptionDTO `json:"subscription"`
 }
 
-// AddPageResponse represents a successful page addition
+// AddPageResponse represents a successful page addition (includes full content with cleaned_html)
 type AddPageResponse struct {
-	Type    string               `json:"type"` // Always "page"
-	Content *UserContentResponse `json:"content"`
+	Type    string                     `json:"type"` // Always "page"
+	Content *UserContentDetailResponse `json:"content"`
 }
 
 // FeedSubscriptionDTO represents a feed subscription from Ingest RSS service
@@ -90,8 +90,24 @@ func (u UpdateUserContentRequest) Validate() error {
 	)
 }
 
-// UserContentResponse represents a user-content item in API responses
+// UserContentResponse represents a user-content item in list/search API responses.
+// The embedded Content is a summary (no cleaned_html). Use UserContentDetailResponse
+// for the single-item detail endpoint which includes the full HTML body.
 type UserContentResponse struct {
+	ID             uuid.UUID               `json:"id"`
+	UserID         uuid.UUID               `json:"user_id"`
+	ContentID      uuid.UUID               `json:"content_id"`
+	Status         string                  `json:"status"`
+	ScrollPosition int                     `json:"scroll_position"`
+	IsFavorite     bool                    `json:"is_favorite"`
+	AddedAt        time.Time               `json:"added_at"`
+	UpdatedAt      time.Time               `json:"updated_at"`
+	Content        *ContentSummaryResponse `json:"content,omitempty"`
+}
+
+// UserContentDetailResponse is the single-item detail response that includes
+// the full ContentResponse (with cleaned_html).
+type UserContentDetailResponse struct {
 	ID             uuid.UUID        `json:"id"`
 	UserID         uuid.UUID        `json:"user_id"`
 	ContentID      uuid.UUID        `json:"content_id"`

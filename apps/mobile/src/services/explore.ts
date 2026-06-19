@@ -1,6 +1,7 @@
 import { AuthService } from './auth';
 import { Article } from '../types';
 import { getServerUrl } from '../config/api';
+import { withRetry } from '../utils/retry';
 
 interface RecommendationsResponse {
   user_id: string;
@@ -109,9 +110,25 @@ export class ExploreService {
     return response;
   }
 
+  /**
+   * Like fetchWithAuth but also retries on 5xx / network errors.
+   */
+  private static async fetchWithAuthAndRetry(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    return withRetry(async (signal) => {
+      const response = await this.fetchWithAuth(url, { ...options, signal });
+      if (response.status >= 500) {
+        throw new Error(`Server error ${response.status}`);
+      }
+      return response;
+    });
+  }
+
   static async getRecommendations(offset = 0): Promise<Article[]> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/recommendation?offset=${offset}`
       );
 
@@ -274,7 +291,7 @@ export class ExploreService {
 
   static async getUserVoteStats(): Promise<{ upvotes: number; downvotes: number }> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await this.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/user/vote-stats`
       );
 
@@ -295,7 +312,7 @@ export class ExploreService {
   static async searchArticles(q: string, limit = 20, offset = 0): Promise<Article[]> {
     try {
       const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
-      const response = await this.fetchWithAuth(
+      const response = await this.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/search?${params.toString()}`
       );
 

@@ -526,50 +526,34 @@ func (r *contentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[
 	return result, nil
 }
 
-// BulkCreate creates multiple content records in a transaction
+// BulkCreate creates multiple content records in a single multi-row INSERT.
 func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.Content) error {
 	if len(contents) == 0 {
 		return nil
 	}
 
-	// Start transaction
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Prepare the insert statement
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO contents (
-			id, content_hash, cleaned_html, original_url, canonical_url,
-			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-		)
-		RETURNING id, created_at, updated_at
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
-	defer func() { _ = stmt.Close() }()
-
 	now := time.Now()
 
-	// Insert each content
-	for _, content := range contents {
-		// Generate UUID if not provided
+	// Build a single multi-row INSERT with 15 parameters per row.
+	const colsPerRow = 15
+	placeholders := make([]string, len(contents))
+	args := make([]interface{}, 0, len(contents)*colsPerRow)
+
+	for i, content := range contents {
 		if content.ID == uuid.Nil {
 			content.ID = uuid.New()
 		}
-
-		// Set timestamps
 		content.CreatedAt = now
 		content.UpdatedAt = now
 
-		err := stmt.QueryRowContext(
-			ctx,
+		base := i * colsPerRow
+		placeholders[i] = fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1, base+2, base+3, base+4, base+5,
+			base+6, base+7, base+8, base+9, base+10,
+			base+11, base+12, base+13, base+14, base+15,
+		)
+		args = append(args,
 			content.ID,
 			content.ContentHash,
 			content.CleanedHTML,
@@ -585,16 +569,17 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 			content.Metadata,
 			content.CreatedAt,
 			content.UpdatedAt,
-		).Scan(&content.ID, &content.CreatedAt, &content.UpdatedAt)
-
-		if err != nil {
-			return fmt.Errorf("failed to insert content in bulk: %w", err)
-		}
+		)
 	}
 
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit bulk create transaction: %w", err)
+	query := `INSERT INTO contents (
+		id, content_hash, cleaned_html, original_url, canonical_url,
+		title, author, published_at, description, image_urls,
+		source_type, source_feed_id, metadata, created_at, updated_at
+	) VALUES ` + strings.Join(placeholders, ", ")
+
+	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("failed to bulk create contents: %w", err)
 	}
 
 	return nil

@@ -14,11 +14,22 @@ import (
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/cairn-app/cairn-reader/services/users/internal/models"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockEmailVerificationService struct{}
+
+func (m *mockEmailVerificationService) SendVerificationEmail(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
+func (m *mockEmailVerificationService) VerifyEmail(_ context.Context, _ string) (*models.User, error) {
+	return nil, nil
+}
 
 // setupTestAuthHandler creates a test auth handler with all dependencies
 func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *internalAuth.JWTManager, func()) {
@@ -55,7 +66,9 @@ func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *internalAu
 		RequireComplexity:   true,
 	})
 
-	handler := NewAuthHandler(authService)
+	emailVerificationService := &mockEmailVerificationService{}
+
+	handler := NewAuthHandler(authService, emailVerificationService)
 
 	cleanup := func() {
 		db.Close()

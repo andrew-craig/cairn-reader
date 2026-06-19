@@ -14,6 +14,7 @@ type Config struct {
 	Vault    VaultConfig
 	JWT      JWTConfig
 	Security SecurityConfig
+	Redis    RedisConfig
 	Logging  LoggingConfig
 }
 
@@ -65,6 +66,14 @@ type JWTConfig struct {
 	KeyRotationInterval time.Duration // How often to check for new keys
 }
 
+// RedisConfig contains Redis connection configuration for distributed rate limiting
+type RedisConfig struct {
+	Host     string // Redis host (empty means use in-memory rate limiter)
+	Port     string // Redis port (default: 6379)
+	Password string // Redis password (optional)
+	DB       int    // Redis database index (default: 0)
+}
+
 // SecurityConfig contains security-related configuration
 type SecurityConfig struct {
 	BcryptCost                int
@@ -91,7 +100,7 @@ func Load() (*Config, error) {
 			SSLMode:          env.GetString("DB_SSLMODE", "disable"),
 			MaxOpenConns:     env.GetInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns:     env.GetInt("DB_MAX_IDLE_CONNS", 5),
-			ConnMaxLifetime:  env.GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+			ConnMaxLifetime:  env.GetDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 			StatementTimeout: env.GetDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 		},
 		Vault: VaultConfig{
@@ -117,6 +126,12 @@ func Load() (*Config, error) {
 			RequirePasswordComplexity: env.GetBool("REQUIRE_PASSWORD_COMPLEXITY", true),
 			RateLimitRequests:         env.GetInt("RATE_LIMIT_REQUESTS", 100),
 			RateLimitWindow:           env.GetDuration("RATE_LIMIT_WINDOW", 1*time.Minute),
+		},
+		Redis: RedisConfig{
+			Host:     env.GetString("REDIS_HOST", ""),
+			Port:     env.GetString("REDIS_PORT", "6379"),
+			Password: env.GetString("REDIS_PASSWORD", ""),
+			DB:       env.GetInt("REDIS_DB", 0),
 		},
 		Logging: LoggingConfig{
 			Level:  env.GetString("LOG_LEVEL", "info"),

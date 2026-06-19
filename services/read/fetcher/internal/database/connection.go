@@ -49,7 +49,7 @@ func DefaultConfig() *Config {
 		SSLMode:          "disable",
 		MaxOpenConns:     25,
 		MaxIdleConns:     5,
-		ConnMaxLifetime:  time.Hour,
+		ConnMaxLifetime:  30 * time.Minute,
 		ConnMaxIdleTime:  10 * time.Minute,
 		StatementTimeout: 30 * time.Second,
 	}
@@ -109,7 +109,7 @@ func NewConnectionFromURL(url string) (*sql.DB, error) {
 	// Configure connection pool with defaults
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(time.Hour)
+	db.SetConnMaxLifetime(30 * time.Minute)
 	db.SetConnMaxIdleTime(10 * time.Minute)
 
 	// Test the connection

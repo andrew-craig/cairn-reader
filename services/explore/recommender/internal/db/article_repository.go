@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/pkg/models"
@@ -70,7 +71,7 @@ func (r *articleRepository) Create(ctx context.Context, article models.Article) 
 	return nil
 }
 
-// CreateBatch inserts multiple articles into the database
+// CreateBatch inserts multiple articles in a single multi-row INSERT.
 // Implements Phase 2 deduplication: ON CONFLICT (link) DO UPDATE
 // Preserves vote counts, recommends, and deleted status on updates
 func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
@@ -78,34 +79,19 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 		return nil
 	}
 
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
-			slog.Error("failed to rollback transaction", slog.Any("error", err))
-		}
-	}()
+	// Build argument list and placeholder rows for a single INSERT statement.
+	const colsPerRow = 11
+	valueRows := make([]string, len(articles))
+	args := make([]interface{}, 0, len(articles)*colsPerRow)
 
-	query := `
-		INSERT INTO articles (
-			id, title, link, description, content, author, published,
-			feed_url, feed_title, categories, feed_id, created_at, updated_at
+	for i, article := range articles {
+		base := i * colsPerRow
+		valueRows[i] = fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,NOW(),NOW())",
+			base+1, base+2, base+3, base+4, base+5,
+			base+6, base+7, base+8, base+9, base+10, base+11,
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-		ON CONFLICT (link) DO UPDATE SET
-			title = EXCLUDED.title,
-			description = EXCLUDED.description,
-			content = EXCLUDED.content,
-			author = EXCLUDED.author,
-			published = EXCLUDED.published,
-			updated_at = NOW()
-		WHERE articles.deleted = false
-	`
-
-	for _, article := range articles {
-		_, err := tx.Exec(ctx, query,
+		args = append(args,
 			article.ID,
 			article.Title,
 			article.Link,
@@ -118,13 +104,23 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 			article.Categories,
 			article.FeedID,
 		)
-		if err != nil {
-			return fmt.Errorf("failed to insert article %s: %w", article.ID, err)
-		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	query := `INSERT INTO articles (
+		id, title, link, description, content, author, published,
+		feed_url, feed_title, categories, feed_id, created_at, updated_at
+	) VALUES ` + strings.Join(valueRows, ", ") + `
+	ON CONFLICT (link) DO UPDATE SET
+		title = EXCLUDED.title,
+		description = EXCLUDED.description,
+		content = EXCLUDED.content,
+		author = EXCLUDED.author,
+		published = EXCLUDED.published,
+		updated_at = NOW()
+	WHERE articles.deleted = false`
+
+	if _, err := r.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("failed to batch insert articles: %w", err)
 	}
 
 	return nil

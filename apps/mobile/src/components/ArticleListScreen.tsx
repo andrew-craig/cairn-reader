@@ -36,6 +36,8 @@ interface ArticleListScreenProps {
   endOfListMessage?: string;
   searchQuery?: string;
   onClearSearch?: () => void;
+  /** When set, renders a small banner below the header to indicate stale data. */
+  staleMessage?: string;
 }
 
 export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
@@ -56,6 +58,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   endOfListMessage,
   searchQuery,
   onClearSearch,
+  staleMessage,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -72,6 +75,13 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   const renderHeader = () => (
     <View>
       <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
+      {staleMessage && (
+        <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
+          <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
+            {staleMessage}
+          </Text>
+        </View>
+      )}
       {searchQuery && onClearSearch && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>

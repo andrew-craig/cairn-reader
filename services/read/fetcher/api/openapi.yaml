@@ -20,7 +20,7 @@ tags:
     description: Feed subscription management operations
 
 paths:
-  /api/v1/users/{user_id}/feeds/subscribe:
+  /api/v1/source/rss/user/{user_id}/subscription:
     post:
       tags:
         - Feed Subscriptions
@@ -63,13 +63,19 @@ paths:
                 invalidURL:
                   summary: Invalid feed URL
                   value:
-                    error: "Invalid feed URL format"
-                    code: "INVALID_FEED_URL"
+                    error: "invalid_feed_url"
+                    message: "Invalid feed URL format"
+                    meta:
+                      timestamp: "2026-01-01T00:00:00Z"
+                      version: "v1"
                 feedLimitExceeded:
                   summary: Feed limit exceeded
                   value:
-                    error: "User has reached the maximum of 100 feeds"
-                    code: "FEED_LIMIT_EXCEEDED"
+                    error: "bad_request"
+                    message: "User has reached the maximum of 100 feeds"
+                    meta:
+                      timestamp: "2026-01-01T00:00:00Z"
+                      version: "v1"
         '409':
           description: Already subscribed to this feed
           content:
@@ -83,7 +89,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/users/{user_id}/feeds:
     get:
       tags:
         - Feed Subscriptions
@@ -133,7 +138,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/users/{user_id}/feeds/{feed_id}:
+  /api/v1/source/rss/user/{user_id}/subscription/{feed_id}:
     delete:
       tags:
         - Feed Subscriptions
@@ -171,15 +176,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/v1/feeds/{feed_id}/enable:
+  /api/v1/source/rss/feed/{feed_id}:
     patch:
       tags:
         - Feed Subscriptions
-      summary: Re-enable a disabled feed
+      summary: Update feed (enable/disable)
       description: |
-        Re-enable a feed that was automatically disabled due to consecutive errors.
-        Resets error counters and sets the feed status to 'active'.
-      operationId: enableFeed
+        Update a feed's enabled/disabled state. Re-enables a feed that was automatically
+        disabled due to consecutive errors (resets error counters).
+      operationId: updateFeed
       parameters:
         - name: feed_id
           in: path
@@ -188,9 +193,21 @@ paths:
             type: string
             format: uuid
           description: Feed ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  description: Whether the feed should be enabled for polling
       responses:
         '200':
-          description: Feed successfully enabled
+          description: Feed successfully updated
           content:
             application/json:
               schema:
@@ -379,10 +396,24 @@ components:
       properties:
         error:
           type: string
-          description: Error message
-        code:
+          description: Machine-readable error code
+          example: bad_request
+        message:
           type: string
-          description: Error code
+          description: Human-readable error message
         details:
           type: object
-          description: Additional error details
+          additionalProperties: true
+          description: Optional additional error details
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: v1

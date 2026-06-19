@@ -120,6 +120,33 @@ func RateLimit(limit int, window time.Duration) func(http.Handler) http.Handler 
 	}
 }
 
+// RateLimitRedis creates a middleware that limits requests per IP address using
+// a Redis-backed sliding window algorithm. Safe for multi-instance deployments.
+// Falls back to allowing the request if Redis is unavailable.
+func RateLimitRedis(client RedisScripter, limit int, window time.Duration) func(http.Handler) http.Handler {
+	limiter := NewRedisRateLimiter(client, limit, window)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := getClientIP(r)
+
+			if !limiter.allow(key) {
+				w.Header().Set("X-RateLimit-Limit", fmt.Sprint(limit))
+				w.Header().Set("X-RateLimit-Window", window.String())
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error":       "rate limit exceeded",
+					"retry_after": window.String(),
+				})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // KeyFunc is a function that extracts a rate limit key from a request.
 type KeyFunc func(*http.Request) string
 

@@ -135,12 +135,37 @@ func (h *ContentHandler) GetContent(w http.ResponseWriter, r *http.Request) {
 	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
-// contentToResponse converts a models.Content to dto.ContentResponse
+// contentToResponse converts a models.Content to dto.ContentResponse (full detail, includes cleaned_html)
 func contentToResponse(content *models.Content) *dto.ContentResponse {
 	response := &dto.ContentResponse{
 		ID:           content.ID,
 		ContentHash:  content.ContentHash,
 		CleanedHTML:  content.CleanedHTML,
+		OriginalURL:  content.OriginalURL,
+		CanonicalURL: content.CanonicalURL,
+		Title:        content.Title,
+		Author:       content.Author,
+		PublishedAt:  content.PublishedAt,
+		Description:  content.Description,
+		SourceType:   content.SourceType,
+		SourceFeedID: content.SourceFeedID,
+		CreatedAt:    content.CreatedAt,
+		UpdatedAt:    content.UpdatedAt,
+	}
+
+	// Convert pq.StringArray to []string
+	if content.ImageURLs != nil {
+		response.ImageURLs = []string(content.ImageURLs)
+	}
+
+	return response
+}
+
+// contentToSummaryResponse converts a models.Content to dto.ContentSummaryResponse (no cleaned_html)
+func contentToSummaryResponse(content *models.Content) *dto.ContentSummaryResponse {
+	response := &dto.ContentSummaryResponse{
+		ID:           content.ID,
+		ContentHash:  content.ContentHash,
 		OriginalURL:  content.OriginalURL,
 		CanonicalURL: content.CanonicalURL,
 		Title:        content.Title,

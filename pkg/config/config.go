@@ -195,7 +195,7 @@ func LoadDatabaseConfig(userDefault, passwordDefault, dbnameDefault string) Data
 		SSLMode:          GetString("DB_SSLMODE", "require"),
 		MaxOpenConns:     GetInt("DB_MAX_OPEN_CONNS", 25),
 		MaxIdleConns:     GetInt("DB_MAX_IDLE_CONNS", 5),
-		ConnMaxLifetime:  GetDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+		ConnMaxLifetime:  GetDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 		StatementTimeout: GetDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 	}
 }

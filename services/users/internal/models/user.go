@@ -26,6 +26,9 @@ type User struct {
 	// This field is never included in JSON responses as it's treated as a credential
 	ExpoDeviceID *string `json:"-" db:"expo_device_id"`
 
+	// EmailVerified indicates whether the user has verified their email address
+	EmailVerified bool `json:"email_verified" db:"email_verified"`
+
 	// CreatedAt is the timestamp when the user account was created
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 

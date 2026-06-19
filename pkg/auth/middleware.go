@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -24,10 +25,18 @@ var (
 	ErrUserIDNotFound = errors.New("user ID not found in context - ensure RequireAuth middleware is applied")
 )
 
-// ErrorResponse represents a JSON error response
+// errorMeta is the metadata included in error responses
+type errorMeta struct {
+	Timestamp string `json:"timestamp"`
+	Version   string `json:"version"`
+}
+
+// ErrorResponse represents a JSON error response matching the standard pkg/api envelope
 type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
+	Error   string            `json:"error"`
+	Message string            `json:"message,omitempty"`
+	Details map[string]string `json:"details,omitempty"`
+	Meta    errorMeta         `json:"meta"`
 }
 
 // Middleware provides HTTP middleware for JWT authentication
@@ -125,6 +134,10 @@ func (m *Middleware) sendError(w http.ResponseWriter, statusCode int, error stri
 	json.NewEncoder(w).Encode(ErrorResponse{
 		Error:   error,
 		Message: message,
+		Meta: errorMeta{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Version:   "v1",
+		},
 	})
 }
 
