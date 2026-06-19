@@ -4,15 +4,10 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_5378** · P1 · open · Pre-beta audit remediation
-- **task_0502** · P1 · open · Add explore server-side search endpoint (replace client-side-only filter)  (parent: epic_5378)
 - **task_065e** · P1 · open · API freeze: reconcile OpenAPI specs with routes and unify error envelope  (parent: epic_5378)
-- **task_0b27** · P1 · open · Add statement_timeout to all API DB connection pools  (parent: epic_5378)
-- **task_12e0** · P1 · open · Add explore vote-stats aggregate endpoint (replace limit=10000 client count)  (parent: epic_5378)
 - **task_2c1f** · P1 · open · RFC email validation and email verification flow  (parent: epic_5378)
-- **task_7683** · P1 · open · Set Postgres max_connections and cap connection pools in prod compose  (parent: epic_5378)
 - **task_bfad** · P1 · open · Split content list vs detail payload (drop cleaned_html from list/search responses)  (parent: epic_5378)
 - **task_f416** · P1 · open · Add per-account failed-login tracking and account lockout  (parent: epic_5378)
-- **task_fc2f** · P1 · open · Set HTTP Read/Write/Idle timeouts on user-service  (parent: epic_5378)
 - **task_fe44** · P1 · open · Add forgot-password / reset-password flow  (parent: epic_5378)
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
@@ -47,7 +42,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_9208** · P3 · open · Data-layer fast-follow: indexes, pool unification, bulk insert, drop unused view, migration CI  (parent: epic_5378)
-- **task_9b71** · P3 · open · Propagate X-Request-ID across service-to-service HTTP calls  (parent: epic_5378)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_c542** · P3 · open · Infra fast-follow: document single-instance topology, sslmode note, email API key rotation  (parent: epic_5378)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
