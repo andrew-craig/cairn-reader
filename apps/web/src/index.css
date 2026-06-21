@@ -53,10 +53,10 @@
   :root {
     /* Colors — dark (mirrors Colors.dark) */
     --color-primary: #fdfcfc;
-    --color-background: #0f0c0b;
+    --color-background: hsl(40, 21%, 9%);
     --color-card: #1c1c1e;
-    --color-text: #fdfcfc;
-    --color-text-secondary: #8e8e93;
+    --color-text: hsl(40, 21%, 88%);
+    --color-text-secondary: hsl(40, 4%, 68%);
     --color-border: #38383a;
     --color-hover: #2c2c2e;
     --color-success: #30d158;
