@@ -537,7 +537,7 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 		return fmt.Errorf("failed to look up user: %w", err)
 	}
 
-	token, hash, err := s.refreshTokenService.GenerateToken()
+	_, hash, err := s.refreshTokenService.GenerateToken()
 	if err != nil {
 		return fmt.Errorf("failed to generate reset token: %w", err)
 	}
@@ -549,9 +549,8 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 		return fmt.Errorf("failed to store reset token: %w", err)
 	}
 
-	slog.Info("password reset token generated",
+	auditEvent("password_reset_requested",
 		slog.String("user_id", user.ID.String()),
-		slog.String("token", token),
 		slog.Time("expires_at", expiresAt),
 	)
 
@@ -587,15 +586,8 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	if _, err := s.userRepo.UpdatePasswordHash(ctx, tokenRecord.UserID, passwordHash); err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
-
-	if err := s.passwordResetTokenRepo.MarkPasswordResetTokenUsed(ctx, tokenRecord.ID); err != nil {
-		slog.Warn("failed to mark password reset token used",
-			slog.String("token_id", tokenRecord.ID.String()),
-			slog.Any("error", err),
-		)
+	if err := s.passwordResetTokenRepo.ResetPasswordAtomically(ctx, tokenRecord.UserID, passwordHash, tokenRecord.ID); err != nil {
+		return fmt.Errorf("failed to reset password: %w", err)
 	}
 
 	if err := s.refreshTokenService.RevokeAllUserTokens(ctx, tokenRecord.UserID); err != nil {

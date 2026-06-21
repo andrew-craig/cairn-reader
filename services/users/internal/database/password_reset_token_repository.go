@@ -23,6 +23,9 @@ type PasswordResetTokenRepository interface {
 	// MarkPasswordResetTokenUsed marks the token as consumed.
 	MarkPasswordResetTokenUsed(ctx context.Context, id uuid.UUID) error
 
+	// ResetPasswordAtomically updates the user's password and marks the token as used in a single transaction.
+	ResetPasswordAtomically(ctx context.Context, userID uuid.UUID, passwordHash string, tokenID uuid.UUID) error
+
 	// DeleteExpiredPasswordResetTokens removes tokens that have passed their expiry.
 	DeleteExpiredPasswordResetTokens(ctx context.Context) (int64, error)
 }
@@ -125,6 +128,44 @@ func (r *passwordResetTokenRepository) MarkPasswordResetTokenUsed(ctx context.Co
 
 	if result.RowsAffected() == 0 {
 		return apperrors.ErrTokenNotFound
+	}
+
+	return nil
+}
+
+// ResetPasswordAtomically updates the user's password and marks the reset token as used
+// within a single database transaction to prevent inconsistent state.
+func (r *passwordResetTokenRepository) ResetPasswordAtomically(ctx context.Context, userID uuid.UUID, passwordHash string, tokenID uuid.UUID) error {
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	now := time.Now().UTC()
+
+	result, err := tx.Exec(ctx,
+		`UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3`,
+		passwordHash, now, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return apperrors.ErrUserNotFound
+	}
+
+	result, err = tx.Exec(ctx,
+		`UPDATE password_reset_tokens SET used_at = $1 WHERE id = $2`,
+		now, tokenID)
+	if err != nil {
+		return fmt.Errorf("failed to mark token used: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return apperrors.ErrTokenNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

@@ -435,21 +435,28 @@ type ResendVerificationRequest struct {
 	UserID string `json:"user_id"`
 }
 
-// VerifyEmail handles POST /auth/verify-email
-// Accepts a verification token and marks the user's email as verified
+// VerifyEmail handles POST /auth/verify-email and GET /auth/verify-email?token=...
+// Accepts a verification token and marks the user's email as verified.
+// Supports both query parameter (for email links) and JSON body.
 func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
-	var req VerifyEmailRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
-		return
+	var token string
+	if q := r.URL.Query().Get("token"); q != "" {
+		token = q
+	} else {
+		var req VerifyEmailRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+			return
+		}
+		token = req.Token
 	}
 
-	if req.Token == "" {
+	if token == "" {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "token is required", nil, "v1")
 		return
 	}
 
-	user, err := h.emailVerificationService.VerifyEmail(r.Context(), req.Token)
+	user, err := h.emailVerificationService.VerifyEmail(r.Context(), token)
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidVerificationToken) {
 			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid or expired verification token", nil, "v1")

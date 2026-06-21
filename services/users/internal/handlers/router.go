@@ -93,7 +93,8 @@ func Router(config RouterConfig) http.Handler {
 			// logout-all requires authentication since it needs to know which user's tokens to revoke
 			r.With(authMiddleware.RequireAuth).Post("/logout-all", authHandler.LogoutAll)
 			// Email verification endpoints
-			r.Post("/verify-email", authHandler.VerifyEmail)                                            // Verify email with token
+			r.Post("/verify-email", authHandler.VerifyEmail) // Verify email with token (JSON body)
+			r.Get("/verify-email", authHandler.VerifyEmail)  // Verify email with token (query param from email link)
 			r.With(authMiddleware.RequireAuth).Post("/resend-verification", authHandler.ResendVerification) // Resend verification email
 			// Password reset endpoints
 			r.Post("/forgot-password", authHandler.ForgotPassword) // Initiate password reset

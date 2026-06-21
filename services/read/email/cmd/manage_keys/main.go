@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	ctx := context.Background()
 
@@ -167,10 +167,10 @@ func cmdList(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("query failed: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSTATUS\tCREATED\tEXPIRES\tLAST USED\tNOTES")
+	_, _ = fmt.Fprintln(w, "NAME\tSTATUS\tCREATED\tEXPIRES\tLAST USED\tNOTES")
 
 	for rows.Next() {
 		var (
@@ -199,7 +199,7 @@ func cmdList(ctx context.Context, db *sql.DB) error {
 			notesStr = notes.String
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			name, status, createdAt.Format("2006-01-02"), expires, lastUsed, notesStr,
 		)
 	}
@@ -255,7 +255,7 @@ func cmdRotate(ctx context.Context, db *sql.DB, name, notes string) error {
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck
 
 	// Insert new key
 	if _, err = tx.ExecContext(ctx, `

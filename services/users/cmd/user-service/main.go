@@ -154,7 +154,10 @@ func main() {
 		RequireComplexity: cfg.Security.RequirePasswordComplexity,
 	})
 
-	baseURL := fmt.Sprintf("http://localhost:%s", cfg.Server.Port)
+	baseURL := cfg.Server.BaseURL
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Server.Port)
+	}
 	emailVerificationService := services.NewEmailVerificationService(userRepo, baseURL)
 	slog.Info("services initialized")
 
