@@ -79,8 +79,9 @@ func (h *HealthHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
 	if allHealthy {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(HealthResponse{
-			Status: "healthy",
-			Checks: checks,
+			Status:  "healthy",
+			Version: h.version,
+			Checks:  checks,
 		})
 	} else {
 		w.WriteHeader(http.StatusServiceUnavailable)

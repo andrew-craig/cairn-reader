@@ -22,7 +22,7 @@ RUN go mod download
 # Build the binary
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
-    -ldflags "-X main.version=${VERSION}" \
+    -ldflags "-X 'main.version=${VERSION}'" \
     -o user-service ./cmd/user-service
 
 # Final stage

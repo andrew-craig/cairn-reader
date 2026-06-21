@@ -13,7 +13,7 @@ import (
 // TestLivenessCheck tests the GET /health/live endpoint
 func TestLivenessCheck(t *testing.T) {
 	// We don't need actual DB or Vault for basic liveness check
-	handler := NewHealthHandler(nil, nil)
+	handler := NewHealthHandler(nil, nil, "")
 
 	t.Run("Returns 200 OK", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
@@ -47,7 +47,7 @@ func TestReadinessCheck(t *testing.T) {
 		defer db.Close()
 
 		// For Vault, we'll test with nil (not configured)
-		handler := NewHealthHandler(db, nil)
+		handler := NewHealthHandler(db, nil, "")
 
 		req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 		w := httptest.NewRecorder()
@@ -77,7 +77,7 @@ func TestReadinessCheck(t *testing.T) {
 		db := setupTestDB(t)
 		defer db.Close()
 
-		handler := NewHealthHandler(db, nil)
+		handler := NewHealthHandler(db, nil, "")
 
 		req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
 		w := httptest.NewRecorder()
