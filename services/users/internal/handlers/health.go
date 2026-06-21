@@ -14,19 +14,22 @@ import (
 type HealthHandler struct {
 	db          *database.DB
 	vaultClient *auth.VaultClient
+	version     string
 }
 
 // NewHealthHandler creates a new health handler
-func NewHealthHandler(db *database.DB, vaultClient *auth.VaultClient) *HealthHandler {
+func NewHealthHandler(db *database.DB, vaultClient *auth.VaultClient, version string) *HealthHandler {
 	return &HealthHandler{
 		db:          db,
 		vaultClient: vaultClient,
+		version:     version,
 	}
 }
 
 // HealthResponse represents the health check response
 type HealthResponse struct {
 	Status  string            `json:"status"`
+	Version string            `json:"version,omitempty"`
 	Checks  map[string]string `json:"checks,omitempty"`
 	Message string            `json:"message,omitempty"`
 }
@@ -38,7 +41,8 @@ func (h *HealthHandler) LivenessCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(HealthResponse{
-		Status: "healthy",
+		Status:  "healthy",
+		Version: h.version,
 	})
 }
 
@@ -75,8 +79,9 @@ func (h *HealthHandler) ReadinessCheck(w http.ResponseWriter, r *http.Request) {
 	if allHealthy {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(HealthResponse{
-			Status: "healthy",
-			Checks: checks,
+			Status:  "healthy",
+			Version: h.version,
+			Checks:  checks,
 		})
 	} else {
 		w.WriteHeader(http.StatusServiceUnavailable)

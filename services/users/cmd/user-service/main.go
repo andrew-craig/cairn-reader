@@ -20,6 +20,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// version is set at build time via -ldflags "-X main.version=<value>".
+var version = "dev"
+
 func main() {
 	// Load .env file in development (before logger initialization)
 	_ = godotenv.Load() // Ignore error as .env file is optional
@@ -201,6 +204,7 @@ func main() {
 		AuthRateLimit:            cfg.Security.RateLimitRequests,
 		AuthRateLimitWindow:      cfg.Security.RateLimitWindow,
 		Logger:                   logger,
+		Version:                  version,
 	})
 	slog.Info("HTTP router configured")
 
