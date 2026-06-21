@@ -5,30 +5,30 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
     paths:
-      - 'cmd/selfhost/**'
-      - 'pkg/**'
-      - 'services/**'
-      - 'apps/web/**'
-      - 'apps/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'infrastructure/docker/selfhost/**'
-      - '.github/workflows/docker-build-selfhost.yml'
+      - "cmd/selfhost/**"
+      - "pkg/**"
+      - "services/**"
+      - "apps/web/**"
+      - "apps/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "infrastructure/docker/selfhost/**"
+      - ".github/workflows/docker-build-selfhost.yml"
   pull_request:
     branches:
       - main
     paths:
-      - 'cmd/selfhost/**'
-      - 'pkg/**'
-      - 'services/**'
-      - 'apps/web/**'
-      - 'apps/shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'infrastructure/docker/selfhost/**'
-      - '.github/workflows/docker-build-selfhost.yml'
+      - "cmd/selfhost/**"
+      - "pkg/**"
+      - "services/**"
+      - "apps/web/**"
+      - "apps/shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "infrastructure/docker/selfhost/**"
+      - ".github/workflows/docker-build-selfhost.yml"
   workflow_dispatch:
 
 env:
@@ -38,7 +38,6 @@ env:
 
 jobs:
   build-and-push:
-    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
