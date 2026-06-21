@@ -38,7 +38,6 @@ env:
 
 jobs:
   build-and-push:
-    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,7 +81,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
+            VERSION=${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/arm64
