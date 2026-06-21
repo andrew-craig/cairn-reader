@@ -14,7 +14,6 @@ describe('ReadService.transformToArticle', () => {
     content: {
       id: 'content-1',
       content_hash: 'abc123',
-      cleaned_html: '<p>Article body</p>',
       original_url: 'https://example.com/article',
       title: 'Test Article',
       author: 'John Doe',
@@ -37,7 +36,7 @@ describe('ReadService.transformToArticle', () => {
     expect(article.author).toBe('John Doe');
     expect(article.imageUrl).toBe('https://example.com/image.jpg');
     expect(article.publishedDate).toBe('2025-01-10T08:00:00Z');
-    expect(article.content).toBe('<p>Article body</p>');
+    expect(article.content).toBeUndefined();
   });
 
   it('calculates reading time from word count (200 wpm)', () => {
