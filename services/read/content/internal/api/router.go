@@ -51,7 +51,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintf(w, `{"status":"healthy"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"ok"}`)
 	})
 
 	// Readiness probe - indicates if the service is ready to accept traffic
@@ -62,13 +62,13 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 		if err := db.Ping(ctx); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintf(w, `{"status":"unhealthy","checks":{"database":"error"}}`)
+			_, _ = fmt.Fprintf(w, `{"status":"error","checks":{"database":"error"}}`)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintf(w, `{"status":"healthy","checks":{"database":"ok"}}`)
+		_, _ = fmt.Fprintf(w, `{"status":"ok","checks":{"database":"ok"}}`)
 	})
 
 	// Root endpoint
@@ -102,6 +102,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 			r.Get("/", userContentHandler.ListUserContents)
 			r.Post("/", userContentHandler.AddContentToUser)
 			r.Get("/search", userContentHandler.SearchUserContents)
+			r.Get("/{content_id}", userContentHandler.GetUserContent)
 			r.Patch("/{content_id}", userContentHandler.UpdateUserContent)
 			r.Delete("/{content_id}", userContentHandler.DeleteUserContent)
 

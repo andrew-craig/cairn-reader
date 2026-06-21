@@ -50,17 +50,17 @@ tags:
     description: Batch processing endpoints (Content Service)
 
 paths:
-  # Fetcher Service Endpoints (Port 8082)
-  /health:
+  # Fetcher Service Endpoints (Port 8085)
+  /health/live:
     get:
       tags:
         - Health
-      summary: Health check (Fetcher Service)
-      description: Returns the health status of the fetcher service with database connectivity check
-      operationId: fetcherHealth
+      summary: Liveness check (Fetcher Service)
+      description: Returns the liveness status of the fetcher service
+      operationId: fetcherLive
       responses:
         '200':
-          description: Service is healthy
+          description: Service is alive
           content:
             application/json:
               schema:
@@ -68,10 +68,32 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: ok
-                  service:
+                    example: healthy
+
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: Readiness check (Fetcher Service)
+      description: Returns the readiness status of the fetcher service with database connectivity check
+      operationId: fetcherReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
                     type: string
-                    example: rss-fetcher-service
+                    example: healthy
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: ok
         '503':
           description: Service unavailable (database connection failed)
           content:
@@ -81,42 +103,15 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: error
-                  service:
-                    type: string
-                    example: rss-fetcher-service
-                  message:
-                    type: string
-                    example: Database connection failed
-                  error:
-                    type: string
+                    example: unhealthy
+                  checks:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        example: error
 
-  /:
-    get:
-      tags:
-        - Health
-      summary: Service info
-      description: Returns service name, version, and status
-      operationId: fetcherInfo
-      responses:
-        '200':
-          description: Service information
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  service:
-                    type: string
-                    example: rss-fetcher-service
-                  version:
-                    type: string
-                    example: 0.1.0
-                  status:
-                    type: string
-                    example: running
-
-  /api/v1/users/{user_id}/feeds/subscribe:
+  /api/v1/source/rss/user/{user_id}/subscription:
     post:
       tags:
         - Feed Subscriptions
@@ -148,7 +143,7 @@ paths:
               required:
                 - feed_url
       responses:
-        '200':
+        '201':
           description: Successfully subscribed to feed
           content:
             application/json:
@@ -160,6 +155,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Already subscribed to this feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -167,7 +168,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/v1/users/{user_id}/feeds:
     get:
       tags:
         - Feed Subscriptions
@@ -182,6 +182,23 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of feeds to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Number of feeds to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: List of feed subscriptions
@@ -189,6 +206,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListFeedSubscriptionsResponse'
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -196,7 +219,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/v1/users/{user_id}/feeds/{feed_id}:
+  /api/v1/source/rss/user/{user_id}/subscription/{feed_id}:
     delete:
       tags:
         - Feed Subscriptions
@@ -219,19 +242,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        '204':
           description: Successfully unsubscribed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Successfully unsubscribed
-                  success:
-                    type: boolean
-                    example: true
         '404':
           description: Subscription not found
           content:
@@ -245,13 +257,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/v1/feeds/{feed_id}/enable:
+  /api/v1/source/rss/feed/{feed_id}:
     patch:
       tags:
         - Feed Subscriptions
-      summary: Enable feed fetching
-      description: Re-enables a disabled feed for fetching
-      operationId: enableFeed
+      summary: Update feed (enable/disable)
+      description: Updates a feed's enabled/disabled state. Re-enables a disabled feed (resets error counters).
+      operationId: updateFeed
       parameters:
         - name: feed_id
           in: path
@@ -260,20 +272,25 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  description: Whether the feed should be enabled for polling
       responses:
         '200':
-          description: Feed enabled successfully
+          description: Feed updated successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Feed enabled successfully
-                  success:
-                    type: boolean
-                    example: true
+                $ref: '#/components/schemas/FeedSubscriptionResponse'
         '404':
           description: Feed not found
           content:

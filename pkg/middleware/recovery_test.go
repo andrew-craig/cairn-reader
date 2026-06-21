@@ -42,16 +42,24 @@ func TestRecovery(t *testing.T) {
 			t.Errorf("expected 500, got %d", w.Code)
 		}
 
-		var body map[string]string
+		var body map[string]interface{}
 		if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode body: %v", err)
 		}
 
 		if body["error"] == "" {
-			t.Error("expected error message in response")
+			t.Error("expected error field in response")
 		}
-		if body["request_id"] == "" {
-			t.Error("expected request_id in response")
+		if body["message"] == "" {
+			t.Error("expected message field in response")
+		}
+		details, ok := body["details"].(map[string]interface{})
+		if !ok || details["request_id"] == "" {
+			t.Error("expected request_id in details")
+		}
+		meta, ok := body["meta"].(map[string]interface{})
+		if !ok || meta["version"] == "" {
+			t.Error("expected meta.version in response")
 		}
 
 		if w.Header().Get("Content-Type") != "application/json" {

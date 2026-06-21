@@ -348,8 +348,6 @@ func TestContentRepository_BulkCreate_Success(t *testing.T) {
 	repo := NewContentRepository(db)
 	ctx := context.Background()
 
-	now := time.Now()
-
 	contents := []*models.Content{
 		{
 			ContentHash: "hash1",
@@ -367,14 +365,8 @@ func TestContentRepository_BulkCreate_Success(t *testing.T) {
 		},
 	}
 
-	mock.ExpectBegin()
-	stmt := mock.ExpectPrepare(`INSERT INTO contents`)
-	for range contents {
-		stmt.ExpectQuery().
-			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-				AddRow(uuid.New(), now, now))
-	}
-	mock.ExpectCommit()
+	mock.ExpectExec(`INSERT INTO contents`).
+		WillReturnResult(sqlmock.NewResult(0, 2))
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.NoError(t, err)
@@ -397,7 +389,7 @@ func TestContentRepository_BulkCreate_EmptyInput(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestContentRepository_BulkCreate_TransactionRollback(t *testing.T) {
+func TestContentRepository_BulkCreate_ExecError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
@@ -415,10 +407,8 @@ func TestContentRepository_BulkCreate_TransactionRollback(t *testing.T) {
 		},
 	}
 
-	mock.ExpectBegin()
-	mock.ExpectPrepare(`INSERT INTO contents`).
+	mock.ExpectExec(`INSERT INTO contents`).
 		WillReturnError(sql.ErrConnDone)
-	mock.ExpectRollback()
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.Error(t, err)

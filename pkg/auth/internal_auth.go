@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 const (
@@ -51,5 +52,9 @@ func sendInternalAuthError(w http.ResponseWriter, statusCode int, errCode string
 	json.NewEncoder(w).Encode(ErrorResponse{
 		Error:   errCode,
 		Message: message,
+		Meta: errorMeta{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Version:   "v1",
+		},
 	})
 }

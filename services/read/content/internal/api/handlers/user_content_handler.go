@@ -182,7 +182,7 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 			IsFavorite:     uc.IsFavorite,
 			AddedAt:        uc.AddedAt,
 			UpdatedAt:      uc.UpdatedAt,
-			Content:        contentToResponse(content),
+			Content:        contentToSummaryResponse(content),
 		})
 	}
 
@@ -197,6 +197,66 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		HasMore: hasMore,
 		Limit:   limit,
 	}, "v1")
+}
+
+// GetUserContent handles GET /api/v1/content/user/:user_id/:content_id
+// Returns the full content detail including cleaned_html.
+func (h *UserContentHandler) GetUserContent(w http.ResponseWriter, r *http.Request) {
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
+		return
+	}
+
+	contentIDStr := chi.URLParam(r, "content_id")
+	contentID, err := uuid.Parse(contentIDStr)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid content ID format", nil, "v1")
+		return
+	}
+
+	userContent, err := h.userContentRepo.GetByUserAndContent(r.Context(), userID, contentID)
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user content", nil, "v1")
+		return
+	}
+	if userContent == nil {
+		api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "User content not found", nil, "v1")
+		return
+	}
+
+	content, err := h.contentRepo.GetByID(r.Context(), contentID)
+	if err != nil {
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch content", nil, "v1")
+		return
+	}
+
+	response := &dto.UserContentDetailResponse{
+		ID:             userContent.ID,
+		UserID:         userContent.UserID,
+		ContentID:      userContent.ContentID,
+		Status:         userContent.Status,
+		ScrollPosition: userContent.ScrollPosition,
+		IsFavorite:     userContent.IsFavorite,
+		AddedAt:        userContent.AddedAt,
+		UpdatedAt:      userContent.UpdatedAt,
+		Content:        contentToResponse(content),
+	}
+
+	api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // AddContentToUser handles POST /api/v1/content/user/:user_id
@@ -363,7 +423,7 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 	// Build page response
 	response := &dto.AddPageResponse{
 		Type: "page",
-		Content: &dto.UserContentResponse{
+		Content: &dto.UserContentDetailResponse{
 			ID:             userContent.ID,
 			UserID:         userContent.UserID,
 			ContentID:      userContent.ContentID,
@@ -434,7 +494,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 	// Get content details for response
 	content, _ := h.contentRepo.GetByID(r.Context(), contentID)
 
-	response := &dto.UserContentResponse{
+	response := &dto.UserContentDetailResponse{
 		ID:             userContent.ID,
 		UserID:         userContent.UserID,
 		ContentID:      userContent.ContentID,
@@ -520,7 +580,7 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 	// Get content details for response
 	content, _ := h.contentRepo.GetByID(r.Context(), contentID)
 
-	response := &dto.UserContentResponse{
+	response := &dto.UserContentDetailResponse{
 		ID:             userContent.ID,
 		UserID:         userContent.UserID,
 		ContentID:      userContent.ContentID,
@@ -662,7 +722,7 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 			IsFavorite:     uc.IsFavorite,
 			AddedAt:        uc.AddedAt,
 			UpdatedAt:      uc.UpdatedAt,
-			Content:        contentToResponse(content),
+			Content:        contentToSummaryResponse(content),
 		})
 	}
 

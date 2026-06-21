@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	"github.com/cairn-app/cairn-reader/services/users/internal/validation"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -110,10 +110,12 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Basic email validation if provided
-	if req.Email != nil && !strings.Contains(*req.Email, "@") {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid email format", nil, "v1")
-		return
+	// RFC 5322 email validation if provided
+	if req.Email != nil {
+		if err := validation.ValidateEmail(*req.Email); err != nil {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid email format", nil, "v1")
+			return
+		}
 	}
 
 	// Update user (service layer handles authorization)
@@ -173,8 +175,8 @@ func (h *UserHandler) UpgradeAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Basic email validation
-	if !strings.Contains(req.Email, "@") {
+	// RFC 5322 email validation
+	if err := validation.ValidateEmail(req.Email); err != nil {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid email format", nil, "v1")
 		return
 	}

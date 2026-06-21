@@ -92,3 +92,4 @@ services/read/email/email_ingest_worker
 
 # Chalk auto-generated files
 .chalk/task_list.md
+.claude/worktrees/

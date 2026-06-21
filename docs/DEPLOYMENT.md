@@ -504,6 +504,28 @@ docker compose exec postgres psql -U cairn -c '\l'
 docker compose exec postgres psql -U cairn -d cairn_users
 ```
 
+### Database SSL Mode
+
+All services default to `sslmode=disable` for PostgreSQL connections. This is intentional and safe **within the Docker network** because:
+
+- All containers run on the same private Docker bridge network
+- Traffic never leaves the host machine
+- PostgreSQL is not exposed on a public port
+
+If you move the database outside the Docker network (e.g., managed PostgreSQL on AWS RDS, DigitalOcean Managed Databases, or a separate server), you **must** enable SSL:
+
+```bash
+# In each service's .env file, change:
+DB_SSLMODE=disable
+
+# To:
+DB_SSLMODE=require    # Encrypt connection, trust server cert
+# or
+DB_SSLMODE=verify-full  # Encrypt and verify server certificate (recommended for production)
+```
+
+The `DB_SSLMODE` (or `DB_SSL_MODE` in the Email Ingest service) environment variable controls this setting in all services.
+
 ### Database Contents
 
 **cairn_users:**
@@ -721,23 +743,59 @@ docker compose up -d
 
 ---
 
+## Single-Instance Topology
+
+Cairn is currently designed and tested for **single-instance deployment** — one container per service behind a reverse proxy. This is the supported production topology.
+
+### In-Memory Rate Limiter
+
+The User Service (`pkg/middleware/rate_limit.go`) uses an in-memory token bucket rate limiter keyed by client IP. This works correctly only when there is **one running instance** of the service:
+
+- With multiple instances, each instance holds its own independent counter. A client sending N requests round-robined across M instances will be allowed up to N×M requests before any single instance triggers the limit.
+- A Redis-backed distributed rate limiter is planned for future multi-instance support.
+
+**Scaling ceiling**: Run a single instance of each API service. Use vertical scaling (more CPU/memory) to handle increased traffic until Redis-based rate limiting is implemented.
+
+### Services that require single-instance coordination
+
+| Service | Reason |
+|---------|--------|
+| User Service | In-memory rate limiter (auth endpoints) |
+| Fetcher Worker | In-memory job scheduler — multiple instances would cause duplicate feed fetches |
+| Email Ingest Worker | In-memory job scheduler — multiple instances would cause duplicate email processing |
+
+### Future Multi-Instance Support
+
+To run multiple instances of the User Service safely:
+1. Replace `pkg/middleware/rate_limit.go` with a Redis-backed implementation (e.g., `go-redis/redis_rate`)
+2. Ensure a shared Redis instance is available to all service instances
+3. Update the `RateLimit` and `RateLimitWithKey` middleware to use Redis instead of an in-memory map
+
+---
+
 ## Scaling
 
 ### Horizontal Scaling (Multi-Instance)
 
-**Services that can be scaled horizontally**:
-- User Service API (stateless)
-- Recommender Service API (stateless)
-- Fetcher Service API (stateless)
+> **Note**: See [Single-Instance Topology](#single-instance-topology) above. Horizontal scaling of the User Service requires replacing the in-memory rate limiter with a Redis-backed one first.
 
-**Services that need coordination**:
+**Services that can be scaled horizontally (stateless, no rate limiter)**:
+- Recommender Service API
+- Fetcher Service API
+- Content Service API
+- Ingest RSS Service API
+- Email Ingest Service API
+
+**Services that need coordination before scaling**:
+- User Service API (in-memory rate limiter — replace with Redis first)
 - Fetcher Worker (use distributed locks for multi-instance)
+- Email Ingest Worker (use distributed locks for multi-instance)
 
 #### Scaling with Docker Compose
 
 ```bash
-# Scale User Service to 3 instances
-docker compose up -d --scale user-service=3
+# Scale Recommender Service to 3 instances (no rate limiter)
+docker compose up -d --scale recommender=3
 
 # Requires load balancer (nginx, HAProxy, etc.)
 ```
@@ -905,7 +963,7 @@ For production:
 
 ### 2. Database
 - Use strong passwords (min 32 characters)
-- Enable SSL/TLS
+- Enable SSL/TLS when database is outside the Docker network (set `DB_SSLMODE=require` or `verify-full`; see [Database SSL Mode](#database-ssl-mode))
 - Set up automated backups
 - Consider managed PostgreSQL (AWS RDS, etc.)
 - Regular maintenance (VACUUM, ANALYZE)
@@ -934,6 +992,64 @@ For production:
 - Database replication
 - Connection pooling (PgBouncer)
 - CDN for static assets
+
+---
+
+## Email Ingest API Key Rotation
+
+The Email Ingest Service authenticates the Cloudflare Email Worker via an `X-API-Key` header. Keys are stored as SHA-256 hashes in the `api_keys` table (raw key never persisted).
+
+### Key Storage Schema
+
+| Column | Notes |
+|--------|-------|
+| `key_name` | Human-readable identifier (e.g., `cloudflare-worker-prod`) |
+| `key_hash` | SHA-256 of the raw key |
+| `status` | `active` / `revoked` |
+| `created_at` | When the key was created |
+| `expires_at` | Optional expiry (NULL = no expiry) |
+| `last_used_at` | Updated on each successful validation |
+
+### Key Rotation Tool
+
+The `manage_keys` CLI (`services/read/email/cmd/manage_keys/`) manages keys:
+
+```bash
+# Build the tool
+cd services/read/email
+go build -o bin/manage_keys ./cmd/manage_keys
+
+# List all keys and their status
+./bin/manage_keys list
+
+# Create a new key (prints raw key — copy it now, it is not stored)
+./bin/manage_keys create --name cloudflare-worker-prod --notes "Cloudflare Email Worker"
+
+# Rotate: creates a new key, revokes the old one atomically
+./bin/manage_keys rotate --name cloudflare-worker-prod
+
+# Revoke a key immediately
+./bin/manage_keys revoke --name cloudflare-worker-prod
+```
+
+The tool requires the same `DB_*` environment variables as the service. You can run it locally or inside the container:
+
+```bash
+# In Docker
+docker compose exec email-ingest \
+  ./manage_keys rotate --name cloudflare-worker-prod
+```
+
+### Rotation Procedure
+
+1. **Run rotate**: `./bin/manage_keys rotate --name <key-name>`
+2. **Copy the new raw key** printed to stdout — it is not stored anywhere.
+3. **Update the Cloudflare Email Worker** with the new key.
+4. **Update `INGEST_API_KEY`** in the service's `.env` / Docker secret.
+5. **Restart the Email Ingest service** to pick up the new key.
+6. The old key is revoked in the same database transaction as step 1, so there is no window where both are valid simultaneously.
+
+> **Note**: The `INGEST_API_KEY` environment variable is used only for the initial key provisioning during `docker compose up`. After the first key is stored in the database, the service validates all requests against the `api_keys` table regardless of the environment variable.
 
 ---
 

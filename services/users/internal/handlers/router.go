@@ -19,14 +19,15 @@ import (
 // RouterConfig holds all dependencies needed to set up the HTTP router.
 // These dependencies are injected from the main application during startup.
 type RouterConfig struct {
-	DB                  *database.DB           // Database connection for health checks
-	VaultClient         *localAuth.VaultClient // Vault client for health checks
-	AuthService         services.AuthService   // Service handling authentication operations
-	UserService         services.UserService   // Service handling user management operations
-	JWTManager          *localAuth.JWTManager  // JWT manager for token validation middleware
-	AuthRateLimit       int                    // Requests per window for auth endpoints (default: 10)
-	AuthRateLimitWindow time.Duration          // Time window for auth rate limiting (default: 1 minute)
-	Logger              *slog.Logger           // Structured logger for request logging
+	DB                       *database.DB                      // Database connection for health checks
+	VaultClient              *localAuth.VaultClient            // Vault client for health checks
+	AuthService              services.AuthService              // Service handling authentication operations
+	UserService              services.UserService              // Service handling user management operations
+	EmailVerificationService services.EmailVerificationService // Service handling email verification
+	JWTManager               *localAuth.JWTManager             // JWT manager for token validation middleware
+	AuthRateLimit            int                               // Requests per window for auth endpoints (default: 10)
+	AuthRateLimitWindow      time.Duration                     // Time window for auth rate limiting (default: 1 minute)
+	Logger                   *slog.Logger                      // Structured logger for request logging
 }
 
 // Router sets up the HTTP routes and returns a configured http.Handler.
@@ -49,7 +50,7 @@ func Router(config RouterConfig) http.Handler {
 
 	// Initialize handlers
 	healthHandler := NewHealthHandler(config.DB, config.VaultClient)
-	authHandler := NewAuthHandler(config.AuthService)
+	authHandler := NewAuthHandler(config.AuthService, config.EmailVerificationService)
 	userHandler := NewUserHandler(config.UserService)
 
 	// Create stdlib middleware from pkg/auth
@@ -91,6 +92,13 @@ func Router(config RouterConfig) http.Handler {
 			r.Post("/logout", authHandler.Logout)                  // Revoke a specific refresh token
 			// logout-all requires authentication since it needs to know which user's tokens to revoke
 			r.With(authMiddleware.RequireAuth).Post("/logout-all", authHandler.LogoutAll)
+			// Email verification endpoints
+			r.Post("/verify-email", authHandler.VerifyEmail)                                                // Verify email with token (JSON body)
+			r.Get("/verify-email", authHandler.VerifyEmail)                                                 // Verify email with token (query param from email link)
+			r.With(authMiddleware.RequireAuth).Post("/resend-verification", authHandler.ResendVerification) // Resend verification email
+			// Password reset endpoints
+			r.Post("/forgot-password", authHandler.ForgotPassword) // Initiate password reset
+			r.Post("/reset-password", authHandler.ResetPassword)   // Reset password with token
 		})
 
 		// User management endpoints - all routes require JWT authentication

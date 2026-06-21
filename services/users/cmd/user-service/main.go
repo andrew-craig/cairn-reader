@@ -113,6 +113,7 @@ func main() {
 	slog.Info("initializing repositories")
 	userRepo := database.NewUserRepository(db)
 	refreshTokenRepo := database.NewRefreshTokenRepository(db)
+	passwordResetTokenRepo := database.NewPasswordResetTokenRepository(db)
 	slog.Info("repositories initialized")
 
 	// Initialize auth components
@@ -136,12 +137,13 @@ func main() {
 	// Initialize services
 	slog.Info("initializing services")
 	authService := services.NewAuthService(services.AuthServiceConfig{
-		UserRepo:            userRepo,
-		RefreshTokenService: refreshTokenService,
-		JWTManager:          jwtManager,
-		PasswordHasher:      passwordHasher,
-		PasswordMinLength:   cfg.Security.MinPasswordLength,
-		RequireComplexity:   cfg.Security.RequirePasswordComplexity,
+		UserRepo:               userRepo,
+		RefreshTokenService:    refreshTokenService,
+		PasswordResetTokenRepo: passwordResetTokenRepo,
+		JWTManager:             jwtManager,
+		PasswordHasher:         passwordHasher,
+		PasswordMinLength:      cfg.Security.MinPasswordLength,
+		RequireComplexity:      cfg.Security.RequirePasswordComplexity,
 	})
 
 	userService := services.NewUserService(services.UserServiceConfig{
@@ -151,6 +153,12 @@ func main() {
 		PasswordMinLength: cfg.Security.MinPasswordLength,
 		RequireComplexity: cfg.Security.RequirePasswordComplexity,
 	})
+
+	baseURL := cfg.Server.BaseURL
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Server.Port)
+	}
+	emailVerificationService := services.NewEmailVerificationService(userRepo, baseURL)
 	slog.Info("services initialized")
 
 	// Set up key rotation manager
@@ -184,14 +192,15 @@ func main() {
 	// Set up HTTP router
 	slog.Info("setting up HTTP router")
 	router := handlers.Router(handlers.RouterConfig{
-		DB:                  db,
-		VaultClient:         vaultClient,
-		AuthService:         authService,
-		UserService:         userService,
-		JWTManager:          jwtManager,
-		AuthRateLimit:       cfg.Security.RateLimitRequests,
-		AuthRateLimitWindow: cfg.Security.RateLimitWindow,
-		Logger:              logger,
+		DB:                       db,
+		VaultClient:              vaultClient,
+		AuthService:              authService,
+		UserService:              userService,
+		EmailVerificationService: emailVerificationService,
+		JWTManager:               jwtManager,
+		AuthRateLimit:            cfg.Security.RateLimitRequests,
+		AuthRateLimitWindow:      cfg.Security.RateLimitWindow,
+		Logger:                   logger,
 	})
 	slog.Info("HTTP router configured")
 
@@ -250,7 +259,8 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
-// initializeVault creates and configures the Vault client
+// initializeVault creates and configures the Vault client with exponential backoff retry.
+// It attempts up to 5 times with delays of 1s, 2s, 4s, 8s, 16s before giving up.
 func initializeVault(cfg *config.Config) (*auth.VaultClient, error) {
 	vaultCfg := &auth.VaultConfig{
 		Address:   cfg.Vault.Address,
@@ -261,12 +271,41 @@ func initializeVault(cfg *config.Config) (*auth.VaultClient, error) {
 		AuthPath:  cfg.Vault.AuthPath,
 	}
 
+	const maxRetries = 5
+	delay := 1 * time.Second
+
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		client, err := tryConnectVault(vaultCfg)
+		if err == nil {
+			return client, nil
+		}
+
+		lastErr = err
+		if attempt == maxRetries {
+			break
+		}
+
+		slog.Warn("vault initialization failed, retrying",
+			slog.Int("attempt", attempt),
+			slog.Int("max_attempts", maxRetries),
+			slog.Duration("retry_after", delay),
+			slog.Any("error", err),
+		)
+		time.Sleep(delay)
+		delay *= 2
+	}
+
+	return nil, fmt.Errorf("vault initialization failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// tryConnectVault attempts a single Vault connection and health check.
+func tryConnectVault(vaultCfg *auth.VaultConfig) (*auth.VaultClient, error) {
 	vaultClient, err := auth.NewVaultClient(vaultCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	// Verify Vault health
 	if err := vaultClient.Health(); err != nil {
 		return nil, fmt.Errorf("vault health check failed: %w", err)
 	}

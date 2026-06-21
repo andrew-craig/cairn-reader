@@ -26,6 +26,9 @@ type User struct {
 	// This field is never included in JSON responses as it's treated as a credential
 	ExpoDeviceID *string `json:"-" db:"expo_device_id"`
 
+	// EmailVerified indicates whether the user has verified their email address
+	EmailVerified bool `json:"email_verified" db:"email_verified"`
+
 	// CreatedAt is the timestamp when the user account was created
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 
@@ -34,6 +37,20 @@ type User struct {
 
 	// LastLoginAt is the timestamp of the user's last successful login (nullable)
 	LastLoginAt *time.Time `json:"last_login_at,omitempty" db:"last_login_at"`
+
+	// FailedLoginAttempts is the number of consecutive failed login attempts
+	FailedLoginAttempts int `json:"-" db:"failed_login_attempts"`
+
+	// LockedUntil is the timestamp until which the account is locked (nullable)
+	LockedUntil *time.Time `json:"-" db:"locked_until"`
+
+	// LastFailedLoginAt is the timestamp of the most recent failed login attempt (nullable)
+	LastFailedLoginAt *time.Time `json:"-" db:"last_failed_login_at"`
+}
+
+// IsLocked returns true if the account is currently locked
+func (u *User) IsLocked() bool {
+	return u.LockedUntil != nil && u.LockedUntil.After(time.Now())
 }
 
 // IsMobileOnly returns true if the user account is mobile-only

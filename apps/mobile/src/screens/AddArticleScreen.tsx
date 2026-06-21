@@ -61,7 +61,7 @@ export const AddArticleScreen: React.FC = () => {
       // Transform the response to Article format
       let article: Article;
       if (addResponse.type === 'page' && addResponse.content) {
-        article = ReadService.transformToArticle(addResponse.content);
+        article = ReadService.transformDetailToArticle(addResponse.content);
       } else {
         // For feed subscriptions, create a basic article entry
         article = {

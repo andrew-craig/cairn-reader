@@ -59,8 +59,8 @@ func (c *Config) Connect(ctx context.Context) (*pgxpool.Pool, error) {
 	// server's max_connections.
 	config.MaxConns = envInt32("DB_MAX_CONNS", 25)
 	config.MinConns = envInt32("DB_MIN_CONNS", 5)
-	config.MaxConnLifetime = 5 * time.Minute
-	config.MaxConnIdleTime = 5 * time.Minute
+	config.MaxConnLifetime = envDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute)
+	config.MaxConnIdleTime = envDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute)
 
 	// Statement timeout: prevent slow queries from exhausting the pool.
 	// Overridable via DB_STATEMENT_TIMEOUT (e.g. "30s", "60s").

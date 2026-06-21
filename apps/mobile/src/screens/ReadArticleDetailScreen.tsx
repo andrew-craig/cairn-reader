@@ -1,13 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
+  ActivityIndicator,
   StyleSheet,
   useColorScheme,
   Alert,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
+import { Article, RootStackParamList } from '../types';
 import { StorageService, ReadService } from '../services';
 import { Colors } from '../constants';
 import { ArticleContent, BottomActionMenu } from '../components/common';
@@ -23,7 +24,30 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const navigation = useNavigation<ReadArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const { article, articles = [], currentIndex = -1 } = route.params;
+  const { article: initialArticle, articles = [], currentIndex = -1 } = route.params;
+
+  // When arriving from a list screen the article may not have cleaned_html yet
+  // (list responses are summaries). We lazy-load the full content on mount.
+  const [article, setArticle] = useState<Article>(initialArticle);
+  const [contentLoading, setContentLoading] = useState(!initialArticle.content);
+
+  useEffect(() => {
+    if (initialArticle.content) return; // already have the HTML
+    let cancelled = false;
+    ReadService.getContentById(initialArticle.id)
+      .then((detail) => {
+        if (cancelled) return;
+        setArticle(ReadService.transformDetailToArticle(detail));
+        setContentLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load article content:', err);
+        setContentLoading(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialArticle.id]);
 
   // Mutable UI state tracked separately from the article object so async updates
   // are scoped to the displayed article. Seeded from the article and resynced
@@ -150,6 +174,14 @@ export const ReadArticleDetailScreen: React.FC = () => {
     }
   };
 
+  if (contentLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ArticleContent
@@ -188,5 +220,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

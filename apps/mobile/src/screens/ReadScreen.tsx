@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -8,6 +8,10 @@ import { AddLinkModal } from '../components/AddLinkModal';
 import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
+import { StorageService } from '../services/storage';
+
+// Minimum ms between background refetches triggered by tab focus.
+const FOCUS_REFETCH_TTL_MS = 30_000;
 
 type ReadScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -24,6 +28,10 @@ export const ReadScreen: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [isStale, setIsStale] = useState(false);
+
+  // Timestamp of the last successful network fetch (null = never fetched)
+  const lastFetchedAtRef = useRef<number | null>(null);
 
   const loadReadArticles = useCallback(async (reset = false) => {
     try {
@@ -46,6 +54,10 @@ export const ReadScreen: React.FC = () => {
 
       if (reset) {
         setArticles(transformedArticles);
+        // Persist fresh data to cache and clear stale indicator
+        void StorageService.saveReadListCache(transformedArticles);
+        lastFetchedAtRef.current = Date.now();
+        setIsStale(false);
       } else {
         setArticles((prev) => [...prev, ...transformedArticles]);
       }
@@ -54,11 +66,17 @@ export const ReadScreen: React.FC = () => {
       setCursor(response.cursor);
     } catch (error) {
       console.error('Error loading read articles:', error);
-      Alert.alert(
-        'Error',
-        'Failed to load articles. Please try again.',
-        [{ text: 'OK' }]
-      );
+      if (reset) {
+        // On network failure after showing stale data, mark as stale rather than
+        // showing a blocking alert — the user can still read cached content.
+        setIsStale(true);
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to load articles. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -66,14 +84,29 @@ export const ReadScreen: React.FC = () => {
     }
   }, [cursor]);
 
-  // Reload the list whenever the screen regains focus (e.g. after returning
-  // from the article detail screen where an article may have been archived).
-  // Skip the reload while a search is active so we don't clobber search results.
+  // On focus: show cached stale data immediately, then refetch in background
+  // if TTL has expired.  Skip while a search is active.
   useFocusEffect(
     useCallback(() => {
-      if (!searchQuery) {
+      if (searchQuery) return;
+
+      const now = Date.now();
+      const ttlExpired =
+        lastFetchedAtRef.current === null ||
+        now - lastFetchedAtRef.current > FOCUS_REFETCH_TTL_MS;
+
+      if (!ttlExpired) return;
+
+      // Show cached data right away so the screen is not blank while fetching
+      StorageService.getReadListCache().then((cached) => {
+        if (cached && cached.articles.length > 0) {
+          setArticles(cached.articles);
+          setLoading(false);
+          setIsStale(true);
+        }
+        // Fetch fresh data (will clear isStale on success)
         loadReadArticles(true);
-      }
+      });
       // We only want this to fire on focus, not on every loadReadArticles
       // identity change, so keep the dependency list minimal.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,6 +202,7 @@ export const ReadScreen: React.FC = () => {
         loadingMore={loadingMore}
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
+        staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
       />
       <AddLinkModal
         visible={modalVisible}

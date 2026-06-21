@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -13,6 +13,9 @@ import { ReadService } from '../services/read';
 import { pluralize } from '../utils/helpers';
 
 type YouScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
+// Minimum ms between data refetches triggered by tab focus.
+const FOCUS_REFETCH_TTL_MS = 30_000;
 
 interface MenuItemProps {
   title: string;
@@ -74,10 +77,20 @@ export const YouScreen: React.FC = () => {
 
   const accountName = user?.email || 'Anonymous user';
 
-  // Fetch user statistics every time the screen comes into focus so that
-  // changes made elsewhere (e.g. voting) are reflected on return.
+  // Timestamp of the last successful stats fetch (null = never fetched)
+  const lastFetchedAtRef = useRef<number | null>(null);
+
+  // Fetch user statistics when the screen comes into focus, but only if the
+  // TTL has expired.  This avoids a redundant round-trip on every tab switch.
   useFocusEffect(
     useCallback(() => {
+      const now = Date.now();
+      const ttlExpired =
+        lastFetchedAtRef.current === null ||
+        now - lastFetchedAtRef.current > FOCUS_REFETCH_TTL_MS;
+
+      if (!ttlExpired) return;
+
       const fetchStats = async () => {
         setLoading(true);
         setError(null);
@@ -118,6 +131,10 @@ export const YouScreen: React.FC = () => {
         }
 
         setError(errorMsg);
+        if (!errorMsg) {
+          // Only advance the TTL clock on a fully successful fetch
+          lastFetchedAtRef.current = Date.now();
+        }
         setLoading(false);
       };
 

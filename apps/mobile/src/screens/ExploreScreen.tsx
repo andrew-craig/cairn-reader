@@ -7,6 +7,7 @@ import { IconButton } from '../components/common/IconButton';
 import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ExploreService } from '../services';
+import { StorageService } from '../services/storage';
 import { useAuth } from '../contexts/AuthContext';
 
 type ExploreScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
@@ -48,6 +49,7 @@ export const ExploreScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [isStale, setIsStale] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<Article[]>([]);
@@ -183,6 +185,12 @@ export const ExploreScreen: React.FC = () => {
         // Set all articles at once
         setArticles(allArticles);
         articlesRef.current = allArticles;
+        void StorageService.saveExploreCache(allArticles);
+        setIsStale(false);
+      } else {
+        // Single page was enough — persist it
+        void StorageService.saveExploreCache(recommendations);
+        setIsStale(false);
       }
     } catch (error) {
       console.error('Error loading explore articles:', error);
@@ -197,6 +205,9 @@ export const ExploreScreen: React.FC = () => {
         // Log out the user to force re-authentication
         console.log('Authentication failed, logging out user');
         await logout();
+      } else {
+        // Network/server error — mark as stale if we already have articles
+        setIsStale(true);
       }
     } finally {
       isFetchingRef.current = false;
@@ -239,8 +250,19 @@ export const ExploreScreen: React.FC = () => {
   }, [loadMoreUntilBuffer]);
 
   useEffect(() => {
-    loadExploreArticles();
-  }, [loadExploreArticles]);
+    // Show cached data immediately to avoid a blank screen while fetching
+    StorageService.getExploreCache().then((cached) => {
+      if (cached && cached.articles.length > 0) {
+        setArticles(cached.articles);
+        articlesRef.current = cached.articles;
+        setLoading(false);
+        setIsStale(true);
+      }
+      loadExploreArticles();
+    });
+    // loadExploreArticles identity is stable on mount; the dep keeps lint happy
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Flush pending shown events when the user leaves the Explore tab, and
   // require a fresh scroll interaction on return.
@@ -265,6 +287,7 @@ export const ExploreScreen: React.FC = () => {
   const handleRefresh = () => {
     flushShownRef.current();
     setRefreshing(true);
+    setIsStale(false);
     setArticles([]);
     lastVisibleIndexRef.current = 0;
     offsetRef.current = 0;
@@ -436,6 +459,7 @@ export const ExploreScreen: React.FC = () => {
         }
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
+        staleMessage={isStale && !searchQuery ? 'Showing cached data — pull to refresh' : undefined}
       />
       <SearchModal
         visible={searchVisible}

@@ -4,11 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_5378** · P1 · open · Pre-beta audit remediation
-- **task_065e** · P1 · open · API freeze: reconcile OpenAPI specs with routes and unify error envelope  (parent: epic_5378)
-- **task_2c1f** · P1 · open · RFC email validation and email verification flow  (parent: epic_5378)
-- **task_bfad** · P1 · open · Split content list vs detail payload (drop cleaned_html from list/search responses)  (parent: epic_5378)
-- **task_f416** · P1 · open · Add per-account failed-login tracking and account lockout  (parent: epic_5378)
-- **task_fe44** · P1 · open · Add forgot-password / reset-password flow  (parent: epic_5378)
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -34,16 +29,11 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
-- **task_126b** · P3 · open · Security fast-follow: Redis-backed rate limiter, auth audit log, Vault startup retry  (parent: epic_5378)
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
-- **task_396d** · P3 · open · Standardise health-check JSON and document undocumented routes in specs  (parent: epic_5378)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
-- **task_5229** · P3 · open · Mobile resilience: focus-refetch TTL, retry/backoff, offline stale-fallback  (parent: epic_5378)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
-- **task_9208** · P3 · open · Data-layer fast-follow: indexes, pool unification, bulk insert, drop unused view, migration CI  (parent: epic_5378)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
-- **task_c542** · P3 · open · Infra fast-follow: document single-instance topology, sslmode note, email API key rotation  (parent: epic_5378)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support

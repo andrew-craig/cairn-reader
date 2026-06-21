@@ -3,6 +3,8 @@ import { Article } from '../types';
 import {
   UserContentsListResponse,
   UserContentResponse,
+  UserContentDetailResponse,
+  ContentDetailResponse,
   AddContentToUserRequest,
   UpdateUserContentRequest,
   SearchParams,
@@ -15,6 +17,7 @@ import {
   UnifiedSubscriptionsResponse,
 } from '../types/read';
 import { getServerUrl } from '../config/api';
+import { withRetry } from '../utils/retry';
 
 const PAGE_SIZE_DEFAULT = 20;
 
@@ -72,6 +75,24 @@ export class ReadService {
   }
 
   /**
+   * Like fetchWithAuth but also retries on 5xx / network errors.
+   * 4xx responses are returned as-is (callers handle error status).
+   */
+  private static async fetchWithAuthAndRetry(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    return withRetry(async (signal) => {
+      const response = await this.fetchWithAuth(url, { ...options, signal });
+      // Throw on 5xx so withRetry can retry; let 4xx pass through to caller
+      if (response.status >= 500) {
+        throw new Error(`Server error ${response.status}`);
+      }
+      return response;
+    });
+  }
+
+  /**
    * List user's saved content
    */
   static async listUserContents(
@@ -97,7 +118,7 @@ export class ReadService {
         queryParams.toString() ? `?${queryParams.toString()}` : ''
       }`;
 
-      const response = await this.fetchWithAuth(url);
+      const response = await this.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -143,7 +164,7 @@ export class ReadService {
 
       const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
 
-      const response = await this.fetchWithAuth(url);
+      const response = await this.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -390,7 +411,7 @@ export class ReadService {
       const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions`;
       console.log('Fetching subscriptions from:', url);
 
-      const response = await this.fetchWithAuth(url);
+      const response = await this.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -495,13 +516,79 @@ export class ReadService {
   }
 
   /**
-   * Transform backend UserContentResponse to mobile Article format
+   * Fetch a single user content item with full detail (including cleaned_html).
+   * Use this when opening an article for reading if the list response did not
+   * include cleaned_html.
+   */
+  static async getContentById(contentId: string): Promise<UserContentDetailResponse> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`;
+    const response = await this.fetchWithAuth(url);
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to fetch content detail');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Transform backend UserContentResponse (summary) to mobile Article format.
+   * The returned Article will have content=undefined when the response is a summary.
+   * Call getContentById and use transformDetailToArticle to fill in the HTML body.
    */
   static transformToArticle(userContent: UserContentResponse): Article {
     const content = userContent.content;
 
     if (!content) {
       // Fallback if content is not included
+      return {
+        id: userContent.content_id,
+        url: '',
+        title: 'Unknown Article',
+        description: '',
+        tags: [],
+        isRead: userContent.status === 'completed',
+        isFavorite: userContent.is_favorite,
+        addedAt: new Date(userContent.added_at).getTime(),
+        scrollPosition: userContent.scroll_position || undefined,
+      };
+    }
+
+    return {
+      id: content.id,
+      url: content.original_url,
+      title: content.title,
+      description: content.description,
+      // cleaned_html is not present in summary responses — will be loaded on demand
+      content: undefined,
+      imageUrl: content.image_urls?.[0],
+      author: content.author,
+      publishedDate: content.published_at,
+      readingTime: content.word_count ? Math.ceil(content.word_count / 200) : undefined,
+      tags: [],
+      isRead: userContent.status === 'completed',
+      isFavorite: userContent.is_favorite,
+      addedAt: new Date(userContent.added_at).getTime(),
+      readAt: userContent.status === 'completed' ? new Date(userContent.updated_at).getTime() : undefined,
+      scrollPosition: userContent.scroll_position || undefined,
+    };
+  }
+
+  /**
+   * Transform a full UserContentDetailResponse (with cleaned_html) to Article.
+   */
+  static transformDetailToArticle(userContent: UserContentDetailResponse): Article {
+    const content = userContent.content;
+
+    if (!content) {
       return {
         id: userContent.content_id,
         url: '',
