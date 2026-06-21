@@ -28,6 +28,7 @@ type RouterConfig struct {
 	AuthRateLimit            int                               // Requests per window for auth endpoints (default: 10)
 	AuthRateLimitWindow      time.Duration                     // Time window for auth rate limiting (default: 1 minute)
 	Logger                   *slog.Logger                      // Structured logger for request logging
+	Version                  string                            // Build version string embedded at compile time
 }
 
 // Router sets up the HTTP routes and returns a configured http.Handler.
@@ -49,7 +50,7 @@ func Router(config RouterConfig) http.Handler {
 	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
 
 	// Initialize handlers
-	healthHandler := NewHealthHandler(config.DB, config.VaultClient)
+	healthHandler := NewHealthHandler(config.DB, config.VaultClient, config.Version)
 	authHandler := NewAuthHandler(config.AuthService, config.EmailVerificationService)
 	userHandler := NewUserHandler(config.UserService)
 

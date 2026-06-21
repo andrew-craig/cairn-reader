@@ -20,7 +20,10 @@ WORKDIR /app/services/users
 RUN go mod download
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o user-service ./cmd/user-service
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo \
+    -ldflags "-X main.version=${VERSION}" \
+    -o user-service ./cmd/user-service
 
 # Final stage
 FROM alpine:latest
