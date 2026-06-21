@@ -54,7 +54,7 @@
 .reader__title {
   margin: 0 0 var(--spacing-sm);
   font-family: var(--font-heading);
-  font-size: var(--font-size-xxl);
+  font-size: var(--font-size-xl);
   font-weight: 600;
   line-height: 1.2;
 }
