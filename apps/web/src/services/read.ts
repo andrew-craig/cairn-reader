@@ -341,10 +341,10 @@ export class ReadService {
 
     const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`;
     const response = await AuthService.fetchWithAuth(url);
-    const result = await response.json();
+    const result = await response.json().catch(() => ({}));
 
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Failed to fetch article');
+    if (!response.ok || !result?.data) {
+      throw new Error(result?.message || result?.error || 'Failed to fetch article');
     }
 
     return this.transformToArticle(result.data as UserContentResponse);
