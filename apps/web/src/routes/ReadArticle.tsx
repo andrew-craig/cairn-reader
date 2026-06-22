@@ -44,11 +44,12 @@ export default function ReadArticle() {
   const index = navState?.index ?? -1;
   const hasList = Array.isArray(articles) && index >= 0;
 
-  // The article from nav state is the source of truth when present; otherwise we
-  // fetch it (direct load). Re-derive on id change so prev/next swaps the article.
+  // The article from nav state seeds an instant placeholder (title/metadata),
+  // but it is a list *summary* that omits the article body — so we always fetch
+  // the full detail by id below. Re-derive on id change so prev/next swaps it.
   const initialArticle = hasList ? articles[index] : undefined;
   const [article, setArticle] = useState<Article | undefined>(initialArticle);
-  const [loading, setLoading] = useState(!initialArticle);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Mutable UI state tracked separately from the article object so async updates
@@ -72,10 +73,12 @@ export default function ReadArticle() {
   const nextIndex = hasList ? index + 1 : -1;
   const hasNext = hasList && nextIndex < (articles?.length ?? 0);
 
-  // When opened without nav state, fetch the single article (paging the list,
-  // since the backend has no per-user get-by-id route — see ReadService).
+  // Fetch the full article detail (including the body) by id. The list endpoint
+  // returns only a summary without cleaned_html, so the nav-state article seeds
+  // the placeholder while this loads the content; a direct load fetches it
+  // outright. Runs on id change so prev/next loads the swapped article's body.
   useEffect(() => {
-    if (initialArticle || !id) return;
+    if (!id) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -94,7 +97,7 @@ export default function ReadArticle() {
     return () => {
       cancelled = true;
     };
-  }, [id, initialArticle]);
+  }, [id]);
 
   // Reset per-article progress refs and seed the mutable UI state from the
   // article's saved state whenever the displayed article changes (open,
@@ -240,10 +243,13 @@ export default function ReadArticle() {
     }
   }, [article?.url]);
 
-  if (loading) {
+  // Full-screen states only when there is nothing to display yet (direct load).
+  // With a nav-state placeholder we keep the title visible and surface load /
+  // error states inside the body instead.
+  if (loading && !article) {
     return <p className="reader__status">Loading article…</p>;
   }
-  if (error || !article) {
+  if (!article) {
     return (
       <div className="reader__status">
         <p className="reader__error">{error ?? 'Article not found.'}</p>
@@ -273,8 +279,10 @@ export default function ReadArticle() {
             // Content is sanitized with DOMPurify (utils/sanitize) before injection.
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
+        ) : loading ? (
+          <p className="reader__status">Loading article…</p>
         ) : (
-          <p className="reader__status">No content available for this article.</p>
+          <p className="reader__status">{error ?? 'No content available for this article.'}</p>
         )}
       </article>
       <FloatingActionBar
