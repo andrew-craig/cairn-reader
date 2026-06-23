@@ -114,7 +114,7 @@ func (m *mockUserContentRepo) UpdateWithTx(ctx context.Context, tx *sql.Tx, uc *
 	return nil
 }
 
-func (m *mockUserContentRepo) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *int, isFavorite *bool) error {
+func (m *mockUserContentRepo) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
 	return nil
 }
 

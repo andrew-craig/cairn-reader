@@ -1015,9 +1015,12 @@ components:
           enum: [unread, reading, completed, archived]
           default: unread
         scroll_position:
-          type: integer
+          type: number
+          format: float
           minimum: 0
+          maximum: 1
           default: 0
+          description: Initial reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
           default: false
@@ -1033,9 +1036,12 @@ components:
           enum: [unread, reading, completed, archived]
           nullable: true
         scroll_position:
-          type: integer
+          type: number
+          format: float
           minimum: 0
+          maximum: 1
           nullable: true
+          description: Reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
           nullable: true
@@ -1058,7 +1064,9 @@ components:
           type: string
           enum: [unread, reading, completed, archived]
         scroll_position:
-          type: integer
+          type: number
+          format: float
+          description: Reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
         added_at:

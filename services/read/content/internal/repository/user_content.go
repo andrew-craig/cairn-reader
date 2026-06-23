@@ -42,7 +42,7 @@ type UserContentRepository interface {
 	UpdateWithTx(ctx context.Context, tx *sql.Tx, userContent *models.UserContent) error
 
 	// UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite)
-	UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *int, isFavorite *bool) error
+	UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error
 
 	// Delete deletes a user-content relationship
 	Delete(ctx context.Context, userID, contentID uuid.UUID) error
@@ -450,7 +450,7 @@ func (r *userContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, us
 }
 
 // UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite)
-func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *int, isFavorite *bool) error {
+func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
 	// Build dynamic update query based on which fields are provided
 	query := "UPDATE user_contents SET updated_at = $1"
 	args := []interface{}{time.Now()}

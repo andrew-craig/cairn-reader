@@ -1209,9 +1209,11 @@ components:
           enum: [unread, reading, completed, archived]
           description: Initial reading status (default unread)
         scroll_position:
-          type: integer
+          type: number
+          format: float
           minimum: 0
-          description: Initial scroll position
+          maximum: 1
+          description: Initial reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
           description: Initial favorite flag
@@ -1286,9 +1288,11 @@ components:
           enum: [unread, reading, completed, archived]
           description: Reading status
         scroll_position:
-          type: integer
+          type: number
+          format: float
           minimum: 0
-          description: Scroll position in the article
+          maximum: 1
+          description: Reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
           description: Favorite flag
@@ -1309,8 +1313,9 @@ components:
           enum: [unread, reading, completed, archived]
           description: Reading status
         scroll_position:
-          type: integer
-          description: Scroll position
+          type: number
+          format: float
+          description: Reading progress as a fraction of the article scrolled (0–1)
         is_favorite:
           type: boolean
           description: Favorite flag
