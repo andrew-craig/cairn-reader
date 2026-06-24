@@ -4,7 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_5378** · P1 · open · Pre-beta audit remediation
-- **task_5860** · P2 · in_progress · Web: Migrate apps/mobile onto @cairn/shared (converge shared code)  (parent: epic_f54e)
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
