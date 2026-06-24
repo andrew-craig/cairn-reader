@@ -35,7 +35,7 @@ type UserContent struct {
 	UserID         uuid.UUID `json:"user_id"`
 	ContentID      uuid.UUID `json:"content_id"`
 	Status         string    `json:"status"`
-	ScrollPosition int       `json:"scroll_position"`
+	ScrollPosition float64   `json:"scroll_position"`
 	IsFavorite     bool      `json:"is_favorite"`
 	AddedAt        time.Time `json:"added_at"`
 	UpdatedAt      time.Time `json:"updated_at"`

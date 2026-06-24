@@ -24,9 +24,9 @@ type AddContentToUserRequest struct {
 	ContentID *uuid.UUID `json:"content_id,omitempty"`
 
 	// Common metadata (applies to both flows)
-	Status         string `json:"status,omitempty"`
-	ScrollPosition int    `json:"scroll_position,omitempty"`
-	IsFavorite     bool   `json:"is_favorite,omitempty"`
+	Status         string  `json:"status,omitempty"`
+	ScrollPosition float64 `json:"scroll_position,omitempty"` // Reading progress as a fraction in [0,1]
+	IsFavorite     bool    `json:"is_favorite,omitempty"`
 }
 
 // Validate validates the AddContentToUserRequest
@@ -44,6 +44,10 @@ func (a AddContentToUserRequest) Validate() error {
 				validation.In(models.StatusUnread, models.StatusReading, models.StatusCompleted, models.StatusArchived).
 					Error("Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'"),
 			),
+		),
+		validation.Field(&a.ScrollPosition,
+			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
+			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
 	)
 }
@@ -73,9 +77,9 @@ type FeedSubscriptionDTO struct {
 
 // UpdateUserContentRequest represents the request body for updating user-content metadata
 type UpdateUserContentRequest struct {
-	Status         *string `json:"status,omitempty"`
-	ScrollPosition *int    `json:"scroll_position,omitempty"`
-	IsFavorite     *bool   `json:"is_favorite,omitempty"`
+	Status         *string  `json:"status,omitempty"`
+	ScrollPosition *float64 `json:"scroll_position,omitempty"` // Reading progress as a fraction in [0,1]
+	IsFavorite     *bool    `json:"is_favorite,omitempty"`
 }
 
 // Validate validates the UpdateUserContentRequest
@@ -86,6 +90,10 @@ func (u UpdateUserContentRequest) Validate() error {
 				validation.In(models.StatusUnread, models.StatusReading, models.StatusCompleted, models.StatusArchived).
 					Error("Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'"),
 			),
+		),
+		validation.Field(&u.ScrollPosition,
+			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
+			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
 	)
 }
@@ -98,7 +106,7 @@ type UserContentResponse struct {
 	UserID         uuid.UUID               `json:"user_id"`
 	ContentID      uuid.UUID               `json:"content_id"`
 	Status         string                  `json:"status"`
-	ScrollPosition int                     `json:"scroll_position"`
+	ScrollPosition float64                 `json:"scroll_position"`
 	IsFavorite     bool                    `json:"is_favorite"`
 	AddedAt        time.Time               `json:"added_at"`
 	UpdatedAt      time.Time               `json:"updated_at"`
@@ -112,7 +120,7 @@ type UserContentDetailResponse struct {
 	UserID         uuid.UUID        `json:"user_id"`
 	ContentID      uuid.UUID        `json:"content_id"`
 	Status         string           `json:"status"`
-	ScrollPosition int              `json:"scroll_position"`
+	ScrollPosition float64          `json:"scroll_position"`
 	IsFavorite     bool             `json:"is_favorite"`
 	AddedAt        time.Time        `json:"added_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`

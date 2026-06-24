@@ -61,7 +61,7 @@ export default function ReadArticle() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll fraction in [0,1] — offsetY / contentHeight, matching mobile and the
-  // backend's NUMERIC(5,4) scroll_position column (commit c67a17d).
+  // backend's NUMERIC(5,4) scroll_position column.
   const scrollFractionRef = useRef(0);
   const hasScrolledRef = useRef(false);
   const hasMarkedCompletedRef = useRef(false);

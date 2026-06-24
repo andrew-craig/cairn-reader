@@ -126,14 +126,14 @@ func TestUserContentRepository_GetByUserAndContent_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).AddRow(
-			ucID, userID, contentID, models.StatusCompleted, 100, true, now, now,
+			ucID, userID, contentID, models.StatusCompleted, 0.5, true, now, now,
 		))
 
 	result, err := repo.GetByUserAndContent(ctx, userID, contentID)
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, models.StatusCompleted, result.Status)
-	assert.Equal(t, 100, result.ScrollPosition)
+	assert.Equal(t, 0.5, result.ScrollPosition)
 	assert.True(t, result.IsFavorite)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -280,7 +280,7 @@ func TestUserContentRepository_Update_Success(t *testing.T) {
 	uc := &models.UserContent{
 		ID:             ucID,
 		Status:         models.StatusCompleted,
-		ScrollPosition: 250,
+		ScrollPosition: 0.5,
 		IsFavorite:     true,
 	}
 
@@ -310,7 +310,7 @@ func TestUserContentRepository_UpdateMetadata_AllFields(t *testing.T) {
 
 	ucID := uuid.New()
 	status := models.StatusArchived
-	scrollPosition := 500
+	scrollPosition := 0.75
 	isFavorite := true
 
 	mock.ExpectExec(`UPDATE user_contents SET updated_at = \$1, status = \$2, scroll_position = \$3, is_favorite = \$4 WHERE id = \$5`).
@@ -570,7 +570,7 @@ func TestUserContentRepository_UpdateWithTx_Success(t *testing.T) {
 	uc := &models.UserContent{
 		ID:             ucID,
 		Status:         models.StatusCompleted,
-		ScrollPosition: 100,
+		ScrollPosition: 0.5,
 		IsFavorite:     true,
 	}
 

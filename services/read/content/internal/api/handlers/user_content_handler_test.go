@@ -72,7 +72,7 @@ func (m *MockUserContentRepository) ListByUserWithFilter(ctx context.Context, us
 	return args.Get(0).([]*models.UserContent), args.Error(1)
 }
 
-func (m *MockUserContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *int, isFavorite *bool) error {
+func (m *MockUserContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
 	args := m.Called(ctx, id, status, scrollPosition, isFavorite)
 	return args.Error(0)
 }
@@ -559,7 +559,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 		UserID:         userID,
 		ContentID:      contentID,
 		Status:         "completed",
-		ScrollPosition: 100,
+		ScrollPosition: 0.5,
 		IsFavorite:     true,
 		AddedAt:        time.Now(),
 		UpdatedAt:      time.Now(),
@@ -577,7 +577,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	}
 
 	newStatus := "completed"
-	newScroll := 100
+	newScroll := 0.5
 	newFavorite := true
 
 	mockUserContentRepo.On("GetByUserAndContent", mock.Anything, userID, contentID).Return(existingUC, nil)
@@ -587,7 +587,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 
 	reqBody := map[string]interface{}{
 		"status":          "completed",
-		"scroll_position": 100,
+		"scroll_position": 0.5,
 		"is_favorite":     true,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -609,7 +609,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	data := response["data"].(map[string]interface{})
 	assert.Equal(t, "completed", data["status"])
-	assert.Equal(t, float64(100), data["scroll_position"])
+	assert.Equal(t, float64(0.5), data["scroll_position"])
 	assert.Equal(t, true, data["is_favorite"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
