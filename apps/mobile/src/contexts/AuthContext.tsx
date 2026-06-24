@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthService } from '../services';
-import { loadServerUrl } from '../config/api';
+import { loadServerUrl } from '@cairn/shared';
 import { User } from '../types';
 
 interface AuthContextType {

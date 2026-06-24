@@ -1,6 +1,6 @@
 import { AuthService } from './auth';
 import { Article } from '../types';
-import { getServerUrl } from '../config/api';
+import { getServerUrl } from '@cairn/shared';
 import { withRetry } from '../utils/retry';
 
 interface RecommendationsResponse {

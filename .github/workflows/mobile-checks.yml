@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'apps/mobile/**'
+      - 'apps/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/mobile-checks.yml'
 
 jobs:
@@ -21,8 +24,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
       - run: npx tsc --noEmit
 
   lint:
@@ -37,8 +42,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
       - run: npx eslint .
 
   test:
@@ -53,8 +60,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
       - run: npx jest --ci --coverage
 
   bundle:
@@ -69,8 +78,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
       - name: Verify JS bundle compiles
         run: npx expo export --platform ios --output-dir /tmp/expo-export-test
 
@@ -86,6 +97,8 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - run: npm ci
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
       - run: npx knip

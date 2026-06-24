@@ -1,5 +1,5 @@
 import { ReadService } from './read';
-import { UserContentResponse } from '../types/read';
+import { UserContentResponse } from '@cairn/shared';
 
 describe('ReadService.transformToArticle', () => {
   const baseUserContent: UserContentResponse = {

@@ -1,4 +1,4 @@
-import { Article } from './article';
+import { Article } from '@cairn/shared';
 
 export type RootStackParamList = {
   MainTabs: undefined;

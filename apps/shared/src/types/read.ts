@@ -1,7 +1,25 @@
 // Read Service API Types
 // Based on OpenAPI spec in services/read/api/openapi.yaml
 
-interface ContentResponse {
+// Summary content returned in list/search responses (no cleaned_html)
+interface ContentSummaryResponse {
+  id: string;
+  content_hash: string;
+  original_url: string;
+  canonical_url?: string;
+  title: string;
+  author?: string;
+  published_at?: string;
+  description?: string;
+  image_urls?: string[];
+  word_count?: number;
+  source_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Full content returned in detail/create responses (includes cleaned_html)
+export interface ContentDetailResponse {
   id: string;
   content_hash: string;
   cleaned_html: string;
@@ -12,14 +30,15 @@ interface ContentResponse {
   published_at?: string;
   description?: string;
   image_urls?: string[];
-  source_type: string;
   word_count?: number;
+  source_type: string;
   created_at: string;
   updated_at: string;
 }
 
 type ContentStatus = 'unread' | 'reading' | 'completed' | 'archived';
 
+// List/search response — content is a summary (no cleaned_html)
 export interface UserContentResponse {
   id: string;
   user_id: string;
@@ -29,7 +48,20 @@ export interface UserContentResponse {
   is_favorite: boolean;
   added_at: string;
   updated_at: string;
-  content?: ContentResponse;
+  content?: ContentSummaryResponse;
+}
+
+// Detail response — content includes cleaned_html
+export interface UserContentDetailResponse {
+  id: string;
+  user_id: string;
+  content_id: string;
+  status: ContentStatus;
+  scroll_position: number;
+  is_favorite: boolean;
+  added_at: string;
+  updated_at: string;
+  content?: ContentDetailResponse;
 }
 
 export interface UserContentsListResponse {
@@ -80,7 +112,7 @@ interface AddFeedResponse {
 
 interface AddPageResponse {
   type: 'page';
-  content: UserContentResponse;
+  content: UserContentDetailResponse;
 }
 
 export type AddURLResponse = AddFeedResponse | AddPageResponse;

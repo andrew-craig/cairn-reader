@@ -15,8 +15,8 @@ import {
   AddURLResponse,
   ListFeedSubscriptionsResponse,
   UnifiedSubscriptionsResponse,
-} from '../types/read';
-import { getServerUrl } from '../config/api';
+  getServerUrl,
+} from '@cairn/shared';
 import { withRetry } from '../utils/retry';
 
 const PAGE_SIZE_DEFAULT = 20;

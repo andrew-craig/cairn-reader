@@ -13,6 +13,7 @@ import {
   type SearchParams,
   type UpdateUserContentRequest,
   type UserContentResponse,
+  type UserContentDetailResponse,
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
 } from '@cairn/shared';
@@ -26,15 +27,60 @@ export const PAGE_SIZE = 20;
 
 export class ReadService {
   /**
-   * Transform a backend UserContentResponse into the UI Article shape.
-   * Mirrors apps/mobile/src/services/read.ts, including the reading-time
-   * estimate from word_count (undefined until the backend emits word_count).
+   * Transform a backend UserContentResponse (summary) into the UI Article shape.
+   * Summary responses omit cleaned_html, so the returned Article has
+   * content=undefined; use getUserContent/transformDetailToArticle to fill in
+   * the HTML body. Mirrors apps/mobile/src/services/read.ts.
    */
   static transformToArticle(userContent: UserContentResponse): Article {
     const content = userContent.content;
 
     if (!content) {
       // Fallback when the list response omits the nested content.
+      return {
+        id: userContent.content_id,
+        url: '',
+        title: 'Unknown Article',
+        description: '',
+        tags: [],
+        isRead: userContent.status === 'completed',
+        isFavorite: userContent.is_favorite,
+        addedAt: new Date(userContent.added_at).getTime(),
+        scrollPosition: userContent.scroll_position || undefined,
+      };
+    }
+
+    return {
+      id: content.id,
+      url: content.original_url,
+      title: content.title,
+      description: content.description,
+      // cleaned_html is not present in summary responses — loaded on demand.
+      content: undefined,
+      imageUrl: content.image_urls?.[0],
+      author: content.author,
+      publishedDate: content.published_at,
+      readingTime: content.word_count ? Math.ceil(content.word_count / 200) : undefined,
+      tags: [],
+      isRead: userContent.status === 'completed',
+      isFavorite: userContent.is_favorite,
+      addedAt: new Date(userContent.added_at).getTime(),
+      readAt:
+        userContent.status === 'completed'
+          ? new Date(userContent.updated_at).getTime()
+          : undefined,
+      scrollPosition: userContent.scroll_position || undefined,
+    };
+  }
+
+  /**
+   * Transform a full UserContentDetailResponse (with cleaned_html) into an
+   * Article. Mirrors apps/mobile/src/services/read.ts.
+   */
+  static transformDetailToArticle(userContent: UserContentDetailResponse): Article {
+    const content = userContent.content;
+
+    if (!content) {
       return {
         id: userContent.content_id,
         url: '',
@@ -347,6 +393,6 @@ export class ReadService {
       throw new Error(result?.message || result?.error || 'Failed to fetch article');
     }
 
-    return this.transformToArticle(result.data as UserContentResponse);
+    return this.transformDetailToArticle(result.data as UserContentDetailResponse);
   }
 }

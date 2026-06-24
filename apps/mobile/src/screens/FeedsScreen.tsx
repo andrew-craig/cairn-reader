@@ -1,6 +1,6 @@
 import React from 'react';
 import { SubscriptionListScreen } from '../components/SubscriptionListScreen';
-import { UnifiedSubscription } from '../types/read';
+import { UnifiedSubscription } from '@cairn/shared';
 
 const feedsFilter = (s: UnifiedSubscription) => s.type !== 'email';
 

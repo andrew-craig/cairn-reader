@@ -16,9 +16,16 @@ import {
   CrimsonPro_600SemiBold,
   CrimsonPro_700Bold,
 } from '@expo-google-fonts/crimson-pro';
+import { configureStorage, configureDefaultServerUrl } from '@cairn/shared';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { TopBlurGradient } from './src/components/common';
+import { asyncStorageAdapter, DEFAULT_SERVER_URL } from './src/config/storage';
+
+// Wire the shared API config layer to mobile's persistence + default backend
+// before any service reads the server URL (decision_9b2d ADR).
+configureStorage(asyncStorageAdapter);
+configureDefaultServerUrl(() => DEFAULT_SERVER_URL);
 
 export default function App() {
   const colorScheme = useColorScheme();
