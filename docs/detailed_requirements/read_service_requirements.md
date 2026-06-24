@@ -44,11 +44,10 @@ Track user-specific data for each saved content item:
 
 #### Required Fields
 - **Status**: One of `unread`, `read`, or `archived`
-- **Scroll Position**: Integer representing the character offset within the cleaned HTML content
-  - Stores the position in the content as a character count from the beginning (e.g., `15420` means 15,420 characters into the content)
-  - The mobile app calculates this based on DOM text nodes at the current scroll position
-  - This approach is stable across different viewports, layouts, and devices
-  - Used by industry standard read-it-later apps (Kindle, Pocket, Instapaper)
+- **Scroll Position**: Fraction in `[0, 1]` representing how far the reader has scrolled through the content
+  - Stores `offsetY / contentHeight` (e.g., `0.5` means halfway through the article)
+  - The mobile and web apps compute this from the current scroll offset relative to total content height
+  - A relative fraction is stable across different viewports, layouts, font sizes, and devices (unlike an absolute pixel/character offset, which shifts when content reflows)
 - **Favorite**: Boolean flag for favorited items
 - **Added Timestamp**: When the user saved/received this content
 
@@ -354,7 +353,7 @@ CREATE TABLE user_contents (
 
     -- User-specific metadata
     status VARCHAR(20) NOT NULL DEFAULT 'unread', -- 'unread', 'read', 'archived'
-    scroll_position INTEGER NOT NULL DEFAULT 0, -- Character offset
+    scroll_position NUMERIC(5,4) NOT NULL DEFAULT 0.0, -- Reading progress as a fraction in [0,1]
     is_favorite BOOLEAN NOT NULL DEFAULT false,
 
     -- Timestamps
@@ -363,7 +362,7 @@ CREATE TABLE user_contents (
 
     -- Constraints
     CONSTRAINT chk_status CHECK (status IN ('unread', 'read', 'archived')),
-    CONSTRAINT chk_scroll_position CHECK (scroll_position >= 0),
+    CONSTRAINT chk_scroll_position CHECK (scroll_position >= 0 AND scroll_position <= 1),
     CONSTRAINT unique_user_content UNIQUE(user_id, content_id)
 );
 

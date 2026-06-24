@@ -834,7 +834,7 @@ CREATE TABLE user_contents (
     user_id UUID NOT NULL,
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'reading', 'completed', 'archived')),
-    scroll_position INTEGER DEFAULT 0,
+    scroll_position NUMERIC(5,4) DEFAULT 0.0,
     is_favorite BOOLEAN DEFAULT FALSE,
     added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_accessed_at TIMESTAMP WITH TIME ZONE,
