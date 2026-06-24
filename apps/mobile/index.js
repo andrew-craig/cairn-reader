@@ -1,3 +1,7 @@
+// Side-effect import: configures the shared API layer (storage + default server
+// URL) before any other module that might read the server URL is evaluated.
+// Must stay first.
+import './src/config/init';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

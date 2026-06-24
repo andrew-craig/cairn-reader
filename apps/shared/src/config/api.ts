@@ -18,7 +18,7 @@ export interface StorageAdapter {
 const SERVER_URL_KEY = '@cairn:server_url';
 
 let storage: StorageAdapter | null = null;
-let resolveDefaultServerUrl: () => string = () => '';
+let resolveDefaultServerUrl: (() => string) | null = null;
 let currentServerUrl = '';
 
 /** Configure the persistence backend. Must be called once during app startup. */
@@ -27,15 +27,24 @@ export function configureStorage(adapter: StorageAdapter): void {
 }
 
 /**
- * Inject the app-specific default server URL resolver and initialize the current
- * server URL to it. Must be called once during app startup.
+ * Inject the app-specific default server URL resolver and seed the current
+ * server URL from it. Must be called once during app startup. The seed only
+ * applies on first configuration so a dev hot-reload re-running this does not
+ * clobber a server URL already loaded from storage or chosen by the user.
  */
 export function configureDefaultServerUrl(resolver: () => string): void {
   resolveDefaultServerUrl = resolver;
-  currentServerUrl = resolver();
+  if (!currentServerUrl) {
+    currentServerUrl = resolver();
+  }
 }
 
 export function getDefaultServerUrl(): string {
+  if (!resolveDefaultServerUrl) {
+    throw new Error(
+      'Default server URL resolver not configured. Call configureDefaultServerUrl() first.',
+    );
+  }
   return resolveDefaultServerUrl();
 }
 
