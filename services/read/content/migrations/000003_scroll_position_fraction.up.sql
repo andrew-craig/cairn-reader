@@ -5,10 +5,13 @@
 -- fractional PATCH values like 0.5 were rejected by the API and progress never
 -- persisted. Migrate to NUMERIC(5,4) so the fraction can be stored.
 
--- Clamp legacy absolute offsets (any value > 1) back to the top before the type
--- change: they are meaningless as fractions, would overflow NUMERIC(5,4), and
--- clients already ignore values > 1 on restore.
-UPDATE user_contents SET scroll_position = 0 WHERE scroll_position > 1;
+-- Clamp legacy absolute offsets back to the top before the type change. Under
+-- the old INTEGER column every non-zero value was an absolute pixel/character
+-- offset, so any value >= 1 is a legacy offset rather than a fraction — e.g. a
+-- stored 1 ("1px from the top") must not become 1.0000 (100% scrolled, the
+-- bottom). Such values would also overflow NUMERIC(5,4), and clients already
+-- ignore values > 1 on restore.
+UPDATE user_contents SET scroll_position = 0 WHERE scroll_position >= 1;
 
 ALTER TABLE user_contents DROP CONSTRAINT chk_scroll_position;
 

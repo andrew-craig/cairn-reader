@@ -46,8 +46,8 @@ func (a AddContentToUserRequest) Validate() error {
 			),
 		),
 		validation.Field(&a.ScrollPosition,
-			validation.Min(0.0), validation.Max(1.0).
-				Error("scroll_position must be a fraction between 0 and 1"),
+			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
+			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
 	)
 }
@@ -92,10 +92,8 @@ func (u UpdateUserContentRequest) Validate() error {
 			),
 		),
 		validation.Field(&u.ScrollPosition,
-			validation.When(u.ScrollPosition != nil,
-				validation.Min(0.0), validation.Max(1.0).
-					Error("scroll_position must be a fraction between 0 and 1"),
-			),
+			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
+			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
 	)
 }
