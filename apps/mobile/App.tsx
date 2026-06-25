@@ -20,6 +20,10 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { TopBlurGradient } from './src/components/common';
 
+// The shared API config layer (storage + default server URL) is wired up in
+// src/config/init.ts, imported first from index.js so it runs before any module
+// that reads the server URL.
+
 export default function App() {
   const colorScheme = useColorScheme();
   const [fontsLoaded] = useFonts({

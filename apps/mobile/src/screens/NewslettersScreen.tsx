@@ -4,7 +4,7 @@ import { IconButton } from '../components/common/IconButton';
 import { HeaderPopover } from '../components/common/HeaderPopover';
 import { SubscriptionListScreen } from '../components/SubscriptionListScreen';
 import { Colors, FontSizes, FontFamily } from '../constants/theme';
-import { UnifiedSubscription } from '../types/read';
+import { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
 
 const newslettersFilter = (s: UnifiedSubscription) => s.type === 'email';

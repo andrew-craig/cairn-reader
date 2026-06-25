@@ -6,8 +6,12 @@ module.exports = {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@react-native-async-storage/async-storage$':
-      '<rootDir>/node_modules/@react-native-async-storage/async-storage/jest/async-storage-mock.js',
+    // Resolve the AsyncStorage mock via node resolution rather than a fixed
+    // <rootDir> path, since in the monorepo the dependency hoists to the root
+    // node_modules instead of apps/mobile/node_modules.
+    '^@react-native-async-storage/async-storage$': require.resolve(
+      '@react-native-async-storage/async-storage/jest/async-storage-mock.js',
+    ),
     '^react-native-safe-area-context$': '<rootDir>/__mocks__/react-native-safe-area-context.js',
     '^@expo/vector-icons$': '<rootDir>/__mocks__/@expo/vector-icons.js',
     '^@expo/vector-icons/(.*)$': '<rootDir>/__mocks__/@expo/vector-icons.js',

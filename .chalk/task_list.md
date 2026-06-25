@@ -7,10 +7,10 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
-- **task_5860** · P2 · open · Web: Migrate apps/mobile onto @cairn/shared (converge shared code)  (parent: epic_f54e)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
+- **task_81eb** · P2 · open · Web: Converge apps/web onto @cairn/shared config/api (storage adapter)  (parent: epic_f54e)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **decision_4052** · P3 · open · Decide to offer hosted service
