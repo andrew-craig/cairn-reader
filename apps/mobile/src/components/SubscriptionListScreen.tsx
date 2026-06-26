@@ -16,7 +16,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ScreenHeader } from './common/ScreenHeader';
 import { Colors, Layout, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
-import { UnifiedSubscription } from '../types/read';
+import { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
 
 const AVATAR_SIZE = 48;

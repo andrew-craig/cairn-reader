@@ -20,10 +20,10 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/mobile
+        working-directory: .
         run: npm ci
 
       - name: Save fastlane config

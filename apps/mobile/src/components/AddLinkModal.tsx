@@ -12,7 +12,7 @@ import {
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { HeaderPopover } from './common/HeaderPopover';
 import { ReadService } from '../services/read';
-import { DetectURLResponse } from '../types/read';
+import { DetectURLResponse } from '@cairn/shared';
 
 interface AddLinkModalProps {
   visible: boolean;

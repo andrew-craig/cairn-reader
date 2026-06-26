@@ -9,7 +9,7 @@ import {
   AuthTokens,
   User,
 } from '../types';
-import { getServerUrl } from '../config/api';
+import { getServerUrl } from '@cairn/shared';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
