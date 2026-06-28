@@ -2,14 +2,14 @@
 id: task_3a07
 title: Web: Animate modal enter/exit and add prefers-reduced-motion
 type: task
-status: open
+status: closed
 priority: 2
 labels: [web,design-review,motion]
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-24T22:59:33Z
-updated_at: 2026-06-24T22:59:33Z
+updated_at: 2026-06-28T23:02:35Z
 ---
 SearchModal and AddLinkModal are conditionally mounted ({showSearch && <SearchModal/>}) with no entrance or exit — they snap in/out, reading as a glitch.
 

@@ -63,16 +63,18 @@
   cursor: pointer;
   padding: 0;
   /* Smooth color transition for active/disabled state changes */
-  transition: color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
 }
 
-.fab__btn:hover:not(:disabled) {
-  background-color: rgba(0, 0, 0, 0.06);
-}
-
-@media (prefers-color-scheme: dark) {
+@media (hover: hover) and (pointer: fine) {
   .fab__btn:hover:not(:disabled) {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: rgba(0, 0, 0, 0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .fab__btn:hover:not(:disabled) {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
   }
 }
 

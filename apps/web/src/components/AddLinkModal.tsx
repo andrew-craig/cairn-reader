@@ -37,6 +37,7 @@ function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>) {
 interface AddLinkModalProps {
   onClose: () => void;
   onSuccess?: () => void;
+  closing?: boolean;
 }
 
 function isValidUrl(urlString: string): boolean {
@@ -58,7 +59,7 @@ function normalizeUrl(urlString: string): string {
   return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) {
+export default function AddLinkModal({ onClose, onSuccess, closing = false }: AddLinkModalProps) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
@@ -220,7 +221,7 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
 
   return (
     // Overlay backdrop
-    <div className="add-link-overlay" role="dialog" aria-modal="true" aria-label="Add link">
+    <div className={`add-link-overlay${closing ? ' add-link-overlay--closing' : ''}`} role="dialog" aria-modal="true" aria-label="Add link">
       <div className="add-link-modal" ref={modalRef} onKeyDown={handleKeyDown}>
         <div className="add-link-modal__body">
           <input

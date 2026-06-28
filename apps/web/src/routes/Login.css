@@ -81,6 +81,11 @@
   color: var(--color-background);
   font-size: var(--font-size-md);
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.login-submit:active {
+  transform: scale(0.97);
 }
 
 .login-submit:disabled {

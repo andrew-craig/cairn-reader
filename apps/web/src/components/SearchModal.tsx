@@ -7,6 +7,7 @@ import './SearchModal.css';
 
 interface SearchModalProps {
   onClose: () => void;
+  closing?: boolean;
 }
 
 const FOCUSABLE_SELECTORS =
@@ -43,7 +44,7 @@ function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>) {
 // Search overlay for the reading list. Debounces the query and calls
 // ReadService.searchUserContents. Results render in the same ArticleRow
 // layout as the main reading list.
-export default function SearchModal({ onClose }: SearchModalProps) {
+export default function SearchModal({ onClose, closing = false }: SearchModalProps) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -132,7 +133,7 @@ export default function SearchModal({ onClose }: SearchModalProps) {
   };
 
   return (
-    <div className="search-overlay" role="dialog" aria-modal="true" aria-label="Search your reading list">
+    <div className={`search-overlay${closing ? ' search-overlay--closing' : ''}`} role="dialog" aria-modal="true" aria-label="Search your reading list">
       <div className="search-modal" ref={modalRef}>
         <div className="search-modal__header">
           <div className="search-modal__input-wrap">

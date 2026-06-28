@@ -45,6 +45,10 @@
   --font-heading: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-brand: 'Crimson Pro', Georgia, 'Times New Roman', serif;
 
+  /* Motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
   /* Hint to the UA so form controls, scrollbars, etc. adapt to the scheme. */
   color-scheme: light;
 }
@@ -103,6 +107,59 @@ h6 {
 .sidebar__brand,
 .login-title {
   font-family: var(--font-brand);
+}
+
+/* Reduced motion: keep opacity fades but drop all scale/transform animations
+   introduced by the motion system (press feedback and modal enter/exit). */
+@media (prefers-reduced-motion: reduce) {
+  /* Press feedback — strip the transition and active transform */
+  .login-submit,
+  .read__refresh,
+  .read__add-link,
+  .add-link-modal__btn,
+  .reader__action,
+  .sidebar__item,
+  .article-row__button,
+  .search-modal__close {
+    transition: none;
+  }
+
+  .login-submit:active,
+  .read__refresh:active,
+  .read__add-link:active,
+  .add-link-modal__btn:active,
+  .reader__action:active,
+  .sidebar__item:active,
+  .article-row__button:active,
+  .search-modal__close:active {
+    transform: none;
+  }
+
+  /* Sidebar chevron rotation */
+  .sidebar__chevron {
+    transition: none;
+  }
+
+  /* Modal enter/exit animations — replace with opacity-only fade (no scale) */
+  .search-overlay,
+  .search-overlay--closing,
+  .add-link-overlay,
+  .add-link-overlay--closing {
+    animation: overlay-in 200ms var(--ease-out) both;
+  }
+
+  .search-overlay--closing,
+  .add-link-overlay--closing {
+    animation: overlay-out 150ms var(--ease-out) both;
+  }
+
+  .search-modal,
+  .search-overlay--closing .search-modal,
+  .add-link-modal,
+  .add-link-overlay--closing .add-link-modal {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* Visually hidden but available to screen readers. Used for section titles that

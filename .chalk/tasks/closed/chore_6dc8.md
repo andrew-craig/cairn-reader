@@ -2,14 +2,14 @@
 id: chore_6dc8
 title: Web: Define shared easing tokens and adopt them
 type: chore
-status: open
+status: closed
 priority: 3
 labels: [web,design-review,motion]
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-24T22:59:33Z
-updated_at: 2026-06-24T22:59:33Z
+updated_at: 2026-06-28T23:02:34Z
 ---
 The whole app has only two transitions (FAB color/opacity, sidebar chevron rotate) and both use the default 'ease', which is weak.
 

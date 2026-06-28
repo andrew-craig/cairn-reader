@@ -19,7 +19,25 @@ export default function Read() {
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddLink, setShowAddLink] = useState(false);
+  const [closingAddLink, setClosingAddLink] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [closingSearch, setClosingSearch] = useState(false);
+
+  const handleCloseAddLink = useCallback(() => {
+    setClosingAddLink(true);
+    setTimeout(() => {
+      setShowAddLink(false);
+      setClosingAddLink(false);
+    }, 150);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setClosingSearch(true);
+    setTimeout(() => {
+      setShowSearch(false);
+      setClosingSearch(false);
+    }, 150);
+  }, []);
 
   // Pagination cursor + guards kept in refs so the IntersectionObserver
   // callback reads current values without re-subscribing on every page.
@@ -132,12 +150,13 @@ export default function Read() {
 
       {showAddLink && (
         <AddLinkModal
-          onClose={() => setShowAddLink(false)}
+          onClose={handleCloseAddLink}
           onSuccess={handleRefresh}
+          closing={closingAddLink}
         />
       )}
 
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showSearch && <SearchModal onClose={handleCloseSearch} closing={closingSearch} />}
 
       {loading ? (
         <p className="read__status">Loading your reading list…</p>

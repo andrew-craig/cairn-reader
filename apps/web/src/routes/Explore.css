@@ -16,8 +16,10 @@
   cursor: pointer;
 }
 
-.explore__refresh:hover:not(:disabled) {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .explore__refresh:hover:not(:disabled) {
+    background-color: var(--color-hover);
+  }
 }
 
 .explore__refresh:disabled {
@@ -72,8 +74,10 @@
   cursor: pointer;
 }
 
-.explore-card__button:hover {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .explore-card__button:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .explore-card__button:focus-visible {

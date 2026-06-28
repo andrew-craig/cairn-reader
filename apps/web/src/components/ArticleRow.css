@@ -18,10 +18,17 @@
   text-align: left;
   cursor: pointer;
   border-radius: var(--spacing-sm);
+  transition: transform 160ms var(--ease-out);
 }
 
-.article-row__button:hover {
-  background-color: var(--color-hover);
+.article-row__button:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .article-row__button:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .article-row__button:focus-visible {

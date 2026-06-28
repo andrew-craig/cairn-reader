@@ -65,10 +65,17 @@
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
-.sidebar__item:hover {
-  background-color: var(--color-hover);
+.sidebar__item:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar__item:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .sidebar__item:focus-visible {
@@ -95,7 +102,7 @@
 
 .sidebar__chevron {
   color: var(--color-text-secondary);
-  transition: transform 0.15s ease;
+  transition: transform 0.15s var(--ease-out);
 }
 
 .sidebar__chevron--open {
