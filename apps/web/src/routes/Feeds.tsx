@@ -32,6 +32,7 @@ export default function Feeds() {
 
   const handleUnsubscribe = useCallback(async (sub: UnifiedSubscription) => {
     if (!sub.rss_data?.feed_id) return;
+    if (!window.confirm(`Unsubscribe from ${sub.title}?`)) return;
     const feedId = sub.rss_data.feed_id;
 
     // Optimistic: remove immediately, restore on error.

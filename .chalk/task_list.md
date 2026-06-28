@@ -32,7 +32,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
-- **task_8a07** · P3 · open · Web: Visual polish pass (You-hub duplication, key-value rows, image frames, dark palette, FAB labels)  (parent: epic_f54e)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal

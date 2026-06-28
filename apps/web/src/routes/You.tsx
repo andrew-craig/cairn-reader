@@ -1,4 +1,5 @@
-import { useNavigate, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './You.css';
 
@@ -12,13 +13,27 @@ const YOU_ITEMS = [
   { to: '/you/about', label: 'About' },
 ];
 
-// The You index route (/you). On desktop/tablet this is never reached because
-// the sidebar auto-expands the You sub-menu and routes land on sub-pages.
-// On mobile (<768px) the sidebar is hidden, so /you acts as the "You" hub page
-// showing all sub-destinations — mirroring the mobile app's YouScreen.
+// The You index route (/you). On desktop/tablet (>=768px) the sidebar is
+// visible and shows the sub-menu, so /you is redundant — redirect to the first
+// sub-page. On mobile (<768px) the sidebar is hidden; /you acts as the hub.
 export default function You() {
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  // SSR-safe: window may not exist. Initialise from window if available, then
+  // keep in sync with resize so hot-reloading and orientation changes work.
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -28,6 +43,10 @@ export default function You() {
     }
     navigate('/login', { replace: true });
   };
+
+  if (isDesktop) {
+    return <Navigate to="/you/account" replace />;
+  }
 
   return (
     <div className="you-page">

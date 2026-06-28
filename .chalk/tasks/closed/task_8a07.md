@@ -2,14 +2,14 @@
 id: task_8a07
 title: Web: Visual polish pass (You-hub duplication, key-value rows, image frames, dark palette, FAB labels)
 type: task
-status: open
+status: closed
 priority: 3
 labels: [web,design-review]
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-24T22:59:33Z
-updated_at: 2026-06-24T22:59:33Z
+updated_at: 2026-06-28T23:07:07Z
 ---
 Lower-priority polish from the apps/web design review:
 

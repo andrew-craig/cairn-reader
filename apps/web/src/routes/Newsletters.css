@@ -13,6 +13,7 @@
   gap: var(--spacing-md);
   padding: var(--spacing-md) 0;
   border-bottom: 1px solid var(--color-border);
+  max-width: 560px;
 }
 
 .feeds__item:last-child {
