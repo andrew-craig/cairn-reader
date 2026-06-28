@@ -4,6 +4,7 @@ import type { Article } from '@cairn/shared';
 import { ExploreService } from '../services/explore';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
+import { decodeEntities } from '../utils/decodeEntities';
 import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 
@@ -183,7 +184,7 @@ export default function ExploreArticle() {
 
       <article className="reader__article">
         <header className="reader__header">
-          <h1 className="reader__title">{article.title}</h1>
+          <h1 className="reader__title">{decodeEntities(article.title)}</h1>
           <p className="reader__meta">
             {article.author && <span>{article.author}</span>}
             {publishedDate && <span>{publishedDate}</span>}

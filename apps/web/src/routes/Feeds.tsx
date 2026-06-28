@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
+import { decodeEntities } from '../utils/decodeEntities';
 import './Read.css';
 import './Newsletters.css';
 
@@ -83,7 +84,7 @@ export default function Feeds() {
           {subscriptions.map((sub) => (
             <li key={sub.id} className="feeds__item">
               <div className="feeds__info">
-                <span className="feeds__title">{sub.title}</span>
+                <span className="feeds__title">{decodeEntities(sub.title)}</span>
                 {sub.rss_data?.feed_url && (
                   <span className="feeds__url">{sub.rss_data.feed_url}</span>
                 )}

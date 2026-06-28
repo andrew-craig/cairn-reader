@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ExploreService, type VotedArticleWithType } from '../services/explore';
+import { decodeEntities } from '../utils/decodeEntities';
 import './Votes.css';
 
 // Page size: fetch one page of 50 voted articles (offset-paginated, no
@@ -25,7 +26,7 @@ function VoteRow({ voted, onSelect }: VoteRowProps) {
         onClick={() => onSelect(voted)}
       >
         <div className="vote-row__text">
-          <h2 className="vote-row__title">{voted.title}</h2>
+          <h2 className="vote-row__title">{decodeEntities(voted.title)}</h2>
           <p className="vote-row__meta">{voted.author || 'Unknown'}</p>
           {voted.description && (
             <p className="vote-row__excerpt">{voted.description}</p>

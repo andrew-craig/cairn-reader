@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Article } from '@cairn/shared';
 import { ExploreService } from '../services/explore';
+import { decodeEntities } from '../utils/decodeEntities';
 import './Explore.css';
 
 // Page size matched to the backend's recommendationPageSize. A page shorter
@@ -30,7 +31,7 @@ function ExploreCard({ article, onSelect, observeRef }: ExploreCardProps) {
         onClick={() => onSelect(article)}
       >
         <div className="explore-card__text">
-          <h2 className="explore-card__title">{article.title}</h2>
+          <h2 className="explore-card__title">{decodeEntities(article.title)}</h2>
           <p className="explore-card__meta">{article.author || 'Unknown'}</p>
           {article.description && (
             <p className="explore-card__excerpt">{article.description}</p>

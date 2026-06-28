@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DetectURLResponse, DiscoverFeedResponse } from '@cairn/shared';
 import { ReadService } from '../services/read';
+import { decodeEntities } from '../utils/decodeEntities';
 import './AddLinkModal.css';
 
 const FOCUSABLE_SELECTORS =
@@ -246,7 +247,7 @@ export default function AddLinkModal({ onClose, onSuccess }: AddLinkModalProps) 
                     className="add-link-modal__feed-item"
                     onClick={() => handlePickFeed(feed.url)}
                   >
-                    {feed.title || feed.url}
+                    {feed.title ? decodeEntities(feed.title) : feed.url}
                   </button>
                 </li>
               ))}

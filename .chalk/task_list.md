@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **bug_75da** · P1 · open · Web: Decode HTML entities in article titles  (parent: epic_f54e)
 - **epic_5378** · P1 · open · Pre-beta audit remediation
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **epic_f54e** · P2 · open · Desktop web app
