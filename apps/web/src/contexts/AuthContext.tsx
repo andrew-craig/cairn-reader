@@ -5,8 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import { type User } from '@cairn/shared';
-import { loadServerUrl } from '../config/api';
+import { type User, loadServerUrl } from '@cairn/shared';
 import { AuthService } from '../services/auth';
 
 // Same shape as the mobile AuthContext (web_app_requirements.md §Auth state):
