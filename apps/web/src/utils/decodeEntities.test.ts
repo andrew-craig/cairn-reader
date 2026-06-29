@@ -29,4 +29,14 @@ describe('decodeEntities', () => {
   it('decodes a realistic article title', () => {
     expect(decodeEntities('Charlie Kirk&#8217;s legacy')).toBe("Charlie Kirk’s legacy");
   });
+
+  it('does not execute or retain embedded markup (XSS-safe)', () => {
+    // A hostile title with a textarea-breakout payload must decode inertly:
+    // markup is stripped to its text content, no <img>/onerror node survives.
+    const result = decodeEntities('safe</textarea><img src=x onerror="alert(1)">tail');
+    expect(result).not.toContain('<img');
+    expect(result).not.toContain('onerror');
+    expect(result).toContain('safe');
+    expect(result).toContain('tail');
+  });
 });
