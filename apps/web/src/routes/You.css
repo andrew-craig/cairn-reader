@@ -49,8 +49,10 @@
   font-size: var(--font-size-lg);
 }
 
-.you-page__link:hover {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .you-page__link:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .you-page__link:focus-visible {

@@ -3,8 +3,7 @@
 // voting, and reading. Mirrors apps/mobile/src/services/explore.ts, substituting
 // AuthService.fetchWithAuth for the mobile fetch wrapper and @cairn/shared's
 // getServerUrl for the mobile config.
-import { type Article } from '@cairn/shared';
-import { getServerUrl } from '../config/api';
+import { type Article, getServerUrl } from '@cairn/shared';
 import { AuthService } from './auth';
 
 // Internal backend shapes — not in @cairn/shared (explore-only concepts).

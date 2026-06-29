@@ -10,6 +10,12 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 80px;
+  /* Backdrop enter */
+  animation: overlay-in 200ms var(--ease-out) both;
+}
+
+.add-link-overlay--closing {
+  animation: overlay-out 150ms var(--ease-out) both;
 }
 
 /* Semi-transparent backdrop sits behind the modal card */
@@ -17,6 +23,8 @@
   position: absolute;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 /* Modal card */
@@ -29,6 +37,32 @@
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  /* Card enter */
+  animation: modal-in 200ms var(--ease-out) both;
+}
+
+.add-link-overlay--closing .add-link-modal {
+  animation: modal-out 150ms var(--ease-out) both;
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes modal-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
 }
 
 .add-link-modal__body {
@@ -92,8 +126,10 @@
   border-bottom: none;
 }
 
-.add-link-modal__feed-item:hover {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .add-link-modal__feed-item:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .add-link-modal__feed-item:focus-visible {
@@ -115,6 +151,11 @@
   font-weight: 500;
   cursor: pointer;
   min-height: 48px;
+  transition: transform 160ms var(--ease-out);
+}
+
+.add-link-modal__btn:active {
+  transform: scale(0.97);
 }
 
 .add-link-modal__btn:disabled {
@@ -128,18 +169,10 @@
   color: var(--color-background);
 }
 
-.add-link-modal__btn--primary:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
 .add-link-modal__btn--secondary {
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
   color: var(--color-text);
-}
-
-.add-link-modal__btn--secondary:hover:not(:disabled) {
-  background-color: var(--color-hover);
 }
 
 .add-link-modal__btn--cancel {
@@ -148,8 +181,18 @@
   color: var(--color-text-secondary);
 }
 
-.add-link-modal__btn--cancel:hover:not(:disabled) {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .add-link-modal__btn--primary:hover:not(:disabled) {
+    opacity: 0.85;
+  }
+
+  .add-link-modal__btn--secondary:hover:not(:disabled) {
+    background-color: var(--color-hover);
+  }
+
+  .add-link-modal__btn--cancel:hover:not(:disabled) {
+    background-color: var(--color-hover);
+  }
 }
 
 .add-link-modal__btn:focus-visible {

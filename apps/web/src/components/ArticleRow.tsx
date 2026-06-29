@@ -1,4 +1,5 @@
 import type { Article } from '@cairn/shared';
+import { decodeEntities } from '../utils/decodeEntities';
 import './ArticleRow.css';
 
 interface ArticleRowProps {
@@ -18,7 +19,7 @@ export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
         onClick={() => onSelect(article)}
       >
         <div className="article-row__text">
-          <h2 className="article-row__title">{article.title}</h2>
+          <h2 className="article-row__title">{decodeEntities(article.title)}</h2>
           <p className="article-row__meta">{article.author || 'Unknown'}</p>
           {article.description && (
             <p className="article-row__excerpt">{article.description}</p>

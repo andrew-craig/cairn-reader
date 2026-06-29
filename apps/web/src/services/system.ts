@@ -1,4 +1,4 @@
-import { getServerUrl } from '../config/api';
+import { getServerUrl } from '@cairn/shared';
 
 /**
  * SystemService exposes backend metadata that isn't tied to a user session.

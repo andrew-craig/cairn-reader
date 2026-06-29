@@ -25,8 +25,10 @@
   cursor: text;
 }
 
-.read__search-bar:hover {
-  border-color: var(--color-text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .read__search-bar:hover {
+    border-color: var(--color-text-secondary);
+  }
 }
 
 .read__search-bar:focus-visible {
@@ -50,11 +52,19 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
-.read__refresh:hover:not(:disabled),
-.read__add-link:hover:not(:disabled) {
-  background-color: var(--color-hover);
+.read__refresh:active,
+.read__add-link:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .read__refresh:hover:not(:disabled),
+  .read__add-link:hover:not(:disabled) {
+    background-color: var(--color-hover);
+  }
 }
 
 .read__refresh:disabled {

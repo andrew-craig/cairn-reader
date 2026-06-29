@@ -16,10 +16,17 @@
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
-.reader__action:hover:not(:disabled) {
-  background-color: var(--color-hover);
+.reader__action:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reader__action:hover:not(:disabled) {
+    background-color: var(--color-hover);
+  }
 }
 
 .reader__action:disabled {

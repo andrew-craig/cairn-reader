@@ -10,8 +10,8 @@ import {
   type RegisterRequest,
   type AuthTokens,
   type User,
+  getServerUrl,
 } from '@cairn/shared';
-import { getServerUrl } from '../config/api';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';

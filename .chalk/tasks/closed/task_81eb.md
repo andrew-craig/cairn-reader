@@ -2,14 +2,14 @@
 id: task_81eb
 title: Web: Converge apps/web onto @cairn/shared config/api (storage adapter)
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-24T08:38:09Z
-updated_at: 2026-06-24T08:38:09Z
+updated_at: 2026-06-28T22:55:21Z
 ---
 
 

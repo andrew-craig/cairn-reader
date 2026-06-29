@@ -16,8 +16,8 @@ import {
   type UserContentDetailResponse,
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
+  getServerUrl,
 } from '@cairn/shared';
-import { getServerUrl } from '../config/api';
 import { AuthService } from './auth';
 
 const PAGE_SIZE_DEFAULT = 20;

@@ -56,8 +56,10 @@
   cursor: pointer;
 }
 
-.votes__refresh:hover {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .votes__refresh:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .votes__refresh:focus-visible {
@@ -85,8 +87,10 @@
   cursor: pointer;
 }
 
-.vote-row__button:hover {
-  background-color: var(--color-hover);
+@media (hover: hover) and (pointer: fine) {
+  .vote-row__button:hover {
+    background-color: var(--color-hover);
+  }
 }
 
 .vote-row__button:focus-visible {

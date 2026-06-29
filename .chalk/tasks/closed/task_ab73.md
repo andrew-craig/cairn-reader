@@ -2,14 +2,14 @@
 id: task_ab73
 title: Web: Add :active press feedback and gate hover states for touch
 type: task
-status: open
+status: closed
 priority: 2
 labels: [web,design-review,motion]
 blocked_by: []
 parent: epic_f54e
 remote_task_url: null
 created_at: 2026-06-24T22:59:32Z
-updated_at: 2026-06-24T22:59:32Z
+updated_at: 2026-06-28T23:02:35Z
 ---
 No pressable element gives press feedback anywhere in apps/web — zero :active states across all buttons, nav items, article rows, FAB icons, modal actions. Per Emil design-eng philosophy every pressable element should confirm it heard the user.
 

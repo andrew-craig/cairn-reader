@@ -2,7 +2,8 @@
 
 interface ImportMetaEnv {
   /** Optional backend base URL. Overrides the serving origin as the default
-   *  backend — primarily for local development (see src/config/api.ts). */
+   *  backend — primarily for local development (resolved in main.tsx and
+   *  injected into @cairn/shared via configureDefaultServerUrl). */
   readonly VITE_API_URL?: string;
 }
 
