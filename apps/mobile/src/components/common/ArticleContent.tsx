@@ -26,33 +26,32 @@ export interface ScrollProgressInfo {
   offsetY: number;
   contentHeight: number;
   layoutHeight: number;
+  fraction: number;
 }
 
 /**
- * Whether a saved scroll offset can actually be reached given the currently
- * measured content and viewport heights. HTML content (especially emails) lays
- * out progressively, so early size measurements understate the final height and
- * a scrollTo to the target would be clamped short. We only consider restoration
- * final once the content has grown tall enough to reach the target.
+ * Whether a saved scroll fraction can actually be reached given the currently
+ * measured content and viewport heights. The pixel target is fraction * contentHeight;
+ * it's reachable when the max scrollable offset (contentHeight - layoutHeight) >= target.
  */
 export const isScrollTargetReachable = (
   contentHeight: number,
   layoutHeight: number,
-  target: number
-): boolean => layoutHeight > 0 && contentHeight - layoutHeight >= target;
+  fraction: number
+): boolean => layoutHeight > 0 && contentHeight - layoutHeight >= fraction * contentHeight;
 
 interface ArticleContentProps {
   article: Article;
   colors: typeof Colors.light;
   onScrollProgress?: (info: ScrollProgressInfo) => void;
-  initialScrollPosition?: number;
+  initialScrollFraction?: number;
 }
 
 export const ArticleContent: React.FC<ArticleContentProps> = ({
   article,
   colors,
   onScrollProgress,
-  initialScrollPosition,
+  initialScrollFraction,
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -69,6 +68,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       offsetY: offsetYRef.current,
       contentHeight: contentHeightRef.current,
       layoutHeight: layoutHeightRef.current,
+      fraction: offsetYRef.current / contentHeightRef.current,
     });
   }, [onScrollProgress]);
 
@@ -130,23 +130,15 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
 
   const handleContentSizeChange = useCallback((_w: number, contentHeight: number) => {
     contentHeightRef.current = contentHeight;
-    // Only fractional positions (0-1) are restored. The target scales with the
-    // content height, so we re-apply it on every size change as progressively-
-    // rendered HTML (e.g. emails) grows and never latch on size. Latching early
-    // would freeze the user near the top, since a half-rendered article reports
-    // a much smaller height. Control is handed over once the user starts
-    // dragging. Legacy absolute pixel values (> 1) are ignored.
-    if (
-      !hasRestoredPosition.current &&
-      initialScrollPosition &&
-      initialScrollPosition > 0 &&
-      initialScrollPosition <= 1
-    ) {
-      const targetY = Math.round(initialScrollPosition * contentHeight);
-      scrollViewRef.current?.scrollTo({ y: targetY, animated: false });
+    if (!hasRestoredPosition.current && initialScrollFraction && initialScrollFraction > 0) {
+      const target = Math.round(initialScrollFraction * contentHeight);
+      scrollViewRef.current?.scrollTo({ y: target, animated: false });
+      if (isScrollTargetReachable(contentHeight, layoutHeightRef.current, initialScrollFraction)) {
+        hasRestoredPosition.current = true;
+      }
     }
     emitProgress();
-  }, [initialScrollPosition, emitProgress]);
+  }, [initialScrollFraction, emitProgress]);
 
   // Once the user takes control by dragging, stop trying to restore so we never
   // yank them away from where they scrolled.

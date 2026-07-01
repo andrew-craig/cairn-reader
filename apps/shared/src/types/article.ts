@@ -15,4 +15,5 @@ export interface Article {
   readAt?: number;
   notes?: string;
   scrollPosition?: number;
+  scrollFraction?: number;
 }
