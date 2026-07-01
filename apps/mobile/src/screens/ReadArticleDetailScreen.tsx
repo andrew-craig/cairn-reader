@@ -16,6 +16,9 @@ import type { ScrollProgressInfo } from '../components/common/ArticleContent';
 
 const COMPLETED_PROGRESS_THRESHOLD = 0.95;
 
+const toFraction = (v?: number): number | undefined =>
+  v !== undefined && v <= 1 ? v : undefined;
+
 type ReadArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
 type ReadArticleDetailNavigationProp = StackNavigationProp<RootStackParamList, 'ArticleDetail'>;
 
@@ -54,7 +57,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   // when the displayed article changes (see effect below). isRead drives the
   // completion guard; isFavorite is reflected in the action menu.
   const [isFavorite, setIsFavorite] = useState(article.isFavorite);
-  const scrollFractionRef = useRef(article.scrollFraction ?? article.scrollPosition ?? 0);
+  const scrollFractionRef = useRef(toFraction(article.scrollFraction) ?? toFraction(article.scrollPosition) ?? 0);
   const hasScrolledRef = useRef(false);
   const hasMarkedCompletedRef = useRef(article.isRead);
   // Tracks the currently displayed article id so async callbacks can detect a
@@ -67,7 +70,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   // displayed article changes (next article reuses this screen via replace()).
   useEffect(() => {
     articleIdRef.current = article.id;
-    scrollFractionRef.current = article.scrollFraction ?? article.scrollPosition ?? 0;
+    scrollFractionRef.current = toFraction(article.scrollFraction) ?? toFraction(article.scrollPosition) ?? 0;
     hasScrolledRef.current = false;
     hasMarkedCompletedRef.current = article.isRead;
     setIsFavorite(article.isFavorite);
@@ -186,7 +189,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
         article={article}
         colors={colors}
         onScrollProgress={handleScrollProgress}
-        initialScrollFraction={article.scrollFraction}
+        initialScrollFraction={toFraction(article.scrollFraction) ?? toFraction(article.scrollPosition)}
       />
 
       <BottomActionMenu
