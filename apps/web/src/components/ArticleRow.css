@@ -3,7 +3,7 @@
 .article-row {
   list-style: none;
   padding: var(--spacing-xs) 0;
-  /*border-bottom: 1px solid var(--color-border);*/
+  border-bottom: 1px solid var(--color-border);
 }
 
 .article-row__button {

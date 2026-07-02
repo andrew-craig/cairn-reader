@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Article } from '@cairn/shared';
 import { ExploreService } from '../services/explore';
-import { decodeEntities } from '../utils/decodeEntities';
+import ArticleRow from '../components/ArticleRow';
 import './Explore.css';
 
 // Page size matched to the backend's recommendationPageSize. A page shorter
@@ -13,44 +13,6 @@ const RECOMMENDATION_PAGE_SIZE = 10;
 // batches. Flush triggers: threshold reached, debounce timer, or unmount.
 const SHOWN_BATCH_FLUSH_THRESHOLD = 10;
 const SHOWN_BATCH_DEBOUNCE_MS = 3000;
-
-// Explore recommendation card: title, source, excerpt, optional image.
-// Clicking the card body navigates to the reader.
-interface ExploreCardProps {
-  article: Article;
-  onSelect: (article: Article) => void;
-  observeRef: (id: string, node: HTMLLIElement | null) => void;
-}
-
-function ExploreCard({ article, onSelect, observeRef }: ExploreCardProps) {
-  return (
-    <li className="explore-card" ref={(node) => observeRef(article.id, node)}>
-      <button
-        type="button"
-        className="explore-card__button"
-        onClick={() => onSelect(article)}
-      >
-        <div className="explore-card__text">
-          <h2 className="explore-card__title">{decodeEntities(article.title)}</h2>
-          <p className="explore-card__meta">{article.author || 'Unknown'}</p>
-          {article.description && (
-            <p className="explore-card__excerpt">{article.description}</p>
-          )}
-        </div>
-        {article.imageUrl && (
-          <div className="explore-card__image-frame">
-            <img
-              className="explore-card__image"
-              src={article.imageUrl}
-              alt=""
-              loading="lazy"
-            />
-          </div>
-        )}
-      </button>
-    </li>
-  );
-}
 
 // The Explore feed (/explore): personalised recommendations from the Explore
 // Service, with infinite-scroll offset pagination, batched shown-reporting,
@@ -251,11 +213,11 @@ export default function Explore() {
         <>
           <ul className="explore__list">
             {articles.map((article) => (
-              <ExploreCard
+              <ArticleRow
                 key={article.id}
                 article={article}
                 onSelect={handleSelect}
-                observeRef={observeCard}
+                itemRef={(node) => observeCard(article.id, node)}
               />
             ))}
           </ul>
