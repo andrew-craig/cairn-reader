@@ -40,6 +40,9 @@ export default function Explore() {
   // IntersectionObserver entries keyed by article id so we can report shown.
   const cardObserverRef = useRef<IntersectionObserver | null>(null);
   const cardNodeMapRef = useRef<Map<string, Element>>(new Map());
+  // Stable itemRef callbacks per article id, so passing one to ArticleRow
+  // doesn't re-trigger React's ref cleanup/setup on every Explore render.
+  const cardRefCallbacksRef = useRef<Map<string, (node: HTMLLIElement | null) => void>>(new Map());
 
   const flushShown = useCallback(() => {
     if (flushTimerRef.current) {
@@ -75,6 +78,20 @@ export default function Explore() {
       }
     }
   }, []);
+
+  // Returns a stable itemRef callback for an article id, creating it once and
+  // reusing it on subsequent renders (see cardRefCallbacksRef above).
+  const getCardRef = useCallback(
+    (articleId: string) => {
+      let cb = cardRefCallbacksRef.current.get(articleId);
+      if (!cb) {
+        cb = (node) => observeCard(articleId, node);
+        cardRefCallbacksRef.current.set(articleId, cb);
+      }
+      return cb;
+    },
+    [observeCard],
+  );
 
   // Set up the card-visibility observer once on mount.
   useEffect(() => {
@@ -217,7 +234,7 @@ export default function Explore() {
                 key={article.id}
                 article={article}
                 onSelect={handleSelect}
-                itemRef={(node) => observeCard(article.id, node)}
+                itemRef={getCardRef(article.id)}
               />
             ))}
           </ul>
