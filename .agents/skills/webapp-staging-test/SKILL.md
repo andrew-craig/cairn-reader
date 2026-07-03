@@ -1,20 +1,23 @@
 ---
 name: webapp-staging-test
-description: Run the Cairn web app locally against the cairn.seatrain.net staging backend and drive it with a headless browser, using the shared test account. Use when asked to test, verify, or demo a web app change against staging (or any remote backend), or to check something in the browser end-to-end.
+description: Run the Cairn web app locally against a remote backend and drive it with a headless browser, using the shared test account. Use when asked to test, verify, or demo a web app change against a staging/remote backend, or to check something in the browser end-to-end.
 ---
 
-# Testing the web app against staging
+# Testing the web app against a remote backend
 
 Runs `apps/web` locally (Vite dev server) pointed at a remote backend, then
 drives it with Chromium via a plain Playwright script. There is no browser
 MCP tool in this environment — don't look for one or install one. Use the
 globally-installed Playwright package instead (see below).
 
-## 1. Point the dev server at staging
+The backend URL is not committed anywhere in this repo — it points at a
+personal environment. **Ask the user for it** if it wasn't given to you.
+
+## 1. Point the dev server at the backend
 
 ```bash
 cp apps/web/.env.example apps/web/.env   # gitignored, safe to overwrite
-# edit apps/web/.env: VITE_API_URL=https://cairn.seatrain.net
+# edit apps/web/.env: VITE_API_URL=<backend URL the user gave you>
 cd apps/web && npm install               # if node_modules isn't already present
 npm run dev -- --port 5173               # leave running in the background
 ```
@@ -23,14 +26,9 @@ The app is then served at `http://localhost:5173`.
 
 ## 2. Test account
 
-From `apps/web/CLAUDE.md` — a real seeded account on the default backend:
-
-- **Email**: `cairn.web.test@seatrain.net`
-- **Password**: `CairnWebTest!2026`
-- Seeded data: 2 RSS feed subscriptions (Hacker News, The Verge) and 1 saved page.
-
-Log in through the app's normal login form (`#email`, `#password` inputs, then
-a `button[type="submit"]`) — there's no separate auth API shortcut.
+From `apps/web/CLAUDE.md` — a real seeded account on the default backend.
+Log in through the app's normal login form (`#email`, `#password` inputs,
+then a `button[type="submit"]`) — there's no separate auth API shortcut.
 
 ## 3. Driving the browser
 
@@ -86,4 +84,4 @@ unrelated to the app or backend, not a bug to chase.
 ## 4. Cleanup
 
 Kill the background `npm run dev` process when done. `apps/web/.env` is
-gitignored, so it's fine to leave it pointed at staging for the next run.
+gitignored, so it's fine to leave it pointed at the backend for the next run.
