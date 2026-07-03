@@ -5,14 +5,18 @@ import './ArticleRow.css';
 interface ArticleRowProps {
   article: Article;
   onSelect: (article: Article) => void;
+  itemRef?: (node: HTMLLIElement | null) => void;
 }
 
 // A single reading-list entry: title, source/author, excerpt and an optional
 // lead image. Mirrors mobile's ArticleRow (muted once read) while adding the
-// excerpt the web list calls for.
-export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
+// excerpt the web list calls for. Shared by Read, Bookmarks, SearchModal and
+// Explore so all lists render identically. `itemRef` is optional so Explore
+// can hook each row into its visibility observer without other callers
+// needing to care.
+export default function ArticleRow({ article, onSelect, itemRef }: ArticleRowProps) {
   return (
-    <li className="article-row">
+    <li className="article-row" ref={itemRef}>
       <button
         type="button"
         className={`article-row__button${article.isRead ? ' article-row__button--read' : ''}`}
