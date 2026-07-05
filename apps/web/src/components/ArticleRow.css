@@ -11,7 +11,7 @@
   align-items: flex-start;
   gap: var(--spacing-lg);
   width: 100%;
-  padding: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-xs);
   border: none;
   background: transparent;
   color: inherit;
@@ -21,20 +21,15 @@
   transition: transform 160ms var(--ease-out);
 }
 
-.article-row__button:active {
-  transform: scale(0.97);
-}
 
-@media (hover: hover) and (pointer: fine) {
-  .article-row__button:hover {
-    background-color: var(--color-hover);
-  }
-}
+.article-row__button:hover .article-row__title {
+    text-decoration: underline;
+ }
 
-.article-row__button:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
+ .article-row__button:active .article-row__title {
+     color: var(--color-primary);
+ }
+
 
 .article-row__text {
   display: flex;
