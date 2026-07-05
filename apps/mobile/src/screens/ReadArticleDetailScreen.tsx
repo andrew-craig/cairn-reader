@@ -131,6 +131,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
       article: articles[nextIndex],
       articles,
       currentIndex: nextIndex,
+      onArchived,
     });
   };
 
@@ -164,11 +165,11 @@ export const ReadArticleDetailScreen: React.FC = () => {
     try {
       await StorageService.deleteArticle(article.id);
       onArchived?.(article.id);
-      try {
-        await ReadService.deleteUserContent(article.id);
-      } catch (backendError) {
+      // Backend delete runs in the background so a slow/offline network
+      // doesn't block navigation; failures are logged only (see above).
+      ReadService.deleteUserContent(article.id).catch((backendError) => {
         console.error('Failed to archive article in backend:', backendError);
-      }
+      });
       navigation.goBack();
     } catch (error) {
       console.error('Failed to archive article:', error);

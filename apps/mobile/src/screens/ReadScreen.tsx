@@ -163,12 +163,10 @@ export const ReadScreen: React.FC = () => {
   }, [loadingMore, hasMore, loading, loadReadArticles, searchQuery]);
 
   const handleArticleArchived = useCallback((articleId: string) => {
-    setArticles((prev) => {
-      const next = prev.filter((a) => a.id !== articleId);
-      void StorageService.saveReadListCache(next);
-      return next;
-    });
-  }, []);
+    const next = articles.filter((a) => a.id !== articleId);
+    setArticles(next);
+    void StorageService.saveReadListCache(next);
+  }, [articles]);
 
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex(a => a.id === article.id);
