@@ -190,3 +190,92 @@ This first pass was seven **static, per-area** reviews. The highest-value follow
 10. **Front-end deep-dive #2 — resilience & accessibility.** Error/empty/offline states, loading skeletons, retry UX, keyboard/screen-reader accessibility, and actual performance profiling of the large article lists (the mobile review flagged unmemoized rows statically; a profiler would quantify the jank and catch anything static review missed).
 
 If run, #1 and #2 should go first — a dynamic pass and the cross-service contract check are the two things most likely to surface a *new* critical that a read-only, single-service lens structurally cannot.
+
+---
+---
+
+# Part 2 — Deeper investigations (follow-up pass)
+
+**Method:** A second fan-out of focused reviews along *different axes* than Part 1 (dynamic behavior, cross-service seams, data at rest, supply chain, infra/secrets, tenancy, observability, test quality, DoS, front-end resilience). Five of the ten completed in this pass and are consolidated below; the remaining five are listed under "Still outstanding" at the end and were re-queued.
+
+This pass **did not overturn any Part 1 finding** — it confirmed several with independent evidence and, more importantly, surfaced a class of issues Part 1 structurally could not see: **runtime/operational failures** (a daily self-inflicted auth outage, a wedged-worker blind spot), **whole-service authentication gaps** (not just query bugs), and **tests that pass unconditionally**.
+
+## New critical findings from Part 2
+
+### P2-C1 — Scheduled daily auth outage: downstream services never refresh the JWT public key
+The users service **rotates its JWT signing key every `JWT_KEY_ROTATION_INTERVAL` (default 24h)** (`services/users/internal/config/config.go:123`, `KeyRotationManager`). But content, explore-recommender, and email-ingest each call `vaultClient.GetPublicKey()` **exactly once at startup** and never refresh it (`services/read/content/cmd/content/main.go:100-117`, explore-recommender + email-ingest equivalents). After the first rotation, every access token the users service issues fails signature verification on those three services until they are manually restarted. This is a self-inflicted outage baked into the default config — arguably the single highest-impact operational finding in either pass, because it triggers on a timer with no bad input required.
+
+### P2-C2 — Full account-takeover URL logged in cleartext at INFO (users)
+`services/users/internal/services/email_verification_service.go:84-91` logs the **raw, unhashed verification token assembled into a ready-to-click URL, plus the user's plaintext email**, at INFO level. Anyone with production log access can take over any unverified account for 24h by replaying the URL. This is a more severe, exploit-ready variant of Part 1's "verification token logged" finding (H2) — it's not a token fragment, it's a working exploit link plus the victim's email in one line.
+
+### P2-C3 — Two tests are dead code that pass unconditionally
+- `services/read/email/internal/worker/outbox_worker_test.go:74-107` (`TestOutboxWorker_DeliverEntry_Success`) assigns the client/repo to `_`, calls an unrelated mapping helper, and never invokes `deliverEntry` — there is **zero real coverage of a successful email delivery**.
+- `pkg/middleware/cors_test.go` only uses `evil.com` (which shares no suffix with `example.com`) as the negative case, so it **cannot reveal the wildcard-suffix bypass** (Part 1 C4). Neither `evilexample.com` nor `example.com.evil.com` is tested.
+Together with the reuse-detection test (Part 1 C3, root-caused here), this establishes that **a green suite is not evidence the security-critical paths work** — three of the most safety-relevant tests exercise the wrong code path or nothing at all.
+
+### P2-C4 — Multi-container production deployment is not shippable as checked in (infra)
+Three stacked, independently verified blockers: (a) all 10 `docker-build-*.yml` workflows that publish images have `build-and-push: if: false`, so `prod/docker-compose.yml` has **no images to pull**; (b) `init-vault-prod.sh` never creates AppRoles for content-service or email-ingest, so those two **crash-loop on `os.Exit(1)`** with empty Vault credentials; (c) the dev compose is already broken for content-service (missing `VAULT_*` vars → `os.Exit(1)` before DB/migrations). Either the project pivoted to the `selfhost` binary (making `prod/` dead + misleading) or the prod path hasn't been run end-to-end in a while — needs an explicit decision.
+
+### P2-C5 — Mobile "Archive" button performs a permanent, unconfirmed delete
+`apps/mobile/src/screens/ReadArticleDetailScreen.tsx:163-176` — `handleArchive` calls `deleteUserContent` (a hard `DELETE`), with no `status:'archived'` call anywhere in the mobile codebase (grep: zero hits) and no confirmation dialog. The web client has a real reversible archive. A mobile user tidying their list irreversibly deletes articles with no undo. A correctness bug that is also the worst-possible destructive-action UX.
+
+## Confirmations & amplifications of Part 1 (Part 2 evidence)
+
+- **Readiness probe lies (Part 1 shared-#5), now confirmed from the deploy side:** `addDB` is called for only 3 of 6 self-host databases; users/explore-recommender/explore-fetcher outages report `healthy`, and the CI smoke test curls that same endpoint → **false green in CI**.
+- **Recovery/request-ID ordering (Part 1 H10):** confirmed in all 6 routers, and *broadened* — the per-request logger (`logging.FromContext`) is actually consumed in **exactly one handler in the whole repo** (users `RefreshToken`); every other error log across all services uses the global logger with no `request_id`. This is the largest correlation gap in the codebase, bigger than the panic-path bug alone. The email service never populates the logging context at all (uses chi's own middleware).
+- **Wrong-sentinel token-expiry ERROR spam (Part 1 users-#6):** root-caused precisely — `auth.ErrTokenExpired` (`jwt.go:21`) vs `apperrors.ErrTokenExpired` (`pkg/errors/errors.go:53`); routine expiry logs at ERROR forever, and with **no metrics backend anywhere in the repo**, the elevated error rate can't be separated from real spikes.
+- **Network-failure-clears-tokens:** Part 1 flagged the mobile 401-retry gap; Part 2 found the adjacent bug on **both** platforms — any error in `doRefreshAccessToken` (including plain offline) calls `clearTokens()`, so opening the app offline near token expiry forces a full re-login instead of retrying.
+
+## Tenancy / IDOR matrix (the headline structural result)
+
+A full endpoint-by-endpoint matrix across all services produced a clear, reassuring-but-pointed conclusion:
+
+- **The JWT-authenticated surface is uniformly solid.** Every `RequireAuth` endpoint derives `user_id` from the validated token and backs it with a SQL `WHERE user_id = $jwt` clause. **There is no query-level scoping bug anywhere** — no resource fetched by PK alone, no `user_id` trusted from body/query, and the one path-param-vs-PK pattern in content is fed a PK from an already-scoped lookup.
+- **The real risk is entire services with no inbound authentication**, relying solely on network topology:
+  - **`read/fetcher` (ingest-rss) has ZERO inbound auth** (`internal/api/router.go:73-86`, only `RequireHTTPS`). `user_id` comes straight from the URL path, never checked against a token. Anything that can reach `ingest-rss:8085` (a sibling container, an SSRF pivot from C1/P1) can **read, add, or delete any user's RSS subscriptions** — a direct cross-tenant IDOR the moment the "internal only" assumption is violated. This is the standout Part 2 security finding.
+  - Unauthenticated global feed admin (`PATCH /feed/{feed_id}` disables a feed for all subscribers), unauthenticated article injection into the shared explore catalog, and the Part 1 unauthenticated content writes all share the same root cause: **"internal" is a comment, not an enforced boundary.**
+
+**Structural recommendation:** put JWT (or at minimum `RequireInternalAPIKey`, with ownership re-checked at the resource-owning service) on read/fetcher's user routes, the read/content write endpoints, and the explore ingest endpoints. The system's tenant isolation currently hinges on a single unenforced assumption.
+
+## Observability maturity: Level 1 of 4
+
+Structured-logging plumbing *looks* mature (slog, JSON, request-ID middleware) but isn't wired through where it matters, and there is **no metrics or tracing infrastructure anywhere** (no Prometheus/OTel/StatsD, no `/metrics` endpoint). Consequences, concretely: none of Part 1's three critical bugs can be *detected* in production, only reconstructed after a user complains —
+- the **wedged outbox worker** emits its "delivering batch" log only when work exists, has no liveness heartbeat, and has no `recover()` around its loop (a panic crashes the process silently);
+- **silent feed-batch failure** has no "feeds polled per hour" counter;
+- **circuit-breaker state changes** — the loudest "downstream is down" signal — are logged via raw `fmt.Printf` in both services, invisible to any level-based alert.
+
+## Front-end resilience & accessibility
+
+Web is meaningfully more resilient (real loading/error/empty triad + explicit retry on every route); mobile is weak exactly where it matters most:
+- **No React error boundary in either app** — one malformed article throws during render → blank white screen (web) / hard crash (mobile).
+- **Mobile Read/Explore/Bookmarks/Votes have no error state** — a network failure is indistinguishable from an empty account; pull-to-refresh is the only retry affordance (itself an accessibility gap).
+- **Every icon-only control in the mobile app lacks an `accessibilityLabel`** — the entire reader action bar (Back, Next, Favorite, Archive, Upvote, Downvote, Save) is unlabeled to screen readers. Web sets `aria-label`/`aria-pressed` correctly; mobile has regressed relative to it.
+- Web reader destructive actions (archive/delete) fire immediately with no confirmation and only `console.error` on failure.
+
+## Test-suite trust
+
+Coverage percentage is a poor proxy for confidence here. Beyond the two dead tests (P2-C3), the pattern is systemic: tests assert `Error`/`NotNil` without checking the *type* or *effect* that distinguishes safe from compromised; the unauthenticated write endpoints have **no router-level auth test that could even detect the gap** (handler tests bypass the router); the SSRF surface has no adversarial test because the code has no check to test; and the email client patches production retry delays to sub-millisecond values, hiding the ~17h worker-blocking behavior. The load-bearing security paths would all stay green through the exact regressions that matter.
+
+## Updated priority order (Parts 1 + 2 combined)
+
+1. **P2-C1 (JWT key-refresh)** — add periodic public-key refresh to content/explore/email before the next rotation. Timer-triggered outage; fix is small.
+2. **Authorization boundaries** — Part 1 C1/C2 + Part 2 read/fetcher IDOR + explore/email ingest. Enforce the "internal" boundary instead of assuming it.
+3. **Stop logging credential material** — P2-C2 (verification URL) is exploit-ready; plus Part 1 H1/H2/H14.
+4. **Fix or disable broken security features** — reuse detection (P1-C3), and correct the tests that hid them (P2-C3).
+5. **Outbox worker blocking + no liveness signal** — P1-C5 + observability blind spot.
+6. **Add minimal observability** — worker-liveness heartbeat, outbox queue depth/age, circuit-breaker state via slog, and fix the token-expiry sentinel so error-rate alerting is usable.
+7. **Row-level locking** before any worker scales past one replica (Part 1 Theme 4).
+8. **Consolidate duplicated code** (Part 1 Theme 3) so the above fixes land once.
+9. **Front-end:** error boundaries, mobile error states, mobile a11y labels, destructive-action confirmations; fix the mobile "Archive"=delete bug (P2-C5).
+10. **Decide the deploy story** (P2-C4): is `prod/docker-compose.yml` supported or should it be archived?
+
+## Still outstanding (re-queued)
+
+Five Part 2 investigations were interrupted by an account session limit and re-queued; three of them (highest value) were relaunched:
+- **Dynamic build/test/`-race` pass** *(relaunched)* — got as far as confirming all Go modules build and `go vet` cleanly; the test-run and race-detector phases (the parts most likely to surface a *new confirmed* bug) did not finish.
+- **Database & migration review** *(relaunched)* — migration reversibility, index-vs-query alignment, transaction atomicity, `ON DELETE` integrity.
+- **Cross-service contract conformance** *(relaunched)* — HTTP client↔server↔OpenAPI drift, idempotency across boundaries.
+- **Dependency & supply-chain audit** *(not yet relaunched)* — `npm audit` had started (vulnerabilities present); govulncheck + version-skew sweep incomplete.
+- **DoS / resource-exhaustion sweep** *(not yet relaunched)* — largely overlaps findings already recorded (body limits, pagination caps, recursion, fan-out); lowest marginal value.
+
+This section will be updated when the relaunched investigations report.
