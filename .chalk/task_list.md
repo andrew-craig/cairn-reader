@@ -5,6 +5,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
+- **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
