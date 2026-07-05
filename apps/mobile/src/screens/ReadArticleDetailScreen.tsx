@@ -27,7 +27,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const navigation = useNavigation<ReadArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const { article: initialArticle, articles = [], currentIndex = -1 } = route.params;
+  const { article: initialArticle, articles = [], currentIndex = -1, onArchived } = route.params;
 
   // When arriving from a list screen the article may not have cleaned_html yet
   // (list responses are summaries). We lazy-load the full content on mount.
@@ -163,6 +163,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const handleArchive = async () => {
     try {
       await StorageService.deleteArticle(article.id);
+      onArchived?.(article.id);
       try {
         await ReadService.deleteUserContent(article.id);
       } catch (backendError) {

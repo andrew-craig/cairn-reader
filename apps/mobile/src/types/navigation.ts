@@ -2,7 +2,7 @@ import { Article } from '@cairn/shared';
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
+  ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number; onArchived?: (articleId: string) => void };
   ExploreArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
   AddArticle: undefined;
   Bookmarks: undefined;
