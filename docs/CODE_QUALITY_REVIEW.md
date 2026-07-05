@@ -312,8 +312,82 @@ The content service's client (`internal/service/ingest_rss_client.go:144-151`) u
 
 The relaunched pass reinforces the central Part 1 thesis and sharpens it: the most dangerous class of bug in this system is **the RSS/email→content ingestion write path**, where hand-maintained DTOs, missing `ON CONFLICT`/unique constraints, and a mixed-batch PK collision combine so that *ordinary* re-polling traffic can fail an entire batch, drop good articles, duplicate content, or return empty success. None of it is caught by the (green, race-clean) test suite because the failures need real Postgres semantics and cross-service wire formats that the mocks paper over. Updated top-priority items to fold into the list above: **P2-C6/C7/C8 belong alongside the existing #2 (authorization) and #5 (outbox) as must-fix-before-next-ingestion-deploy.**
 
-## Still outstanding (not relaunched)
+---
+---
 
-Two investigations remain un-run (lower marginal value; deferred to stay within the account session budget):
-- **Dependency & supply-chain audit** — the dynamic pass incidentally surfaced **13 moderate npm vulnerabilities** (via `npm audit` during install) plus the Part 1 `google/uuid v1.1.2` pin; a full `govulncheck` + version-skew sweep across all modules is still worth doing.
-- **DoS / resource-exhaustion sweep** — largely overlaps findings already recorded (body limits, pagination caps, recursion, fan-out); lowest marginal value.
+# Part 3 — Final two investigations (dependency audit + DoS sweep)
+
+**Method:** The two investigations left outstanding at the end of Part 2b were run as focused fan-out reviews. Both were completed with tools actually executed against a fresh checkout — `govulncheck` across all 12 Go modules and `npm audit` on every npm package for the dependency audit; a systematic per-handler/per-query enumeration for the DoS sweep. Neither overturned a prior finding; both sharpened the picture on the untrusted-input path (RSS/HTML/email ingestion), which remains the most dangerous surface in the system.
+
+The headline result is a **confirmed, call-graph-verified XSS in the HTML-parsing path** and a **confirmed SQL-injection CVE in the Postgres driver reachable from production query code** (dependency audit), plus a **crash-class DoS** where an uncapped email body feeds unbounded recursive HTML tree-walks (DoS sweep). These two passes intersect precisely on the email/content ingestion write path that Part 2b already identified as the system's soft underbelly.
+
+## Dependency & supply-chain audit
+
+`govulncheck` was run against all 12 Go modules (the audit worked around a proxy-blocked `vuln.go.dev` by cloning `golang/vulndb` and running against its local OSV corpus as of 2026-06-26 — high confidence, ~9-day-old data), and `npm audit` against all npm workspaces.
+
+### New critical/high findings
+
+### P3-C1 — XSS in `golang.org/x/net/html`, confirmed reachable on the untrusted-article path
+GO-2026-5030 ("duplicate attributes can cause XSS"), plus GO-2026-5025/5027/5028/5029 (parsing bugs incl. a DoS), all fixed in `x/net v0.55.0`. Confirmed call-graph trace: `pkg/rss/readability/readability.go:34 Extract → readability.FromReader → html.Parse`. **Every module pin is below the fix**: `pkg/rss` v0.35.0, `services/explore` v0.42.0, `services/read` + `services/read/email` v0.47.0, `cmd/selfhost` v0.52.0. This is the exact code path that parses fetched article HTML *before* `bluemonday` sanitizes it, so it affects RSS/email/explore/read uniformly. **This is the sharpest supply-chain finding — a live XSS primitive on the attacker-reachable ingestion path, not a latent one.** Fix: bump `x/net` to ≥ v0.55.0 across all modules.
+
+### P3-H1 — SQL injection in `github.com/jackc/pgx/v5`, reachable from production code
+GO-2026-5004, fixed in v5.9.2. Confirmed reachable (not just tests): `services/explore/recommender/internal/db/vote_repository.go:289 GetUserVotedArticles`, `services/users/internal/database/user_repository.go:441 UpdatePasswordHash`, and `cmd/selfhost` via `selfhost.MountEmail`. Pins are split v5.7.6 / v5.8.0 — consolidate to a single version ≥ v5.9.2.
+
+### P3-H2 — HTTP/2 infinite-loop DoS in `x/net` (bundled http2)
+GO-2026-4918 (infinite loop via bad `SETTINGS_MAX_FRAME_SIZE`), fixed in x/net v0.53.0. Present in every module — none reach v0.53.0. Same bump as P3-C1 clears it.
+
+### P3-H3 — `apps/mobile`: 13 moderate npm vulnerabilities (confirmed count)
+Exact count verified via `npm audit --json` (reproducible from root and from `apps/mobile`; **`apps/web` scoped audit is clean at 0**). All resolve by bumping `expo` (54.0.35 → 57.0.2, semver-major) + `jest-expo`. Root causes: `uuid@7.0.3` (GHSA-w5hq-g745-h8pq, CVSS 7.5, via `xcode`), `postcss@8.4.49` (GHSA-qx2v-qp2m-jg93 XSS, CVSS 6.1, via `@expo/metro-config`), `js-yaml@3.14.2` (GHSA-h67p-54hq-rp68 quadratic DoS, dev/test coverage tooling only); the other 9 are `@expo/*` umbrella advisories rolling those up. The semver-major Expo bump is the real cost here, not the audit itself.
+
+### Medium
+
+- **`pkg/auth/go.mod`: `google/uuid v1.1.2`** — confirms Part 1's stale-pin flag and sharpens it: it's the single sharpest divergence in the repo (2019 release; every *other* module is on current v1.6.0), and it's **not dead** — imported in `pkg/auth/middleware.go` and `validator.go`, i.e. the JWT-validation path hit by every authenticated request. No CVE tied to this version, but a trivial, high-signal fix.
+- **`golang.org/x/crypto/ssh` — 5 advisories** (GO-2026-5013/5017/5018/5019/5020, fixed v0.52.0) in `services/explore` at v0.40.0, but reachable **only** through `testcontainers-go` in test helpers (`internal/testutil/db.go`), not production. Risk confined to local/CI.
+- **Version drift on the HTML/JWT path**: `goquery` v1.8.0/v1.9.1 (latest v1.12.0, transitively via go-readability — same untrusted-HTML path); `go-jose/go-jose/v4` v4.1.1/v4.1.3 (GO-2026-4945 present but trace only reaches `jose.init` via Vault, low real risk); `golang-jwt/jwt/v5` v5.3.0/v5.3.1; `golang-migrate` v4.19.0/v4.19.1.
+- **Go toolchain staleness (highest-leverage fix)**: all 12 modules built with go1.24.7 vs current go1.24.13/go1.25.11. This alone accounts for ~15–20 stdlib CVEs *per module* (`crypto/tls`, `crypto/x509`, `net/url`, `net/http` cookie memory exhaustion, `encoding/pem`+`asn1`+`net/mail` quadratic-complexity DoS). **Bumping the toolchain patch version clears the bulk of the flagged list at once with zero dependency work** — do this first.
+
+### Low / informational
+
+- `infrastructure/cloudflare/email-worker` (on the untrusted email-ingest path): `npm audit` shows 5 vulns (1 low/4 high) — **all inside `wrangler` devDependency** (undici + ws advisories), none reach the deployed Worker. The actual prod parser `postal-mime@2.7.4` (parses untrusted inbound email) is near-current (latest 2.7.5) with **0 findings**.
+- Docker/Moby CVEs in `services/explore` — reachable only via `testcontainers-go` test helpers, not the prod binary.
+- `hashicorp/vault/api` v1.22.0 (consistent, no CVE); `apps/web` `vite` 6.4.3 two majors behind (build-tool only).
+
+### What's solid (dependency side)
+`bluemonday v1.0.27` (primary RSS/email sanitizer) = latest; `mmcdole/gofeed v1.3.0` = latest; `dompurify@3.4.11` (web client sanitizer) = latest, 0 findings; `go-chi/chi v5.2.3` and `stretchr/testify v1.11.1` perfectly consistent across all 12 modules; `apps/web` audit = 0 vulns.
+
+### Limitations
+`vuln.go.dev` and `api.osv.dev` are blocked by proxy policy (403 on CONNECT); the audit used a locally cloned `golang/vulndb` OSV corpus (~9 days old) — high confidence, not guaranteed byte-identical to the live feed. GitHub's general Advisory DB endpoint is session-scoped to attached repos, so GHSA cross-referencing outside npm's own dataset wasn't possible.
+
+## DoS / resource-exhaustion sweep
+
+The systemic gap is **request-body decoding**: only `explore/recommender` applies `http.MaxBytesReader`; every other service (`users`, `read/content`, `read/fetcher`, `read/email`) calls `json.NewDecoder(r.Body).Decode(...)` directly with no cap, so any JSON endpoint fully buffers an attacker-supplied body before any size/field validation runs. The most severe instance compounds with unbounded recursive HTML tree-walks. Pagination, worker pools, and the shared RSS fetch path are, by contrast, generally well-bounded.
+
+### New critical findings
+
+### P3-C2 — Uncapped email body + unbounded recursive HTML walk = process-crashing DoS
+Two findings that combine into the sharpest DoS in the repo:
+- **No body cap**: `services/read/email/internal/api/handlers/ingest_handler.go:27` decodes `IngestEmailRequest` (with `HTMLBody`/`TextBody`) via plain `json.NewDecoder` — no `MaxBytesReader`, no downstream field-length limit (confirms Part 1 H6).
+- **Unbounded recursion**: `services/read/email/internal/processor/content_extractor.go:84-97` (`htmlToPlainText`'s `walk`) and `email_cleaner.go:58-65` (`walkForRemoval`) are naive recursive DOM walks whose depth = attacker-controlled HTML nesting depth.
+
+Together: an attacker (holding or leaking the single `INGEST_API_KEY`) submits an `HTMLBody` of millions of nested `<div>`s — cheap in bytes because no cap rejects it — and the recursive walk **stack-overflows, which in Go is a fatal, unrecoverable runtime error that crashes the whole process**, not a per-request panic. Uncapped body feeding uncapped recursion = single-request process kill. Fix: add `http.MaxBytesReader` to the ingest handler *and* a depth guard to both walkers.
+
+### High / medium
+
+- **[High] Unauthenticated oversized-body decode in `read/content`** — `POST /api/v1/content` and `/bulk` are on the **no-auth** route group (`router.go:82-117`) and decode via `middleware.DecodeJSONBody` (`validation.go:30`, no cap). The 5MB `MaxContentSize` check and bulk `Length(0, MaxContentSize)` validator fire *only after* the full body is decoded into memory. Anonymous multi-GB body → full in-memory decode before rejection. Same uncapped pattern in `users` (`auth_handler.go`/`user_handler.go`, `/auth/*` rate-limited but body-uncapped; `/user/{id}/*` neither) and `read/fetcher` (`subscription_handler.go:42,201`, no rate limit either).
+- **[Medium] Unbounded recursion (lower severity) in content** — `url_detector.go:229-269` and `:392-411` `traverse` walkers share the pattern, but the feeding body is capped at 10MB, likely under the practical stack-overflow threshold — still not defensively bounded.
+- **[Medium] No rate limit on `POST /content/detect` and `/discover-feed`** (`router.go:85-86`) — both unauthenticated, each triggers 1–9 outbound fetches (10–20s timeouts) against attacker-supplied URLs. Per-request fan-out is semaphore-capped at 8, but there's no *cross-request* concurrency/rate limit, so many concurrent requests multiply held outbound connections/goroutines — also an SSRF/amplification primitive (adjacent to Part 1 C1).
+- **[Low] `GetFeedsForTierUpdate`** (`read/fetcher/repository/feed.go:335`) — no `LIMIT`, loads every active feed for the daily tier job; scales with feed count, not attacker-triggered.
+
+### What's actually bounded correctly (don't re-litigate)
+- **Pagination**: no unbounded endpoint found — every `limit` is clamped to ≤100 with sane defaults (`user_content_handler.go:106,668`; `sender_handler.go:46,92`; `recommender/handlers.go:450,496`). `ListSubscriptions` has no limit param but is backed by a DB trigger capping subscriptions at 100/user.
+- **Worker pools all bounded**: `DiscoverFeeds` 8-worker semaphore; `EmailProcessorWorker` batch-20/3-concurrent; `OutboxWorker` 5-worker/batch-20; `FeedWorker` 5-worker; content-extraction batch-20. No unbounded per-request/per-batch goroutine spawning.
+- **Batch queries `LIMIT`-bound** by fixed config, not attacker input (`feed_item.go`, `outbox.go`, `raw_email.go`).
+- **`io.ReadAll` guarded**: every read outside the two email/content walkers above goes through `io.LimitReader` first (`pkg/rss/fetch/fetch.go:115` 5MB, `url_detector.go` 10MB, parser/readability/email-ingest-client paths).
+- **`explore/recommender` is the reference pattern**: per-handler `http.MaxBytesReader` (10MB/16KB/1KB) returning 413 — the other four services should copy it.
+
+## Net effect
+
+Both final passes converge on the same conclusion the earlier parts reached from other angles: **the RSS/email→content ingestion write path is where this system is most exposed.** The dependency audit puts a live XSS (P3-C1) and a reachable SQLi CVE (P3-H1) directly on it; the DoS sweep puts a process-crashing recursion (P3-C2) directly on it. The two cheapest high-leverage remediations are **(a) bump `x/net` to ≥ v0.55.0 and the Go toolchain patch version across all modules** (clears P3-C1, P3-H2, and the bulk of the stdlib CVE tail in one sweep), and **(b) add `http.MaxBytesReader` to the four services missing it plus depth guards to the two email walkers** (closes P3-C2 and the uncapped-body class). Both are small, mechanical, and land once across the repo.
+
+## All ten follow-up investigations are now complete
+Every item from the Part 1 "next 10 investigations" list has been run across Parts 2, 2b, and 3. No investigations remain outstanding.
