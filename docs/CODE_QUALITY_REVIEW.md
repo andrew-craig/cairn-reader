@@ -162,3 +162,31 @@ Across every area, the exact code that's risky is the code that's untested: auth
 - Web `utils/sanitize.ts`: correct DOMPurify usage plus anchor hardening (`target=_blank` + `rel=noopener noreferrer`), well tested.
 - Front-end refresh-dedup mutex, stale-while-revalidate caching, and optimistic-update rollback guards are implemented correctly and race-free.
 - `cmd/selfhost/web.go` static-file serving correctly guards against path traversal.
+
+---
+
+## Suggested next steps — the next 10 investigations
+
+This first pass was seven **static, per-area** reviews. The highest-value follow-ups deliberately cut along *different axes* — dynamic behavior, cross-service seams, data at rest, and supply chain — rather than re-reading the same files. In rough priority order:
+
+1. **Dynamic verification pass.** Actually build every module and run `go test -race ./...`, `go vet`, `golangci-lint`, plus `tsc --noEmit` / `eslint` on the front-ends. Static review can't see data races, and several findings above (Theme 4 locking, the mobile refresh-race, the users reuse-detection path) are exactly the kind of thing `-race` and a green-but-wrong-path test hide. First job: confirm the whole repo even builds and the suites pass on a clean checkout.
+
+2. **Cross-service contract conformance.** Diff each service's HTTP *client* against the *server* it calls (read/fetcher→content, email→content, explore/fetcher→recommender) and against the four `openapi.yaml` specs. Look for field/enum/status-code drift, error-shape mismatches, and missing idempotency keys across boundaries — the seams are where the per-service reviews had the least visibility.
+
+3. **Database & migration review.** Up/down reversibility, index coverage vs. actual query predicates (are the hot `WHERE`/`ORDER BY` paths indexed?), `ON DELETE` behavior, missing constraints, and the broader fallout of the content-hash-as-primary-key design (finding H8). Also transaction boundaries for the multi-step writes flagged in read/content and users.
+
+4. **Dependency & supply-chain audit.** `govulncheck` across all `go.mod`, `npm audit` on both front-ends, plus an outdated/pinned-dep sweep (the stale `google/uuid` pin is likely not the only one). Check transitive CVEs in the RSS/HTML-parsing and JWT libraries specifically, since those sit on the untrusted-input path.
+
+5. **Infrastructure, deployment & secrets hygiene.** Review `infrastructure/docker`, the Dockerfiles, compose files, the Vault init scripts, and health-probe wiring. What happens when **Vault is down** at startup (every service depends on it for JWT keys)? Are there secrets/default passwords in the repo? Resource limits, non-root containers, image pinning.
+
+6. **Systematic tenancy / IDOR matrix.** One consistent checklist over *every* user-scoped endpoint in all four services, verifying `user_id` scoping is enforced on the query itself (not just a path-param check). The per-service reviews spot-checked this; a full matrix would either close it out or find the gap the spot-checks missed.
+
+7. **Observability & logging audit.** Structured-logging consistency, log levels, PII beyond the token leaks already found, and the metrics/tracing gaps that make incident response hard (this is where the `request_id=unknown` finding, H10, really bites). Is there anything to alert on when the outbox worker wedges (C5)?
+
+8. **Test-suite quality meta-review.** Not "is there coverage" but "does the coverage assert anything." Hunt for tests that pass through the wrong code path (like the reuse-detection test, C3), mocks that have drifted from real signatures, and error paths that are never exercised. Quantify coverage on the *security-critical* files specifically.
+
+9. **DoS / resource-exhaustion sweep.** A systematic pass for unbounded work: pagination without max limits, queries without `LIMIT`, unbounded allocations/recursion (the email HTML-depth issue), and missing body-size caps across *all* services, not just email. Pair each with the concurrency limits (or lack thereof) on the worker pools.
+
+10. **Front-end deep-dive #2 — resilience & accessibility.** Error/empty/offline states, loading skeletons, retry UX, keyboard/screen-reader accessibility, and actual performance profiling of the large article lists (the mobile review flagged unmemoized rows statically; a profiler would quantify the jank and catch anything static review missed).
+
+If run, #1 and #2 should go first — a dynamic pass and the cross-service contract check are the two things most likely to surface a *new* critical that a read-only, single-service lens structurally cannot.
