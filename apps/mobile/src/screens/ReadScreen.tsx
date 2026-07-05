@@ -162,9 +162,15 @@ export const ReadScreen: React.FC = () => {
     }
   }, [loadingMore, hasMore, loading, loadReadArticles, searchQuery]);
 
+  const handleArticleArchived = useCallback((articleId: string) => {
+    const next = articles.filter((a) => a.id !== articleId);
+    setArticles(next);
+    void StorageService.saveReadListCache(next);
+  }, [articles]);
+
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex(a => a.id === article.id);
-    navigation.navigate('ArticleDetail', { article, articles, currentIndex });
+    navigation.navigate('ArticleDetail', { article, articles, currentIndex, onArchived: handleArticleArchived });
   };
 
   const handleAddPress = () => {
