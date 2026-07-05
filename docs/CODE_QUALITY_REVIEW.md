@@ -269,13 +269,51 @@ Coverage percentage is a poor proxy for confidence here. Beyond the two dead tes
 9. **Front-end:** error boundaries, mobile error states, mobile a11y labels, destructive-action confirmations; fix the mobile "Archive"=delete bug (P2-C5).
 10. **Decide the deploy story** (P2-C4): is `prod/docker-compose.yml` supported or should it be archived?
 
-## Still outstanding (re-queued)
+---
 
-Five Part 2 investigations were interrupted by an account session limit and re-queued; three of them (highest value) were relaunched:
-- **Dynamic build/test/`-race` pass** *(relaunched)* — got as far as confirming all Go modules build and `go vet` cleanly; the test-run and race-detector phases (the parts most likely to surface a *new confirmed* bug) did not finish.
-- **Database & migration review** *(relaunched)* — migration reversibility, index-vs-query alignment, transaction atomicity, `ON DELETE` integrity.
-- **Cross-service contract conformance** *(relaunched)* — HTTP client↔server↔OpenAPI drift, idempotency across boundaries.
-- **Dependency & supply-chain audit** *(not yet relaunched)* — `npm audit` had started (vulnerabilities present); govulncheck + version-skew sweep incomplete.
-- **DoS / resource-exhaustion sweep** *(not yet relaunched)* — largely overlaps findings already recorded (body limits, pagination caps, recursion, fan-out); lowest marginal value.
+# Part 2b — Relaunched investigations (results)
 
-This section will be updated when the relaunched investigations report.
+Three of the five interrupted investigations were relaunched and completed. They added **three more criticals**, all in the RSS/content ingestion write path and all reachable under *normal* operation — plus the reassuring result that the code builds and race-tests clean.
+
+## Dynamic build/test/`-race` pass — clean, with one CI trap
+
+Empirically verified from a fresh checkout:
+- **All 12 Go modules build cleanly; `golangci-lint` is clean** except 19 pre-existing `errcheck` warnings (unchecked `Encode`/`Fprint` on the HTTP response writer, in `pkg/auth`/`pkg/middleware`/`pkg/api`) — harmless, non-blocking.
+- **`go test -race ./...` found NO data races anywhere.** This is a genuinely good result given Part 1 Theme 4 (unlocked job claiming): the concurrency bugs are latent under *horizontal scaling*, not present in single-process execution, and nothing the existing tests exercise trips the detector.
+- **Front-ends are clean**: `tsc --noEmit` passes for web and mobile; web `vitest` 13/13, mobile `jest` 78/78; lint has only pre-existing warnings.
+- **[Medium — CI/DX] `services/users/test/integration/*.go` is missing the `//go:build integration` tag** that every sibling service uses (`services/read`, `services/read/email`, `services/explore` all gate theirs). Consequence: a naive `go test ./...` in `services/users` (or repo-root) **hangs indefinitely** in `WaitForDatabase` (`testutil/setup.go:221`) trying to reach Postgres at `localhost:5433`, instead of skipping. This is a real CI/onboarding footgun — fix by adding the build tag to match the convention.
+
+## Database & migrations — two new criticals in the write path
+
+### P2-C6 — Bulk content ingestion PK-collides on any mixed new+seen batch
+`services/read/content/internal/service/content_service.go:270-321` (`BulkCreateFromHTML`) puts *both* already-existing `Content` rows (which already carry a real DB `id`) and genuinely-new rows into one slice, then hands it to `BulkCreate` (`repository/content.go:530-586`), which issues a single multi-row `INSERT` with **no `ON CONFLICT`** and only assigns a UUID when `id == Nil`. The pre-existing row's real `id` violates the `contents` primary key → the whole statement rolls back → the entire `POST /api/v1/content/bulk` fails, including the valid new items. This is the production RSS ingestion path (`bulk_handler.go:67`), and re-polled feeds *routinely* contain a mix of seen + new items, so it fires in normal operation. The existing test mocks the repo and masks it. Fix: filter existing items before `BulkCreate`, or add `ON CONFLICT (id) DO NOTHING`.
+
+### P2-C7 — Recommender batch drops all articles on a content-hash collision (mechanism behind Part 1 explore-H8)
+`services/explore/recommender/internal/db/article_repository.go:77-127` upserts via `ON CONFLICT (link) DO UPDATE`, but `id` is a *separate* primary key set to `SHA256(cleaned_content)` (per `fetcher/migrations/000002`). When two different links carry the same content (syndicated/re-published articles — the exact case the content-hash ID was designed to dedupe), the new row's `link` doesn't conflict but its `id` does → an **unhandled** PK violation, and because it's one multi-row `INSERT`, the whole batch fails and silently drops every other new article in that fetch cycle. Fix: arm the `id` constraint (`ON CONFLICT (id) ...`).
+
+### Also from the DB pass
+- **[Critical] Orphan-cleanup "batching" is a no-op** — `DeleteOrphaned` (`repository/content.go:338-358`) has no `LIMIT`, and `RunWithBatching` (`jobs/cleanup_job.go:53-102`) loops it expecting batches, so the first call deletes everything in one long lock-holding, WAL-heavy transaction. The correct bounded pattern already exists at `fetcher/.../feed_item.go:379-401`. Same unbounded-`DELETE` anti-pattern (lower volume) in email `outbox.go:248-268` and `raw_email.go:223-243`.
+- **[High] The `contents` dedup index is NOT unique** — `idx_contents_rss_dedup` (`content/migrations/000001:37-39`) is a plain index, so the check-then-insert in `CreateFromURL`/`CreateFromHTML` has no DB backstop; concurrent RSS deliveries produce genuine duplicate content rows. Make it `UNIQUE` + `ON CONFLICT DO NOTHING`.
+- **[High] Every `explore/recommender` `down.sql` (000001–000006) is an empty comment stub** — including the two destructive user-ID-migration steps (000004, 000006). `make migrate-down` silently "succeeds" while reversing nothing — false reversibility.
+- Medium: non-atomic `Subscribe`; unindexed `ILIKE '%…%'` search on the unbounded `articles` table (no `pg_trgm`); several hot queries lacking composite indexes matching their `ORDER BY`. Low: `explore/*` uses naive `TIMESTAMP` while everything else uses `TIMESTAMP WITH TIME ZONE`; a duplicate index; the `read/content` CLAUDE.md's `VARCHAR(2048)` URL claim is stale (columns are actually `TEXT` — no truncation risk).
+
+## Cross-service contracts — loose, and one seam silently broken
+
+### P2-C8 — Feed-subscribe returns empty data to the app despite HTTP 201
+The content service's client (`internal/service/ingest_rss_client.go:144-151`) unmarshals the subscribe response into a **nested** `{subscription{…}, feed{…}}` struct, but ingest-rss actually returns a **flat** DTO (`subscription_id`/`feed_id`/`feed_url`/`feed_title`/…) wrapped in the `pkg/api.WriteSuccess` `{data,meta}` envelope the client never unwraps here. `json.Unmarshal` doesn't error on missing keys, so it "succeeds" with a zero-valued struct, which propagates through `user_content_handler.go:366-380` to the app: the feed *is* created, but the client gets `feed_id:""`, `title:""`, `subscribed_at:0001-01-01` with a real 201 and no error anywhere. (The sibling `ListUserSubscriptions` in the same file unwraps correctly — an isolated regression.) The kind of bug unit tests miss because nothing actually fails.
+
+### Also from the contracts pass
+- **[High] 409/400 → 500 mistranslation** on ordinary conditions: the client matches error *codes* (`"already_subscribed"`) the server never sends (it sends generic `"conflict"`/`"bad_request"` with the human text only in `message`), then a downstream exact-string `switch` misses too, so re-subscribing to a feed you already have returns **500 instead of 409**. This is Part 1 read-M6, now confirmed broken end-to-end across the wire.
+- **[High] Email/manual content delivery is not idempotent** — the dedup check in `BulkCreateFromHTML` runs *only* for `source_type=rss`; email/web skip it, there's no unique constraint (per P2-C7-adjacent DB finding), and delivery is two separate HTTP calls, so an outbox retry after a partial success creates a **duplicate content row every time** → the same email appears multiple times in a user's list. The "at-least-once + dedupe" guarantee in `docs/ARCHITECTURE.md` holds for RSS in the common case and is absent for email/manual content.
+- Medium/Low: the RSS outbox marks a batch `delivered` without checking per-user `Failed` counts (and the server can never populate `Failed` anyway — `ON CONFLICT DO NOTHING` + swallowed `ErrNoRows` makes it dead signal); the `Existing`/duplicate DTO fields are dead on the wire; the fetcher OpenAPI documents a *third* subscribe-response shape matching neither side.
+- **Solid:** the one seam that shares a Go type (`explore` fetcher→recommender uses `pkg/models.Article` on both sides) never drifts; JWT issuer/audience defaults are consistent; `Unsubscribe` correctly branches on HTTP *status* rather than string-matching — the counter-example that shows the right pattern.
+
+## Net effect on the combined picture
+
+The relaunched pass reinforces the central Part 1 thesis and sharpens it: the most dangerous class of bug in this system is **the RSS/email→content ingestion write path**, where hand-maintained DTOs, missing `ON CONFLICT`/unique constraints, and a mixed-batch PK collision combine so that *ordinary* re-polling traffic can fail an entire batch, drop good articles, duplicate content, or return empty success. None of it is caught by the (green, race-clean) test suite because the failures need real Postgres semantics and cross-service wire formats that the mocks paper over. Updated top-priority items to fold into the list above: **P2-C6/C7/C8 belong alongside the existing #2 (authorization) and #5 (outbox) as must-fix-before-next-ingestion-deploy.**
+
+## Still outstanding (not relaunched)
+
+Two investigations remain un-run (lower marginal value; deferred to stay within the account session budget):
+- **Dependency & supply-chain audit** — the dynamic pass incidentally surfaced **13 moderate npm vulnerabilities** (via `npm audit` during install) plus the Part 1 `google/uuid v1.1.2` pin; a full `govulncheck` + version-skew sweep across all modules is still worth doing.
+- **DoS / resource-exhaustion sweep** — largely overlaps findings already recorded (body limits, pagination caps, recursion, fan-out); lowest marginal value.
