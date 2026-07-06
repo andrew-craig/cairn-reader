@@ -27,7 +27,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const navigation = useNavigation<ReadArticleDetailNavigationProp>();
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
-  const { article: initialArticle, articles = [], currentIndex = -1 } = route.params;
+  const { article: initialArticle, articles = [], currentIndex = -1, onArchived } = route.params;
 
   // When arriving from a list screen the article may not have cleaned_html yet
   // (list responses are summaries). We lazy-load the full content on mount.
@@ -131,6 +131,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
       article: articles[nextIndex],
       articles,
       currentIndex: nextIndex,
+      onArchived,
     });
   };
 
@@ -163,11 +164,12 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const handleArchive = async () => {
     try {
       await StorageService.deleteArticle(article.id);
-      try {
-        await ReadService.deleteUserContent(article.id);
-      } catch (backendError) {
+      onArchived?.(article.id);
+      // Backend delete runs in the background so a slow/offline network
+      // doesn't block navigation; failures are logged only (see above).
+      ReadService.deleteUserContent(article.id).catch((backendError) => {
         console.error('Failed to archive article in backend:', backendError);
-      }
+      });
       navigation.goBack();
     } catch (error) {
       console.error('Failed to archive article:', error);
