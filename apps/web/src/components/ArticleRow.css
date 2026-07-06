@@ -30,6 +30,12 @@
      color: var(--color-primary);
  }
 
+ .article-row__button:focus-visible .article-row__title {
+     text-decoration: underline;
+     color: var(--color-primary);
+  }
+
+
 
 .article-row__text {
   display: flex;
