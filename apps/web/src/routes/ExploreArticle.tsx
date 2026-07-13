@@ -5,6 +5,7 @@ import { ExploreService } from '../services/explore';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import { decodeEntities } from '../utils/decodeEntities';
+import { formatPublishedDate } from '../utils/helpers';
 import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 
@@ -19,17 +20,6 @@ interface ExploreNavState {
   article?: ReaderArticle;
   articles?: ReaderArticle[];
   index?: number;
-}
-
-function formatPublishedDate(value?: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 // The Explore article reader (/explore/:id): sanitized full content from the

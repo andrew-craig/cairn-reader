@@ -4,6 +4,7 @@ import type { Article } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import { decodeEntities } from '../utils/decodeEntities';
+import { formatPublishedDate } from '../utils/helpers';
 import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 
@@ -19,17 +20,6 @@ const SCROLL_SAVE_DEBOUNCE_MS = 500;
 interface ReaderNavState {
   articles?: Article[];
   index?: number;
-}
-
-function formatPublishedDate(value?: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
 }
 
 // The article reader (/read/:id): full sanitized content, scroll-progress
