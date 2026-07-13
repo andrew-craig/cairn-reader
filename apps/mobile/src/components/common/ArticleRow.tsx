@@ -28,6 +28,9 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
+  const publishedTimestamp = article.publishedDate ? new Date(article.publishedDate).getTime() : NaN;
+  const publishedDateLabel = Number.isNaN(publishedTimestamp) ? null : formatDate(publishedTimestamp);
+
   const renderRightContent = () => {
     if (voteType) {
       const iconColor = VOTE_COLORS[voteType];
@@ -80,7 +83,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
           numberOfLines={1}
         >
           {article.author || 'Unknown'}
-          {article.publishedDate && ` | ${formatDate(new Date(article.publishedDate).getTime())}`}
+          {publishedDateLabel && ` | ${publishedDateLabel}`}
         </Text>
       </View>
       {renderRightContent()}
