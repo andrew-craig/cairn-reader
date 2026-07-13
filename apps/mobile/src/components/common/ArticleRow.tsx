@@ -10,6 +10,7 @@ import {
 import { Article } from '../../types';
 import { Colors, FontFamily } from '../../constants';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../icons';
+import { formatDate } from '../../utils';
 
 // Vote indicator colors
 const VOTE_COLORS = {
@@ -26,6 +27,9 @@ interface ArticleRowProps {
 export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteType }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+
+  const publishedTimestamp = article.publishedDate ? new Date(article.publishedDate).getTime() : NaN;
+  const publishedDateLabel = Number.isNaN(publishedTimestamp) ? null : formatDate(publishedTimestamp);
 
   const renderRightContent = () => {
     if (voteType) {
@@ -79,6 +83,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
           numberOfLines={1}
         >
           {article.author || 'Unknown'}
+          {publishedDateLabel && ` | ${publishedDateLabel}`}
         </Text>
       </View>
       {renderRightContent()}

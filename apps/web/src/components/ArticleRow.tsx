@@ -1,5 +1,6 @@
 import type { Article } from '@cairn/shared';
 import { decodeEntities } from '../utils/decodeEntities';
+import { formatPublishedDate } from '../utils/helpers';
 import './ArticleRow.css';
 
 interface ArticleRowProps {
@@ -15,6 +16,8 @@ interface ArticleRowProps {
 // can hook each row into its visibility observer without other callers
 // needing to care.
 export default function ArticleRow({ article, onSelect, itemRef }: ArticleRowProps) {
+  const publishedDate = formatPublishedDate(article.publishedDate);
+
   return (
     <li className="article-row" ref={itemRef}>
       <button
@@ -24,7 +27,10 @@ export default function ArticleRow({ article, onSelect, itemRef }: ArticleRowPro
       >
         <div className="article-row__text">
           <h2 className="article-row__title">{decodeEntities(article.title)}</h2>
-          <p className="article-row__meta">{article.author || 'Unknown'}</p>
+          <p className="article-row__meta">
+            {article.author || 'Unknown'}
+            {publishedDate && ` | ${publishedDate}`}
+          </p>
           {article.description && (
             <p className="article-row__excerpt">{article.description}</p>
           )}
