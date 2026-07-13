@@ -10,6 +10,7 @@ import {
 import { Article } from '../../types';
 import { Colors, FontFamily } from '../../constants';
 import { ThumbsUpIcon, ThumbsDownIcon } from '../icons';
+import { formatDate } from '../../utils';
 
 // Vote indicator colors
 const VOTE_COLORS = {
@@ -79,6 +80,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
           numberOfLines={1}
         >
           {article.author || 'Unknown'}
+          {article.publishedDate && ` | ${formatDate(new Date(article.publishedDate).getTime())}`}
         </Text>
       </View>
       {renderRightContent()}
