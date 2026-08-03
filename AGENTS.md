@@ -1,7 +1,5 @@
 # AGENT INSTRUCTIONS
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Cairn Reader Overview
 
 Cairn is a read-it-later application consisting of:
@@ -85,6 +83,8 @@ Before implementing:
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
+- Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason
+- Lean on dependenceis already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
@@ -104,7 +104,15 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-### 4. Goal-Driven Execution
+### 4. Long-term architecture
+
+- Do not preserve backward compatibility. Remove obsolte paths instead of adding compatilbility layers, fallbacks or migrations.
+- Keep components modular and concerns clearly separated
+- Grow the system in layers. Start from the smallest version that works end to end, add each new capability on top of a product that already works. Never trade a working product for unfinished complexity.
+- Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.
+
+
+### 5. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
