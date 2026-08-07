@@ -65,15 +65,12 @@ services/explore/
 │   │   └── recommend/         # Recommendation algorithm
 │   ├── migrations/            # Recommender database migrations
 │   └── Dockerfile
-├── pkg/
-│   └── models/                # Shared data models (Article, Feed, Vote, etc.)
 ├── api/
 │   └── openapi.yaml           # OpenAPI 3.0 specification
-├── docker-compose.yml         # Local development setup
 ├── Makefile                   # Build and development commands
 ├── README.md                  # Service documentation
-├── RECOMMENDER_PLAN.md        # Implementation roadmap
-└── CLAUDE.md                  # This file
+├── AGENTS.md                  # This file (CLAUDE.md symlinks to it)
+└── CLAUDE.md                  # Symlink to AGENTS.md
 ```
 
 ## Quick Start
@@ -84,7 +81,7 @@ The easiest way to run all Cairn backend services (including Explore) is using t
 
 ```bash
 # From repository root
-cd infrastructure/docker
+cd infrastructure/docker/dev
 
 # Start all services (includes Vault, databases, all microservices)
 docker compose up --build -d
@@ -93,7 +90,7 @@ docker compose up --build -d
 docker compose ps
 
 # View logs
-docker compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore-fetcher explore-recommender
 
 # Stop services
 docker compose down
@@ -546,12 +543,10 @@ make test-integration
 
 **1. Start services:**
 ```bash
-# Option A: Use centralized Docker Compose (recommended)
-cd infrastructure/docker
-docker compose up --build
-
-# Option B: Use local Docker Compose
-cd services/explore
+# Use the centralized Docker Compose (there is no standalone compose file
+# for the Explore service — see "Running Explore Services Locally" above
+# for running the Go binaries natively instead)
+cd infrastructure/docker/dev
 docker compose up --build
 ```
 
@@ -582,33 +577,34 @@ curl -X POST \
 
 **6. View logs:**
 ```bash
-docker compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore-fetcher explore-recommender
 ```
 
 ### Database Operations
 
 **Reset databases:**
 ```bash
-# Local Docker Compose
-cd services/explore
-docker compose down
-docker volume rm cairn-explore_postgres_data cairn-explore_fetcher_postgres_data
-docker compose up --build
-
-# Centralized Docker Compose
-cd infrastructure/docker
-docker compose down
-docker volume rm docker_postgres_data docker_fetcher_postgres_data
+# The fetcher and recommender databases are two logical databases inside the
+# single consolidated `cairn-db` Postgres container (infrastructure/docker/dev),
+# not separate Postgres containers, so resetting means dropping that container's
+# volume — `-v` removes it along with the rest of the stack's volumes.
+cd infrastructure/docker/dev
+docker compose down -v
 docker compose up --build
 ```
 
 **Access database directly:**
 ```bash
+# Run from infrastructure/docker/dev. Both databases live in the same
+# consolidated `cairn-db` Postgres container; connect with the per-service
+# credentials from .env (see .env.example for the POSTGRES_*_FETCHER /
+# POSTGRES_*_RECOMMENDER variable names). `docker compose exec` resolves the
+# service name for you, unlike `docker exec` with a guessed container name.
 # Fetcher database
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher
 
 # Recommender database
-docker exec -it postgres psql -U cairn -d cairn_db
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender
 ```
 
 **View migrations:**
@@ -830,35 +826,31 @@ func TestNewEndpoint(t *testing.T) {
 
 ### Adding a Database Migration
 
+Migrations use [golang-migrate](https://github.com/golang-migrate/migrate) and are
+auto-discovered from each service's `migrations/` directory (embedded via
+`migrations/embed.go`) — there is no list to update in `main.go`.
+
 **For Fetcher Database:**
 
-**1. Create migration file:**
+**1. Create migration files** (golang-migrate up/down pair, 6-digit sequence prefix):
 ```sql
--- fetcher/migrations/004_add_new_column.sql
+-- fetcher/migrations/000003_add_new_column.up.sql
 ALTER TABLE feeds ADD COLUMN new_column TEXT;
+
+-- fetcher/migrations/000003_add_new_column.down.sql
+ALTER TABLE feeds DROP COLUMN new_column;
 ```
 
-**2. Update migration logic:**
-```go
-// fetcher/cmd/fetcher/main.go
-migrations := []string{
-    "001_init.sql",
-    "002_add_feed_history.sql",
-    "003_feed_indexes.sql",
-    "004_add_new_column.sql",  // Add new migration
-}
-```
-
-**3. Test migration:**
+**2. Test migration:**
 ```bash
-docker compose down
-docker volume rm cairn-explore_fetcher_postgres_data
+cd infrastructure/docker/dev
+docker compose down -v
 docker compose up --build
 ```
 
 **For Recommender Database:**
 
-Follow the same pattern but update `recommender/cmd/recommender/main.go` and `recommender/migrations/`.
+Follow the same pattern in `recommender/migrations/`.
 
 ### Debugging
 
@@ -868,31 +860,33 @@ Follow the same pattern but update `recommender/cmd/recommender/main.go` and `re
 docker compose logs -f
 
 # Fetcher only
-docker compose logs -f explore_fetcher
+docker compose logs -f explore-fetcher
 
 # Recommender only
-docker compose logs -f explore_recommender
+docker compose logs -f explore-recommender
 
 # Tail last 100 lines
-docker compose logs --tail=100 explore_fetcher
+docker compose logs --tail=100 explore-fetcher
 ```
 
 **Check database state:**
 ```bash
+# Run from infrastructure/docker/dev
+
 # Fetcher database - view feeds
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db \
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher \
   -c "SELECT id, url, enabled, last_fetched_at, consecutive_failures FROM feeds ORDER BY last_fetched_at LIMIT 10;"
 
 # Fetcher database - view fetch history
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db \
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher \
   -c "SELECT * FROM fetch_history ORDER BY fetched_at DESC LIMIT 10;"
 
 # Recommender database - view articles
-docker exec -it postgres psql -U cairn -d cairn_db \
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender \
   -c "SELECT id, title, upvotes, downvotes, recommends, deleted FROM articles LIMIT 10;"
 
 # Recommender database - view votes
-docker exec -it postgres psql -U cairn -d cairn_db \
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender \
   -c "SELECT v.*, a.title FROM votes v JOIN articles a ON v.article_id = a.id LIMIT 10;"
 ```
 
@@ -940,25 +934,25 @@ docker run -d --name vault -p 8200:8200 \
 
 ### Article ID Generation
 
-**Article IDs are SHA256 hashes of the article link**:
+**Article IDs are SHA256 hashes of the cleaned article content, not the link**
+(`pkg/rss/hash.ContentHash`, called from the fetcher's `convertToArticle`).
+Deduplication in the recommender is still keyed on `link` (`ON CONFLICT (link)`),
+independent of this ID:
 
 ```go
-import (
-    "crypto/sha256"
-    "encoding/hex"
-)
-
-func GenerateArticleID(link string) string {
-    hash := sha256.Sum256([]byte(link))
-    return hex.EncodeToString(hash[:])
+// pkg/rss/hash/hash.go
+func ContentHash(html []byte) string {
+    normalized := bytes.TrimSpace(html)
+    sum := sha256.Sum256(normalized)
+    return hex.EncodeToString(sum[:])
 }
 ```
 
-**Why SHA256 hashes?**
-- Ensures uniqueness across feeds
-- Enables deduplication (same link = same ID)
+**Why content hashes?**
 - Deterministic and reproducible
+- Shared with the Read service so both pipelines derive consistent content-hash IDs
 - No need for auto-incrementing IDs or UUIDs
+- Note: this changed from an earlier `SHA256(link)` scheme (see fetcher migration `000002_add_etag_columns`, which documents the switch)
 
 ### Feed ID References
 
@@ -1024,8 +1018,6 @@ This reduces final image size significantly (~20MB vs 300MB+).
   - Admin dashboard endpoints (`GET /admin/stats`, `GET /admin/articles`)
   - Monitoring metrics
 
-See [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) for detailed progress.
-
 ## Next Steps
 
 ### High Priority
@@ -1057,8 +1049,7 @@ None - All core features are complete and tested.
 - Keeps articles table normalized
 - Required for quality score calculation
 
-### Why Quality Score Formula: (upvotes + (downvotes * 3)) / recommends?
-- Per requirements specification
+### Why Quality Score Formula: (upvotes - (downvotes * 3)) / recommends?
 - Heavily weights downvotes (3x penalty) to filter low-quality content
 - Normalizes by exposure (recommends count)
 - New articles with high upvotes surface quickly
@@ -1076,7 +1067,6 @@ None - All core features are complete and tested.
 - **Main Project CLAUDE.md**: [/CLAUDE.md](/CLAUDE.md) - Project-wide context
 - **Engineering Principles**: [/docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) - Standards and conventions
 - **Service README**: [README.md](README.md) - Detailed service documentation
-- **Implementation Plan**: [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) - Roadmap and progress tracking
 - **OpenAPI Spec**: [api/openapi.yaml](api/openapi.yaml) - Formal API specification
 - **Fetcher Migrations**: [fetcher/migrations/README.md](fetcher/migrations/README.md)
 - **Recommender Migrations**: [recommender/migrations/README.md](recommender/migrations/README.md)
@@ -1100,6 +1090,5 @@ The implementation follows these principles while adding:
 - **Check service logs**: `docker compose logs -f`
 - **Review test cases**: Look at `*_test.go` files for usage examples
 - **Consult OpenAPI spec**: [api/openapi.yaml](api/openapi.yaml) for API reference
-- **Read implementation plan**: [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) for feature status
 - **Check main docs**: [/CLAUDE.md](/CLAUDE.md) and [/docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md)
 - **Database issues**: Check migration files and README files in `migrations/` directories

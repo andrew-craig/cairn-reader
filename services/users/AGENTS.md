@@ -584,15 +584,13 @@ JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 **Purpose**: Prevent brute force attacks on authentication endpoints
 
 **Configuration**:
-- Auth endpoints: 10 requests per minute per IP
-- User endpoints: 60 requests per minute per IP
+- Applies to the entire `/api/v1/auth/*` route group per IP (single limit, not split by endpoint); `/api/v1/user/*` endpoints are not rate limited
+- Limit and window are configurable via `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` (default: 100 requests per 1 minute); the router falls back to 10/minute only if `RATE_LIMIT_REQUESTS` resolves to 0
 - Uses in-memory store (consider Redis for multi-instance deployments)
 
-**Protected Endpoints**:
-- `/api/v1/auth/login`
-- `/api/v1/auth/login/mobile`
-- `/api/v1/auth/register`
-- `/api/v1/auth/register/mobile`
+**Protected Endpoints** (all routes under `/api/v1/auth`):
+- `/register`, `/register/mobile`, `/login`, `/login/mobile`, `/refresh`, `/logout`, `/logout-all`
+- `/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`
 
 ### Mobile Device Authentication
 
@@ -917,8 +915,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 ```bash
 # Server Configuration
-PORT=8082                                    # HTTP server port
-SERVER_ENVIRONMENT=development               # Environment mode (development, production)
+PORT=8080                                    # HTTP server port (default: 8080; dev docker-compose maps host 8082 -> container 8080)
+ENVIRONMENT=development                      # Environment mode (development, production)
 
 # Database Configuration
 DB_HOST=localhost                            # PostgreSQL host
@@ -935,22 +933,19 @@ JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key  # Vault path to private key
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key    # Vault path to public key
 
 # JWT Configuration
-JWT_ACCESS_TOKEN_EXPIRY=15m                      # Access token lifetime (default: 15 minutes)
-JWT_REFRESH_TOKEN_EXPIRY=7d                      # Refresh token lifetime (default: 7 days)
+JWT_ACCESS_TOKEN_EXPIRY=15m                  # Access token lifetime (code default: 60 minutes if unset)
+JWT_REFRESH_TOKEN_EXPIRY=7d                  # Refresh token lifetime (code default: 30 days if unset)
 
 # Password Security
 BCRYPT_COST=12                               # bcrypt cost factor (minimum 12)
-PASSWORD_MIN_LENGTH=8                        # Minimum password length
+MIN_PASSWORD_LENGTH=8                        # Minimum password length
 
-# Rate Limiting
-RATE_LIMIT_AUTH=10                           # Auth requests per minute per IP
-RATE_LIMIT_USER=60                           # User requests per minute per IP
-
-# CORS Configuration
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006  # Comma-separated origins
-CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
-CORS_ALLOWED_HEADERS=Content-Type,Authorization
+# Rate Limiting (applies to the /api/v1/auth/* route group only; /api/v1/user/* is not rate limited)
+RATE_LIMIT_REQUESTS=100                      # Requests per window per IP (code default: 100)
+RATE_LIMIT_WINDOW=1m                         # Rate limit window (code default: 1 minute)
 ```
+
+Note: CORS is currently hardcoded to a permissive development configuration (`pkg/middleware.DefaultCORSConfig()`, allow-origin `*`) and is not configurable via environment variables for this service.
 
 ## Common Development Tasks
 
@@ -1227,16 +1222,15 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 - Revoke all tokens on suspected compromise
 
 **Transport Security**:
-- HTTPS required in production
-- Secure cookies for refresh tokens (httpOnly, secure, sameSite)
-- CORS properly configured
+- HTTPS required in production (`RequireHTTPS` middleware)
+- Tokens are returned in the JSON response body, not as cookies
+- CORS currently hardcoded to a permissive dev configuration (see Environment Variables note above)
 - Security headers (CSP, HSTS, X-Frame-Options)
 
 **Rate Limiting**:
-- 10 requests/minute on auth endpoints (prevent brute force)
-- 60 requests/minute on user endpoints
-- Consider IP-based and user-based limits
-- Use Redis for distributed rate limiting
+- 100 requests/minute (default) on the `/api/v1/auth/*` route group, IP-based (prevent brute force)
+- `/api/v1/user/*` endpoints are not rate limited
+- Use Redis for distributed rate limiting (not yet implemented; in-memory only today)
 
 ### Cross-Service Integration
 
@@ -1295,21 +1289,7 @@ func (u *User) IsHybrid() bool {
 
 ### Token Cleanup
 
-Consider adding a background job to clean up expired refresh tokens:
-
-```go
-// Run daily
-func CleanupExpiredTokens(ctx context.Context, repo RefreshTokenRepository) error {
-    return repo.DeleteExpired(ctx)
-}
-
-// In refresh_token_repository.go
-func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) error {
-    _, err := r.db.ExecContext(ctx,
-        "DELETE FROM refresh_tokens WHERE expires_at < NOW()")
-    return err
-}
-```
+Already implemented: `main.go` runs `tokenCleanupScheduler` in the background, which calls `RefreshTokenService.CleanupExpiredTokens` every hour (with an initial run at startup) to delete expired refresh tokens.
 
 ## Technology Stack
 
@@ -1318,7 +1298,7 @@ func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) error {
 ```go
 // HTTP routing and middleware
 github.com/go-chi/chi/v5               // HTTP router
-github.com/go-chi/cors                 // CORS middleware
+// CORS is a hand-rolled middleware in pkg/middleware, not a third-party package
 
 // JWT handling
 github.com/golang-jwt/jwt/v5           // JWT creation and validation
@@ -1327,7 +1307,8 @@ github.com/golang-jwt/jwt/v5           // JWT creation and validation
 golang.org/x/crypto/bcrypt             // bcrypt password hashing
 
 // Database
-github.com/lib/pq                      // PostgreSQL driver
+github.com/jackc/pgx/v5                // PostgreSQL driver (github.com/lib/pq is only an indirect dependency)
+github.com/golang-migrate/migrate/v4   // Schema migrations
 
 // HashiCorp Vault
 github.com/hashicorp/vault/api         // Vault client
@@ -1337,7 +1318,7 @@ github.com/joho/godotenv               // .env file loading
 
 // Testing
 github.com/stretchr/testify            // Testing framework and assertions
-github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
+github.com/golang/mock                 // Interface mocking for tests
 ```
 
 ## Current Implementation Status

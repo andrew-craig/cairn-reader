@@ -104,11 +104,16 @@ make lint                     # Run fmt + vet
 └──────────┬──────────┘         └──────────┬───────────┘
            │                               │
            │                               │
-     ┌─────▼─────┐                   ┌─────▼─────┐
-     │ PostgreSQL│                   │ PostgreSQL│
-     │ (content) │                   │(ingest_rss)│
-     └───────────┘                   └───────────┘
+     ┌─────▼─────┐                   ┌──────────────────┐
+     │ PostgreSQL│                   │    PostgreSQL     │
+     │ (content_ │                   │(rss_fetcher_      │
+     │  service) │                   │      service)     │
+     └───────────┘                   └──────────────────┘
 ```
+
+Both logical databases live in the same consolidated `cairn-db` Postgres container in dev
+(`infrastructure/docker/dev/docker-compose.yml`) — this diagram shows logical isolation, not
+separate containers.
 
 **Key Principles**:
 1. **Service Isolation**: Each service has its own database
@@ -124,14 +129,14 @@ services/read/
 ├── content/                    # Content Service
 │   ├── api/                   # OpenAPI specs
 │   ├── cmd/
-│   │   ├── server/           # HTTP server entry point
-│   │   └── worker/           # Background worker entry point
+│   │   ├── content/          # HTTP server entry point (binary: content)
+│   │   └── worker/           # Background worker entry point (binary: content-worker)
 │   ├── internal/
 │   │   ├── api/              # HTTP handlers, middleware, DTOs
 │   │   ├── repository/       # Database layer
 │   │   ├── service/          # Business logic
 │   │   ├── processor/        # Content processing (readability, sanitization)
-│   │   ├── jobs/             # Background jobs (cleanup)
+│   │   ├── jobs/             # Background jobs (orphaned content cleanup)
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
 │   ├── Dockerfile            # API server image
@@ -141,16 +146,17 @@ services/read/
 ├── fetcher/                   # Ingest RSS Service
 │   ├── api/                   # OpenAPI specs
 │   ├── cmd/
-│   │   ├── server/           # HTTP server entry point
-│   │   └── worker/           # Background worker entry point
+│   │   ├── ingest_rss/       # HTTP server entry point (binary: ingest_rss)
+│   │   └── ingest_rss_worker/ # Background worker entry point (binary: ingest_rss_worker)
 │   ├── internal/
 │   │   ├── api/              # HTTP handlers, middleware, DTOs
 │   │   ├── repository/       # Database layer
 │   │   ├── service/          # Business logic
 │   │   ├── fetcher/          # Feed fetching and parsing
 │   │   ├── processor/        # Content extraction, update detection
-│   │   ├── worker/           # Background workers (outbox, feed polling)
-│   │   ├── jobs/             # Scheduled jobs (cleanup, tier management)
+│   │   ├── worker/           # Background workers (outbox, per-feed fetch pool)
+│   │   ├── scheduler/        # Poll scheduling and tier management
+│   │   ├── jobs/             # Scheduled jobs (outbox cleanup, feed items cleanup, content extraction)
 │   │   ├── client/           # Content Service HTTP client
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
@@ -346,15 +352,18 @@ POST /api/v1/content/discover-feed                    → Discover an RSS/Atom f
 **Content Management**:
 ```
 POST   /api/v1/content                               → Create content from HTML/URL
-       Body: {"html": "...", "source_url": "...", "title": "...", "source_type": "manual"}
+       Body: {"url": "...", "html": "...", "source_type": "rss|web|email",
+              "source_feed_id": "...", "published_at": "..."}
+       Note: no "title" field here — title is extracted from the HTML, not passed in
 
 GET    /api/v1/content/{content_id}                  → Get content by ID
 
 PUT    /api/v1/content/{content_id}                  → Update existing content
-       Body: {"html": "...", "title": "...", ...}
+       Body: {"url": "...", "html": "...", "published_at": "..."}
 
 POST   /api/v1/content/bulk                          → Bulk create/update (max 100)
-       Body: [{"html": "...", "source_url": "...", ...}, ...]
+       Body: [{"url": "...", "html": "...", "source_type": "rss|web|email",
+               "source_feed_id": "...", "title": "...", "author": "..."}, ...]
 
 POST   /api/v1/content/check-duplicate               → Check for duplicates
        Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
@@ -568,6 +577,9 @@ Content is deduplicated using: `(content_hash, source_feed_id)`
 - Same hash + same feed = duplicate (skip)
 - Same hash + different feed = not duplicate (store)
 - Multiple users can share the same content with individual metadata
+- Enforced via the `POST /api/v1/content/check-duplicate` endpoint at the application level, backed
+  by a partial index `(content_hash, source_feed_id) WHERE source_type = 'rss'` — not a DB-level
+  UNIQUE constraint
 
 ### Feed Polling Strategy
 
@@ -686,24 +698,29 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 ### Running Tests
 
 ```bash
-# Run all unit tests
+# Run all unit tests (make test / make test-all — content + fetcher + email)
 make test
-go test ./...
 
-# Run with coverage
-make test-coverage
-
-# Run integration tests (requires PostgreSQL)
-make test-integration
-
-# Run tests for specific service
+# Run tests for a specific service
+make test-content
+make test-fetcher
 cd content && go test ./...
 cd fetcher && go test ./...
+
+# Run integration tests (requires PostgreSQL; set TEST_DB_* env vars, see internal/testutil/database.go)
+cd content && go test -tags=integration ./...
+cd fetcher && go test -tags=integration ./...
 
 # Run specific package tests
 go test ./content/internal/service/...
 go test -v ./fetcher/internal/worker/...
+
+# Coverage (no dedicated make target — use go test directly)
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
 ```
+
+Note: `make test-coverage` and `make test-integration` are not defined in the Makefile.
 
 ### Test Organization
 
@@ -842,28 +859,53 @@ mock.ExpectQuery("SELECT").WillReturnRows(...)
 
 ## Environment Variables
 
+There is no `DATABASE_URL` connection-string variable — both services (and the shared
+`pkg/config` package they use) read discrete `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`
+variables. The port variable is `PORT`, not `SERVER_PORT`. `MAX_CONTENT_SIZE` (5MB) and the
+90-day orphaned-content cutoff are hardcoded constants, not environment variables — see
+`content/internal/processor/content.go` and `content/internal/jobs/cleanup_job.go`. Likewise,
+the 100-feed-per-user limit, the 7-day error auto-disable threshold, and the tiered polling
+intervals (1h/6h/24h) are hardcoded in the fetcher (`fetcher/internal/scheduler/`), not configurable
+via env vars.
+
 ### Content Service
 
 ```bash
-DATABASE_URL=postgres://user:pass@localhost:5432/content_service?sslmode=disable
-SERVER_PORT=8083
+PORT=8080                              # Container port; mapped to host 8083 in dev docker-compose
+DB_HOST=cairn-db
+DB_PORT=5432
+DB_USER=cairn_content
+DB_PASSWORD=...
+DB_NAME=content_service
 LOG_LEVEL=info
-MAX_CONTENT_SIZE=5242880       # 5MB limit
-ORPHANED_CONTENT_DAYS=90       # Delete after 90 days
+VAULT_ADDR=http://vault:8200
+VAULT_TOKEN=...                        # Or VAULT_ROLE_ID / VAULT_SECRET_ID for AppRole auth
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
+INTERNAL_API_KEY=...                   # Required; validates X-Internal-API-Key on /api/v1/internal
 ```
 
 ### Ingest RSS Service
 
 ```bash
-DATABASE_URL=postgres://user:pass@localhost:5433/ingest_rss?sslmode=disable
-SERVER_PORT=8085
-CONTENT_SERVICE_URL=http://content-service:8083
+PORT=8081                              # Container port; mapped to host 8085 in dev docker-compose
+DB_HOST=cairn-db
+DB_PORT=5432
+DB_USER=cairn_rss
+DB_PASSWORD=...
+DB_NAME=rss_fetcher_service
 LOG_LEVEL=info
-MAX_FEEDS_PER_USER=100
-FEED_ERROR_THRESHOLD=7         # Days before disabling feed
-POLL_INTERVAL_TIER1=1h         # Active feeds
-POLL_INTERVAL_TIER2=6h         # Moderate feeds
-POLL_INTERVAL_TIER3=24h        # Quiet feeds
+```
+
+### Ingest RSS Worker (`cmd/ingest_rss_worker`)
+
+```bash
+CONTENT_SERVICE_URL=http://content-service:8080
+INTERNAL_API_KEY=...                   # Sent as X-Internal-API-Key when calling Content Service
+OUTBOX_CLEANUP_CRON=0 3 * * *
+FEED_ITEMS_CLEANUP_CRON=0 4 * * *
+HEALTH_PORT=8083                       # Default; dev docker-compose overrides to 8086
 ```
 
 ## Database Migrations
@@ -873,8 +915,9 @@ Migrations use `golang-migrate` with numbered SQL files.
 ### Creating Migrations
 
 ```bash
-# Create new migration
-make migrate-create name=add_user_notes
+# Create new migration (per-service targets — there is no combined migrate-create)
+make migrate-create-content name=add_user_notes
+make migrate-create-fetcher name=add_feed_field
 
 # This creates:
 # content/migrations/NNN_add_user_notes.up.sql
@@ -900,20 +943,21 @@ ALTER TABLE existing_table DROP COLUMN new_column;
 ### Running Migrations
 
 ```bash
-# Apply all pending migrations
+# Apply all pending migrations (both services)
 make migrate-up
 
-# Rollback last migration
+# Rollback last migration (both services)
 make migrate-down
 
-# Check current migration version
-make migrate-status
-
-# Force to specific version
-make migrate-force version=5
+# Check current migration version (per-service — there is no combined migrate-status)
+make migrate-status-content
+make migrate-status-fetcher
 ```
 
-**Important**: Migrations run automatically on service startup in Docker.
+Note: there is no `make migrate-force` target in this Makefile.
+
+**Important**: Migrations run automatically on service startup (`database.RunMigrations` in
+`content/cmd/content/main.go` and `fetcher/cmd/ingest_rss/main.go`).
 
 ## Technology Stack
 
@@ -958,7 +1002,7 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 
 ### Adding a New Database Table
 
-1. **Create migration** with `make migrate-create name=add_table`
+1. **Create migration** with `make migrate-create-content name=add_table` (or `migrate-create-fetcher`)
 2. **Write up migration** (`NNN_add_table.up.sql`)
 3. **Write down migration** (`NNN_add_table.down.sql`)
 4. **Run migration** with `make migrate-up`
@@ -976,13 +1020,13 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
        Name() string
    }
    ```
-3. **Register job** in `cmd/worker/main.go`
+3. **Register job** in the relevant worker entry point (`content/cmd/worker/main.go` or `fetcher/cmd/ingest_rss_worker/main.go`)
 4. **Add cron schedule** if needed
 5. **Write job tests**
 
 ### Debugging
 
-**View logs**:
+**View logs** (from `infrastructure/docker/dev/`):
 ```bash
 # All services
 docker compose logs -f
@@ -995,13 +1039,14 @@ docker compose logs -f ingest-rss
 docker compose logs -f | grep ERROR
 ```
 
-**Access database**:
+**Access database**: dev uses one consolidated `cairn-db` Postgres container with separate
+logical databases per service — there is no `postgres-content`/`postgres-fetcher` container:
 ```bash
 # Content Service database
-docker compose exec postgres-content psql -U cairn -d content_service
+docker compose exec cairn-db psql -U cairn_content -d content_service
 
 # Ingest RSS database
-docker compose exec postgres-fetcher psql -U cairn -d ingest_rss
+docker compose exec cairn-db psql -U cairn_rss -d rss_fetcher_service
 ```
 
 **Useful SQL queries**:
@@ -1055,12 +1100,13 @@ When updating content:
 
 ## Documentation References
 
-- **Main README**: `/services/read/README.md` - Comprehensive service documentation
-- **Implementation Plan**: `/services/read/IMPLEMENTATION_PLAN.md` - Detailed implementation roadmap
-- **Integration Tests**: `/services/read/INTEGRATION_TESTS.md` - Integration testing guide
+- **Main README**: `/services/read/README.md` - Service documentation (also drifted in places — trust this file and the Go source over it)
+- **Email Ingest Service**: `/services/read/email/CLAUDE.md` - Third sub-service under this directory
 - **Content Service API**: `/services/read/content/api/openapi.yaml` - OpenAPI specification
 - **Ingest RSS API**: `/services/read/fetcher/api/openapi.yaml` - OpenAPI specification
 - **Root CLAUDE.md**: `/CLAUDE.md` - Project-wide guidance and conventions
+
+Note: `IMPLEMENTATION_PLAN.md` and `INTEGRATION_TESTS.md` do not exist in this directory.
 
 ## Status & Roadmap
 
@@ -1076,10 +1122,10 @@ When updating content:
 - ✅ **JWT Authentication** (Phase 6) - User-content access control with RS256 token validation
 
 **Remaining Work**:
-- 🔲 API documentation (OpenAPI/Swagger UI)
+- 🔲 API documentation (OpenAPI/Swagger UI) — specs exist (`api/openapi.yaml`) but no served UI
 - 🔲 Production observability (metrics, structured logging)
 - 🔲 Performance optimization
-- 🔲 Security hardening (rate limiting, CORS)
+- 🔲 Rate limiting (CORS is already applied via `pkg/middleware` in both routers)
 
 **Future Enhancements**:
 - Recommendation engine
@@ -1090,8 +1136,8 @@ When updating content:
 ## Getting Help
 
 For issues or questions:
-- Check logs: `docker compose logs -f`
-- Check database state: `docker compose exec postgres-content psql -U cairn -d content_service`
+- Check logs: `docker compose logs -f` (from `infrastructure/docker/dev/`)
+- Check database state: `docker compose exec cairn-db psql -U cairn_content -d content_service`
 - Review tests for usage examples
 - Consult OpenAPI specifications for API details
 - See troubleshooting guide: `/services/read/README.md#troubleshooting`

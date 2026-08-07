@@ -829,7 +829,7 @@ async function handleAction() {
 - **Use `useEffect`** for side effects only
 
 ### Naming Conventions
-- **Components**: PascalCase (e.g., `ArticleCard.tsx`)
+- **Components**: PascalCase (e.g., `ArticleRow.tsx`)
 - **Services**: PascalCase classes (e.g., `AuthService`)
 - **Types/Interfaces**: PascalCase (e.g., `Article`, `LoginResponse`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `API_BASE_URL`)
@@ -866,34 +866,34 @@ async function handleAction() {
 ## Environment Configuration
 
 ### API Configuration
-API endpoints configured in `src/config/api.ts`:
+Unlike the old per-service URL setup, the app now talks to a single backend
+origin via the shared server-URL layer (`@cairn/shared`, wired up in
+`src/config/init.ts`/`src/config/storage.ts`). The default is set in
+`src/config/storage.ts`:
 
 ```typescript
-export const API_CONFIG = {
-  USER_SERVICE_URL: 'https://cairn.seatrain.net',
-  RECOMMENDER_SERVICE_URL: 'https://cairn.seatrain.net',
-  READ_SERVICE_URL: 'https://cairn.seatrain.net',
-  REQUEST_TIMEOUT: 30000,
-};
+export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 ```
 
+All service calls (`getServerUrl()`) resolve to `<server URL>/api/v1/auth/...`,
+`/api/v1/explore/...`, `/api/v1/content/...`, etc. against that single origin.
+
 **For Local Development:**
-Update `src/config/api.ts` to point to local services:
-```typescript
-export const API_CONFIG = {
-  USER_SERVICE_URL: 'http://localhost:8082',
-  RECOMMENDER_SERVICE_URL: 'http://localhost:8081',
-  READ_SERVICE_URL: 'http://localhost:8083',
-  REQUEST_TIMEOUT: 30000,
-};
+Point the app at a single local backend origin — either edit
+`DEFAULT_SERVER_URL` in `src/config/storage.ts`, or use the server URL field on
+the login screen (calls `setServerUrl()` at runtime, no rebuild needed). The
+[self-hosted stack](/infrastructure/docker/selfhost/README.md) runs all
+backend services behind one port for exactly this purpose:
+```
+http://localhost:8099
 ```
 
 **iOS Simulator Note:**
-- Use `http://localhost:PORT` for local services
+- Use `http://localhost:8099` directly
 
 **Android Emulator Note:**
-- Use `http://10.0.2.2:PORT` instead of `localhost`
-- Or use your machine's IP address (e.g., `http://192.168.1.100:PORT`)
+- Use `http://10.0.2.2:8099` instead of `localhost`
+- Or use your machine's IP address (e.g., `http://192.168.1.100:8099`)
 
 ### Expo Configuration
 App configuration in `app.json`:
@@ -966,11 +966,12 @@ BackendArticle → Article
 - id (same)
 - link → url
 - title (same)
-- description || content → description
+- description → description
+- content → content
 - author || feed_title → author
 - published → publishedDate
 - categories → tags
-- Extract image from content → imageUrl
+- Extract image from content/description → imageUrl
 ```
 
 **Read Service:**
@@ -979,9 +980,9 @@ UserContentResponse → Article
 - content.id → id
 - content.original_url → url
 - content.title → title
-- content.description || excerpt → description
-- content.lead_image_url → imageUrl
-- content.author || site_name → author
+- content.description → description
+- content.image_urls[0] → imageUrl
+- content.author → author
 - content.published_at → publishedDate
 - content.word_count / 200 → readingTime
 - status === 'completed' → isRead
@@ -1011,7 +1012,7 @@ UserContentResponse → Article
 - Ensure async functions are awaited
 
 **Authentication errors:**
-- Check API endpoint configuration in `src/config/api.ts`
+- Check API endpoint configuration in `src/config/storage.ts` (`DEFAULT_SERVER_URL`)
 - Verify backend services are running
 - Check device ID is being generated correctly
 - Clear stored tokens: AsyncStorage → Delete `@cairn:*` keys
