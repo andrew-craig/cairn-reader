@@ -54,7 +54,7 @@ Cloudflare Email Worker
            │
      ┌─────▼─────┐
      │ PostgreSQL │
-     │ (email_ingest) │
+     │ (ingest_email) │
      └───────────┘
 ```
 
@@ -72,7 +72,8 @@ Cloudflare Email Worker
 services/read/email/
 ├── cmd/
 │   ├── email_ingest/          # API server entry point
-│   └── email_ingest_worker/   # Worker entry point
+│   ├── email_ingest_worker/   # Worker entry point
+│   └── manage_keys/           # CLI for managing API keys
 ├── internal/
 │   ├── api/
 │   │   ├── dto/               # Request/response DTOs
@@ -163,11 +164,14 @@ services/read/email/
 | Column       | Type         | Notes                          |
 |-------------|-------------|--------------------------------|
 | id          | UUID PK     |                                |
-| name        | VARCHAR     |                                |
-| key_hash    | CHAR(64)    | SHA-256 of the raw key         |
+| key_name    | VARCHAR     | UNIQUE, human-readable identifier |
+| key_hash    | VARCHAR(128)| SHA-256 hash of the raw key    |
 | status      | VARCHAR     | active/expired/revoked         |
 | expires_at  | TIMESTAMPTZ | nullable                       |
 | last_used_at| TIMESTAMPTZ | nullable                       |
+| revoked_at  | TIMESTAMPTZ | nullable                       |
+| created_by  | VARCHAR     | nullable                       |
+| notes       | TEXT        | nullable                       |
 | created_at  | TIMESTAMPTZ |                                |
 
 ## API Endpoints
@@ -194,6 +198,15 @@ GET  /api/v1/source/email/user/{user_id}/address    → Get existing address (40
 ```
 GET /api/v1/source/email/user/{user_id}/senders?limit=20&offset=0
   Response 200: {"data": [{"id": "...", "sender_email": "...", "email_count": 5, ...}], "meta": {...}}
+```
+
+### Sender Listing (Internal API key protected)
+
+```
+GET /api/v1/internal/source/email/user/{user_id}/senders?limit=100&offset=0
+  Header: X-Internal-API-Key: <key>
+  Used by the Content Service subscription aggregator; no per-user auth.
+  Response 200: {"data": [{"id": "...", "sender_email": "...", "email_count": 5, "created_at": "...", ...}], "meta": {...}}
 ```
 
 ### Health Checks
@@ -223,7 +236,7 @@ GET /health/ready   → 200 OK or 503 if DB unreachable
 
 ### Outbox Delivery
 
-- Calls `POST /api/v1/internal/content/user/bulk` on Content Service
+- Two-step delivery to Content Service: `POST /api/v1/content/bulk` to create/dedupe the content, then `POST /api/v1/internal/content/user/bulk` to link it to the user
 - Exponential backoff: 1m, 2m, 4m, 8m, 16m, 32m (max 6 retries)
 - Non-retryable on 4xx (400, 401, 403, 404, 422)
 - Circuit breaker: opens after 5 consecutive failures, half-open after 30s
@@ -241,7 +254,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USER=cairn
 DB_PASSWORD=<required>
-DB_NAME=email_ingest
+DB_NAME=ingest_email
 DB_SSL_MODE=disable
 
 # Email
@@ -254,16 +267,19 @@ VAULT_TOKEN=dev-root-token
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 
 # Worker
-EMAIL_PROCESSORS=3
-EMAIL_POLL_INTERVAL=5s
+EMAIL_PROCESS_WORKERS=3
+EMAIL_PROCESS_POLL_INTERVAL=5s
+OUTBOX_WORKER_COUNT=3
 OUTBOX_POLL_INTERVAL=10s
-MAX_RETRIES=5
+OUTBOX_MAX_RETRIES=6
 RAW_EMAIL_CLEANUP_CRON=0 5 * * *
 OUTBOX_CLEANUP_CRON=0 6 * * *
-RETENTION_DAYS=7
+RAW_EMAIL_RETENTION_DAYS=7
 
 # Content Service
-CONTENT_SERVICE_URL=http://content-service:8083
+# Container-internal port (8080), not the dev host-mapped port (8083) --
+# service-to-service calls inside the Docker network use container ports.
+CONTENT_SERVICE_URL=http://content-service:8080
 CONTENT_SERVICE_TIMEOUT=30s
 
 # Logging

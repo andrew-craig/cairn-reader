@@ -31,7 +31,7 @@ The easiest way to run all Cairn backend services (including User Service) is us
 
 ```bash
 # From repository root
-cd infrastructure/docker
+cd infrastructure/docker/dev
 
 # Copy and configure environment variables
 cp .env.example .env
@@ -58,8 +58,9 @@ For development focused on the User Service:
 cd services/users
 
 # 1. Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# No .env.example ships in this directory - set the variables listed under
+# "Environment Variables" below directly (a .env file is picked up automatically
+# via godotenv if present)
 
 # 2. Set up PostgreSQL database
 createdb cairn_users
@@ -201,13 +202,12 @@ services/users/
 ├── pkg/                     # Public libraries (shared with other services)
 │   └── auth/               # Shared JWT validation library
 │       └── middleware.go   # JWT validation middleware for other services
-├── migrations/             # Database migrations
-│   ├── 001_init.sql
-│   ├── 002_add_indexes.sql
+├── migrations/             # Database migrations (golang-migrate up/down pairs)
+│   ├── 000001_create_users_table.up.sql
+│   ├── 000001_create_users_table.down.sql
 │   └── ...
 ├── api/
 │   └── openapi.yaml        # OpenAPI 3.0 specification
-├── .env.example            # Example environment configuration
 ├── Dockerfile              # Multi-stage Docker build
 ├── Makefile                # Build and development commands
 ├── README.md               # Service documentation
@@ -221,13 +221,17 @@ services/users/
 **users** table:
 ```sql
 CREATE TABLE users (
-    id VARCHAR(255) PRIMARY KEY,          -- User ID (UUID or external ID)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE,            -- Email (nullable for mobile-only)
     password_hash VARCHAR(255),           -- bcrypt hash (nullable for mobile-only)
     expo_device_id VARCHAR(255) UNIQUE,   -- Expo device ID (nullable for email-only)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_login_at TIMESTAMP WITH TIME ZONE
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
+    last_failed_login_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Indexes
@@ -238,11 +242,12 @@ CREATE INDEX idx_users_expo_device_id ON users(expo_device_id) WHERE expo_device
 **refresh_tokens** table:
 ```sql
 CREATE TABLE refresh_tokens (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash VARCHAR(255) NOT NULL,     -- SHA-256 hash of refresh token
-    device_info VARCHAR(500),
+    device_info TEXT,
     ip_address VARCHAR(45),
+    token_family UUID,                    -- Groups tokens from the same rotation chain (reuse detection)
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -252,7 +257,10 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
 ```
+
+There are also `email_verification_tokens` and `password_reset_tokens` tables (added in migrations 000005 and 000006) backing the email verification and password reset endpoints below.
 
 ### Account Types
 
@@ -363,6 +371,29 @@ curl -X POST http://localhost:8082/api/v1/auth/logout-all \
   -H "Authorization: Bearer <JWT>"
 ```
 
+**Email verification**:
+```bash
+# Resend verification email (requires auth)
+curl -X POST http://localhost:8082/api/v1/auth/resend-verification \
+  -H "Authorization: Bearer <JWT>"
+
+# Verify email with token (also accepts GET with ?token= for email links)
+curl -X POST http://localhost:8082/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token": "verification-token-here"}'
+```
+
+**Password reset**:
+```bash
+curl -X POST http://localhost:8082/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+
+curl -X POST http://localhost:8082/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "reset-token-here", "password": "newsecurepass123"}'
+```
+
 ### User Management Endpoints (Authenticated)
 
 **Get user profile**:
@@ -403,6 +434,17 @@ curl -X POST http://localhost:8082/api/v1/user/{user_id}/upgrade \
 # User must authenticate with email/password
 ```
 
+**Change password**:
+```bash
+curl -X PUT http://localhost:8082/api/v1/user/{user_id}/password \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "securepass123",
+    "new_password": "newsecurepass123"
+  }'
+```
+
 **Delete account**:
 ```bash
 curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
@@ -414,21 +456,26 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 ### JWT Authentication (`internal/auth/jwt.go`)
 
 **Token Generation**:
-- Algorithm: RS256 (2048-bit RSA keys)
-- Lifetime: 15 minutes (configurable via `JWT_ACCESS_LIFETIME`)
-- Claims: `user_id`, `iat` (issued at), `exp` (expires at)
+- Algorithm: RS256 (2048-bit RSA keys), with a `kid` header identifying the signing key for rotation
+- Lifetime: 15 minutes (configurable via `JWT_ACCESS_TOKEN_EXPIRY`; code default is 60 minutes if unset)
+- Claims: `user_id` (custom) plus standard registered claims - `iss`, `aud`, `sub`, `iat`, `exp`, `nbf`
 - Keys stored in HashiCorp Vault
 
 **Token Validation**:
 - Stateless validation using public key
 - No database lookups required
+- Issuer (`cairn-user-service`) and audience (`cairn-api`) are validated, not just the signature
 - Other services validate independently using shared public key
 
 **JWT Structure**:
 ```json
 {
   "user_id": "uuid-here",
+  "iss": "cairn-user-service",
+  "aud": ["cairn-api"],
+  "sub": "uuid-here",
   "iat": 1704801600,
+  "nbf": 1704801600,
   "exp": 1704805200
 }
 ```
@@ -438,7 +485,7 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 **Token Generation**:
 - Cryptographically random 32-byte token (base64-encoded)
 - SHA-256 hashed before database storage
-- Lifetime: 7 days (configurable via `JWT_REFRESH_LIFETIME`)
+- Lifetime: 7 days (configurable via `JWT_REFRESH_TOKEN_EXPIRY`; code default is 30 days if unset)
 
 **Token Rotation**:
 1. Client sends refresh token to `/auth/refresh`
@@ -700,11 +747,12 @@ make migrate-version
 
 **Create new migration**:
 ```bash
-# Add new SQL file to migrations/ directory
-# migrations/003_add_new_column.sql
+# Add a numbered up/down pair to migrations/ (golang-migrate convention)
+# migrations/000007_add_new_column.up.sql
 ALTER TABLE users ADD COLUMN new_column TEXT;
 
-# Update migration runner in internal/database/migrate.go if needed
+# migrations/000007_add_new_column.down.sql
+ALTER TABLE users DROP COLUMN new_column;
 ```
 
 **Access database directly**:
@@ -887,8 +935,8 @@ JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key  # Vault path to private key
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key    # Vault path to public key
 
 # JWT Configuration
-JWT_ACCESS_LIFETIME=15m                      # Access token lifetime (default: 15 minutes)
-JWT_REFRESH_LIFETIME=7d                      # Refresh token lifetime (default: 7 days)
+JWT_ACCESS_TOKEN_EXPIRY=15m                      # Access token lifetime (default: 15 minutes)
+JWT_REFRESH_TOKEN_EXPIRY=7d                      # Refresh token lifetime (default: 7 days)
 
 # Password Security
 BCRYPT_COST=12                               # bcrypt cost factor (minimum 12)
@@ -969,22 +1017,17 @@ paths:
 
 ### Adding Database Migration
 
-**1. Create migration file**:
+**1. Create migration files** (golang-migrate up/down pair):
 ```sql
--- migrations/004_add_email_verification.sql
-ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
-CREATE INDEX idx_users_verification_token ON users(verification_token);
+-- migrations/000007_add_display_name.up.sql
+ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
+```
+```sql
+-- migrations/000007_add_display_name.down.sql
+ALTER TABLE users DROP COLUMN display_name;
 ```
 
-**2. Update migration runner**:
-```go
-// internal/database/migrate.go
-// If using file-based migrations, just add the file
-// If using code-based migrations, add to migration list
-```
-
-**3. Test migration**:
+**2. Test migration**:
 ```bash
 # Apply migration
 make migrate-up
@@ -996,18 +1039,17 @@ psql -U cairn_user -d cairn_users -c "\d users"
 make migrate-down
 ```
 
-**4. Update models**:
+**3. Update models**:
 ```go
 // internal/models/user.go
 type User struct {
-    ID                string
-    Email             string
-    PasswordHash      string
-    ExpoDeviceID      string
-    EmailVerified     bool       // New field
-    VerificationToken string     // New field
-    CreatedAt         time.Time
-    UpdatedAt         time.Time
+    ID           uuid.UUID
+    Email        *string
+    PasswordHash *string
+    ExpoDeviceID *string
+    DisplayName  *string    // New field
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
 }
 ```
 
@@ -1341,15 +1383,11 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 
 ### Future Enhancements
 
-**High Priority**:
-- Email verification workflow
-- Password reset functionality
-- Token reuse detection (security)
+Note: Email verification, password reset, refresh token reuse detection, and account lockout after failed attempts are already implemented (see API Endpoints and Data Models above) - they are not listed here.
 
 **Medium Priority**:
 - Multi-factor authentication (MFA)
 - OAuth2/OpenID Connect support
-- Account lockout after failed attempts
 - Session management improvements
 
 **Low Priority**:
@@ -1365,8 +1403,6 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 - **Service README**: [README.md](README.md) - Comprehensive service documentation
 - **Requirements**: [requirements.md](/docs/detailed_requirements/users_service_requirements.md) - Detailed requirements and specifications
 - **OpenAPI Spec**: [api/openapi.yaml](api/openapi.yaml) - Formal API specification
-- **Implementation Plan**: [todo.md](todo.md) - Phased implementation checklist
-- **Security Assessment**: [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) - Security analysis
 
 ## Getting Help
 

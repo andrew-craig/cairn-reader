@@ -43,10 +43,9 @@ Fetcher DB ← Explore Fetcher (8080) → HTTP POST → Explore Recommender (808
 ```
 services/explore/
 ├── fetcher/                    # Fetcher service
-│   ├── cmd/fetcher/
-│   │   └── main.go            # Fetcher entrypoint
+│   ├── cmd/explore_fetcher/
+│   │   └── main.go            # Fetcher entrypoint (also wires up HTTP handlers: health, stats, triggers)
 │   ├── internal/
-│   │   ├── api/               # HTTP handlers (health, stats, triggers)
 │   │   ├── client/            # HTTP client for recommender API
 │   │   ├── db/                # Database repositories
 │   │   ├── fetcher/           # Core RSS fetching logic
@@ -55,13 +54,12 @@ services/explore/
 │   └── Dockerfile
 ├── recommender/                # Recommender service
 │   ├── cmd/
-│   │   ├── recommender/
+│   │   ├── explore_recommender/
 │   │   │   └── main.go        # Recommender entrypoint
-│   │   └── cleanup/
+│   │   └── explore_cleanup/
 │   │       └── main.go        # Article cleanup utility
 │   ├── internal/
 │   │   ├── api/               # HTTP handlers (articles, votes, recommendations)
-│   │   ├── auth/              # JWT authentication middleware
 │   │   ├── cleanup/           # Article retention cleanup
 │   │   ├── db/                # Database repositories
 │   │   └── recommend/         # Recommendation algorithm
@@ -103,22 +101,17 @@ docker compose down
 
 ### Running Explore Services Locally
 
-For development focused on the Explore service:
+There is no standalone Docker Compose file for the Explore service — `cairn-db` (Postgres) and Vault are shared, centralized infrastructure. For development focused on the Explore service, start the shared infrastructure via the centralized compose, then run the Go binaries natively so you get fast rebuild/restart cycles:
 
 ```bash
+# Start shared infra (Postgres, Vault) via the centralized compose
+cd infrastructure/docker/dev
+docker compose up -d cairn-db vault vault-init
+
+# From services/explore, run the services natively (see Makefile Commands below)
 cd services/explore
-
-# Start both services with databases
-docker compose up --build
-
-# Or start in detached mode
-docker compose up --build -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
+make run-fetcher
+make run-recommender
 ```
 
 ### Makefile Commands
@@ -190,26 +183,47 @@ curl http://localhost:8081/health/ready
 
 #### Article Management
 ```bash
-# Submit article (from fetcher)
+# Submit articles (from fetcher) — note the request wraps articles in an
+# "articles" array, and fields are "published"/"feed_url"/"feed_title"/
+# "categories" (not "published_at"/"feed_id"); article "id" is a content hash,
+# not a hash of the link (see Article ID Generation below)
 curl -X POST http://localhost:8081/api/v1/explore/article \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "...",
-    "link": "https://example.com/article",
-    "title": "Article Title",
-    "description": "Article description",
-    "content": "Full content...",
-    "author": "Author Name",
-    "published_at": "2025-01-08T10:00:00Z",
-    "feed_id": 123
+    "articles": [{
+      "id": "...",
+      "link": "https://example.com/article",
+      "title": "Article Title",
+      "description": "Article description",
+      "content": "Full content...",
+      "author": "Author Name",
+      "published": "2025-01-08T10:00:00Z",
+      "feed_url": "https://example.com/feed.xml",
+      "feed_title": "Feed Title"
+    }]
   }'
 ```
 
 #### Recommendations (requires authentication)
 ```bash
-# Get 5 recommendations for the authenticated user (user identified by JWT)
+# Get a page of recommended articles for the authenticated user (user
+# identified by JWT), ranked by quality score. Paginate with ?offset=N
+# (page size is fixed at 10, ranked from a pool of the top 100 eligible
+# articles). This is a pure read — it does not affect recommends counts.
 curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation
+  "http://localhost:8081/api/v1/explore/recommendation?offset=0"
+
+# Full-text search over articles
+curl -H "Authorization: Bearer <JWT>" \
+  "http://localhost:8081/api/v1/explore/search?q=keyword"
+
+# Record that a batch of articles was shown to the user — this is what
+# actually increments articles.recommends and writes recommendations rows
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"article_ids": ["..."]}' \
+  http://localhost:8081/api/v1/explore/shown
 ```
 
 #### User Interactions (requires authentication)
@@ -238,6 +252,10 @@ curl -H "Authorization: Bearer <JWT>" \
 # Get all articles user has voted on (with pagination)
 curl -H "Authorization: Bearer <JWT>" \
   "http://localhost:8081/api/v1/explore/user/votes?limit=20&offset=0"
+
+# Get aggregate vote counts for the authenticated user
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/user/vote-stats
 ```
 
 ## Data Models
@@ -254,6 +272,8 @@ CREATE TABLE feeds (
     enabled BOOLEAN DEFAULT true,
     last_fetched_at TIMESTAMP,
     consecutive_failures INT DEFAULT 0,
+    etag TEXT,                        -- HTTP ETag from last fetch (conditional GET)
+    last_modified TEXT,               -- HTTP Last-Modified from last fetch
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -264,10 +284,13 @@ CREATE TABLE feeds (
 CREATE TABLE fetch_history (
     id SERIAL PRIMARY KEY,
     feed_id INT REFERENCES feeds(id) ON DELETE CASCADE,
-    success BOOLEAN NOT NULL,
-    error_message TEXT,
+    fetch_started_at TIMESTAMP NOT NULL,
+    fetch_completed_at TIMESTAMP,
+    success BOOLEAN,
     articles_found INT DEFAULT 0,
-    fetched_at TIMESTAMP DEFAULT NOW()
+    articles_sent INT DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -276,29 +299,43 @@ CREATE TABLE fetch_history (
 **Articles Table** (`articles`):
 ```sql
 CREATE TABLE articles (
-    id TEXT PRIMARY KEY,              -- SHA256 hash of link
+    id VARCHAR(255) PRIMARY KEY,      -- SHA256 hash of cleaned article content (not the link)
     title TEXT NOT NULL,
     link TEXT UNIQUE NOT NULL,
     description TEXT,
     content TEXT,
-    author TEXT,
-    published_at TIMESTAMP,
+    author VARCHAR(255),
+    published TIMESTAMP NOT NULL,
+    feed_url TEXT NOT NULL,
+    feed_title VARCHAR(255),
+    categories TEXT[],
     feed_id INT,                      -- References feeds in fetcher DB (no FK)
     upvotes INT DEFAULT 0,
     downvotes INT DEFAULT 0,
     recommends INT DEFAULT 0,
     deleted BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP
 );
 ```
 
 **Users Table** (`users`):
 ```sql
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT UNIQUE NOT NULL,     -- External user identifier
+    id TEXT PRIMARY KEY,              -- External user ID from User Service, used directly
     created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**User Articles Table** (`user_articles`, tracks read status):
+```sql
+CREATE TABLE user_articles (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, article_id)
 );
 ```
 
@@ -306,8 +343,8 @@ CREATE TABLE users (
 ```sql
 CREATE TABLE votes (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    article_id TEXT REFERENCES articles(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
     vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(user_id, article_id)       -- One vote per user per article
@@ -318,9 +355,10 @@ CREATE TABLE votes (
 ```sql
 CREATE TABLE recommendations (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    article_id TEXT REFERENCES articles(id) ON DELETE CASCADE,
-    recommended_at TIMESTAMP DEFAULT NOW()
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    recommended_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, article_id)       -- One tracked recommendation per user/article
 );
 ```
 
@@ -332,6 +370,7 @@ CREATE TABLE article_categories (
     PRIMARY KEY (article_id, category)
 );
 ```
+Note: this table exists in migrations but is not currently read from or written to by application code — categories are stored on `articles.categories` (a `TEXT[]` column) instead.
 
 ## Key Implementation Details
 
@@ -382,27 +421,34 @@ WHERE articles.deleted = false;
 
 **Algorithm** (`recommender/internal/recommend/engine.go`):
 
-1. **Filter out deleted articles** (`deleted = false`)
-2. **Calculate quality score**: `(upvotes + (downvotes * 3)) / recommends`
+`GetRecommendations` is a pure read — it does not mutate `recommends` counts or
+write `recommendations` rows. It returns one offset-paginated page:
+
+1. **Fetch eligible articles**: not deleted, not already recommended to this
+   user (`GetForRecommendation`), up to a pool of the top 100 candidates
+2. **Calculate quality score** for each: `(upvotes - (downvotes * 3)) / recommends`
    - Higher score = better quality relative to exposure
    - Heavily weights downvotes (3x penalty)
-   - Articles with 0 recommends get special handling (high priority)
-3. **Select 4 articles** with highest quality score
-4. **Select 1 article** with lowest `recommends` count (discovery)
-5. **Increment `recommends`** counter for each recommended article
-6. **Track recommendation** in `recommendations` table
+   - Articles with `recommends == 0` score `+Inf` if they have upvotes, else `1000.0`
+3. **Sort the pool** by quality score descending (ties broken by article ID descending, for stable pagination)
+4. **Slice out a page of 10** starting at the caller's `offset` query param (default 0)
+
+Tracking is driven separately by the client: `POST /api/v1/explore/shown` is
+the sole writer of `recommendations` rows and the sole driver of the
+`articles.recommends` counter, called once articles have actually scrolled
+into view.
 
 **Edge Cases Handled**:
-- If `recommends = 0`, treat score as very high (new content prioritized)
-- Avoid recommending same article to same user repeatedly
+- If `recommends = 0`, treat score as very high/infinite (new content prioritized)
+- Avoid recommending same article to same user repeatedly (filtered at the eligibility query)
 - Handle division by zero gracefully
+- `offset` beyond the pool size returns an empty page rather than erroring
 
 **Why This Formula?**
-- Per requirements specification
 - Downvotes heavily penalized (3x weight) to surface quality content
 - Normalizes by exposure (recommends count)
 - New articles with high upvotes surface quickly
-- Mix of exploitation (high quality) and exploration (low exposure)
+- Mix of exploitation (high quality) and exploration (low exposure) — the split is emergent from the ranking rather than a fixed "N quality + 1 discovery" slot
 
 ### Voting System
 
@@ -433,7 +479,7 @@ WHERE articles.deleted = false;
 make run-cleanup
 
 # Or run directly
-go run recommender/cmd/cleanup/main.go
+go run recommender/cmd/explore_cleanup/main.go
 ```
 
 **Why Two-Phase Deletion?**
@@ -447,7 +493,7 @@ go run recommender/cmd/cleanup/main.go
 **JWT Authentication** (Recommender only):
 - Recommender service requires JWT authentication for user-specific endpoints
 - Uses HashiCorp Vault for JWT public key retrieval
-- Middleware: `recommender/internal/auth/middleware.go`
+- Middleware: `pkg/auth/middleware.go` (shared package, not local to the recommender)
 - Extracts `user_id` from JWT claims
 
 **Public Endpoints**:
@@ -456,7 +502,10 @@ go run recommender/cmd/cleanup/main.go
 
 **Protected Endpoints** (require JWT):
 - Recommendations (`GET /api/v1/explore/recommendation`)
+- Search (`GET /api/v1/explore/search`)
+- Mark shown (`POST /api/v1/explore/shown`)
 - User voted articles (`GET /api/v1/explore/user/votes`)
+- User vote stats (`GET /api/v1/explore/user/vote-stats`)
 - Voting (`POST/DELETE /api/v1/explore/article/:id/vote`)
 - Read tracking (`POST /api/v1/explore/article/:id/read`)
 
@@ -703,9 +752,7 @@ func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request
 PORT=8080                          # HTTP server port
 RECOMMENDER_URL=http://localhost:8081  # URL to recommender service
 FETCH_INTERVAL=60                  # Seconds between fetches (1 feed/minute)
-FETCH_TIMEOUT=30                   # Timeout per feed fetch (seconds)
-MAX_FETCH_ERRORS=10                # Disable feed after N consecutive failures
-DB_HOST=fetcher_db                 # PostgreSQL host
+DB_HOST=cairn-db                   # PostgreSQL host (consolidated Postgres container; "localhost" if unset)
 DB_PORT=5432                       # PostgreSQL port
 DB_USER=fetcher                    # Database user
 DB_PASSWORD=fetcher_password       # Database password
@@ -713,11 +760,15 @@ DB_NAME=fetcher_db                 # Database name
 FEED_LIST_PATH=/app/feeds/feeds.txt   # Mount your own list here to override the default
 FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
 ```
+Note: the 30-second per-fetch HTTP timeout and the 10-consecutive-failure auto-disable
+threshold are hardcoded (`pkg/rss/fetch` and `feed_repository.go` respectively), not
+configurable via `FETCH_TIMEOUT`/`MAX_FETCH_ERRORS` env vars — those variables are not
+read anywhere in the codebase.
 
 ### Explore Recommender (explore_recommender)
 ```bash
 PORT=8081                          # HTTP server port
-DB_HOST=postgres                   # PostgreSQL host
+DB_HOST=cairn-db                   # PostgreSQL host (consolidated Postgres container; "localhost" if unset)
 DB_PORT=5432                       # PostgreSQL port
 DB_USER=cairn                      # Database user
 DB_PASSWORD=cairn_password         # Database password
