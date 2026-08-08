@@ -4,6 +4,7 @@
 
 Cairn is a read-it-later application consisting of:
 - **Mobile App** (React Native/Expo): iOS and Android app for reading saved articles
+- **Web App** (React/Vite): browser client for reading saved articles
 - **Backend Services** (Go): Microservices for content discovery, storage, and user management
   - **Explore Service**: RSS feed fetching and content recommendation
   - **Read Service**: Article storage and user-specific metadata
@@ -13,21 +14,22 @@ Cairn is a read-it-later application consisting of:
 ### Architecture
 
 ```
-Mobile App (React Native) → REST APIs → Backend Services
-                                        ├── User Service (Auth, port 8082)
-                                        ├── Explore Service (RSS, ports 8080/8081)
-                                        ├── Read Service (Storage, ports 8083/8085)
-                                        └── Email Ingest Service (port 8087)
-                                               ↓
-                                        PostgreSQL
+Mobile App / Web App → REST APIs → Backend Services
+                                   ├── User Service (Auth)
+                                   ├── Explore Service (RSS)
+                                   ├── Read Service (Storage)
+                                   └── Email Ingest Service
+                                          ↓
+                                   PostgreSQL
 ```
 
 - Each service owns its own logical database (single PostgreSQL instance)
 - Services communicate only via HTTP REST APIs — **never** access another service's database
 - JWT-based stateless authentication (RS256, keys managed by HashiCorp Vault)
 - All user-specific endpoints require `Authorization: Bearer <token>` header
+- Local dev ports differ from each service's container-internal port — see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md) for the full port table.
 
-For detailed architecture, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md). For per-service details, see the service CLAUDE.md files linked above.
+For detailed architecture, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md). For per-service details, see the service CLAUDE.md files linked below.
 
 
 ## Documentation
@@ -35,6 +37,7 @@ Read the following documentation as necessary for each task. do not read a docum
 
 ### Service documentation
 - [Mobile App](/apps/mobile/CLAUDE.md) - React Native/Expo mobile application
+- [Web App](/apps/web/CLAUDE.md) - React/Vite browser client
 - [Explore Service](/services/explore/CLAUDE.md) - RSS feed fetching and content recommendation
 - [Read Service](/services/read/CLAUDE.md) - Article storage and RSS feed management
 - [User Service](/services/users/CLAUDE.md) - Authentication and user management

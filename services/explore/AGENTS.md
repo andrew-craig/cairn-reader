@@ -43,10 +43,9 @@ Fetcher DB ← Explore Fetcher (8080) → HTTP POST → Explore Recommender (808
 ```
 services/explore/
 ├── fetcher/                    # Fetcher service
-│   ├── cmd/fetcher/
-│   │   └── main.go            # Fetcher entrypoint
+│   ├── cmd/explore_fetcher/
+│   │   └── main.go            # Fetcher entrypoint (also wires up HTTP handlers: health, stats, triggers)
 │   ├── internal/
-│   │   ├── api/               # HTTP handlers (health, stats, triggers)
 │   │   ├── client/            # HTTP client for recommender API
 │   │   ├── db/                # Database repositories
 │   │   ├── fetcher/           # Core RSS fetching logic
@@ -55,27 +54,23 @@ services/explore/
 │   └── Dockerfile
 ├── recommender/                # Recommender service
 │   ├── cmd/
-│   │   ├── recommender/
+│   │   ├── explore_recommender/
 │   │   │   └── main.go        # Recommender entrypoint
-│   │   └── cleanup/
+│   │   └── explore_cleanup/
 │   │       └── main.go        # Article cleanup utility
 │   ├── internal/
 │   │   ├── api/               # HTTP handlers (articles, votes, recommendations)
-│   │   ├── auth/              # JWT authentication middleware
 │   │   ├── cleanup/           # Article retention cleanup
 │   │   ├── db/                # Database repositories
 │   │   └── recommend/         # Recommendation algorithm
 │   ├── migrations/            # Recommender database migrations
 │   └── Dockerfile
-├── pkg/
-│   └── models/                # Shared data models (Article, Feed, Vote, etc.)
 ├── api/
 │   └── openapi.yaml           # OpenAPI 3.0 specification
-├── docker-compose.yml         # Local development setup
 ├── Makefile                   # Build and development commands
 ├── README.md                  # Service documentation
-├── RECOMMENDER_PLAN.md        # Implementation roadmap
-└── CLAUDE.md                  # This file
+├── AGENTS.md                  # This file (CLAUDE.md symlinks to it)
+└── CLAUDE.md                  # Symlink to AGENTS.md
 ```
 
 ## Quick Start
@@ -86,7 +81,7 @@ The easiest way to run all Cairn backend services (including Explore) is using t
 
 ```bash
 # From repository root
-cd infrastructure/docker
+cd infrastructure/docker/dev
 
 # Start all services (includes Vault, databases, all microservices)
 docker compose up --build -d
@@ -95,7 +90,7 @@ docker compose up --build -d
 docker compose ps
 
 # View logs
-docker compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore-fetcher explore-recommender
 
 # Stop services
 docker compose down
@@ -103,22 +98,17 @@ docker compose down
 
 ### Running Explore Services Locally
 
-For development focused on the Explore service:
+There is no standalone Docker Compose file for the Explore service — `cairn-db` (Postgres) and Vault are shared, centralized infrastructure. For development focused on the Explore service, start the shared infrastructure via the centralized compose, then run the Go binaries natively so you get fast rebuild/restart cycles:
 
 ```bash
+# Start shared infra (Postgres, Vault) via the centralized compose
+cd infrastructure/docker/dev
+docker compose up -d cairn-db vault vault-init
+
+# From services/explore, run the services natively (see Makefile Commands below)
 cd services/explore
-
-# Start both services with databases
-docker compose up --build
-
-# Or start in detached mode
-docker compose up --build -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
+make run-fetcher
+make run-recommender
 ```
 
 ### Makefile Commands
@@ -190,26 +180,47 @@ curl http://localhost:8081/health/ready
 
 #### Article Management
 ```bash
-# Submit article (from fetcher)
+# Submit articles (from fetcher) — note the request wraps articles in an
+# "articles" array, and fields are "published"/"feed_url"/"feed_title"/
+# "categories" (not "published_at"/"feed_id"); article "id" is a content hash,
+# not a hash of the link (see Article ID Generation below)
 curl -X POST http://localhost:8081/api/v1/explore/article \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "...",
-    "link": "https://example.com/article",
-    "title": "Article Title",
-    "description": "Article description",
-    "content": "Full content...",
-    "author": "Author Name",
-    "published_at": "2025-01-08T10:00:00Z",
-    "feed_id": 123
+    "articles": [{
+      "id": "...",
+      "link": "https://example.com/article",
+      "title": "Article Title",
+      "description": "Article description",
+      "content": "Full content...",
+      "author": "Author Name",
+      "published": "2025-01-08T10:00:00Z",
+      "feed_url": "https://example.com/feed.xml",
+      "feed_title": "Feed Title"
+    }]
   }'
 ```
 
 #### Recommendations (requires authentication)
 ```bash
-# Get 5 recommendations for the authenticated user (user identified by JWT)
+# Get a page of recommended articles for the authenticated user (user
+# identified by JWT), ranked by quality score. Paginate with ?offset=N
+# (page size is fixed at 10, ranked from a pool of the top 100 eligible
+# articles). This is a pure read — it does not affect recommends counts.
 curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8081/api/v1/explore/recommendation
+  "http://localhost:8081/api/v1/explore/recommendation?offset=0"
+
+# Full-text search over articles
+curl -H "Authorization: Bearer <JWT>" \
+  "http://localhost:8081/api/v1/explore/search?q=keyword"
+
+# Record that a batch of articles was shown to the user — this is what
+# actually increments articles.recommends and writes recommendations rows
+curl -X POST \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"article_ids": ["..."]}' \
+  http://localhost:8081/api/v1/explore/shown
 ```
 
 #### User Interactions (requires authentication)
@@ -238,6 +249,10 @@ curl -H "Authorization: Bearer <JWT>" \
 # Get all articles user has voted on (with pagination)
 curl -H "Authorization: Bearer <JWT>" \
   "http://localhost:8081/api/v1/explore/user/votes?limit=20&offset=0"
+
+# Get aggregate vote counts for the authenticated user
+curl -H "Authorization: Bearer <JWT>" \
+  http://localhost:8081/api/v1/explore/user/vote-stats
 ```
 
 ## Data Models
@@ -254,6 +269,8 @@ CREATE TABLE feeds (
     enabled BOOLEAN DEFAULT true,
     last_fetched_at TIMESTAMP,
     consecutive_failures INT DEFAULT 0,
+    etag TEXT,                        -- HTTP ETag from last fetch (conditional GET)
+    last_modified TEXT,               -- HTTP Last-Modified from last fetch
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -264,10 +281,13 @@ CREATE TABLE feeds (
 CREATE TABLE fetch_history (
     id SERIAL PRIMARY KEY,
     feed_id INT REFERENCES feeds(id) ON DELETE CASCADE,
-    success BOOLEAN NOT NULL,
-    error_message TEXT,
+    fetch_started_at TIMESTAMP NOT NULL,
+    fetch_completed_at TIMESTAMP,
+    success BOOLEAN,
     articles_found INT DEFAULT 0,
-    fetched_at TIMESTAMP DEFAULT NOW()
+    articles_sent INT DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -276,29 +296,43 @@ CREATE TABLE fetch_history (
 **Articles Table** (`articles`):
 ```sql
 CREATE TABLE articles (
-    id TEXT PRIMARY KEY,              -- SHA256 hash of link
+    id VARCHAR(255) PRIMARY KEY,      -- SHA256 hash of cleaned article content (not the link)
     title TEXT NOT NULL,
     link TEXT UNIQUE NOT NULL,
     description TEXT,
     content TEXT,
-    author TEXT,
-    published_at TIMESTAMP,
+    author VARCHAR(255),
+    published TIMESTAMP NOT NULL,
+    feed_url TEXT NOT NULL,
+    feed_title VARCHAR(255),
+    categories TEXT[],
     feed_id INT,                      -- References feeds in fetcher DB (no FK)
     upvotes INT DEFAULT 0,
     downvotes INT DEFAULT 0,
     recommends INT DEFAULT 0,
     deleted BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP
 );
 ```
 
 **Users Table** (`users`):
 ```sql
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT UNIQUE NOT NULL,     -- External user identifier
+    id TEXT PRIMARY KEY,              -- External user ID from User Service, used directly
     created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**User Articles Table** (`user_articles`, tracks read status):
+```sql
+CREATE TABLE user_articles (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, article_id)
 );
 ```
 
@@ -306,8 +340,8 @@ CREATE TABLE users (
 ```sql
 CREATE TABLE votes (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    article_id TEXT REFERENCES articles(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
     vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE(user_id, article_id)       -- One vote per user per article
@@ -318,9 +352,10 @@ CREATE TABLE votes (
 ```sql
 CREATE TABLE recommendations (
     id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    article_id TEXT REFERENCES articles(id) ON DELETE CASCADE,
-    recommended_at TIMESTAMP DEFAULT NOW()
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+    recommended_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, article_id)       -- One tracked recommendation per user/article
 );
 ```
 
@@ -332,6 +367,7 @@ CREATE TABLE article_categories (
     PRIMARY KEY (article_id, category)
 );
 ```
+Note: this table exists in migrations but is not currently read from or written to by application code — categories are stored on `articles.categories` (a `TEXT[]` column) instead.
 
 ## Key Implementation Details
 
@@ -382,27 +418,34 @@ WHERE articles.deleted = false;
 
 **Algorithm** (`recommender/internal/recommend/engine.go`):
 
-1. **Filter out deleted articles** (`deleted = false`)
-2. **Calculate quality score**: `(upvotes + (downvotes * 3)) / recommends`
+`GetRecommendations` is a pure read — it does not mutate `recommends` counts or
+write `recommendations` rows. It returns one offset-paginated page:
+
+1. **Fetch eligible articles**: not deleted, not already recommended to this
+   user (`GetForRecommendation`), up to a pool of the top 100 candidates
+2. **Calculate quality score** for each: `(upvotes - (downvotes * 3)) / recommends`
    - Higher score = better quality relative to exposure
    - Heavily weights downvotes (3x penalty)
-   - Articles with 0 recommends get special handling (high priority)
-3. **Select 4 articles** with highest quality score
-4. **Select 1 article** with lowest `recommends` count (discovery)
-5. **Increment `recommends`** counter for each recommended article
-6. **Track recommendation** in `recommendations` table
+   - Articles with `recommends == 0` score `+Inf` if they have upvotes, else `1000.0`
+3. **Sort the pool** by quality score descending (ties broken by article ID descending, for stable pagination)
+4. **Slice out a page of 10** starting at the caller's `offset` query param (default 0)
+
+Tracking is driven separately by the client: `POST /api/v1/explore/shown` is
+the sole writer of `recommendations` rows and the sole driver of the
+`articles.recommends` counter, called once articles have actually scrolled
+into view.
 
 **Edge Cases Handled**:
-- If `recommends = 0`, treat score as very high (new content prioritized)
-- Avoid recommending same article to same user repeatedly
+- If `recommends = 0`, treat score as very high/infinite (new content prioritized)
+- Avoid recommending same article to same user repeatedly (filtered at the eligibility query)
 - Handle division by zero gracefully
+- `offset` beyond the pool size returns an empty page rather than erroring
 
 **Why This Formula?**
-- Per requirements specification
 - Downvotes heavily penalized (3x weight) to surface quality content
 - Normalizes by exposure (recommends count)
 - New articles with high upvotes surface quickly
-- Mix of exploitation (high quality) and exploration (low exposure)
+- Mix of exploitation (high quality) and exploration (low exposure) — the split is emergent from the ranking rather than a fixed "N quality + 1 discovery" slot
 
 ### Voting System
 
@@ -433,7 +476,7 @@ WHERE articles.deleted = false;
 make run-cleanup
 
 # Or run directly
-go run recommender/cmd/cleanup/main.go
+go run recommender/cmd/explore_cleanup/main.go
 ```
 
 **Why Two-Phase Deletion?**
@@ -447,7 +490,7 @@ go run recommender/cmd/cleanup/main.go
 **JWT Authentication** (Recommender only):
 - Recommender service requires JWT authentication for user-specific endpoints
 - Uses HashiCorp Vault for JWT public key retrieval
-- Middleware: `recommender/internal/auth/middleware.go`
+- Middleware: `pkg/auth/middleware.go` (shared package, not local to the recommender)
 - Extracts `user_id` from JWT claims
 
 **Public Endpoints**:
@@ -456,7 +499,10 @@ go run recommender/cmd/cleanup/main.go
 
 **Protected Endpoints** (require JWT):
 - Recommendations (`GET /api/v1/explore/recommendation`)
+- Search (`GET /api/v1/explore/search`)
+- Mark shown (`POST /api/v1/explore/shown`)
 - User voted articles (`GET /api/v1/explore/user/votes`)
+- User vote stats (`GET /api/v1/explore/user/vote-stats`)
 - Voting (`POST/DELETE /api/v1/explore/article/:id/vote`)
 - Read tracking (`POST /api/v1/explore/article/:id/read`)
 
@@ -497,12 +543,10 @@ make test-integration
 
 **1. Start services:**
 ```bash
-# Option A: Use centralized Docker Compose (recommended)
-cd infrastructure/docker
-docker compose up --build
-
-# Option B: Use local Docker Compose
-cd services/explore
+# Use the centralized Docker Compose (there is no standalone compose file
+# for the Explore service — see "Running Explore Services Locally" above
+# for running the Go binaries natively instead)
+cd infrastructure/docker/dev
 docker compose up --build
 ```
 
@@ -533,33 +577,34 @@ curl -X POST \
 
 **6. View logs:**
 ```bash
-docker compose logs -f explore_fetcher explore_recommender
+docker compose logs -f explore-fetcher explore-recommender
 ```
 
 ### Database Operations
 
 **Reset databases:**
 ```bash
-# Local Docker Compose
-cd services/explore
-docker compose down
-docker volume rm cairn-explore_postgres_data cairn-explore_fetcher_postgres_data
-docker compose up --build
-
-# Centralized Docker Compose
-cd infrastructure/docker
-docker compose down
-docker volume rm docker_postgres_data docker_fetcher_postgres_data
+# The fetcher and recommender databases are two logical databases inside the
+# single consolidated `cairn-db` Postgres container (infrastructure/docker/dev),
+# not separate Postgres containers, so resetting means dropping that container's
+# volume — `-v` removes it along with the rest of the stack's volumes.
+cd infrastructure/docker/dev
+docker compose down -v
 docker compose up --build
 ```
 
 **Access database directly:**
 ```bash
+# Run from infrastructure/docker/dev. Both databases live in the same
+# consolidated `cairn-db` Postgres container; connect with the per-service
+# credentials from .env (see .env.example for the POSTGRES_*_FETCHER /
+# POSTGRES_*_RECOMMENDER variable names). `docker compose exec` resolves the
+# service name for you, unlike `docker exec` with a guessed container name.
 # Fetcher database
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher
 
 # Recommender database
-docker exec -it postgres psql -U cairn -d cairn_db
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender
 ```
 
 **View migrations:**
@@ -703,9 +748,7 @@ func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request
 PORT=8080                          # HTTP server port
 RECOMMENDER_URL=http://localhost:8081  # URL to recommender service
 FETCH_INTERVAL=60                  # Seconds between fetches (1 feed/minute)
-FETCH_TIMEOUT=30                   # Timeout per feed fetch (seconds)
-MAX_FETCH_ERRORS=10                # Disable feed after N consecutive failures
-DB_HOST=fetcher_db                 # PostgreSQL host
+DB_HOST=cairn-db                   # PostgreSQL host (consolidated Postgres container; "localhost" if unset)
 DB_PORT=5432                       # PostgreSQL port
 DB_USER=fetcher                    # Database user
 DB_PASSWORD=fetcher_password       # Database password
@@ -713,11 +756,15 @@ DB_NAME=fetcher_db                 # Database name
 FEED_LIST_PATH=/app/feeds/feeds.txt   # Mount your own list here to override the default
 FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
 ```
+Note: the 30-second per-fetch HTTP timeout and the 10-consecutive-failure auto-disable
+threshold are hardcoded (`pkg/rss/fetch` and `feed_repository.go` respectively), not
+configurable via `FETCH_TIMEOUT`/`MAX_FETCH_ERRORS` env vars — those variables are not
+read anywhere in the codebase.
 
 ### Explore Recommender (explore_recommender)
 ```bash
 PORT=8081                          # HTTP server port
-DB_HOST=postgres                   # PostgreSQL host
+DB_HOST=cairn-db                   # PostgreSQL host (consolidated Postgres container; "localhost" if unset)
 DB_PORT=5432                       # PostgreSQL port
 DB_USER=cairn                      # Database user
 DB_PASSWORD=cairn_password         # Database password
@@ -779,35 +826,31 @@ func TestNewEndpoint(t *testing.T) {
 
 ### Adding a Database Migration
 
+Migrations use [golang-migrate](https://github.com/golang-migrate/migrate) and are
+auto-discovered from each service's `migrations/` directory (embedded via
+`migrations/embed.go`) — there is no list to update in `main.go`.
+
 **For Fetcher Database:**
 
-**1. Create migration file:**
+**1. Create migration files** (golang-migrate up/down pair, 6-digit sequence prefix):
 ```sql
--- fetcher/migrations/004_add_new_column.sql
+-- fetcher/migrations/000003_add_new_column.up.sql
 ALTER TABLE feeds ADD COLUMN new_column TEXT;
+
+-- fetcher/migrations/000003_add_new_column.down.sql
+ALTER TABLE feeds DROP COLUMN new_column;
 ```
 
-**2. Update migration logic:**
-```go
-// fetcher/cmd/fetcher/main.go
-migrations := []string{
-    "001_init.sql",
-    "002_add_feed_history.sql",
-    "003_feed_indexes.sql",
-    "004_add_new_column.sql",  // Add new migration
-}
-```
-
-**3. Test migration:**
+**2. Test migration:**
 ```bash
-docker compose down
-docker volume rm cairn-explore_fetcher_postgres_data
+cd infrastructure/docker/dev
+docker compose down -v
 docker compose up --build
 ```
 
 **For Recommender Database:**
 
-Follow the same pattern but update `recommender/cmd/recommender/main.go` and `recommender/migrations/`.
+Follow the same pattern in `recommender/migrations/`.
 
 ### Debugging
 
@@ -817,31 +860,33 @@ Follow the same pattern but update `recommender/cmd/recommender/main.go` and `re
 docker compose logs -f
 
 # Fetcher only
-docker compose logs -f explore_fetcher
+docker compose logs -f explore-fetcher
 
 # Recommender only
-docker compose logs -f explore_recommender
+docker compose logs -f explore-recommender
 
 # Tail last 100 lines
-docker compose logs --tail=100 explore_fetcher
+docker compose logs --tail=100 explore-fetcher
 ```
 
 **Check database state:**
 ```bash
+# Run from infrastructure/docker/dev
+
 # Fetcher database - view feeds
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db \
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher \
   -c "SELECT id, url, enabled, last_fetched_at, consecutive_failures FROM feeds ORDER BY last_fetched_at LIMIT 10;"
 
 # Fetcher database - view fetch history
-docker exec -it fetcher_db psql -U fetcher -d fetcher_db \
+docker compose exec cairn-db psql -U cairn_fetcher -d cairn_fetcher \
   -c "SELECT * FROM fetch_history ORDER BY fetched_at DESC LIMIT 10;"
 
 # Recommender database - view articles
-docker exec -it postgres psql -U cairn -d cairn_db \
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender \
   -c "SELECT id, title, upvotes, downvotes, recommends, deleted FROM articles LIMIT 10;"
 
 # Recommender database - view votes
-docker exec -it postgres psql -U cairn -d cairn_db \
+docker compose exec cairn-db psql -U cairn_recommender -d cairn_recommender \
   -c "SELECT v.*, a.title FROM votes v JOIN articles a ON v.article_id = a.id LIMIT 10;"
 ```
 
@@ -889,25 +934,25 @@ docker run -d --name vault -p 8200:8200 \
 
 ### Article ID Generation
 
-**Article IDs are SHA256 hashes of the article link**:
+**Article IDs are SHA256 hashes of the cleaned article content, not the link**
+(`pkg/rss/hash.ContentHash`, called from the fetcher's `convertToArticle`).
+Deduplication in the recommender is still keyed on `link` (`ON CONFLICT (link)`),
+independent of this ID:
 
 ```go
-import (
-    "crypto/sha256"
-    "encoding/hex"
-)
-
-func GenerateArticleID(link string) string {
-    hash := sha256.Sum256([]byte(link))
-    return hex.EncodeToString(hash[:])
+// pkg/rss/hash/hash.go
+func ContentHash(html []byte) string {
+    normalized := bytes.TrimSpace(html)
+    sum := sha256.Sum256(normalized)
+    return hex.EncodeToString(sum[:])
 }
 ```
 
-**Why SHA256 hashes?**
-- Ensures uniqueness across feeds
-- Enables deduplication (same link = same ID)
+**Why content hashes?**
 - Deterministic and reproducible
+- Shared with the Read service so both pipelines derive consistent content-hash IDs
 - No need for auto-incrementing IDs or UUIDs
+- Note: this changed from an earlier `SHA256(link)` scheme (see fetcher migration `000002_add_etag_columns`, which documents the switch)
 
 ### Feed ID References
 
@@ -973,8 +1018,6 @@ This reduces final image size significantly (~20MB vs 300MB+).
   - Admin dashboard endpoints (`GET /admin/stats`, `GET /admin/articles`)
   - Monitoring metrics
 
-See [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) for detailed progress.
-
 ## Next Steps
 
 ### High Priority
@@ -1006,8 +1049,7 @@ None - All core features are complete and tested.
 - Keeps articles table normalized
 - Required for quality score calculation
 
-### Why Quality Score Formula: (upvotes + (downvotes * 3)) / recommends?
-- Per requirements specification
+### Why Quality Score Formula: (upvotes - (downvotes * 3)) / recommends?
 - Heavily weights downvotes (3x penalty) to filter low-quality content
 - Normalizes by exposure (recommends count)
 - New articles with high upvotes surface quickly
@@ -1025,7 +1067,6 @@ None - All core features are complete and tested.
 - **Main Project CLAUDE.md**: [/CLAUDE.md](/CLAUDE.md) - Project-wide context
 - **Engineering Principles**: [/docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md) - Standards and conventions
 - **Service README**: [README.md](README.md) - Detailed service documentation
-- **Implementation Plan**: [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) - Roadmap and progress tracking
 - **OpenAPI Spec**: [api/openapi.yaml](api/openapi.yaml) - Formal API specification
 - **Fetcher Migrations**: [fetcher/migrations/README.md](fetcher/migrations/README.md)
 - **Recommender Migrations**: [recommender/migrations/README.md](recommender/migrations/README.md)
@@ -1049,6 +1090,5 @@ The implementation follows these principles while adding:
 - **Check service logs**: `docker compose logs -f`
 - **Review test cases**: Look at `*_test.go` files for usage examples
 - **Consult OpenAPI spec**: [api/openapi.yaml](api/openapi.yaml) for API reference
-- **Read implementation plan**: [RECOMMENDER_PLAN.md](RECOMMENDER_PLAN.md) for feature status
 - **Check main docs**: [/CLAUDE.md](/CLAUDE.md) and [/docs/ENGINEERING_PRINCIPLES.md](/docs/ENGINEERING_PRINCIPLES.md)
 - **Database issues**: Check migration files and README files in `migrations/` directories

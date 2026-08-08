@@ -32,16 +32,25 @@ apps/mobile/
 └── src/
     ├── components/                  # Reusable UI components
     │   ├── common/                  # Shared components
-    │   │   ├── ArticleCard.tsx      # Card display for articles
+    │   │   ├── ArticleContent.tsx   # Article body renderer (react-native-render-html)
     │   │   ├── ArticleRow.tsx       # List row for articles
+    │   │   ├── BottomActionMenu.tsx # Floating bottom action menu
     │   │   ├── Button.tsx           # Primary button component
     │   │   ├── CustomTabBar.tsx     # Custom tab bar
-    │   │   ├── EmptyState.tsx       # Empty state placeholder
-    │   │   └── IconButton.tsx       # Icon-only button
+    │   │   ├── HeaderPopover.tsx    # Popover menu anchored to a header
+    │   │   ├── IconButton.tsx       # Icon-only button
+    │   │   ├── QuickAccessButton.tsx # Icon button used in BottomActionMenu
+    │   │   ├── ScreenHeader.tsx     # Shared screen header
+    │   │   └── TopBlurGradient.tsx  # Top-of-screen blur/gradient overlay
+    │   ├── icons/                   # SVG icon components
     │   ├── AddLinkModal.tsx         # Modal for adding URLs
-    │   └── ArticleListScreen.tsx    # Reusable article list
+    │   ├── ArticleListScreen.tsx    # Reusable article list
+    │   ├── LogoMark.tsx             # App logo mark
+    │   ├── SearchModal.tsx          # Modal for searching content
+    │   └── SubscriptionListScreen.tsx  # Reusable feed/newsletter subscription list
     ├── config/                      # App configuration
-    │   └── api.ts                   # API endpoint configuration
+    │   ├── init.ts                  # Wires shared API config layer at startup (imported first, from index.js)
+    │   └── storage.ts               # AsyncStorage adapter + DEFAULT_SERVER_URL
     ├── constants/                   # Constants and theme
     │   ├── globalStyles.ts          # Global style definitions
     │   ├── theme.ts                 # Colors, spacing, fonts
@@ -52,30 +61,33 @@ apps/mobile/
     │   ├── RootNavigator.tsx        # Stack navigator (root)
     │   └── TabNavigator.tsx         # Bottom tab navigator
     ├── screens/                     # App screens
+    │   ├── AboutScreen.tsx          # App/about info
+    │   ├── AccountScreen.tsx        # Account settings (logout, upgrade, password)
     │   ├── AddArticleScreen.tsx     # Add new article/URL
-    │   ├── ArchiveScreen.tsx        # Archived articles
-    │   ├── ArticleDetailScreen.tsx  # Read article details
+    │   ├── BookmarksScreen.tsx      # Favorited articles
     │   ├── ExploreArticleDetailScreen.tsx  # Explore article view
     │   ├── ExploreScreen.tsx        # Content discovery feed
-    │   ├── FavoritesScreen.tsx      # Favorited articles
+    │   ├── FeedsScreen.tsx          # RSS/social feed subscriptions
     │   ├── LoginScreen.tsx          # Authentication
+    │   ├── NewslettersScreen.tsx    # Email newsletter subscriptions
+    │   ├── ReadArticleDetailScreen.tsx  # Read article details
     │   ├── ReadScreen.tsx           # Reading list (main)
-    │   ├── SettingsScreen.tsx       # App settings
+    │   ├── VotesScreen.tsx          # Upvoted/downvoted articles
+    │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/Feeds/etc.)
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
     │   ├── auth.ts                  # Authentication service
     │   ├── explore.ts               # Explore/recommendations API
     │   ├── read.ts                  # Read service API
     │   ├── storage.ts               # Local storage (AsyncStorage)
+    │   ├── system.ts                # Backend metadata not tied to a user session
     │   └── index.ts                 # Exports
     ├── types/                       # TypeScript type definitions
-    │   ├── article.ts               # Article interface
-    │   ├── auth.ts                  # Auth types
-    │   ├── navigation.ts            # Navigation param types
-    │   ├── read.ts                  # Read service types
-    │   └── index.ts                 # Exports
+    │   ├── navigation.ts            # Navigation param types (client-specific)
+    │   └── index.ts                 # Re-exports @cairn/shared types + navigation.ts
     └── utils/                       # Utility functions
         ├── helpers.ts               # Helper functions
+        ├── retry.ts                 # Retry with exponential backoff for transient failures
         └── index.ts                 # Exports
 ```
 
@@ -87,12 +99,18 @@ The app uses React Navigation with a stack + tabs pattern:
 ```
 RootNavigator (Stack)
 ├── MainTabs (Bottom Tabs)
-│   ├── Explore Tab → ExploreScreen
 │   ├── Read Tab → ReadScreen
-│   └── Settings Tab → SettingsScreen
-├── ArticleDetail (Modal)
+│   ├── Explore Tab → ExploreScreen
+│   └── You Tab → YouScreen
+├── ArticleDetail → ReadArticleDetailScreen
 ├── ExploreArticleDetail (Modal)
-└── AddArticle (Modal)
+├── AddArticle (Modal)
+├── Bookmarks
+├── Votes
+├── Account
+├── About
+├── Feeds
+└── Newsletters
 ```
 
 **Navigation Types:**
@@ -140,13 +158,13 @@ All backend communication goes through service classes:
 
 ### Common Components
 
-**ArticleCard.tsx** - Card-based article display
+**ArticleContent.tsx** - Article body renderer (used by ReadArticleDetailScreen)
 ```typescript
-interface ArticleCardProps {
+interface ArticleContentProps {
   article: Article;
-  onPress: () => void;
-  onToggleFavorite?: () => void;
-  onArchive?: () => void;
+  colors: typeof Colors.light;
+  onScrollProgress?: (info: ScrollProgressInfo) => void;
+  initialScrollFraction?: number;
 }
 ```
 
@@ -155,7 +173,7 @@ interface ArticleCardProps {
 interface ArticleRowProps {
   article: Article;
   onPress: () => void;
-  showOptions?: boolean;
+  voteType?: 'upvote' | 'downvote';
 }
 ```
 
@@ -164,19 +182,9 @@ interface ArticleRowProps {
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
   disabled?: boolean;
-}
-```
-
-**EmptyState.tsx** - Empty state placeholder
-```typescript
-interface EmptyStateProps {
-  icon: string;              // Ionicons name
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  loading?: boolean;
 }
 ```
 
@@ -190,12 +198,11 @@ interface EmptyStateProps {
 
 **ReadScreen.tsx** - Reading list (main screen)
 - Displays user's saved articles
-- Tabs for Unread/Archive/Favorites
-- Search and filter functionality
+- Search functionality
 - Integrates with Read service
 
-**ArticleDetailScreen.tsx** - Full article view
-- Displays article content in WebView
+**ReadArticleDetailScreen.tsx** - Full article view
+- Displays article content via `ArticleContent` (`react-native-render-html`)
 - Reading progress tracking
 - Mark as read/unread
 - Favorite/unfavorite actions
@@ -206,16 +213,18 @@ interface EmptyStateProps {
 - Email/password login/registration
 - Account upgrade (device → email/password)
 
-**SettingsScreen.tsx** - App settings
-- User profile information
+**YouScreen.tsx** - Profile hub
+- User profile summary and reading stats (feeds, newsletters, bookmarks, votes)
+- Links to Bookmarks, Votes, Account, About, Feeds, and Newsletters screens
+
+**AccountScreen.tsx** - Account settings
 - Logout functionality
-- App information
-- Future: Reading preferences, notifications
+- Account upgrade (device → email/password) and password change
 
 ## Data Models and Types
 
 ### Core Article Interface
-Located in `src/types/article.ts`:
+Located in `apps/shared/src/types/article.ts` (`@cairn/shared`, re-exported via `src/types/index.ts`):
 
 ```typescript
 interface Article {
@@ -223,6 +232,7 @@ interface Article {
   url: string;             // Source URL
   title: string;
   description?: string;
+  content?: string;        // Cleaned HTML content from readability extraction
   imageUrl?: string;
   author?: string;
   publishedDate?: string;  // ISO 8601 date string
@@ -233,6 +243,8 @@ interface Article {
   addedAt: number;         // Unix timestamp (ms)
   readAt?: number;         // Unix timestamp (ms)
   notes?: string;
+  scrollPosition?: number;
+  scrollFraction?: number;
 }
 ```
 
@@ -242,39 +254,48 @@ Located in `src/types/navigation.ts`:
 ```typescript
 type RootStackParamList = {
   MainTabs: undefined;
-  ArticleDetail: { article: Article };
-  ExploreArticleDetail: { article: Article };
+  ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number; onArchived?: (articleId: string) => void };
+  ExploreArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
   AddArticle: undefined;
+  Bookmarks: undefined;
+  Votes: undefined;
+  Account: undefined;
+  About: undefined;
+  Feeds: undefined;
+  Newsletters: undefined;
 };
 
 type MainTabParamList = {
   Explore: undefined;
   Read: undefined;
-  Settings: undefined;
+  You: undefined;
 };
 ```
 
 ### Authentication Types
-Located in `src/types/auth.ts`:
+Located in `apps/shared/src/types/auth.ts` (`@cairn/shared`, re-exported via `src/types/index.ts`):
 
 ```typescript
 interface User {
   id: string;
   email?: string;
-  expo_device_id?: string;
-  created_at: string;
-  updated_at: string;
+  expoDeviceId?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastLoginAt: string;
 }
 
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+  expiresAt?: number; // Unix timestamp in milliseconds
 }
 
 interface LoginResponse {
   user: User;
   access_token: string;
   refresh_token: string;
+  expires_in: number;
 }
 ```
 
@@ -337,7 +358,7 @@ ExploreService.getVoteCounts(articleId: string): Promise<{upvotes, downvotes, us
 ```
 
 **Backend Integration:**
-- Endpoint: `${RECOMMENDER_SERVICE_URL}/api/v1/explore/...`
+- Endpoint: `${getServerUrl()}/api/v1/explore/...` (from `@cairn/shared`)
 - Requires JWT authentication
 - Transforms `BackendArticle` → `Article` interface
 
@@ -356,9 +377,9 @@ ReadService.addURL(request: AddURLRequest): Promise<AddURLResponse>
 ```
 
 **Backend Integration:**
-- Endpoint: `${READ_SERVICE_URL}/api/v1/content/...`
+- Endpoint: `${getServerUrl()}/api/v1/content/...` (from `@cairn/shared`)
 - Requires JWT authentication
-- Supports pagination (limit/offset)
+- Supports cursor-based pagination (limit/cursor)
 - URL detection (feed vs page) with 10s timeout
 
 ## Navigation
@@ -808,7 +829,7 @@ async function handleAction() {
 - **Use `useEffect`** for side effects only
 
 ### Naming Conventions
-- **Components**: PascalCase (e.g., `ArticleCard.tsx`)
+- **Components**: PascalCase (e.g., `ArticleRow.tsx`)
 - **Services**: PascalCase classes (e.g., `AuthService`)
 - **Types/Interfaces**: PascalCase (e.g., `Article`, `LoginResponse`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `API_BASE_URL`)
@@ -845,34 +866,34 @@ async function handleAction() {
 ## Environment Configuration
 
 ### API Configuration
-API endpoints configured in `src/config/api.ts`:
+Unlike the old per-service URL setup, the app now talks to a single backend
+origin via the shared server-URL layer (`@cairn/shared`, wired up in
+`src/config/init.ts`/`src/config/storage.ts`). The default is set in
+`src/config/storage.ts`:
 
 ```typescript
-export const API_CONFIG = {
-  USER_SERVICE_URL: 'https://cairn.seatrain.net',
-  RECOMMENDER_SERVICE_URL: 'https://cairn.seatrain.net',
-  READ_SERVICE_URL: 'https://cairn.seatrain.net',
-  REQUEST_TIMEOUT: 30000,
-};
+export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 ```
 
+All service calls (`getServerUrl()`) resolve to `<server URL>/api/v1/auth/...`,
+`/api/v1/explore/...`, `/api/v1/content/...`, etc. against that single origin.
+
 **For Local Development:**
-Update `src/config/api.ts` to point to local services:
-```typescript
-export const API_CONFIG = {
-  USER_SERVICE_URL: 'http://localhost:8082',
-  RECOMMENDER_SERVICE_URL: 'http://localhost:8081',
-  READ_SERVICE_URL: 'http://localhost:8083',
-  REQUEST_TIMEOUT: 30000,
-};
+Point the app at a single local backend origin — either edit
+`DEFAULT_SERVER_URL` in `src/config/storage.ts`, or use the server URL field on
+the login screen (calls `setServerUrl()` at runtime, no rebuild needed). The
+[self-hosted stack](/infrastructure/docker/selfhost/README.md) runs all
+backend services behind one port for exactly this purpose:
+```
+http://localhost:8099
 ```
 
 **iOS Simulator Note:**
-- Use `http://localhost:PORT` for local services
+- Use `http://localhost:8099` directly
 
 **Android Emulator Note:**
-- Use `http://10.0.2.2:PORT` instead of `localhost`
-- Or use your machine's IP address (e.g., `http://192.168.1.100:PORT`)
+- Use `http://10.0.2.2:8099` instead of `localhost`
+- Or use your machine's IP address (e.g., `http://192.168.1.100:8099`)
 
 ### Expo Configuration
 App configuration in `app.json`:
@@ -945,11 +966,12 @@ BackendArticle → Article
 - id (same)
 - link → url
 - title (same)
-- description || content → description
+- description → description
+- content → content
 - author || feed_title → author
 - published → publishedDate
 - categories → tags
-- Extract image from content → imageUrl
+- Extract image from content/description → imageUrl
 ```
 
 **Read Service:**
@@ -958,9 +980,9 @@ UserContentResponse → Article
 - content.id → id
 - content.original_url → url
 - content.title → title
-- content.description || excerpt → description
-- content.lead_image_url → imageUrl
-- content.author || site_name → author
+- content.description → description
+- content.image_urls[0] → imageUrl
+- content.author → author
 - content.published_at → publishedDate
 - content.word_count / 200 → readingTime
 - status === 'completed' → isRead
@@ -990,7 +1012,7 @@ UserContentResponse → Article
 - Ensure async functions are awaited
 
 **Authentication errors:**
-- Check API endpoint configuration in `src/config/api.ts`
+- Check API endpoint configuration in `src/config/storage.ts` (`DEFAULT_SERVER_URL`)
 - Verify backend services are running
 - Check device ID is being generated correctly
 - Clear stored tokens: AsyncStorage → Delete `@cairn:*` keys

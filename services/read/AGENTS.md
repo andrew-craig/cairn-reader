@@ -11,26 +11,32 @@ The Read service is a microservices-based backend system that provides article s
 **Components**:
 - **Content Service** (`content/`): Stores and serves article content with user-specific metadata (port 8083)
 - **Ingest RSS Service** (`fetcher/`): Manages RSS feed subscriptions and content delivery (port 8085)
+- **Email Ingest Service** (`email/`): Email-to-article ingestion pipeline, delivers into Content Service the same way as Ingest RSS. See [email/CLAUDE.md](/services/read/email/CLAUDE.md) for details.
 
 ## Quick Start
 
 ### Start All Services
 
+There is no `docker-compose.yml` under `services/read/`. The dev topology lives in
+`infrastructure/docker/dev/docker-compose.yml`, which starts every backend service
+(User, Explore, Read, Email Ingest) against one consolidated Postgres container.
+
 ```bash
-cd /home/user/cairn/services/read
+cd /home/user/cairn-reader/infrastructure/docker/dev
 
-# Start services with Docker Compose
-make docker-up
-
-# Or manually
+# Start all services (Read Service + everything else)
 docker compose up -d
 ```
 
-This starts:
-- Content Service (http://localhost:8083)
-- Ingest RSS Service (http://localhost:8085)
-- PostgreSQL databases for both services
-- Background workers for feed polling and content delivery
+This starts, among other services:
+- Content Service (http://localhost:8083, container port 8080)
+- Ingest RSS Service (http://localhost:8085, container port 8081)
+- Email Ingest Service (http://localhost:8089, container port 8087)
+- `cairn-db`: one Postgres container hosting separate logical databases per service
+  (`content_service` for Content Service, `rss_fetcher_service` for Ingest RSS)
+- Background workers for content cleanup, feed polling, and outbox delivery
+
+See [infrastructure/docker/README.md](/infrastructure/docker/README.md) for the full topology.
 
 ### Verify Services
 
@@ -44,31 +50,42 @@ curl http://localhost:8085/health/ready
 
 ### Common Commands
 
+These are the targets actually defined in `services/read/Makefile` (run `make help` for the full list):
+
 ```bash
 # Build services
-make build                   # Build both services
+make build-all                # Build content, content-worker, fetcher, fetcher-worker, email, email-worker
+make build                    # Alias for build-all
+make build-content            # Build content service only
+make build-fetcher             # Build ingest_rss service only
+make build-email               # Build email ingest service only
 
 # Testing
-make test                    # Run all tests
-make test-coverage           # Generate coverage report
-make test-integration        # Run integration tests
+make test-all                 # Run tests for content, fetcher, and email
+make test                     # Alias for test-all
+make test-content             # Run content service tests only
+make test-fetcher              # Run fetcher service tests only
+# Integration tests use the `integration` build tag and TEST_DB_* env vars
+# (see internal/testutil/database.go); run them directly with go test, e.g.:
+cd content && go test -tags=integration ./...
 
 # Database migrations
-make migrate-up              # Apply pending migrations
-make migrate-down            # Rollback last migration
-make migrate-status          # Check migration status
-make migrate-create name=... # Create new migration
+make migrate-up               # Apply pending migrations for content + fetcher
+make migrate-down             # Rollback last migration for content + fetcher
+make migrate-up-content       # Apply pending migrations for content only
+make migrate-create-content name=...  # Create new migration for content
+make migrate-status-content   # Show migration status for content
+# (equivalent *-fetcher targets also exist)
 
-# Docker operations
-make docker-up               # Start services
-make docker-down             # Stop services
-make docker-logs             # Show logs
-make docker-restart          # Restart all services
+# Docker operations (from infrastructure/docker/dev/)
+docker compose up -d          # Start services
+docker compose down           # Stop services
+docker compose logs -f        # Show logs
 
 # Code quality
-make fmt                     # Format Go code
-make vet                     # Run go vet
-make lint                    # Run linter
+make fmt                      # Format Go code (content, fetcher, email)
+make vet                      # Run go vet
+make lint                     # Run fmt + vet
 ```
 
 ## Architecture
@@ -87,11 +104,16 @@ make lint                    # Run linter
 └──────────┬──────────┘         └──────────┬───────────┘
            │                               │
            │                               │
-     ┌─────▼─────┐                   ┌─────▼─────┐
-     │ PostgreSQL│                   │ PostgreSQL│
-     │ (content) │                   │(ingest_rss)│
-     └───────────┘                   └───────────┘
+     ┌─────▼─────┐                   ┌──────────────────┐
+     │ PostgreSQL│                   │    PostgreSQL     │
+     │ (content_ │                   │(rss_fetcher_      │
+     │  service) │                   │      service)     │
+     └───────────┘                   └──────────────────┘
 ```
+
+Both logical databases live in the same consolidated `cairn-db` Postgres container in dev
+(`infrastructure/docker/dev/docker-compose.yml`) — this diagram shows logical isolation, not
+separate containers.
 
 **Key Principles**:
 1. **Service Isolation**: Each service has its own database
@@ -107,14 +129,14 @@ services/read/
 ├── content/                    # Content Service
 │   ├── api/                   # OpenAPI specs
 │   ├── cmd/
-│   │   ├── server/           # HTTP server entry point
-│   │   └── worker/           # Background worker entry point
+│   │   ├── content/          # HTTP server entry point (binary: content)
+│   │   └── worker/           # Background worker entry point (binary: content-worker)
 │   ├── internal/
 │   │   ├── api/              # HTTP handlers, middleware, DTOs
 │   │   ├── repository/       # Database layer
 │   │   ├── service/          # Business logic
 │   │   ├── processor/        # Content processing (readability, sanitization)
-│   │   ├── jobs/             # Background jobs (cleanup)
+│   │   ├── jobs/             # Background jobs (orphaned content cleanup)
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
 │   ├── Dockerfile            # API server image
@@ -124,16 +146,17 @@ services/read/
 ├── fetcher/                   # Ingest RSS Service
 │   ├── api/                   # OpenAPI specs
 │   ├── cmd/
-│   │   ├── server/           # HTTP server entry point
-│   │   └── worker/           # Background worker entry point
+│   │   ├── ingest_rss/       # HTTP server entry point (binary: ingest_rss)
+│   │   └── ingest_rss_worker/ # Background worker entry point (binary: ingest_rss_worker)
 │   ├── internal/
 │   │   ├── api/              # HTTP handlers, middleware, DTOs
 │   │   ├── repository/       # Database layer
 │   │   ├── service/          # Business logic
 │   │   ├── fetcher/          # Feed fetching and parsing
 │   │   ├── processor/        # Content extraction, update detection
-│   │   ├── worker/           # Background workers (outbox, feed polling)
-│   │   ├── jobs/             # Scheduled jobs (cleanup, tier management)
+│   │   ├── worker/           # Background workers (outbox, per-feed fetch pool)
+│   │   ├── scheduler/        # Poll scheduling and tier management
+│   │   ├── jobs/             # Scheduled jobs (outbox cleanup, feed items cleanup, content extraction)
 │   │   ├── client/           # Content Service HTTP client
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
@@ -141,14 +164,14 @@ services/read/
 │   ├── Dockerfile.worker     # Background worker image
 │   └── integration_test.go   # Integration tests
 │
+├── email/                      # Email Ingest Service (see email/CLAUDE.md)
 ├── api/                       # Shared OpenAPI documentation
 ├── scripts/                   # Utility scripts
-├── docker-compose.yml         # Docker Compose configuration
 ├── Makefile                   # Build and development commands
-├── README.md                  # Main documentation
-├── IMPLEMENTATION_PLAN.md     # Implementation details and roadmap
-└── INTEGRATION_TESTS.md       # Integration testing guide
+└── README.md                  # Main documentation
 ```
+
+Note: there is no `docker-compose.yml` under `services/read/` — see [Quick Start](#quick-start) above.
 
 ## Data Models
 
@@ -156,98 +179,101 @@ services/read/
 
 **contents** table:
 ```sql
-id                UUID PRIMARY KEY
-source_url        VARCHAR(2048) NOT NULL UNIQUE
-canonical_url     VARCHAR(2048)
+id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
+content_hash      VARCHAR(64) NOT NULL          -- SHA-256 hash
+cleaned_html      TEXT NOT NULL                 -- Max 5MB, enforced by CHECK constraint
+original_url      TEXT NOT NULL
+canonical_url     TEXT                          -- Normalized URL (future use)
 title             TEXT NOT NULL
-author            VARCHAR(255)
+author            TEXT
 published_at      TIMESTAMP WITH TIME ZONE
-content_html      TEXT NOT NULL
-content_text      TEXT NOT NULL
-excerpt           TEXT
-content_length    INTEGER NOT NULL
-reading_time_mins INTEGER
-source_type       VARCHAR(50) NOT NULL DEFAULT 'manual'
-source_feed_id    VARCHAR(255)
-content_hash      CHAR(64) NOT NULL
-image_url         TEXT
-site_name         VARCHAR(255)
+description       TEXT
+image_urls        TEXT[]                        -- Array of image URLs
+source_type       VARCHAR(50) NOT NULL          -- 'rss', 'web', 'email'
+source_feed_id    UUID                          -- Set for RSS-sourced content
+metadata          JSONB                         -- Free-form, source-specific metadata
 created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-orphaned_at       TIMESTAMP WITH TIME ZONE
+orphaned_at       TIMESTAMP WITH TIME ZONE      -- Set when last user_contents row is deleted
 
--- Indexes
-UNIQUE(content_hash, source_feed_id)  -- Deduplication
-INDEX(source_feed_id)
+-- Constraints & Indexes
+CHECK (octet_length(cleaned_html) <= 5242880)                       -- 5MB, hardcoded (not env-configurable)
+INDEX(content_hash, source_feed_id) WHERE source_type = 'rss'       -- RSS deduplication
 INDEX(orphaned_at) WHERE orphaned_at IS NOT NULL
+INDEX(original_url)
+INDEX(canonical_url) WHERE canonical_url IS NOT NULL
+
+-- Full-text search
+GIN INDEX on (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(author, '')))
 ```
 
 **user_contents** table:
 ```sql
-user_id           VARCHAR(255) NOT NULL
+id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id           UUID NOT NULL                 -- External user ID, not validated here
 content_id        UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE
-status            VARCHAR(50) NOT NULL DEFAULT 'unread'
-is_favorite       BOOLEAN NOT NULL DEFAULT FALSE
-scroll_position   NUMERIC(5,4) DEFAULT 0.0
-notes             TEXT
+status            VARCHAR(20) NOT NULL DEFAULT 'unread'   -- 'unread'|'reading'|'completed'|'archived'
+scroll_position   NUMERIC(5,4) NOT NULL DEFAULT 0.0       -- Fraction [0,1] of article scrolled
+is_favorite       BOOLEAN NOT NULL DEFAULT false
 added_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-read_at           TIMESTAMP WITH TIME ZONE
-archived_at       TIMESTAMP WITH TIME ZONE
+updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
-PRIMARY KEY (user_id, content_id)
-
--- Indexes
-INDEX(user_id, status)
-INDEX(user_id, is_favorite)
+-- Constraints & Indexes
+UNIQUE(user_id, content_id)
+CHECK (status IN ('unread', 'reading', 'completed', 'archived'))
+CHECK (scroll_position >= 0 AND scroll_position <= 1)
 INDEX(user_id, added_at DESC)
+INDEX(user_id, status)
+INDEX(user_id, is_favorite) WHERE is_favorite = true
 INDEX(content_id)  -- For CASCADE DELETE performance
-
--- Full-text search
-GIN INDEX on (to_tsvector('english', title || ' ' || COALESCE(author, '')))
 ```
 
-**Triggers**:
-- **orphaned_content_tracker**: Sets `orphaned_at` when last `user_contents` row is deleted
-- **unorphan_content**: Clears `orphaned_at` when new `user_contents` row is added
+Note: there is no `notes`, `read_at`, or `archived_at` column — only `status`/`added_at`/`updated_at` exist.
+`scroll_position` was originally an `INTEGER` pixel/character offset; migration `000003` converted it to a
+`NUMERIC(5,4)` fraction in `[0,1]` to match what the mobile/web readers actually persist.
 
-### Ingest RSS Service Database (`ingest_rss`)
+**Triggers**:
+- **trg_mark_orphaned**: Sets `contents.orphaned_at` when the last `user_contents` row for that content is deleted
+- **trg_clear_orphaned**: Clears `contents.orphaned_at` when a new `user_contents` row is inserted
+
+### Ingest RSS Service Database (`rss_fetcher_service`)
+
+Note: the actual database name is `rss_fetcher_service` (see `POSTGRES_DB_RSS` in
+`infrastructure/docker/dev/.env.example`), not `ingest_rss`.
 
 **feeds** table:
 ```sql
-id                VARCHAR(255) PRIMARY KEY
-feed_url          VARCHAR(2048) NOT NULL UNIQUE
-title             VARCHAR(500)
-description       TEXT
-site_url          VARCHAR(2048)
-polling_tier      VARCHAR(20) NOT NULL DEFAULT 'tier1'
-status            VARCHAR(20) NOT NULL DEFAULT 'active'
-last_fetched_at   TIMESTAMP WITH TIME ZONE
-last_published_at TIMESTAMP WITH TIME ZONE
-next_poll_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-error_count       INTEGER DEFAULT 0
-consecutive_error_days INTEGER DEFAULT 0
-last_error_at     TIMESTAMP WITH TIME ZONE
-last_error_message TEXT
-http_etag         VARCHAR(255)
-http_last_modified VARCHAR(255)
-created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+id                     UUID PRIMARY KEY DEFAULT gen_random_uuid()
+feed_url               TEXT NOT NULL UNIQUE
+title                  TEXT
+description            TEXT
+site_url               TEXT
+polling_tier           VARCHAR(20) NOT NULL DEFAULT 'active'   -- 'active'|'moderate'|'quiet'
+status                 VARCHAR(20) NOT NULL DEFAULT 'active'   -- 'active'|'disabled'
+last_fetched_at        TIMESTAMP WITH TIME ZONE
+last_published_at      TIMESTAMP WITH TIME ZONE
+next_poll_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+consecutive_error_days INTEGER NOT NULL DEFAULT 0
+last_error_at          TIMESTAMP WITH TIME ZONE
+last_error_message     TEXT
+created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
 -- Indexes
 INDEX(next_poll_at) WHERE status = 'active'
 INDEX(polling_tier)
-INDEX(status)
+INDEX(last_published_at)
 ```
 
-**user_feeds** table:
+**feed_subscriptions** table (this is the actual user↔feed table name — not `user_feeds`):
 ```sql
-user_id           VARCHAR(255) NOT NULL
-feed_id           VARCHAR(255) NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
-subscribed_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+id             UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id        UUID NOT NULL                    -- External user ID
+feed_id        UUID NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
+subscribed_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
-PRIMARY KEY (user_id, feed_id)
-
--- Indexes
+-- Constraints & Indexes
+UNIQUE(user_id, feed_id)
 INDEX(user_id)
 INDEX(feed_id)
 
@@ -256,49 +282,51 @@ INDEX(feed_id)
 
 **feed_items** table:
 ```sql
-id                UUID PRIMARY KEY
-feed_id           VARCHAR(255) NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
-item_guid         VARCHAR(500) NOT NULL
-source_url        VARCHAR(2048) NOT NULL
-title             TEXT NOT NULL
-author            VARCHAR(255)
-published_at      TIMESTAMP WITH TIME ZONE
-description       TEXT
-content_hash      CHAR(64)
-processing_status VARCHAR(20) NOT NULL DEFAULT 'pending'
-http_etag         VARCHAR(255)
-http_last_modified VARCHAR(255)
-last_checked_at   TIMESTAMP WITH TIME ZONE
-retry_count       INTEGER DEFAULT 0
-error_message     TEXT
-created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
+feed_id             UUID NOT NULL REFERENCES feeds(id) ON DELETE CASCADE
+item_url            TEXT NOT NULL
+item_guid           TEXT                         -- RSS GUID if available (nullable)
+processing_status   VARCHAR(20) NOT NULL DEFAULT 'pending'  -- 'pending'|'processing'|'completed'|'failed'
+content_hash        VARCHAR(64)                  -- SHA-256 hash after processing
+content_service_id  UUID                         -- ID returned from Content Service
+title               TEXT
+author              TEXT
+published_at        TIMESTAMP WITH TIME ZONE
+description         TEXT
+http_last_modified  TEXT
+http_etag           TEXT
+last_checked_at     TIMESTAMP WITH TIME ZONE
+retry_count         INTEGER NOT NULL DEFAULT 0
+last_error          TEXT
+discovered_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+processed_at        TIMESTAMP WITH TIME ZONE
 
+-- Constraints & Indexes
 UNIQUE(feed_id, item_guid)
-
--- Indexes
-INDEX(processing_status)
-INDEX(feed_id)
-INDEX(created_at)
+INDEX(processing_status, discovered_at)
+INDEX(feed_id, discovered_at DESC)
+INDEX(feed_id, content_hash) WHERE processing_status = 'completed'
 ```
 
 **content_outbox** table:
 ```sql
-id                UUID PRIMARY KEY
-feed_item_id      UUID REFERENCES feed_items(id) ON DELETE CASCADE
-payload           JSONB NOT NULL
-user_ids          TEXT[] NOT NULL
-delivery_status   VARCHAR(20) NOT NULL DEFAULT 'pending'
-content_service_id UUID
-retry_count       INTEGER DEFAULT 0
+id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
+feed_item_id      UUID NOT NULL REFERENCES feed_items(id) ON DELETE CASCADE
+content_payload   JSONB NOT NULL                 -- Full content payload for Content Service API
+user_ids          UUID[] NOT NULL                -- Array of user IDs to deliver to
+delivery_status   VARCHAR(20) NOT NULL DEFAULT 'pending'  -- 'pending'|'sending'|'delivered'|'failed'
+retry_count       INTEGER NOT NULL DEFAULT 0
+max_retries       INTEGER NOT NULL DEFAULT 6
 next_retry_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 last_error        TEXT
+content_service_id UUID                          -- ID returned from Content Service on success
 created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 delivered_at      TIMESTAMP WITH TIME ZONE
 
 -- Indexes
-INDEX(delivery_status, next_retry_at) WHERE delivery_status = 'pending'
-INDEX(created_at)
+INDEX(next_retry_at) WHERE delivery_status IN ('pending', 'sending')
+INDEX(delivery_status, created_at)
+INDEX(feed_item_id)
 ```
 
 ## API Endpoints
@@ -317,20 +345,25 @@ POST /api/v1/content/detect                          → Detect if URL is feed o
      Body: {"url": "https://example.com"}
      Returns: {"url": "...", "type": "feed|page|unknown", "title": "..."}
      Timeout: 10 seconds
+
+POST /api/v1/content/discover-feed                    → Discover an RSS/Atom feed for a page URL
 ```
 
 **Content Management**:
 ```
 POST   /api/v1/content                               → Create content from HTML/URL
-       Body: {"html": "...", "source_url": "...", "title": "...", "source_type": "manual"}
+       Body: {"url": "...", "html": "...", "source_type": "rss|web|email",
+              "source_feed_id": "...", "published_at": "..."}
+       Note: no "title" field here — title is extracted from the HTML, not passed in
 
 GET    /api/v1/content/{content_id}                  → Get content by ID
 
 PUT    /api/v1/content/{content_id}                  → Update existing content
-       Body: {"html": "...", "title": "...", ...}
+       Body: {"url": "...", "html": "...", "published_at": "..."}
 
 POST   /api/v1/content/bulk                          → Bulk create/update (max 100)
-       Body: [{"html": "...", "source_url": "...", ...}, ...]
+       Body: [{"url": "...", "html": "...", "source_type": "rss|web|email",
+               "source_feed_id": "...", "title": "...", "author": "..."}, ...]
 
 POST   /api/v1/content/check-duplicate               → Check for duplicates
        Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
@@ -355,24 +388,37 @@ GET    /api/v1/content/user/{user_id}/search         → Full-text search
        Query: ?q=golang, ?limit=20, ?offset=0
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
+GET    /api/v1/content/user/{user_id}/{content_id}   → Get a single user-content item (full HTML body)
+       Auth: Bearer <JWT token>
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content
+
 PATCH  /api/v1/content/user/{user_id}/{content_id}   → Update user metadata
        Auth: Bearer <JWT token>
-       Body: {"status": "reading|completed|archived", "is_favorite": true,
-              "scroll_position": 0.5, "notes": "..."}
+       Body: {"status": "unread|reading|completed|archived", "is_favorite": true,
+              "scroll_position": 0.5}
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 DELETE /api/v1/content/user/{user_id}/{content_id}   → Remove from user's list
        Auth: Bearer <JWT token>
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
+GET    /api/v1/content/user/{user_id}/subscriptions  → List all subscriptions (RSS + email) for the user
+       Auth: Bearer <JWT token>
+       Note: Aggregates results from Ingest RSS and Email Ingest services
+
+DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id} → Unsubscribe from an RSS feed
+       Auth: Bearer <JWT token>
+       Note: Proxies to Ingest RSS Service
+
 POST   /api/v1/content/user/bulk                     → Bulk add to authenticated user
        Auth: Bearer <JWT token>
        Body: [{"url": "...", ...}, ...]
        Returns: 401 if missing/invalid token, 403 if trying to add to other users
 
-POST   /api/v1/internal/content/user/bulk            → Bulk add (internal - no auth)
+POST   /api/v1/internal/content/user/bulk            → Bulk add (internal service-to-service)
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY) — NOT unauthenticated
        Body: [{"user_id": "...", "url": "...", ...}, ...]
-       Note: Used by internal services (Ingest RSS) only
+       Note: Used by internal services (Ingest RSS, Email Ingest) only
 ```
 
 ### Ingest RSS Service (port 8085)
@@ -393,17 +439,16 @@ DELETE /api/v1/source/rss/user/{user_id}/subscription/{feed_id} → Unsubscribe
 GET    /api/v1/source/rss/user/{user_id}/subscription          → List user's feeds
 ```
 
-**Feed Management (Admin)**:
+**Feed Management**:
 ```
-GET    /api/v1/source/rss/feed                                 → List all feeds
-
-GET    /api/v1/source/rss/feed/{feed_id}                       → Get feed details
-
-PATCH  /api/v1/source/rss/feed/{feed_id}                       → Enable/disable feed
-       Body: {"enabled": true|false}
-
-POST   /api/v1/source/rss/feed/{feed_id}/refresh               → Manually trigger refresh
+PATCH  /api/v1/source/rss/feed/{feed_id}                       → Enable feed
+       Body: {"enabled": true}
+       Note: {"enabled": false} is accepted but currently a no-op (disabling isn't wired up yet)
 ```
+
+Note: there is no `GET /api/v1/source/rss/feed` (list all), `GET /api/v1/source/rss/feed/{feed_id}`
+(get details), or `POST /api/v1/source/rss/feed/{feed_id}/refresh` endpoint — these are not
+implemented in `fetcher/internal/api/router.go`.
 
 ## JWT Authentication
 
@@ -423,8 +468,11 @@ All routes under `/api/v1/content/user/{user_id}` are protected and require:
 - `GET /api/v1/content/user/{user_id}` - List user contents
 - `POST /api/v1/content/user/{user_id}` - Add content to user
 - `GET /api/v1/content/user/{user_id}/search` - Search user contents
+- `GET /api/v1/content/user/{user_id}/{content_id}` - Get a single user-content item
 - `PATCH /api/v1/content/user/{user_id}/{content_id}` - Update content metadata
 - `DELETE /api/v1/content/user/{user_id}/{content_id}` - Delete from user
+- `GET /api/v1/content/user/{user_id}/subscriptions` - List all subscriptions
+- `DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}` - Unsubscribe from RSS feed
 - `POST /api/v1/content/user/bulk` - Bulk add for authenticated user
 
 ### Public Routes (No Auth)
@@ -437,7 +485,9 @@ All routes under `/api/v1/content/user/{user_id}` are protected and require:
 - `PUT /api/v1/content/{content_id}` - Update content (internal)
 - `POST /api/v1/content/bulk` - Bulk create (internal)
 - `POST /api/v1/content/check-duplicate` - Check duplicates (internal)
-- `POST /api/v1/internal/content/user/bulk` - Bulk add by internal services
+
+Note: `POST /api/v1/internal/content/user/bulk` is NOT public — it lives under `/api/v1/internal`,
+which requires the `X-Internal-API-Key` header (see Internal Service Integration below).
 
 ### Configuration
 
@@ -468,7 +518,7 @@ Each protected handler checks:
 
 Example from `user_content_handler.go`:
 ```go
-authenticatedUserID := auth.MustGetUserID(r.Context())  // From JWT
+authenticatedUserID, err := auth.GetUserIDOrError(r.Context())  // From JWT
 requestedUserID, err := uuid.Parse(chi.URLParam(r, "user_id"))
 
 if authenticatedUserID != requestedUserID {
@@ -490,13 +540,19 @@ if authenticatedUserID != requestedUserID {
 
 ### Internal Service Integration
 
-The Ingest RSS Service calls the internal bulk endpoint which does NOT require authentication:
+The Ingest RSS Service (and Email Ingest Service) call the internal bulk endpoint using a shared
+API key instead of a JWT:
 
 ```bash
 POST /api/v1/internal/content/user/bulk
+Header: X-Internal-API-Key: <INTERNAL_API_KEY>
 ```
 
-This endpoint allows Ingest RSS to add content to users without providing JWT tokens. It's marked as internal-only and should not be exposed to clients.
+This endpoint lets internal services add content to users without providing JWT tokens, but it is
+still authenticated — requests must present the correct `X-Internal-API-Key` header (validated by
+`internalAuthMiddleware.RequireInternalAPIKey`, see `pkg/auth/internal_auth.go`), and the Content
+Service refuses to start without `INTERNAL_API_KEY` configured. It's marked as internal-only and
+should not be exposed to clients.
 
 ## Key Implementation Details
 
@@ -521,6 +577,9 @@ Content is deduplicated using: `(content_hash, source_feed_id)`
 - Same hash + same feed = duplicate (skip)
 - Same hash + different feed = not duplicate (store)
 - Multiple users can share the same content with individual metadata
+- Enforced via the `POST /api/v1/content/check-duplicate` endpoint at the application level, backed
+  by a partial index `(content_hash, source_feed_id) WHERE source_type = 'rss'` — not a DB-level
+  UNIQUE constraint
 
 ### Feed Polling Strategy
 
@@ -535,8 +594,9 @@ Content is deduplicated using: `(content_hash, source_feed_id)`
 - Updates `next_poll_at` accordingly
 
 **Key Files**:
-- `fetcher/internal/worker/feed_worker.go`
-- `fetcher/internal/jobs/tier_management_job.go`
+- `fetcher/internal/scheduler/poll_scheduler.go` (polling loop, tier intervals, promotion)
+- `fetcher/internal/scheduler/tier_manager.go` (daily tier re-evaluation by activity)
+- `fetcher/internal/worker/feed_worker.go` (per-feed fetch worker pool)
 
 ### Content Update Detection
 
@@ -571,7 +631,7 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 - After 6 retries: Mark as failed
 
 **Circuit Breaker**:
-- Opens after 5 consecutive failures
+- Opens once at least 5 requests have been made and ≥60% of them failed
 - Half-open after 30 seconds
 - Prevents overwhelming a failing Content Service
 
@@ -621,7 +681,7 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 **Tier Management Job**:
 - **Schedule**: Daily
 - **Purpose**: Adjust feed tiers based on activity
-- **Location**: `fetcher/internal/jobs/tier_management_job.go`
+- **Location**: `fetcher/internal/scheduler/tier_manager.go`
 
 **Outbox Cleanup Job**:
 - **Schedule**: Daily at 3 AM
@@ -638,24 +698,29 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 ### Running Tests
 
 ```bash
-# Run all unit tests
+# Run all unit tests (make test / make test-all — content + fetcher + email)
 make test
-go test ./...
 
-# Run with coverage
-make test-coverage
-
-# Run integration tests (requires PostgreSQL)
-make test-integration
-
-# Run tests for specific service
+# Run tests for a specific service
+make test-content
+make test-fetcher
 cd content && go test ./...
 cd fetcher && go test ./...
+
+# Run integration tests (requires PostgreSQL; set TEST_DB_* env vars, see internal/testutil/database.go)
+cd content && go test -tags=integration ./...
+cd fetcher && go test -tags=integration ./...
 
 # Run specific package tests
 go test ./content/internal/service/...
 go test -v ./fetcher/internal/worker/...
+
+# Coverage (no dedicated make target — use go test directly)
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
 ```
+
+Note: `make test-coverage` and `make test-integration` are not defined in the Makefile.
 
 ### Test Organization
 
@@ -794,28 +859,53 @@ mock.ExpectQuery("SELECT").WillReturnRows(...)
 
 ## Environment Variables
 
+There is no `DATABASE_URL` connection-string variable — both services (and the shared
+`pkg/config` package they use) read discrete `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`
+variables. The port variable is `PORT`, not `SERVER_PORT`. `MAX_CONTENT_SIZE` (5MB) and the
+90-day orphaned-content cutoff are hardcoded constants, not environment variables — see
+`content/internal/processor/content.go` and `content/internal/jobs/cleanup_job.go`. Likewise,
+the 100-feed-per-user limit, the 7-day error auto-disable threshold, and the tiered polling
+intervals (1h/6h/24h) are hardcoded in the fetcher (`fetcher/internal/scheduler/`), not configurable
+via env vars.
+
 ### Content Service
 
 ```bash
-DATABASE_URL=postgres://user:pass@localhost:5432/content_service?sslmode=disable
-SERVER_PORT=8083
+PORT=8080                              # Container port; mapped to host 8083 in dev docker-compose
+DB_HOST=cairn-db
+DB_PORT=5432
+DB_USER=cairn_content
+DB_PASSWORD=...
+DB_NAME=content_service
 LOG_LEVEL=info
-MAX_CONTENT_SIZE=5242880       # 5MB limit
-ORPHANED_CONTENT_DAYS=90       # Delete after 90 days
+VAULT_ADDR=http://vault:8200
+VAULT_TOKEN=...                        # Or VAULT_ROLE_ID / VAULT_SECRET_ID for AppRole auth
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
+INTERNAL_API_KEY=...                   # Required; validates X-Internal-API-Key on /api/v1/internal
 ```
 
 ### Ingest RSS Service
 
 ```bash
-DATABASE_URL=postgres://user:pass@localhost:5433/ingest_rss?sslmode=disable
-SERVER_PORT=8085
-CONTENT_SERVICE_URL=http://content-service:8083
+PORT=8081                              # Container port; mapped to host 8085 in dev docker-compose
+DB_HOST=cairn-db
+DB_PORT=5432
+DB_USER=cairn_rss
+DB_PASSWORD=...
+DB_NAME=rss_fetcher_service
 LOG_LEVEL=info
-MAX_FEEDS_PER_USER=100
-FEED_ERROR_THRESHOLD=7         # Days before disabling feed
-POLL_INTERVAL_TIER1=1h         # Active feeds
-POLL_INTERVAL_TIER2=6h         # Moderate feeds
-POLL_INTERVAL_TIER3=24h        # Quiet feeds
+```
+
+### Ingest RSS Worker (`cmd/ingest_rss_worker`)
+
+```bash
+CONTENT_SERVICE_URL=http://content-service:8080
+INTERNAL_API_KEY=...                   # Sent as X-Internal-API-Key when calling Content Service
+OUTBOX_CLEANUP_CRON=0 3 * * *
+FEED_ITEMS_CLEANUP_CRON=0 4 * * *
+HEALTH_PORT=8083                       # Default; dev docker-compose overrides to 8086
 ```
 
 ## Database Migrations
@@ -825,8 +915,9 @@ Migrations use `golang-migrate` with numbered SQL files.
 ### Creating Migrations
 
 ```bash
-# Create new migration
-make migrate-create name=add_user_notes
+# Create new migration (per-service targets — there is no combined migrate-create)
+make migrate-create-content name=add_user_notes
+make migrate-create-fetcher name=add_feed_field
 
 # This creates:
 # content/migrations/NNN_add_user_notes.up.sql
@@ -852,20 +943,21 @@ ALTER TABLE existing_table DROP COLUMN new_column;
 ### Running Migrations
 
 ```bash
-# Apply all pending migrations
+# Apply all pending migrations (both services)
 make migrate-up
 
-# Rollback last migration
+# Rollback last migration (both services)
 make migrate-down
 
-# Check current migration version
-make migrate-status
-
-# Force to specific version
-make migrate-force version=5
+# Check current migration version (per-service — there is no combined migrate-status)
+make migrate-status-content
+make migrate-status-fetcher
 ```
 
-**Important**: Migrations run automatically on service startup in Docker.
+Note: there is no `make migrate-force` target in this Makefile.
+
+**Important**: Migrations run automatically on service startup (`database.RunMigrations` in
+`content/cmd/content/main.go` and `fetcher/cmd/ingest_rss/main.go`).
 
 ## Technology Stack
 
@@ -910,7 +1002,7 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 
 ### Adding a New Database Table
 
-1. **Create migration** with `make migrate-create name=add_table`
+1. **Create migration** with `make migrate-create-content name=add_table` (or `migrate-create-fetcher`)
 2. **Write up migration** (`NNN_add_table.up.sql`)
 3. **Write down migration** (`NNN_add_table.down.sql`)
 4. **Run migration** with `make migrate-up`
@@ -928,13 +1020,13 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
        Name() string
    }
    ```
-3. **Register job** in `cmd/worker/main.go`
+3. **Register job** in the relevant worker entry point (`content/cmd/worker/main.go` or `fetcher/cmd/ingest_rss_worker/main.go`)
 4. **Add cron schedule** if needed
 5. **Write job tests**
 
 ### Debugging
 
-**View logs**:
+**View logs** (from `infrastructure/docker/dev/`):
 ```bash
 # All services
 docker compose logs -f
@@ -947,13 +1039,14 @@ docker compose logs -f ingest-rss
 docker compose logs -f | grep ERROR
 ```
 
-**Access database**:
+**Access database**: dev uses one consolidated `cairn-db` Postgres container with separate
+logical databases per service — there is no `postgres-content`/`postgres-fetcher` container:
 ```bash
 # Content Service database
-docker compose exec postgres-content psql -U cairn -d content_service
+docker compose exec cairn-db psql -U cairn_content -d content_service
 
 # Ingest RSS database
-docker compose exec postgres-fetcher psql -U cairn -d ingest_rss
+docker compose exec cairn-db psql -U cairn_rss -d rss_fetcher_service
 ```
 
 **Useful SQL queries**:
@@ -1007,12 +1100,13 @@ When updating content:
 
 ## Documentation References
 
-- **Main README**: `/services/read/README.md` - Comprehensive service documentation
-- **Implementation Plan**: `/services/read/IMPLEMENTATION_PLAN.md` - Detailed implementation roadmap
-- **Integration Tests**: `/services/read/INTEGRATION_TESTS.md` - Integration testing guide
+- **Main README**: `/services/read/README.md` - Service documentation (also drifted in places — trust this file and the Go source over it)
+- **Email Ingest Service**: `/services/read/email/CLAUDE.md` - Third sub-service under this directory
 - **Content Service API**: `/services/read/content/api/openapi.yaml` - OpenAPI specification
 - **Ingest RSS API**: `/services/read/fetcher/api/openapi.yaml` - OpenAPI specification
 - **Root CLAUDE.md**: `/CLAUDE.md` - Project-wide guidance and conventions
+
+Note: `IMPLEMENTATION_PLAN.md` and `INTEGRATION_TESTS.md` do not exist in this directory.
 
 ## Status & Roadmap
 
@@ -1028,10 +1122,10 @@ When updating content:
 - ✅ **JWT Authentication** (Phase 6) - User-content access control with RS256 token validation
 
 **Remaining Work**:
-- 🔲 API documentation (OpenAPI/Swagger UI)
+- 🔲 API documentation (OpenAPI/Swagger UI) — specs exist (`api/openapi.yaml`) but no served UI
 - 🔲 Production observability (metrics, structured logging)
 - 🔲 Performance optimization
-- 🔲 Security hardening (rate limiting, CORS)
+- 🔲 Rate limiting (CORS is already applied via `pkg/middleware` in both routers)
 
 **Future Enhancements**:
 - Recommendation engine
@@ -1042,8 +1136,8 @@ When updating content:
 ## Getting Help
 
 For issues or questions:
-- Check logs: `docker compose logs -f`
-- Check database state: `docker compose exec postgres-content psql -U cairn -d content_service`
+- Check logs: `docker compose logs -f` (from `infrastructure/docker/dev/`)
+- Check database state: `docker compose exec cairn-db psql -U cairn_content -d content_service`
 - Review tests for usage examples
 - Consult OpenAPI specifications for API details
 - See troubleshooting guide: `/services/read/README.md#troubleshooting`

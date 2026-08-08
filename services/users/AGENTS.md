@@ -31,7 +31,7 @@ The easiest way to run all Cairn backend services (including User Service) is us
 
 ```bash
 # From repository root
-cd infrastructure/docker
+cd infrastructure/docker/dev
 
 # Copy and configure environment variables
 cp .env.example .env
@@ -58,8 +58,9 @@ For development focused on the User Service:
 cd services/users
 
 # 1. Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# No .env.example ships in this directory - set the variables listed under
+# "Environment Variables" below directly (a .env file is picked up automatically
+# via godotenv if present)
 
 # 2. Set up PostgreSQL database
 createdb cairn_users
@@ -187,32 +188,26 @@ services/users/
 │   │   ├── health.go        # Health checks
 │   │   └── router.go        # Route setup
 │   ├── middleware/          # HTTP middleware
-│   │   ├── authorization.go # JWT validation and user authorization
-│   │   ├── cors.go          # CORS headers
-│   │   ├── rate_limit.go    # Rate limiting
-│   │   ├── security.go      # Security headers
-│   │   └── recovery.go      # Panic recovery
+│   │   └── authorization.go # JWT validation and user authorization
 │   ├── models/              # Data models
 │   │   ├── user.go
 │   │   └── refresh_token.go
 │   └── services/            # Business logic layer
 │       ├── auth_service.go
 │       └── user_service.go
-├── pkg/                     # Public libraries (shared with other services)
-│   └── auth/               # Shared JWT validation library
-│       └── middleware.go   # JWT validation middleware for other services
-├── migrations/             # Database migrations
-│   ├── 001_init.sql
-│   ├── 002_add_indexes.sql
+├── migrations/             # Database migrations (golang-migrate up/down pairs)
+│   ├── 000001_create_users_table.up.sql
+│   ├── 000001_create_users_table.down.sql
 │   └── ...
 ├── api/
 │   └── openapi.yaml        # OpenAPI 3.0 specification
-├── .env.example            # Example environment configuration
 ├── Dockerfile              # Multi-stage Docker build
 ├── Makefile                # Build and development commands
 ├── README.md               # Service documentation
 └── CLAUDE.md              # This file
 ```
+
+CORS, rate limiting, security headers, and panic recovery come from the shared `pkg/middleware/` module at the repo root (`sharedmw.CORS`, `sharedmw.RateLimit`, `sharedmw.SecureHeadersRelaxed`, `sharedmw.Recovery` in `router.go`), not from a package inside `services/users/`. Likewise, JWT validation for other services is the shared `pkg/auth/` module at the repo root — there is no `pkg/` directory inside `services/users/`.
 
 ## Data Models
 
@@ -221,13 +216,17 @@ services/users/
 **users** table:
 ```sql
 CREATE TABLE users (
-    id VARCHAR(255) PRIMARY KEY,          -- User ID (UUID or external ID)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE,            -- Email (nullable for mobile-only)
     password_hash VARCHAR(255),           -- bcrypt hash (nullable for mobile-only)
     expo_device_id VARCHAR(255) UNIQUE,   -- Expo device ID (nullable for email-only)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_login_at TIMESTAMP WITH TIME ZONE
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
+    last_failed_login_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Indexes
@@ -238,11 +237,12 @@ CREATE INDEX idx_users_expo_device_id ON users(expo_device_id) WHERE expo_device
 **refresh_tokens** table:
 ```sql
 CREATE TABLE refresh_tokens (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash VARCHAR(255) NOT NULL,     -- SHA-256 hash of refresh token
-    device_info VARCHAR(500),
+    device_info TEXT,
     ip_address VARCHAR(45),
+    token_family UUID,                    -- Groups tokens from the same rotation chain (reuse detection)
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -252,7 +252,10 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
+CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
 ```
+
+There are also `email_verification_tokens` and `password_reset_tokens` tables (added in migrations 000005 and 000006) backing the email verification and password reset endpoints below.
 
 ### Account Types
 
@@ -363,6 +366,29 @@ curl -X POST http://localhost:8082/api/v1/auth/logout-all \
   -H "Authorization: Bearer <JWT>"
 ```
 
+**Email verification**:
+```bash
+# Resend verification email (requires auth)
+curl -X POST http://localhost:8082/api/v1/auth/resend-verification \
+  -H "Authorization: Bearer <JWT>"
+
+# Verify email with token (also accepts GET with ?token= for email links)
+curl -X POST http://localhost:8082/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token": "verification-token-here"}'
+```
+
+**Password reset**:
+```bash
+curl -X POST http://localhost:8082/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+
+curl -X POST http://localhost:8082/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token": "reset-token-here", "password": "newsecurepass123"}'
+```
+
 ### User Management Endpoints (Authenticated)
 
 **Get user profile**:
@@ -403,6 +429,17 @@ curl -X POST http://localhost:8082/api/v1/user/{user_id}/upgrade \
 # User must authenticate with email/password
 ```
 
+**Change password**:
+```bash
+curl -X PUT http://localhost:8082/api/v1/user/{user_id}/password \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "current_password": "securepass123",
+    "new_password": "newsecurepass123"
+  }'
+```
+
 **Delete account**:
 ```bash
 curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
@@ -414,21 +451,26 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 ### JWT Authentication (`internal/auth/jwt.go`)
 
 **Token Generation**:
-- Algorithm: RS256 (2048-bit RSA keys)
-- Lifetime: 15 minutes (configurable via `JWT_ACCESS_LIFETIME`)
-- Claims: `user_id`, `iat` (issued at), `exp` (expires at)
+- Algorithm: RS256 (2048-bit RSA keys), with a `kid` header identifying the signing key for rotation
+- Lifetime: 15 minutes (configurable via `JWT_ACCESS_TOKEN_EXPIRY`; code default is 60 minutes if unset)
+- Claims: `user_id` (custom) plus standard registered claims - `iss`, `aud`, `sub`, `iat`, `exp`, `nbf`
 - Keys stored in HashiCorp Vault
 
 **Token Validation**:
 - Stateless validation using public key
 - No database lookups required
+- Issuer (`cairn-user-service`) and audience (`cairn-api`) are validated, not just the signature
 - Other services validate independently using shared public key
 
 **JWT Structure**:
 ```json
 {
   "user_id": "uuid-here",
+  "iss": "cairn-user-service",
+  "aud": ["cairn-api"],
+  "sub": "uuid-here",
   "iat": 1704801600,
+  "nbf": 1704801600,
   "exp": 1704805200
 }
 ```
@@ -438,7 +480,7 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 **Token Generation**:
 - Cryptographically random 32-byte token (base64-encoded)
 - SHA-256 hashed before database storage
-- Lifetime: 7 days (configurable via `JWT_REFRESH_LIFETIME`)
+- Lifetime: 7 days (configurable via `JWT_REFRESH_TOKEN_EXPIRY`; code default is 30 days if unset)
 
 **Token Rotation**:
 1. Client sends refresh token to `/auth/refresh`
@@ -465,7 +507,7 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 - Cost factor: 12 (configurable, minimum 12 for production)
 - Password requirements:
   - Minimum length: 8 characters
-  - No complexity requirements by default (configurable)
+  - Complexity required by default (uppercase, lowercase, digit, and special character; toggle via `REQUIRE_PASSWORD_COMPLEXITY`)
 
 **Validation**:
 ```go
@@ -510,16 +552,15 @@ JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 ```
 
-### Authorization Middleware (`internal/middleware/authorization.go`)
+### Authorization
 
 **Purpose**: Ensures users can only access their own resources
 
-**Flow**:
-1. Extract JWT from `Authorization: Bearer <token>` header
-2. Validate JWT signature using public key
-3. Extract `user_id` from JWT claims
-4. Compare `user_id` from claims with `user_id` from URL path
-5. Return 403 Forbidden if mismatch
+**Flow** (split across two layers, not a single middleware):
+1. `pkg/auth`'s `RequireAuth` middleware (wired onto the `/api/v1/user` route group in `router.go`) extracts the JWT from `Authorization: Bearer <token>`, validates its RS256 signature against the public key, and stores `user_id` from the claims on the request context.
+2. Each `UserHandler` method (`internal/handlers/user_handler.go`) reads that authenticated `user_id` and the `{user_id}` path parameter, then calls into `UserService`, passing both. The service layer compares them and returns `services.ErrUnauthorized`, which the handler maps to `403 Forbidden`, on mismatch.
+
+Note: `internal/middleware/authorization.go` defines `RequireSameUser`/`RequireOwnership` helper middleware for this same purpose, but it is not wired into `router.go` anywhere — the actual ownership check happens in the service layer as described above, and this file is currently dead code.
 
 **Example**:
 ```go
@@ -532,20 +573,18 @@ JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 // Result: 200 OK (user can access own data)
 ```
 
-### Rate Limiting (`internal/middleware/rate_limit.go`)
+### Rate Limiting (`pkg/middleware/rate_limit.go`)
 
 **Purpose**: Prevent brute force attacks on authentication endpoints
 
 **Configuration**:
-- Auth endpoints: 10 requests per minute per IP
-- User endpoints: 60 requests per minute per IP
+- Applies to the entire `/api/v1/auth/*` route group per IP (single limit, not split by endpoint); `/api/v1/user/*` endpoints are not rate limited
+- Limit and window are configurable via `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` (default: 100 requests per 1 minute); the router falls back to 10/minute only if `RATE_LIMIT_REQUESTS` resolves to 0
 - Uses in-memory store (consider Redis for multi-instance deployments)
 
-**Protected Endpoints**:
-- `/api/v1/auth/login`
-- `/api/v1/auth/login/mobile`
-- `/api/v1/auth/register`
-- `/api/v1/auth/register/mobile`
+**Protected Endpoints** (all routes under `/api/v1/auth`):
+- `/register`, `/register/mobile`, `/login`, `/login/mobile`, `/refresh`, `/logout`, `/logout-all`
+- `/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`
 
 ### Mobile Device Authentication
 
@@ -700,11 +739,12 @@ make migrate-version
 
 **Create new migration**:
 ```bash
-# Add new SQL file to migrations/ directory
-# migrations/003_add_new_column.sql
+# Add a numbered up/down pair to migrations/ (golang-migrate convention)
+# migrations/000007_add_new_column.up.sql
 ALTER TABLE users ADD COLUMN new_column TEXT;
 
-# Update migration runner in internal/database/migrate.go if needed
+# migrations/000007_add_new_column.down.sql
+ALTER TABLE users DROP COLUMN new_column;
 ```
 
 **Access database directly**:
@@ -869,8 +909,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 ```bash
 # Server Configuration
-PORT=8082                                    # HTTP server port
-SERVER_ENVIRONMENT=development               # Environment mode (development, production)
+PORT=8080                                    # HTTP server port (default: 8080; dev docker-compose maps host 8082 -> container 8080)
+ENVIRONMENT=development                      # Environment mode (development, production)
 
 # Database Configuration
 DB_HOST=localhost                            # PostgreSQL host
@@ -887,22 +927,20 @@ JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key  # Vault path to private key
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key    # Vault path to public key
 
 # JWT Configuration
-JWT_ACCESS_LIFETIME=15m                      # Access token lifetime (default: 15 minutes)
-JWT_REFRESH_LIFETIME=7d                      # Refresh token lifetime (default: 7 days)
+JWT_ACCESS_TOKEN_EXPIRY=15m                  # Access token lifetime (code default: 60 minutes if unset)
+JWT_REFRESH_TOKEN_EXPIRY=7d                  # Refresh token lifetime (code default: 30 days if unset)
 
 # Password Security
 BCRYPT_COST=12                               # bcrypt cost factor (minimum 12)
-PASSWORD_MIN_LENGTH=8                        # Minimum password length
+MIN_PASSWORD_LENGTH=8                        # Minimum password length
+REQUIRE_PASSWORD_COMPLEXITY=true             # Require upper/lower/digit/special char (code default: true)
 
-# Rate Limiting
-RATE_LIMIT_AUTH=10                           # Auth requests per minute per IP
-RATE_LIMIT_USER=60                           # User requests per minute per IP
-
-# CORS Configuration
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:19006  # Comma-separated origins
-CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
-CORS_ALLOWED_HEADERS=Content-Type,Authorization
+# Rate Limiting (applies to the /api/v1/auth/* route group only; /api/v1/user/* is not rate limited)
+RATE_LIMIT_REQUESTS=100                      # Requests per window per IP (code default: 100)
+RATE_LIMIT_WINDOW=1m                         # Rate limit window (code default: 1 minute)
 ```
+
+Note: CORS is currently hardcoded to a permissive development configuration (`pkg/middleware.DefaultCORSConfig()`, allow-origin `*`) and is not configurable via environment variables for this service.
 
 ## Common Development Tasks
 
@@ -969,22 +1007,17 @@ paths:
 
 ### Adding Database Migration
 
-**1. Create migration file**:
+**1. Create migration files** (golang-migrate up/down pair):
 ```sql
--- migrations/004_add_email_verification.sql
-ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN verification_token VARCHAR(255);
-CREATE INDEX idx_users_verification_token ON users(verification_token);
+-- migrations/000007_add_display_name.up.sql
+ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
+```
+```sql
+-- migrations/000007_add_display_name.down.sql
+ALTER TABLE users DROP COLUMN display_name;
 ```
 
-**2. Update migration runner**:
-```go
-// internal/database/migrate.go
-// If using file-based migrations, just add the file
-// If using code-based migrations, add to migration list
-```
-
-**3. Test migration**:
+**2. Test migration**:
 ```bash
 # Apply migration
 make migrate-up
@@ -996,18 +1029,17 @@ psql -U cairn_user -d cairn_users -c "\d users"
 make migrate-down
 ```
 
-**4. Update models**:
+**3. Update models**:
 ```go
 // internal/models/user.go
 type User struct {
-    ID                string
-    Email             string
-    PasswordHash      string
-    ExpoDeviceID      string
-    EmailVerified     bool       // New field
-    VerificationToken string     // New field
-    CreatedAt         time.Time
-    UpdatedAt         time.Time
+    ID           uuid.UUID
+    Email        *string
+    PasswordHash *string
+    ExpoDeviceID *string
+    DisplayName  *string    // New field
+    CreatedAt    time.Time
+    UpdatedAt    time.Time
 }
 ```
 
@@ -1169,7 +1201,7 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 - Minimum bcrypt cost: 12 (production)
 - Never log passwords or hashes
 - Enforce minimum password length (8+ characters)
-- Consider password complexity requirements
+- Password complexity (upper/lower/digit/special char) required by default; toggle via `REQUIRE_PASSWORD_COMPLEXITY`
 
 **JWT Security**:
 - RS256 algorithm only (not HS256)
@@ -1185,16 +1217,15 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 - Revoke all tokens on suspected compromise
 
 **Transport Security**:
-- HTTPS required in production
-- Secure cookies for refresh tokens (httpOnly, secure, sameSite)
-- CORS properly configured
+- HTTPS required in production (`RequireHTTPS` middleware)
+- Tokens are returned in the JSON response body, not as cookies
+- CORS currently hardcoded to a permissive dev configuration (see Environment Variables note above)
 - Security headers (CSP, HSTS, X-Frame-Options)
 
 **Rate Limiting**:
-- 10 requests/minute on auth endpoints (prevent brute force)
-- 60 requests/minute on user endpoints
-- Consider IP-based and user-based limits
-- Use Redis for distributed rate limiting
+- 100 requests/minute (default) on the `/api/v1/auth/*` route group, IP-based (prevent brute force)
+- `/api/v1/user/*` endpoints are not rate limited
+- Use Redis for distributed rate limiting (not yet implemented; in-memory only today)
 
 ### Cross-Service Integration
 
@@ -1229,21 +1260,21 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 **Mobile-only account**:
 ```go
 func (u *User) IsMobileOnly() bool {
-    return u.ExpoDeviceID != "" && u.Email == "" && u.PasswordHash == ""
+    return u.ExpoDeviceID != nil && u.Email == nil && u.PasswordHash == nil
 }
 ```
 
 **Email-only account**:
 ```go
 func (u *User) IsEmailOnly() bool {
-    return u.Email != "" && u.PasswordHash != "" && u.ExpoDeviceID == ""
+    return u.Email != nil && u.PasswordHash != nil && u.ExpoDeviceID == nil
 }
 ```
 
 **Hybrid account** (after upgrade):
 ```go
 func (u *User) IsHybrid() bool {
-    return u.Email != "" && u.PasswordHash != "" && u.ExpoDeviceID != ""
+    return u.Email != nil && u.PasswordHash != nil && u.ExpoDeviceID != nil
 }
 ```
 
@@ -1253,21 +1284,7 @@ func (u *User) IsHybrid() bool {
 
 ### Token Cleanup
 
-Consider adding a background job to clean up expired refresh tokens:
-
-```go
-// Run daily
-func CleanupExpiredTokens(ctx context.Context, repo RefreshTokenRepository) error {
-    return repo.DeleteExpired(ctx)
-}
-
-// In refresh_token_repository.go
-func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) error {
-    _, err := r.db.ExecContext(ctx,
-        "DELETE FROM refresh_tokens WHERE expires_at < NOW()")
-    return err
-}
-```
+Already implemented: `main.go` runs `tokenCleanupScheduler` in the background, which calls `RefreshTokenService.CleanupExpiredTokens` every hour (with an initial run at startup) to delete expired refresh tokens.
 
 ## Technology Stack
 
@@ -1276,7 +1293,7 @@ func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) error {
 ```go
 // HTTP routing and middleware
 github.com/go-chi/chi/v5               // HTTP router
-github.com/go-chi/cors                 // CORS middleware
+// CORS is a hand-rolled middleware in pkg/middleware, not a third-party package
 
 // JWT handling
 github.com/golang-jwt/jwt/v5           // JWT creation and validation
@@ -1285,7 +1302,8 @@ github.com/golang-jwt/jwt/v5           // JWT creation and validation
 golang.org/x/crypto/bcrypt             // bcrypt password hashing
 
 // Database
-github.com/lib/pq                      // PostgreSQL driver
+github.com/jackc/pgx/v5                // PostgreSQL driver (github.com/lib/pq is only an indirect dependency)
+github.com/golang-migrate/migrate/v4   // Schema migrations
 
 // HashiCorp Vault
 github.com/hashicorp/vault/api         // Vault client
@@ -1295,7 +1313,7 @@ github.com/joho/godotenv               // .env file loading
 
 // Testing
 github.com/stretchr/testify            // Testing framework and assertions
-github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
+github.com/golang/mock                 // Interface mocking for tests
 ```
 
 ## Current Implementation Status
@@ -1341,15 +1359,11 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 
 ### Future Enhancements
 
-**High Priority**:
-- Email verification workflow
-- Password reset functionality
-- Token reuse detection (security)
+Note: Email verification, password reset, refresh token reuse detection, and account lockout after failed attempts are already implemented (see API Endpoints and Data Models above) - they are not listed here.
 
 **Medium Priority**:
 - Multi-factor authentication (MFA)
 - OAuth2/OpenID Connect support
-- Account lockout after failed attempts
 - Session management improvements
 
 **Low Priority**:
@@ -1365,8 +1379,6 @@ github.com/DATA-DOG/go-sqlmock         // SQL mocking for tests
 - **Service README**: [README.md](README.md) - Comprehensive service documentation
 - **Requirements**: [requirements.md](/docs/detailed_requirements/users_service_requirements.md) - Detailed requirements and specifications
 - **OpenAPI Spec**: [api/openapi.yaml](api/openapi.yaml) - Formal API specification
-- **Implementation Plan**: [todo.md](todo.md) - Phased implementation checklist
-- **Security Assessment**: [SECURITY_ASSESSMENT.md](SECURITY_ASSESSMENT.md) - Security analysis
 
 ## Getting Help
 
