@@ -188,20 +188,13 @@ services/users/
 │   │   ├── health.go        # Health checks
 │   │   └── router.go        # Route setup
 │   ├── middleware/          # HTTP middleware
-│   │   ├── authorization.go # JWT validation and user authorization
-│   │   ├── cors.go          # CORS headers
-│   │   ├── rate_limit.go    # Rate limiting
-│   │   ├── security.go      # Security headers
-│   │   └── recovery.go      # Panic recovery
+│   │   └── authorization.go # JWT validation and user authorization
 │   ├── models/              # Data models
 │   │   ├── user.go
 │   │   └── refresh_token.go
 │   └── services/            # Business logic layer
 │       ├── auth_service.go
 │       └── user_service.go
-├── pkg/                     # Public libraries (shared with other services)
-│   └── auth/               # Shared JWT validation library
-│       └── middleware.go   # JWT validation middleware for other services
 ├── migrations/             # Database migrations (golang-migrate up/down pairs)
 │   ├── 000001_create_users_table.up.sql
 │   ├── 000001_create_users_table.down.sql
@@ -213,6 +206,8 @@ services/users/
 ├── README.md               # Service documentation
 └── CLAUDE.md              # This file
 ```
+
+CORS, rate limiting, security headers, and panic recovery come from the shared `pkg/middleware/` module at the repo root (`sharedmw.CORS`, `sharedmw.RateLimit`, `sharedmw.SecureHeadersRelaxed`, `sharedmw.Recovery` in `router.go`), not from a package inside `services/users/`. Likewise, JWT validation for other services is the shared `pkg/auth/` module at the repo root — there is no `pkg/` directory inside `services/users/`.
 
 ## Data Models
 
@@ -512,7 +507,7 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 - Cost factor: 12 (configurable, minimum 12 for production)
 - Password requirements:
   - Minimum length: 8 characters
-  - No complexity requirements by default (configurable)
+  - Complexity required by default (uppercase, lowercase, digit, and special character; toggle via `REQUIRE_PASSWORD_COMPLEXITY`)
 
 **Validation**:
 ```go
@@ -557,16 +552,15 @@ JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 ```
 
-### Authorization Middleware (`internal/middleware/authorization.go`)
+### Authorization
 
 **Purpose**: Ensures users can only access their own resources
 
-**Flow**:
-1. Extract JWT from `Authorization: Bearer <token>` header
-2. Validate JWT signature using public key
-3. Extract `user_id` from JWT claims
-4. Compare `user_id` from claims with `user_id` from URL path
-5. Return 403 Forbidden if mismatch
+**Flow** (split across two layers, not a single middleware):
+1. `pkg/auth`'s `RequireAuth` middleware (wired onto the `/api/v1/user` route group in `router.go`) extracts the JWT from `Authorization: Bearer <token>`, validates its RS256 signature against the public key, and stores `user_id` from the claims on the request context.
+2. Each `UserHandler` method (`internal/handlers/user_handler.go`) reads that authenticated `user_id` and the `{user_id}` path parameter, then calls into `UserService`, passing both. The service layer compares them and returns `services.ErrUnauthorized`, which the handler maps to `403 Forbidden`, on mismatch.
+
+Note: `internal/middleware/authorization.go` defines `RequireSameUser`/`RequireOwnership` helper middleware for this same purpose, but it is not wired into `router.go` anywhere — the actual ownership check happens in the service layer as described above, and this file is currently dead code.
 
 **Example**:
 ```go
@@ -579,7 +573,7 @@ JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 // Result: 200 OK (user can access own data)
 ```
 
-### Rate Limiting (`internal/middleware/rate_limit.go`)
+### Rate Limiting (`pkg/middleware/rate_limit.go`)
 
 **Purpose**: Prevent brute force attacks on authentication endpoints
 
@@ -939,6 +933,7 @@ JWT_REFRESH_TOKEN_EXPIRY=7d                  # Refresh token lifetime (code defa
 # Password Security
 BCRYPT_COST=12                               # bcrypt cost factor (minimum 12)
 MIN_PASSWORD_LENGTH=8                        # Minimum password length
+REQUIRE_PASSWORD_COMPLEXITY=true             # Require upper/lower/digit/special char (code default: true)
 
 # Rate Limiting (applies to the /api/v1/auth/* route group only; /api/v1/user/* is not rate limited)
 RATE_LIMIT_REQUESTS=100                      # Requests per window per IP (code default: 100)
@@ -1206,7 +1201,7 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 - Minimum bcrypt cost: 12 (production)
 - Never log passwords or hashes
 - Enforce minimum password length (8+ characters)
-- Consider password complexity requirements
+- Password complexity (upper/lower/digit/special char) required by default; toggle via `REQUIRE_PASSWORD_COMPLEXITY`
 
 **JWT Security**:
 - RS256 algorithm only (not HS256)
@@ -1265,21 +1260,21 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 **Mobile-only account**:
 ```go
 func (u *User) IsMobileOnly() bool {
-    return u.ExpoDeviceID != "" && u.Email == "" && u.PasswordHash == ""
+    return u.ExpoDeviceID != nil && u.Email == nil && u.PasswordHash == nil
 }
 ```
 
 **Email-only account**:
 ```go
 func (u *User) IsEmailOnly() bool {
-    return u.Email != "" && u.PasswordHash != "" && u.ExpoDeviceID == ""
+    return u.Email != nil && u.PasswordHash != nil && u.ExpoDeviceID == nil
 }
 ```
 
 **Hybrid account** (after upgrade):
 ```go
 func (u *User) IsHybrid() bool {
-    return u.Email != "" && u.PasswordHash != "" && u.ExpoDeviceID != ""
+    return u.Email != nil && u.PasswordHash != nil && u.ExpoDeviceID != nil
 }
 ```
 
