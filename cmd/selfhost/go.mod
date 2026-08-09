@@ -1,6 +1,6 @@
 module github.com/cairn-app/cairn-reader/cmd/selfhost
 
-go 1.25.0
+go 1.25.12
 
 require (
 	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0
@@ -46,7 +46,7 @@ require (
 	github.com/hashicorp/vault/api v1.22.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.8.0 // indirect
+	github.com/jackc/pgx/v5 v5.10.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/lib/pq v1.10.9 // indirect
@@ -60,10 +60,10 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/sony/gobreaker v0.5.0 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 )
 

@@ -18,7 +18,7 @@ COPY apps/web apps/web
 RUN npm run build -w @cairn/web
 
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 ENV GOTOOLCHAIN=auto
 
