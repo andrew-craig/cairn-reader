@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
 import { StorageService, ReadService } from '../services';
 import { Colors } from '../constants';
@@ -15,6 +16,10 @@ import { ArticleContent, BottomActionMenu } from '../components/common';
 import type { ScrollProgressInfo } from '../components/common/ArticleContent';
 
 const COMPLETED_PROGRESS_THRESHOLD = 0.95;
+// Throttle persisting scroll position while the user is actively scrolling,
+// so progress survives the app being closed mid-read instead of only being
+// saved on navigation.
+const SCROLL_SAVE_THROTTLE_MS = 1000;
 
 const toFraction = (v?: number): number | undefined =>
   v !== undefined && v <= 1 ? v : undefined;
@@ -63,6 +68,15 @@ export const ReadArticleDetailScreen: React.FC = () => {
   // Tracks the currently displayed article id so async callbacks can detect a
   // swap (next article) and avoid mutating UI state for a different article.
   const articleIdRef = useRef(article.id);
+  // Backend-only throttled save; local AsyncStorage persistence stays on the
+  // unmount flush below since it rewrites the whole articles array.
+  const throttledSaveRef = useRef(
+    throttle((articleId: string, fraction: number) => {
+      ReadService.updateUserContent(articleId, { scroll_position: fraction }).catch(
+        (err) => console.error('Failed to save scroll position:', err)
+      );
+    }, SCROLL_SAVE_THROTTLE_MS),
+  );
 
   const hasNextArticle = currentIndex >= 0 && currentIndex < articles.length - 1;
 
@@ -92,11 +106,14 @@ export const ReadArticleDetailScreen: React.FC = () => {
     scrollFractionRef.current = info.fraction;
     hasScrolledRef.current = true;
 
-    if (hasMarkedCompletedRef.current || info.contentHeight <= 0) return;
-    const progress = (info.offsetY + info.layoutHeight) / info.contentHeight;
-    if (progress >= COMPLETED_PROGRESS_THRESHOLD) {
-      markCompleted(article.id);
+    if (!hasMarkedCompletedRef.current && info.contentHeight > 0) {
+      const progress = (info.offsetY + info.layoutHeight) / info.contentHeight;
+      if (progress >= COMPLETED_PROGRESS_THRESHOLD) {
+        markCompleted(article.id);
+      }
     }
+
+    throttledSaveRef.current(article.id, info.fraction);
   }, [article.id, markCompleted]);
 
   useEffect(() => {
@@ -108,7 +125,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
   useEffect(() => {
     const articleId = article.id;
+    const throttledSave = throttledSaveRef.current;
     return () => {
+      throttledSave.cancel();
       if (!hasScrolledRef.current) return;
       const fraction = scrollFractionRef.current;
       ReadService.updateUserContent(articleId, { scroll_position: fraction }).catch(
