@@ -60,6 +60,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 - **Testing**: [docs/TESTING.md](/docs/TESTING.md)
 - **Deployment**: [docs/DEPLOYMENT.md](/docs/DEPLOYMENT.md)
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
+- **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (epic_fefa)
 
 
 ## Approach to work

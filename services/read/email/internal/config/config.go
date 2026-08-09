@@ -42,13 +42,14 @@ type EmailConfig struct {
 
 // AuthConfig holds authentication settings
 type AuthConfig struct {
-	IngestAPIKey     string
-	VaultAddr        string
-	VaultToken       string
-	VaultRoleID      string
-	VaultSecretID    string
-	JWTPublicKeyPath string
-	VaultAuthPath    string
+	IngestAPIKey             string
+	VaultAddr                string
+	VaultToken               string
+	VaultRoleID              string
+	VaultSecretID            string
+	JWTPublicKeyPath         string
+	VaultAuthPath            string
+	PublicKeyRefreshInterval time.Duration // How often to re-fetch the JWT public key from Vault; catches key rotation without a restart
 }
 
 // ContentServiceConfig holds configuration for the Content Service HTTP client.
@@ -95,13 +96,14 @@ func Load() (*Config, error) {
 			Domain: getEnv("EMAIL_DOMAIN", "read.cairnapp.com"),
 		},
 		Auth: AuthConfig{
-			IngestAPIKey:     getEnv("INGEST_API_KEY", ""),
-			VaultAddr:        getEnv("VAULT_ADDR", "http://localhost:8200"),
-			VaultToken:       getEnv("VAULT_TOKEN", ""),
-			VaultRoleID:      getEnv("VAULT_ROLE_ID", ""),
-			VaultSecretID:    getEnv("VAULT_SECRET_ID", ""),
-			JWTPublicKeyPath: getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt"),
-			VaultAuthPath:    getEnv("VAULT_AUTH_PATH", "approle"),
+			IngestAPIKey:             getEnv("INGEST_API_KEY", ""),
+			VaultAddr:                getEnv("VAULT_ADDR", "http://localhost:8200"),
+			VaultToken:               getEnv("VAULT_TOKEN", ""),
+			VaultRoleID:              getEnv("VAULT_ROLE_ID", ""),
+			VaultSecretID:            getEnv("VAULT_SECRET_ID", ""),
+			JWTPublicKeyPath:         getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt"),
+			VaultAuthPath:            getEnv("VAULT_AUTH_PATH", "approle"),
+			PublicKeyRefreshInterval: getEnvDuration("JWT_PUBLIC_KEY_REFRESH_INTERVAL", 5*time.Minute),
 		},
 		Worker: WorkerConfig{
 			EmailProcessWorkers:      getEnvInt("EMAIL_PROCESS_WORKERS", 3),
