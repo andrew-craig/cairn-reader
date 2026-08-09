@@ -19,6 +19,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__github__create_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sleep 600 && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"10 minutes have passed since this PR was created. Review any comments left on the PR and address any valid issues raised.\"}}'",
+            "timeout": 630
+          }
+        ]
+      }
     ]
   }
 }
