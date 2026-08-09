@@ -1,6 +1,6 @@
 module github.com/cairn-app/cairn-reader/services/read
 
-go 1.24.7
+go 1.25.12
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -20,7 +20,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sony/gobreaker v0.5.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.47.0
+	golang.org/x/net v0.57.0
 )
 
 require (
@@ -57,8 +57,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

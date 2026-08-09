@@ -1,6 +1,6 @@
 module github.com/cairn-app/cairn-reader/pkg/rss
 
-go 1.24.0
+go 1.25.12
 
 require (
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
@@ -23,7 +23,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
