@@ -73,6 +73,7 @@ func TestContentServiceClient_DeliverContent_Success(t *testing.T) {
 		func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, http.MethodPost, r.Method)
 			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			assert.Equal(t, "test-key", r.Header.Get("X-Internal-API-Key"))
 			writeCreateResponse(w, contentID)
 		},
 		func(w http.ResponseWriter, r *http.Request) {

@@ -46,7 +46,7 @@ func setupJWTTestEnv(t *testing.T) *jwtTestEnv {
 	internalAuthMiddleware := auth.NewInternalAuthMiddleware("test-internal-key")
 
 	dbWrapper := &database.DB{DB: testDB.DB}
-	router := api.NewRouter(dbWrapper, "", authMiddleware, internalAuthMiddleware)
+	router := api.NewRouter(dbWrapper, "", "", "test-internal-key", authMiddleware, internalAuthMiddleware)
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
 

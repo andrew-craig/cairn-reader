@@ -339,34 +339,48 @@ GET  /health/live                                    → Liveness check
 GET  /health/ready                                   → Readiness check (includes DB)
 ```
 
-**URL Detection (Smart Submission)**:
+**URL Detection (Smart Submission)** (⚠️ Requires JWT authentication):
 ```
 POST /api/v1/content/detect                          → Detect if URL is feed or page
+     Auth: Bearer <JWT token>
      Body: {"url": "https://example.com"}
      Returns: {"url": "...", "type": "feed|page|unknown", "title": "..."}
      Timeout: 10 seconds
+     Returns: 401 if missing/invalid token
 
 POST /api/v1/content/discover-feed                    → Discover an RSS/Atom feed for a page URL
+     Auth: Bearer <JWT token>
+     Returns: 401 if missing/invalid token
 ```
 
-**Content Management**:
+**Content Management** (⚠️ Internal only — requires `X-Internal-API-Key` header):
 ```
 POST   /api/v1/content                               → Create content from HTML/URL
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: {"url": "...", "html": "...", "source_type": "rss|web|email",
               "source_feed_id": "...", "published_at": "..."}
        Note: no "title" field here — title is extracted from the HTML, not passed in
+       Returns: 401 if missing/invalid internal API key
 
 GET    /api/v1/content/{content_id}                  → Get content by ID
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
+       Returns: 401 if missing/invalid internal API key
 
 PUT    /api/v1/content/{content_id}                  → Update existing content
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: {"url": "...", "html": "...", "published_at": "..."}
+       Returns: 401 if missing/invalid internal API key
 
 POST   /api/v1/content/bulk                          → Bulk create/update (max 100)
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: [{"url": "...", "html": "...", "source_type": "rss|web|email",
                "source_feed_id": "...", "title": "...", "author": "..."}, ...]
+       Returns: 401 if missing/invalid internal API key
 
 POST   /api/v1/content/check-duplicate               → Check for duplicates
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: {"items": [{"content_hash": "...", "source_feed_id": "..."}, ...]}
+       Returns: 401 if missing/invalid internal API key
 ```
 
 **User Content Management** (⚠️ Requires JWT authentication):
@@ -458,13 +472,17 @@ The Content Service now uses JWT-based authentication to ensure users can only a
 
 ### Protected Routes
 
-All routes under `/api/v1/content/user/{user_id}` are protected and require:
+All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect` and
+`/api/v1/content/discover-feed`, are protected and require:
 - JWT token in `Authorization: Bearer <token>` header
-- Token must contain valid `user_id` claim matching the URL parameter
+- Token must contain valid `user_id` claim matching the URL parameter (where applicable —
+  `/detect` and `/discover-feed` only require a valid token, not a matching user_id)
 - Expires: Token expiration validated by service
 - Signature: RS256 with public key fetched from Vault at startup
 
 **Protected endpoints**:
+- `POST /api/v1/content/detect` - URL detection
+- `POST /api/v1/content/discover-feed` - Feed discovery
 - `GET /api/v1/content/user/{user_id}` - List user contents
 - `POST /api/v1/content/user/{user_id}` - Add content to user
 - `GET /api/v1/content/user/{user_id}/search` - Search user contents
@@ -475,19 +493,21 @@ All routes under `/api/v1/content/user/{user_id}` are protected and require:
 - `DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}` - Unsubscribe from RSS feed
 - `POST /api/v1/content/user/bulk` - Bulk add for authenticated user
 
+### Internal Routes (require `X-Internal-API-Key`)
+
+- `POST /api/v1/content/` - Create content
+- `GET /api/v1/content/{content_id}` - Get content
+- `PUT /api/v1/content/{content_id}` - Update content
+- `POST /api/v1/content/bulk` - Bulk create
+- `POST /api/v1/content/check-duplicate` - Check duplicates
+- `POST /api/v1/internal/content/user/bulk` - Bulk add (lives under `/api/v1/internal`, see
+  Internal Service Integration below)
+
 ### Public Routes (No Auth)
 
 - `GET /health/live` - Liveness probe
 - `GET /health/ready` - Readiness probe
-- `POST /api/v1/content/detect` - URL detection
-- `POST /api/v1/content/` - Create content (internal)
-- `GET /api/v1/content/{content_id}` - Get content (internal)
-- `PUT /api/v1/content/{content_id}` - Update content (internal)
-- `POST /api/v1/content/bulk` - Bulk create (internal)
-- `POST /api/v1/content/check-duplicate` - Check duplicates (internal)
-
-Note: `POST /api/v1/internal/content/user/bulk` is NOT public — it lives under `/api/v1/internal`,
-which requires the `X-Internal-API-Key` header (see Internal Service Integration below).
+- `GET /` - Service info
 
 ### Configuration
 

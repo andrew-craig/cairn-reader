@@ -3,16 +3,48 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
+- **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
+- **task_1072** · P0 · open · [P3-C1/H1/H2] Dependency + Go toolchain bumps across all 12 modules (live XSS + reachable SQLi)  (parent: epic_fefa)
+- **task_204b** · P0 · open · [P2-IDOR] read/fetcher has zero inbound auth; user_id read from URL path → cross-tenant access  (parent: epic_fefa)
+- **task_e317** · P0 · open · [P2-C2/H1/H2/H14] Credential material in logs: verification URL at INFO, token prefixes, mobile token logging  (parent: epic_fefa)
+- **task_f0f3** · P0 · open · [SSRF] Add a guarded dialer to pkg/rss/fetch (blocks loopback/RFC1918/link-local/metadata)  (parent: epic_fefa)
+- **epic_fefa** · P1 · open · Code quality remediation program
+- **task_1924** · P1 · open · [P2-C3+C4] Two dead tests (outbox delivery, CORS) + the CORS wildcard-suffix bypass they hid  (parent: epic_fefa)
+- **task_2ff6** · P1 · open · [Dedup index] idx_contents_rss_dedup is not UNIQUE; email/manual content path has no dedup at all  (parent: epic_fefa)
+- **task_40b2** · P1 · open · [P3-C2/H6] MaxBytesReader on all JSON endpoints + depth guards on the recursive email HTML walkers  (parent: epic_fefa)
+- **task_7fbe** · P1 · open · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
+- **task_963d** · P1 · open · [P2-C8] Feed-subscribe client unmarshals the wrong response shape → app gets empty data with HTTP 201  (parent: epic_fefa)
+- **task_9df8** · P1 · open · [Explore auth] explore article-inject + fetch/sync trigger endpoints unauthenticated  (parent: epic_fefa)
+- **task_ac75** · P1 · open · [Integration tier] Add a CI job running //go:build integration tests against a real Postgres  (parent: epic_fefa)
+- **task_b174** · P1 · open · [P2-C7/H8] Recommender upsert conflicts on content-hash id, not just link → batch dropped every poll  (parent: epic_fefa)
+- **task_cef5** · P1 · open · [C3] Refresh-token reuse detection never fires for its actual threat; its test asserts the wrong path  (parent: epic_fefa)
+- **task_dbcf** · P1 · open · [Web CI] apps/web has no CI at all — add web-checks.yml (tsc, eslint, vitest)  (parent: epic_fefa)
+- **task_e7d1** · P1 · open · [P2-C6] Bulk content insert PK-collides on any mixed new+seen batch → whole RSS batch fails  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
+- **task_0849** · P2 · open · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
+- **task_39dd** · P2 · open · [Email sanitizer] Replace email's hand-maintained bluemonday policy with pkg/rss/sanitize  (parent: epic_fefa)
+- **task_3c49** · P2 · open · [FE resilience] Error boundaries, mobile list error states, mobile a11y labels, web destructive-action confirmations  (parent: epic_fefa)
+- **task_47c1** · P2 · open · [FE auth layer] Move the duplicated web/mobile auth.ts into apps/shared; fix H12 + offline-clears-tokens  (parent: epic_fefa)
+- **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
+- **task_5416** · P2 · open · [Theme 4] FOR UPDATE SKIP LOCKED on all job-claim queries (read/fetcher, explore/fetcher, email outbox)  (parent: epic_fefa)
+- **task_57b5** · P2 · open · [H11] Delete the ~250-line dead JWT-validation duplicate in services/users/internal/auth/jwt.go  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
+- **task_8b77** · P2 · open · [users build tag] services/users/test/integration lacks //go:build integration → bare go test hangs  (parent: epic_fefa)
+- **task_8bc5** · P2 · open · [409→500] Client matches error codes the server never sends → re-subscribe returns 500 instead of 409  (parent: epic_fefa)
+- **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
+- **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
+- **task_d1eb** · P2 · open · [Cleanup batching] RunWithBatching does not batch — unbounded DELETE in one transaction  (parent: epic_fefa)
+- **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_dd2d** · P2 · open · [H3+H4] Password-reset tokens never delivered; self-host build panics on reset/verify routes  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
+- **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
@@ -33,6 +65,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
+- **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal

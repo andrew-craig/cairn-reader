@@ -218,6 +218,7 @@ func (c *ContentServiceClient) createContent(ctx context.Context, payload []Emai
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
