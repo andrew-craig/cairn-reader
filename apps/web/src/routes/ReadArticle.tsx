@@ -58,15 +58,16 @@ export default function ReadArticle() {
   const scrollFractionRef = useRef(0);
   const hasScrolledRef = useRef(false);
   const hasMarkedCompletedRef = useRef(false);
+  // Does not clear hasScrolledRef on success: with the throttle firing mid-scroll,
+  // a save can resolve while a newer position is already queued in the throttle's
+  // trailing call. Leaving the dirty flag set means the unmount/switch cleanup
+  // always flushes the latest scrollFractionRef, at the cost of an occasional
+  // harmless duplicate PATCH of an already-saved position.
   const throttledSaveRef = useRef(
     throttle((contentId: string, fraction: number) => {
-      ReadService.updateUserContent(contentId, { scroll_position: fraction })
-        // Clear the dirty flag so the unmount/switch cleanup doesn't re-send the
-        // same position; a later scroll sets it true again.
-        .then(() => {
-          hasScrolledRef.current = false;
-        })
-        .catch((err) => console.error('Failed to save scroll position:', err));
+      ReadService.updateUserContent(contentId, { scroll_position: fraction }).catch((err) =>
+        console.error('Failed to save scroll position:', err),
+      );
     }, SCROLL_SAVE_THROTTLE_MS),
   );
   // Tracks the currently displayed article id so async callbacks can detect a

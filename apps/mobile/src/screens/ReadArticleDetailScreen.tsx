@@ -113,7 +113,11 @@ export const ReadArticleDetailScreen: React.FC = () => {
       }
     }
 
-    throttledSaveRef.current(article.id, info.fraction);
+    // Skip persisting emits fired before the saved position has been restored
+    // (offsetY is still the stale pre-restore 0) so we don't overwrite it.
+    if (!info.isRestoring) {
+      throttledSaveRef.current(article.id, info.fraction);
+    }
   }, [article.id, markCompleted]);
 
   useEffect(() => {
