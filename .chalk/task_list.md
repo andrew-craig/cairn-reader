@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_1072** · P0 · in_progress · [P3-C1/H1/H2] Dependency + Go toolchain bumps across all 12 modules (live XSS + reachable SQLi)  (parent: epic_fefa)
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **task_204b** · P0 · open · [P2-IDOR] read/fetcher has zero inbound auth; user_id read from URL path → cross-tenant access  (parent: epic_fefa)
 - **task_e317** · P0 · open · [P2-C2/H1/H2/H14] Credential material in logs: verification URL at INFO, token prefixes, mobile token logging  (parent: epic_fefa)
