@@ -72,11 +72,17 @@ func TestKeyRefresher_OnDemandRecoversWithoutRestart(t *testing.T) {
 }
 
 // TestKeyRefresher_PollRecoversProactively verifies the periodic-poll path:
-// a rotation is picked up on the next tick, before any token is ever
-// rejected.
+// a rotation is picked up on the next tick, with no token validation
+// involved at all.
+//
+// It deliberately never calls ValidateToken. NewKeyRefresher also registers
+// the on-signature-failure hook, so any failed validation would refresh the
+// key on demand and mask a poll loop that never runs — the key change is
+// observed directly through the validator instead, which only refresh() can
+// cause. With Start() stubbed out to a no-op this test fails.
 func TestKeyRefresher_PollRecoversProactively(t *testing.T) {
 	_, oldPub := generateTestKeys(t)
-	newPriv, newPub := generateTestKeys(t)
+	_, newPub := generateTestKeys(t)
 
 	validator := NewValidator(oldPub)
 	fetcher := newFakeKeyFetcher(oldPub)
@@ -87,22 +93,15 @@ func TestKeyRefresher_PollRecoversProactively(t *testing.T) {
 	kr.Start(ctx, 5*time.Millisecond)
 
 	fetcher.rotate(newPub)
-	token := generateTestToken(t, newPriv, uuid.New(), "cairn-user-service", "cairn-api", time.Hour)
 
 	deadline := time.Now().Add(2 * time.Second)
-	var lastErr error
 	for time.Now().Before(deadline) {
-		claims, err := validator.ValidateToken(token)
-		if err == nil {
-			if claims == nil {
-				t.Fatal("expected non-nil claims")
-			}
+		if validator.GetPublicKey().Equal(newPub) {
 			return
 		}
-		lastErr = err
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("key was not refreshed by polling within deadline, last error: %v", lastErr)
+	t.Fatal("key was not refreshed by polling within deadline")
 }
 
 // TestKeyRefresher_OnDemandDebounced ensures repeated signature failures
