@@ -90,6 +90,8 @@ paths:
         with a 10-second timeout. Used by mobile apps to provide smart URL submission (e.g.,
         showing "Add Feed" vs "Add" button).
       operationId: detectURL
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -130,6 +132,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/content/discover-feed:
     post:
@@ -151,6 +159,8 @@ paths:
         from upstream (network timeouts, parsing failures) are swallowed and presented
         as an empty result.
       operationId: discoverFeed
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -183,14 +193,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/content:
     post:
       tags:
         - Contents
       summary: Create content
-      description: Create a new content item from HTML or URL
+      description: |
+        Create a new content item from HTML or URL.
+
+        **Internal endpoint** - for internal services only (Ingest RSS Service, Email Ingest
+        Service). Requires the `X-Internal-API-Key` header.
       operationId: createContent
+      security:
+        - InternalApiKey: []
       requestBody:
         required: true
         content:
@@ -225,6 +247,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           description: Content too large (exceeds 5MB limit)
           content:
@@ -243,8 +271,13 @@ paths:
       tags:
         - Contents
       summary: Get content by ID
-      description: Retrieve a specific content item by its ID
+      description: |
+        Retrieve a specific content item by its ID.
+
+        **Internal endpoint** - for internal services only. Requires the `X-Internal-API-Key` header.
       operationId: getContent
+      security:
+        - InternalApiKey: []
       parameters:
         - name: content_id
           in: path
@@ -260,6 +293,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Content not found
           content:
@@ -277,8 +316,13 @@ paths:
       tags:
         - Contents
       summary: Update content
-      description: Update an existing content item (preserves user-content relationships)
+      description: |
+        Update an existing content item (preserves user-content relationships).
+
+        **Internal endpoint** - for internal services only. Requires the `X-Internal-API-Key` header.
       operationId: updateContent
+      security:
+        - InternalApiKey: []
       parameters:
         - name: content_id
           in: path
@@ -306,6 +350,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Content not found
           content:
@@ -324,8 +374,14 @@ paths:
       tags:
         - Bulk Operations
       summary: Batch create/update contents
-      description: Create or update multiple content items in a single request (max 100 items)
+      description: |
+        Create or update multiple content items in a single request (max 100 items).
+
+        **Internal endpoint** - for internal services only (Ingest RSS Service, Email Ingest
+        Service). Requires the `X-Internal-API-Key` header.
       operationId: bulkCreateContents
+      security:
+        - InternalApiKey: []
       requestBody:
         required: true
         content:
@@ -345,6 +401,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -357,8 +419,13 @@ paths:
       tags:
         - Bulk Operations
       summary: Check for existing content
-      description: Check if content already exists by feed_id + content_hash
+      description: |
+        Check if content already exists by feed_id + content_hash.
+
+        **Internal endpoint** - for internal services only. Requires the `X-Internal-API-Key` header.
       operationId: checkDuplicates
+      security:
+        - InternalApiKey: []
       requestBody:
         required: true
         content:
@@ -374,6 +441,12 @@ paths:
                 $ref: '#/components/schemas/CheckDuplicatesResponse'
         '400':
           description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
           content:
             application/json:
               schema:
@@ -866,6 +939,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: JWT token from User Service for authentication
+    InternalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+      description: Shared secret for internal service-to-service calls (Ingest RSS, Email Ingest)
   schemas:
     CreateContentRequest:
       type: object

@@ -81,18 +81,24 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	// API v1 routes - all under /api/v1/content prefix for consistent service boundary
 	r.Route("/api/v1/content", func(r chi.Router) {
 		r.Use(sharedmw.RequireHTTPS)
-		// URL detection endpoint (unprotected)
-		r.Post("/detect", detectionHandler.DetectURL)
-		r.Post("/discover-feed", detectionHandler.DiscoverFeed)
 
-		// Content management routes (unprotected - used by internal services)
-		r.Post("/", contentHandler.CreateContent)
-		r.Get("/{content_id}", contentHandler.GetContent)
-		r.Put("/{content_id}", contentHandler.UpdateContent)
+		// URL detection endpoints - user-facing "add link" flow (web/mobile), requires login
+		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.RequireAuth)
+			r.Post("/detect", detectionHandler.DetectURL)
+			r.Post("/discover-feed", detectionHandler.DiscoverFeed)
+		})
 
-		// Bulk operation routes (unprotected - used by internal services)
-		r.Post("/bulk", bulkHandler.BulkCreateContent)
-		r.Post("/check-duplicate", bulkHandler.CheckDuplicates)
+		// Content management + bulk operation routes - internal service-to-service only
+		// (Ingest RSS Service, Email Ingest Service)
+		r.Group(func(r chi.Router) {
+			r.Use(internalAuthMiddleware.RequireInternalAPIKey)
+			r.Post("/", contentHandler.CreateContent)
+			r.Get("/{content_id}", contentHandler.GetContent)
+			r.Put("/{content_id}", contentHandler.UpdateContent)
+			r.Post("/bulk", bulkHandler.BulkCreateContent)
+			r.Post("/check-duplicate", bulkHandler.CheckDuplicates)
+		})
 
 		// Protected user-content routes (nested under /user/{user_id})
 		r.Route("/user/{user_id}", func(r chi.Router) {

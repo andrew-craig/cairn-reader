@@ -254,7 +254,7 @@ export class ReadService {
   }
 
   /**
-   * Detect whether a URL is a feed or page. Non-authenticated; 10 s timeout.
+   * Detect whether a URL is a feed or page. Requires authentication; 10 s timeout.
    * On timeout or network error returns { url, type: 'unknown', title: null }
    * matching mobile behavior.
    */
@@ -262,7 +262,7 @@ export class ReadService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch(`${getServerUrl()}/api/v1/content/detect`, {
+      const response = await AuthService.fetchWithAuth(`${getServerUrl()}/api/v1/content/detect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -281,14 +281,14 @@ export class ReadService {
   }
 
   /**
-   * Discover RSS/Atom feeds associated with a URL. Non-authenticated; 15 s timeout.
+   * Discover RSS/Atom feeds associated with a URL. Requires authentication; 15 s timeout.
    * On error/timeout returns { feeds: [] } matching mobile behavior.
    */
   static async discoverFeed(url: string): Promise<DiscoverFeedResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(`${getServerUrl()}/api/v1/content/discover-feed`, {
+      const response = await AuthService.fetchWithAuth(`${getServerUrl()}/api/v1/content/discover-feed`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),

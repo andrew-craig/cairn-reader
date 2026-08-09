@@ -286,14 +286,14 @@ export class ReadService {
 
   /**
    * Detect URL type (feed or page)
-   * Non-blocking with 10s timeout
+   * Requires authentication. Non-blocking with 10s timeout
    */
   static async detectURL(url: string): Promise<DetectURLResponse> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     try {
-      const response = await fetch(
+      const response = await this.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/detect`,
         {
           method: 'POST',
@@ -328,7 +328,7 @@ export class ReadService {
    * Discover RSS/Atom feeds associated with a page URL.
    * Returns an array of discovered feeds (may be empty).
    *
-   * No authentication required (matches `/detect` pattern).
+   * Requires authentication (matches `/detect` pattern).
    * Uses a 15s timeout matching the backend discovery timeout.
    * On error, returns { feeds: [] } rather than throwing.
    */
@@ -337,7 +337,7 @@ export class ReadService {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
     try {
-      const response = await fetch(
+      const response = await this.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/discover-feed`,
         {
           method: 'POST',
