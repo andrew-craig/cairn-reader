@@ -111,6 +111,15 @@ func main() {
 	authMiddleware := auth.NewMiddleware(validator)
 	slog.Info("JWT authentication middleware initialized")
 
+	// Keep the JWT public key in sync with Vault: the users service rotates
+	// its signing key on a timer (default 24h), and without this, every
+	// token issued after a rotation would fail verification here until the
+	// process is restarted (P2-C1).
+	keyRefresher := auth.NewKeyRefresher(vaultClient, cfg.Vault.PublicKeyPath, validator)
+	keyRefresherCtx, stopKeyRefresher := context.WithCancel(context.Background())
+	defer stopKeyRefresher()
+	keyRefresher.Start(keyRefresherCtx, cfg.Vault.PublicKeyRefreshInterval)
+
 	// Initialize repositories
 	articleRepo := db.NewArticleRepository(database)
 	userRepo := db.NewUserRepository(database)

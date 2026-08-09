@@ -127,7 +127,17 @@ func main() {
 
 	// Initialize middleware
 	apiKeyAuth := middleware.NewAPIKeyAuth(apiKeyRepo)
-	jwtAuth := middleware.NewJWTAuth(publicKey)
+	jwtValidator := auth.NewValidator(publicKey)
+	jwtAuth := middleware.NewJWTAuthFromValidator(jwtValidator)
+
+	// Keep the JWT public key in sync with Vault: the users service rotates
+	// its signing key on a timer (default 24h), and without this, every
+	// token issued after a rotation would fail verification here until the
+	// process is restarted (P2-C1).
+	keyRefresher := auth.NewKeyRefresher(vaultClient, cfg.Auth.JWTPublicKeyPath, jwtValidator)
+	keyRefresherCtx, stopKeyRefresher := context.WithCancel(context.Background())
+	defer stopKeyRefresher()
+	keyRefresher.Start(keyRefresherCtx, cfg.Auth.PublicKeyRefreshInterval)
 
 	// Initialize handlers
 	ingestHandler := handlers.NewIngestHandler(emailService)

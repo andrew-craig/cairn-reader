@@ -5,18 +5,20 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
 )
 
 // VaultConfig contains HashiCorp Vault configuration
 type VaultConfig struct {
-	Address       string
-	Token         string // For token-based auth (development)
-	RoleID        string // For AppRole authentication (production)
-	SecretID      string // For AppRole authentication (production)
-	AuthPath      string // AppRole auth path (default: "approle")
-	PublicKeyPath string
+	Address                  string
+	Token                    string // For token-based auth (development)
+	RoleID                   string // For AppRole authentication (production)
+	SecretID                 string // For AppRole authentication (production)
+	AuthPath                 string // AppRole auth path (default: "approle")
+	PublicKeyPath            string
+	PublicKeyRefreshInterval time.Duration // How often to re-fetch the JWT public key from Vault; catches key rotation without a restart
 }
 
 // HasAppRoleAuth returns true if AppRole credentials are configured
@@ -47,12 +49,13 @@ func Load() (*Config, error) {
 		Database: sharedconfig.LoadDatabaseConfig("cairn_content", "cairn_content_pass", "cairn_content"),
 		Logging:  sharedconfig.LoadLoggingConfig(),
 		Vault: VaultConfig{
-			Address:       sharedconfig.GetString("VAULT_ADDR", "http://localhost:8200"),
-			Token:         sharedconfig.GetString("VAULT_TOKEN", ""),
-			RoleID:        sharedconfig.GetString("VAULT_ROLE_ID", ""),
-			SecretID:      sharedconfig.GetString("VAULT_SECRET_ID", ""),
-			AuthPath:      sharedconfig.GetString("VAULT_AUTH_PATH", "approle"),
-			PublicKeyPath: sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
+			Address:                  sharedconfig.GetString("VAULT_ADDR", "http://localhost:8200"),
+			Token:                    sharedconfig.GetString("VAULT_TOKEN", ""),
+			RoleID:                   sharedconfig.GetString("VAULT_ROLE_ID", ""),
+			SecretID:                 sharedconfig.GetString("VAULT_SECRET_ID", ""),
+			AuthPath:                 sharedconfig.GetString("VAULT_AUTH_PATH", "approle"),
+			PublicKeyPath:            sharedconfig.GetString("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
+			PublicKeyRefreshInterval: sharedconfig.GetDuration("JWT_PUBLIC_KEY_REFRESH_INTERVAL", 5*time.Minute),
 		},
 		IngestRSSServiceURL:   sharedconfig.GetString("INGEST_RSS_SERVICE_URL", "http://localhost:8085"),
 		EmailIngestServiceURL: sharedconfig.GetString("EMAIL_INGEST_SERVICE_URL", "http://localhost:8087"),

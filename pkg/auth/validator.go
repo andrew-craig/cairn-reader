@@ -40,6 +40,14 @@ type Validator struct {
 	keyID     string // Key ID (kid) for identifying which key to use for validation
 	issuer    string
 	audience  string
+
+	// onSignatureFailure, if set, is invoked once by ValidateToken when a
+	// token fails signature verification, before returning the error. It
+	// exists so a KeyRefresher can re-fetch the public key on demand (the
+	// key may be stale due to an out-of-band rotation); ValidateToken then
+	// retries once with whatever key is current afterward. See
+	// SetOnSignatureFailure.
+	onSignatureFailure func()
 }
 
 // ComputeKeyID generates a key ID from an RSA public key.
@@ -123,6 +131,40 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 		return nil, ErrMissingToken
 	}
 
+	claims, err := v.parseAndValidate(tokenString)
+	if errors.Is(err, ErrInvalidSignature) {
+		v.mu.RLock()
+		onFailure := v.onSignatureFailure
+		v.mu.RUnlock()
+
+		if onFailure != nil {
+			// The key may be stale because of an out-of-band rotation. Give
+			// the hook a chance to refresh it, then retry once with
+			// whatever key is current now.
+			onFailure()
+			if retryClaims, retryErr := v.parseAndValidate(tokenString); retryErr == nil {
+				return retryClaims, nil
+			}
+		}
+	}
+
+	return claims, err
+}
+
+// SetOnSignatureFailure registers fn to be called once by ValidateToken each
+// time a token fails signature verification, before ValidateToken returns
+// the error. This is the hook a KeyRefresher uses to re-fetch the public key
+// on demand and let ValidateToken retry, so validation recovers from an
+// out-of-band key rotation without a process restart.
+func (v *Validator) SetOnSignatureFailure(fn func()) {
+	v.mu.Lock()
+	v.onSignatureFailure = fn
+	v.mu.Unlock()
+}
+
+// parseAndValidate parses and validates tokenString against the validator's
+// current public key, issuer, and audience.
+func (v *Validator) parseAndValidate(tokenString string) (*Claims, error) {
 	// Capture key fields under read lock for use in the key function
 	v.mu.RLock()
 	publicKey := v.publicKey
