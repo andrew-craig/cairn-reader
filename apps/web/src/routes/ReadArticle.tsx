@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import type { Article } from '@cairn/shared';
+import { throttle, type Article } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import { decodeEntities } from '../utils/decodeEntities';
@@ -11,8 +11,10 @@ import './ReadArticle.css';
 // Scrolled this far through the article (fraction of scrollable height) marks it
 // completed. Mirrors mobile's COMPLETED_PROGRESS_THRESHOLD.
 const COMPLETED_THRESHOLD = 0.95;
-// Debounce persisting scroll position while the user is actively scrolling.
-const SCROLL_SAVE_DEBOUNCE_MS = 500;
+// Throttle persisting scroll position while the user is actively scrolling,
+// so progress survives the app being closed mid-read instead of only being
+// saved on navigation.
+const SCROLL_SAVE_THROTTLE_MS = 1000;
 
 // Navigation state passed from the reading list (Read.tsx): the list and the
 // position of the opened article, so the reader can offer prev/next without a
@@ -56,7 +58,18 @@ export default function ReadArticle() {
   const scrollFractionRef = useRef(0);
   const hasScrolledRef = useRef(false);
   const hasMarkedCompletedRef = useRef(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Does not clear hasScrolledRef on success: with the throttle firing mid-scroll,
+  // a save can resolve while a newer position is already queued in the throttle's
+  // trailing call. Leaving the dirty flag set means the unmount/switch cleanup
+  // always flushes the latest scrollFractionRef, at the cost of an occasional
+  // harmless duplicate PATCH of an already-saved position.
+  const throttledSaveRef = useRef(
+    throttle((contentId: string, fraction: number) => {
+      ReadService.updateUserContent(contentId, { scroll_position: fraction }).catch((err) =>
+        console.error('Failed to save scroll position:', err),
+      );
+    }, SCROLL_SAVE_THROTTLE_MS),
+  );
   // Tracks the currently displayed article id so async callbacks can detect a
   // swap (prev/next) and avoid mutating UI state for a different article.
   const articleIdRef = useRef<string | undefined>(initialArticle?.id);
@@ -149,26 +162,17 @@ export default function ReadArticle() {
       markCompleted(articleId);
     }
 
-    // Debounced persistence so we PATCH at most every ~500ms during a scroll.
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      ReadService.updateUserContent(articleId, {
-        scroll_position: scrollFractionRef.current,
-      })
-        // Clear the dirty flag so the unmount/switch cleanup doesn't re-send the
-        // same position; a later scroll sets it true again.
-        .then(() => {
-          hasScrolledRef.current = false;
-        })
-        .catch((err) => console.error('Failed to save scroll position:', err));
-    }, SCROLL_SAVE_DEBOUNCE_MS);
+    // Throttled persistence so we PATCH at most once per second during a
+    // scroll, guaranteeing progress is saved even if the app closes mid-read.
+    throttledSaveRef.current(articleId, fraction);
   }, [articleId, markCompleted]);
 
   // On unmount (or article change), flush the final scroll position if the user
-  // scrolled, cancelling any pending debounced save. Mirrors mobile's cleanup.
+  // scrolled, cancelling any pending throttled save. Mirrors mobile's cleanup.
   useEffect(() => {
+    const throttledSave = throttledSaveRef.current;
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      throttledSave.cancel();
       if (!hasScrolledRef.current || !articleId) return;
       ReadService.updateUserContent(articleId, {
         scroll_position: scrollFractionRef.current,

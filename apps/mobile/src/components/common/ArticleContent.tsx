@@ -27,6 +27,10 @@ export interface ScrollProgressInfo {
   contentHeight: number;
   layoutHeight: number;
   fraction: number;
+  // True until a real scroll event (user drag or the initial position restore)
+  // has confirmed offsetY. Emits fired from onContentSizeChange/onLayout before
+  // that report a stale offsetY of 0 and should not be persisted.
+  isRestoring: boolean;
 }
 
 /**
@@ -60,6 +64,10 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   const offsetYRef = useRef(0);
   const contentHeightRef = useRef(0);
   const layoutHeightRef = useRef(0);
+  // Cleared by the first real scroll event (restore landing or user drag);
+  // while true, offsetYRef hasn't been confirmed and may still be the stale
+  // pre-restore 0.
+  const pendingRestoreRef = useRef(!!initialScrollFraction && initialScrollFraction > 0);
 
   const emitProgress = useCallback(() => {
     if (!onScrollProgress) return;
@@ -69,6 +77,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       contentHeight: contentHeightRef.current,
       layoutHeight: layoutHeightRef.current,
       fraction: offsetYRef.current / contentHeightRef.current,
+      isRestoring: pendingRestoreRef.current,
     });
   }, [onScrollProgress]);
 
@@ -125,6 +134,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
     offsetYRef.current = Math.round(contentOffset.y);
     contentHeightRef.current = contentSize.height;
     layoutHeightRef.current = layoutMeasurement.height;
+    pendingRestoreRef.current = false;
     emitProgress();
   }, [emitProgress]);
 
@@ -144,6 +154,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   // yank them away from where they scrolled.
   const handleScrollBeginDrag = useCallback(() => {
     hasRestoredPosition.current = true;
+    pendingRestoreRef.current = false;
   }, []);
 
   const handleScrollViewLayout = useCallback((event: LayoutChangeEvent) => {
