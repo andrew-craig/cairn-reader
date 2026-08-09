@@ -103,8 +103,15 @@ export const ReadArticleDetailScreen: React.FC = () => {
   }, []);
 
   const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
-    scrollFractionRef.current = info.fraction;
-    hasScrolledRef.current = true;
+    // Emits fired before the saved position has been restored report a stale
+    // offsetY of 0. Skip updating the refs so the unmount-flush safety net
+    // can't send that stale value either — not just the throttled save.
+    // Completion marking stays unconditional: it also covers articles short
+    // enough to never scroll, which never leave the restoring state.
+    if (!info.isRestoring) {
+      scrollFractionRef.current = info.fraction;
+      hasScrolledRef.current = true;
+    }
 
     if (!hasMarkedCompletedRef.current && info.contentHeight > 0) {
       const progress = (info.offsetY + info.layoutHeight) / info.contentHeight;
@@ -113,8 +120,6 @@ export const ReadArticleDetailScreen: React.FC = () => {
       }
     }
 
-    // Skip persisting emits fired before the saved position has been restored
-    // (offsetY is still the stale pre-restore 0) so we don't overwrite it.
     if (!info.isRestoring) {
       throttledSaveRef.current(article.id, info.fraction);
     }
