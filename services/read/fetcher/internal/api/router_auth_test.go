@@ -40,8 +40,11 @@ func httpsRequest(method, path string) *http.Request {
 
 // TestUnauthenticatedRoutesRejected proves the P2-IDOR finding is closed: every
 // user-scoped route that used to trust user_id from the path with zero inbound
-// auth now requires the internal API key, including a cross-tenant request that
-// simply names a different user_id in the URL.
+// auth now requires the internal API key, regardless of which user_id is named
+// in the URL. Cross-tenant rejection itself (authenticated user vs. the user_id
+// in the URL) is content service's responsibility, enforced before it proxies
+// down here — fetcher's job is only to reject callers that aren't content
+// service at all.
 func TestUnauthenticatedRoutesRejected(t *testing.T) {
 	router, _ := newTestRouterHandler(t)
 
@@ -53,7 +56,7 @@ func TestUnauthenticatedRoutesRejected(t *testing.T) {
 		{"subscribe", http.MethodPost, "/api/v1/source/rss/user/11111111-1111-1111-1111-111111111111/subscription"},
 		{"list subscriptions", http.MethodGet, "/api/v1/source/rss/user/11111111-1111-1111-1111-111111111111/subscription"},
 		{"unsubscribe", http.MethodDelete, "/api/v1/source/rss/user/11111111-1111-1111-1111-111111111111/subscription/22222222-2222-2222-2222-222222222222"},
-		{"cross-tenant list subscriptions", http.MethodGet, "/api/v1/source/rss/user/99999999-9999-9999-9999-999999999999/subscription"},
+		{"list subscriptions, alternate user_id, no credentials", http.MethodGet, "/api/v1/source/rss/user/99999999-9999-9999-9999-999999999999/subscription"},
 		{"update feed", http.MethodPatch, "/api/v1/source/rss/feed/22222222-2222-2222-2222-222222222222"},
 	}
 
