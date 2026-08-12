@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api/handlers"
@@ -17,7 +18,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router for RSS Fetcher Service
-func NewRouter(db *database.DB) http.Handler {
+func NewRouter(db *database.DB, internalAuthMiddleware *auth.InternalAuthMiddleware) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply global middleware
@@ -69,9 +70,13 @@ func NewRouter(db *database.DB) http.Handler {
 	})
 
 	// API v1 routes with /source/rss prefix
-	// This service is internal-facing, accessed through Content Service gateway
+	// This service is internal-facing, accessed through Content Service gateway.
+	// It has no user-facing JWT context of its own, so the boundary is the shared
+	// internal API key — the resource-owning tables are still scoped by user_id
+	// in every query, but nothing here trusts user_id from the path alone anymore.
 	r.Route("/api/v1/source/rss", func(r chi.Router) {
 		r.Use(sharedmw.RequireHTTPS)
+		r.Use(internalAuthMiddleware.RequireInternalAPIKey)
 		// User feed subscription routes
 		r.Route("/user/{user_id}/subscription", func(r chi.Router) {
 			r.Post("/", subscriptionHandler.Subscribe)

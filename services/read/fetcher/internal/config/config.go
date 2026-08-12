@@ -11,17 +11,19 @@ import (
 
 // Config holds all configuration for the RSS fetcher service
 type Config struct {
-	Server   sharedconfig.ServerConfig
-	Database sharedconfig.DatabaseConfig
-	Logging  sharedconfig.LoggingConfig
+	Server         sharedconfig.ServerConfig
+	Database       sharedconfig.DatabaseConfig
+	Logging        sharedconfig.LoggingConfig
+	InternalAPIKey string
 }
 
 // Load reads configuration from environment variables and validates it
 func Load() (*Config, error) {
 	cfg := &Config{
-		Server:   sharedconfig.LoadServerConfig("8081"),
-		Database: sharedconfig.LoadDatabaseConfig("cairn_rss", "cairn_rss_pass", "cairn_rss"),
-		Logging:  sharedconfig.LoadLoggingConfig(),
+		Server:         sharedconfig.LoadServerConfig("8081"),
+		Database:       sharedconfig.LoadDatabaseConfig("cairn_rss", "cairn_rss_pass", "cairn_rss"),
+		Logging:        sharedconfig.LoadLoggingConfig(),
+		InternalAPIKey: sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -43,6 +45,10 @@ func (c *Config) Validate() error {
 
 	if err := c.Logging.Validate(); err != nil {
 		return fmt.Errorf("logging config: %w", err)
+	}
+
+	if c.InternalAPIKey == "" {
+		return fmt.Errorf("INTERNAL_API_KEY is required for service-to-service authentication")
 	}
 
 	return nil

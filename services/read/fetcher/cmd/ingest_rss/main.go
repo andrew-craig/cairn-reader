@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
 	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/config"
@@ -86,7 +87,8 @@ func main() {
 	slog.Info("component initialized", slog.String("component", "database"))
 
 	// Create router
-	router := api.NewRouter(db)
+	internalAuthMiddleware := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
+	router := api.NewRouter(db, internalAuthMiddleware)
 
 	// Create HTTP server
 	server := &http.Server{

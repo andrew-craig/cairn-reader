@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	rssMigrations "github.com/cairn-app/cairn-reader/services/read/fetcher/migrations"
 	rssSelfhost "github.com/cairn-app/cairn-reader/services/read/fetcher/selfhost"
 )
@@ -23,7 +24,7 @@ func runRSSMigrations(cfg *Config) error {
 	}, rssMigrations.FS)
 }
 
-func mountIngestRSS(ctx context.Context, cfg *Config, r chi.Router, health *healthChecker, logger *slog.Logger) (func(), error) {
+func mountIngestRSS(ctx context.Context, cfg *Config, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
 	sqlDB, closer, err := rssSelfhost.Mount(rssSelfhost.RSSConfig{
 		DBHost:         cfg.DB.Host,
 		DBPort:         cfg.DB.Port,
@@ -33,7 +34,7 @@ func mountIngestRSS(ctx context.Context, cfg *Config, r chi.Router, health *heal
 		DBSSLMode:      cfg.DB.SSLMode,
 		ContentBaseURL: fmt.Sprintf("http://localhost:%s", cfg.Port),
 		InternalAPIKey: cfg.InternalAPIKey,
-	}, r, logger)
+	}, r, internalAuthMiddleware, logger)
 	if err != nil {
 		return nil, err
 	}
