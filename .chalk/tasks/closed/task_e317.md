@@ -2,14 +2,14 @@
 id: task_e317
 title: [P2-C2/H1/H2/H14] Credential material in logs: verification URL at INFO, token prefixes, mobile token logging
 type: task
-status: in_progress
+status: closed
 priority: 0
 labels: [quality,security,wave1,logging]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:43:57Z
-updated_at: 2026-08-12T22:44:28Z
+updated_at: 2026-08-12T23:06:27Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -31,4 +31,20 @@ Violates the project's own "never log passwords or hashes" principle.
 
 ## Done when
 - Log-capture tests fail before the fix for each flow; mobile logging is `__DEV__`-gated and carries no token material.
+
+## Review
+
+PR: https://github.com/andrew-craig/cairn-reader/pull/315
+
+Re-verified all four sub-findings on `main` before starting — all still present at (drifted) line numbers.
+
+- `email_verification_service.go`: dropped `email` and `verification_url` from the INFO log; removed the now-unused `baseURL` field/param and its wiring in `main.go`.
+- `auth_handler.go` / `auth_service.go`: removed the `token_preview` field from every branch of `/auth/refresh` logging (success, invalid, expired, reuse-detected).
+- `apps/mobile/src/services/auth.ts`: gated diagnostic `console.log` calls behind `__DEV__`; stopped logging token previews and full response bodies.
+
+Added buffer-backed `slog` capture tests (users service, both service and handler layers) and a `console.log`/`console.error` capture test (mobile), each verified to fail on pre-fix code and pass after.
+
+Surfaced two pre-existing, unrelated issues while running these tests against a real local Postgres (not fixed here — noted in the PR description for follow-up):
+- Several existing users-service handler tests unmarshal responses without unwrapping `api.WriteSuccess`'s `{"data":...}` envelope, so they panic whenever actually run against a real DB (apparently never exercised in CI today).
+- `isTokenReused`'s exact-timestamp-equality check intermittently misfires on a legitimate first refresh (root of the already-tracked C3 finding).
 
