@@ -290,33 +290,43 @@ export class AuthService {
   static async ensureValidToken(): Promise<boolean> {
     const hasToken = await this.isAuthenticated();
     if (!hasToken) {
-      console.log('[Auth] No access token found, authentication required');
+      if (__DEV__) {
+        console.log('[Auth] No access token found, authentication required');
+      }
       return false;
     }
 
     const isExpired = await this.isTokenExpired();
     if (!isExpired) {
-      const timeLeft = this.expiresAt ? Math.floor((this.expiresAt - Date.now()) / 1000) : 'unknown';
-      console.log(`[Auth] Access token still valid (${timeLeft}s remaining)`);
+      if (__DEV__) {
+        const timeLeft = this.expiresAt ? Math.floor((this.expiresAt - Date.now()) / 1000) : 'unknown';
+        console.log(`[Auth] Access token still valid (${timeLeft}s remaining)`);
+      }
       return true;
     }
 
-    console.log('[Auth] Access token expired or expiring soon, attempting refresh');
+    if (__DEV__) {
+      console.log('[Auth] Access token expired or expiring soon, attempting refresh');
+    }
 
     // Token is expired, need to refresh
     const hasRefresh = await this.hasRefreshToken();
     if (!hasRefresh) {
-      console.log('[Auth] No refresh token available, clearing tokens');
+      if (__DEV__) {
+        console.log('[Auth] No refresh token available, clearing tokens');
+      }
       await this.clearTokens();
       return false;
     }
 
     try {
       await this.refreshAccessToken();
-      console.log('[Auth] Token refresh successful');
+      if (__DEV__) {
+        console.log('[Auth] Token refresh successful');
+      }
       return true;
     } catch (error) {
-      console.error('[Auth] Failed to refresh token:', error);
+      console.error('[Auth] Failed to refresh token:', error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -324,11 +334,15 @@ export class AuthService {
   static async refreshAccessToken(): Promise<void> {
     // If already refreshing, wait for the existing refresh to complete
     if (this.isRefreshing && this.refreshPromise) {
-      console.log('[Auth] Refresh already in progress, waiting for existing refresh');
+      if (__DEV__) {
+        console.log('[Auth] Refresh already in progress, waiting for existing refresh');
+      }
       return this.refreshPromise;
     }
 
-    console.log('[Auth] Starting token refresh');
+    if (__DEV__) {
+      console.log('[Auth] Starting token refresh');
+    }
     this.isRefreshing = true;
     this.refreshPromise = this.doRefreshAccessToken();
 
@@ -350,13 +364,12 @@ export class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const refreshTokenPreview = `${this.refreshToken.substring(0, 20)}...`;
-    console.log(`[Auth] Attempting refresh with token: ${refreshTokenPreview}`);
-    console.log(`[Auth] Refresh endpoint: ${getServerUrl()}/api/v1/auth/refresh`);
+    if (__DEV__) {
+      console.log('[Auth] Attempting token refresh');
+    }
 
     try {
       const requestBody = { refresh_token: this.refreshToken };
-      console.log('[Auth] Sending refresh request...');
 
       const response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
@@ -366,14 +379,11 @@ export class AuthService {
         body: JSON.stringify(requestBody),
       });
 
-      console.log(`[Auth] Refresh response status: ${response.status} ${response.statusText}`);
-
       let result;
       try {
         result = await response.json();
       } catch (parseError) {
         console.error('[Auth] Failed to parse refresh response as JSON:', parseError);
-        console.error('[Auth] Response text will be logged separately');
         throw new Error('Invalid JSON response from refresh endpoint');
       }
 
@@ -381,7 +391,6 @@ export class AuthService {
         console.error('[Auth] Refresh failed with error response:', {
           status: response.status,
           message: result.message || result.error,
-          fullResponse: result,
         });
         throw new Error(result.message || result.error || 'Failed to refresh token');
       }
@@ -399,14 +408,6 @@ export class AuthService {
       }
 
       const expiresAt = Date.now() + (data.expires_in * 1000);
-      const expiresAtDate = new Date(expiresAt).toISOString();
-
-      console.log('[Auth] Refresh successful, saving new tokens', {
-        expiresIn: data.expires_in,
-        expiresAt: expiresAtDate,
-        accessTokenPreview: `${data.access_token.substring(0, 20)}...`,
-        refreshTokenPreview: `${data.refresh_token.substring(0, 20)}...`,
-      });
 
       await this.saveTokens({
         accessToken: data.access_token,
@@ -414,14 +415,12 @@ export class AuthService {
         expiresAt,
       });
 
-      console.log('[Auth] New tokens saved successfully');
+      if (__DEV__) {
+        console.log('[Auth] Token refresh successful');
+      }
     } catch (error) {
       // Clear tokens on ANY error (network issues, parsing errors, HTTP errors, etc.)
-      console.error('[Auth] Refresh failed, clearing all tokens. Error details:', {
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-      });
+      console.error('[Auth] Refresh failed, clearing all tokens:', error instanceof Error ? error.message : String(error));
 
       await this.clearTokens();
       throw error;

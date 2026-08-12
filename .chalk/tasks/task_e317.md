@@ -2,14 +2,14 @@
 id: task_e317
 title: [P2-C2/H1/H2/H14] Credential material in logs: verification URL at INFO, token prefixes, mobile token logging
 type: task
-status: open
+status: in_progress
 priority: 0
 labels: [quality,security,wave1,logging]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:43:57Z
-updated_at: 2026-08-09T06:43:57Z
+updated_at: 2026-08-12T22:44:28Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 

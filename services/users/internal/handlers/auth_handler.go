@@ -292,17 +292,8 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	logger := logging.FromContext(r.Context())
 	requestID := logging.GetRequestIDFromContext(r.Context())
 
-	// Create token preview for debugging (first 20 chars)
-	tokenPreview := ""
-	if len(req.RefreshToken) > 20 {
-		tokenPreview = req.RefreshToken[:20] + "..."
-	} else if len(req.RefreshToken) > 0 {
-		tokenPreview = req.RefreshToken[:len(req.RefreshToken)] + "..."
-	}
-
 	logger.Info("refresh request: processing",
 		slog.String("request_id", requestID),
-		slog.String("token_preview", tokenPreview),
 		slog.String("client_ip", ipAddress),
 	)
 
@@ -317,7 +308,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			logger.Warn("refresh token invalid or not found",
 				slog.String("request_id", requestID),
-				slog.String("token_preview", tokenPreview),
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
@@ -327,7 +317,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "token reuse detected") {
 			logger.Warn("refresh token reuse detected - potential security issue",
 				slog.String("request_id", requestID),
-				slog.String("token_preview", tokenPreview),
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
@@ -337,7 +326,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(err.Error(), "expired") {
 			logger.Info("refresh token expired",
 				slog.String("request_id", requestID),
-				slog.String("token_preview", tokenPreview),
 				slog.String("client_ip", ipAddress),
 			)
 			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
@@ -346,7 +334,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, services.ErrInvalidInput) {
 			logger.Warn("refresh request: invalid input",
 				slog.String("request_id", requestID),
-				slog.String("token_preview", tokenPreview),
 				slog.String("client_ip", ipAddress),
 				slog.String("error", err.Error()),
 			)
@@ -355,7 +342,6 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		}
 		logger.Error("failed to refresh access token",
 			slog.String("request_id", requestID),
-			slog.String("token_preview", tokenPreview),
 			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),
 		)

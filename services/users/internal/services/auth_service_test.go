@@ -1,10 +1,12 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -585,6 +587,70 @@ func TestAuthService_RefreshAccessToken(t *testing.T) {
 		assert.Nil(t, refreshResp2)
 		// Should detect token reuse
 	})
+}
+
+// TestAuthService_RefreshAccessToken_DoesNotLogTokenMaterial guards against H1:
+// no log line emitted by RefreshAccessToken - on success, on an unknown/invalid
+// token, or on an expired token - may contain the raw refresh token or a prefix
+// of it.
+func TestAuthService_RefreshAccessToken_DoesNotLogTokenMaterial(t *testing.T) {
+	service, db, _ := setupTestAuthService(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	email := "refresh-logging@example.com"
+	password := "ValidPass123!"
+	defer cleanupTestUserByEmail(t, db, email)
+
+	registerResp, err := service.Register(ctx, email, password)
+	require.NoError(t, err)
+	refreshToken := registerResp.RefreshToken
+
+	expiredEmail := "refresh-logging-expired@example.com"
+	defer cleanupTestUserByEmail(t, db, expiredEmail)
+	expiredRegisterResp, err := service.Register(ctx, expiredEmail, password)
+	require.NoError(t, err)
+	_, err = db.Pool.Exec(ctx,
+		"UPDATE refresh_tokens SET expires_at = $1 WHERE user_id = $2",
+		time.Now().UTC().Add(-1*time.Hour),
+		expiredRegisterResp.User.ID,
+	)
+	require.NoError(t, err)
+	expiredRefreshToken := expiredRegisterResp.RefreshToken
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	prevDefault := slog.Default()
+	slog.SetDefault(logger)
+	defer slog.SetDefault(prevDefault)
+
+	// Success branch. Note: this may occasionally take the token-reuse-detected
+	// branch instead, due to a pre-existing, unrelated timestamp-equality race
+	// in isTokenReused (tracked separately as finding C3) - either branch is
+	// covered by this fix, so the test doesn't require a specific outcome here.
+	refreshResp, err := service.RefreshAccessToken(ctx, refreshToken, "iPhone", "192.168.1.1")
+	newRefreshToken := ""
+	if err == nil {
+		newRefreshToken = refreshResp.RefreshToken
+	}
+
+	// Unknown/invalid token branch.
+	_, err = service.RefreshAccessToken(ctx, "totally-invalid-refresh-token-value", "", "")
+	assert.Error(t, err)
+
+	// Expired token branch.
+	_, err = service.RefreshAccessToken(ctx, expiredRefreshToken, "", "")
+	assert.Error(t, err)
+
+	output := buf.String()
+	secrets := []string{refreshToken, refreshToken[:20], expiredRefreshToken, expiredRefreshToken[:20]}
+	if newRefreshToken != "" {
+		secrets = append(secrets, newRefreshToken, newRefreshToken[:20])
+	}
+	for _, secret := range secrets {
+		assert.NotContains(t, output, secret, "refresh log output must not contain token material")
+	}
+	assert.NotContains(t, output, "token_preview", "refresh logging must not carry a token_preview field")
 }
 
 func TestAuthService_Logout(t *testing.T) {

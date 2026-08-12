@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -688,6 +689,78 @@ func TestRefresh(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Contains(t, w.Body.String(), "invalid or expired")
 	})
+}
+
+// TestRefresh_DoesNotLogTokenMaterial guards against H1: the /auth/refresh
+// handler must never log the raw refresh token or a prefix of it, on success
+// or on any error branch.
+func TestRefresh_DoesNotLogTokenMaterial(t *testing.T) {
+	handler, db, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	email := "refresh-handler-logging@example.com"
+	password := "SecurePass123!"
+
+	reqBody := RegisterRequest{Email: email, Password: password}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.Register(w, req)
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var registerEnvelope struct {
+		Data services.AuthResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &registerEnvelope))
+	registerResp := registerEnvelope.Data
+	defer cleanupTestUser(t, db, registerResp.User.ID)
+
+	refreshToken := registerResp.RefreshToken
+
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	prevDefault := slog.Default()
+	slog.SetDefault(logger)
+	defer slog.SetDefault(prevDefault)
+
+	// Valid refresh. Note: this may occasionally take the token-reuse-detected
+	// branch instead (401), due to a pre-existing, unrelated timestamp-equality
+	// race in the service layer's reuse detection (tracked separately as finding
+	// C3) - either branch is covered by this fix, so no specific status is required.
+	validBody, _ := json.Marshal(RefreshRequest{RefreshToken: refreshToken})
+	validReq := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(validBody))
+	validReq.Header.Set("Content-Type", "application/json")
+	validW := httptest.NewRecorder()
+	handler.Refresh(validW, validReq)
+	newRefreshToken := ""
+	if validW.Code == http.StatusOK {
+		var refreshEnvelope struct {
+			Data services.AuthResponse `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(validW.Body.Bytes(), &refreshEnvelope))
+		newRefreshToken = refreshEnvelope.Data.RefreshToken
+	}
+
+	// Invalid token.
+	invalidBody, _ := json.Marshal(RefreshRequest{RefreshToken: "totally-invalid-refresh-token-value"})
+	invalidReq := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(invalidBody))
+	invalidReq.Header.Set("Content-Type", "application/json")
+	invalidW := httptest.NewRecorder()
+	handler.Refresh(invalidW, invalidReq)
+	require.Equal(t, http.StatusUnauthorized, invalidW.Code)
+
+	output := logBuf.String()
+	secrets := []string{refreshToken, refreshToken[:20]}
+	if newRefreshToken != "" {
+		secrets = append(secrets, newRefreshToken, newRefreshToken[:20])
+	}
+	for _, secret := range secrets {
+		assert.NotContains(t, output, secret, "refresh handler log output must not contain token material")
+	}
+	assert.NotContains(t, output, "token_preview", "refresh handler logging must not carry a token_preview field")
 }
 
 // TestLogout tests the POST /auth/logout endpoint
