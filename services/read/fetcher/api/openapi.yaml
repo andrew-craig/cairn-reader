@@ -6,6 +6,10 @@ info:
     polling feeds for new content, and delivering content to the Content Service.
     It implements a tiered polling strategy based on feed activity and uses an outbox pattern
     for reliable content delivery.
+
+    This service is internal-facing only, reached through the Content Service gateway.
+    Every route under `/api/v1/source/rss` requires the `X-Internal-API-Key` header —
+    it has no JWT context of its own, so `user_id` in the path is never trusted without it.
   version: 1.0.0
   contact:
     name: Cairn Backend
@@ -18,6 +22,9 @@ servers:
 tags:
   - name: Feed Subscriptions
     description: Feed subscription management operations
+
+security:
+  - InternalApiKey: []
 
 paths:
   /api/v1/source/rss/user/{user_id}/subscription:
@@ -232,6 +239,7 @@ paths:
       summary: Liveness check
       description: Check if the service is running
       operationId: getLiveness
+      security: []
       responses:
         '200':
           description: Service is alive
@@ -251,6 +259,7 @@ paths:
       summary: Readiness check
       description: Check if the service is ready to accept traffic (includes database connection check)
       operationId: getReadiness
+      security: []
       responses:
         '200':
           description: Service is ready
@@ -280,6 +289,12 @@ paths:
                     example: "disconnected"
 
 components:
+  securitySchemes:
+    InternalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+      description: Shared secret for internal service-to-service calls (Content Service is the only caller)
   schemas:
     SubscribeToFeedRequest:
       type: object

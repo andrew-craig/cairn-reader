@@ -129,7 +129,7 @@ func main() {
 	closers = append(closers, contentCloser)
 
 	slog.Info("initializing ingest RSS service")
-	rssCloser, err := mountIngestRSS(ctx, cfg, r, health, logger)
+	rssCloser, err := mountIngestRSS(ctx, cfg, r, internalAuthMiddleware, health, logger)
 	if err != nil {
 		slog.Error("failed to initialize ingest RSS service", slog.Any("error", err))
 		os.Exit(1)

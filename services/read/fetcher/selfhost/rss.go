@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	rssAPI "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/api"
 	rssClient "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/client"
 	rssDB "github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
@@ -60,7 +61,7 @@ func RunMigrations(cfg RSSConfig, migrations fs.FS) error {
 
 // Mount initializes the RSS ingest service and mounts routes.
 // Returns the underlying *sql.DB for health checks, a cleanup function, and any error.
-func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), error) {
+func Mount(cfg RSSConfig, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (*sql.DB, func(), error) {
 	dbConfig := &rssDB.Config{
 		Host:            cfg.DBHost,
 		Port:            cfg.DBPort,
@@ -79,7 +80,7 @@ func Mount(cfg RSSConfig, r chi.Router, logger *slog.Logger) (*sql.DB, func(), e
 		return nil, nil, fmt.Errorf("rss db: %w", err)
 	}
 
-	rssRouter := rssAPI.NewRouter(db)
+	rssRouter := rssAPI.NewRouter(db, internalAuthMiddleware)
 	r.Handle("/api/v1/source/rss", rssRouter)
 	r.Handle("/api/v1/source/rss/*", rssRouter)
 

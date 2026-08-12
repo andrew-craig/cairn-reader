@@ -36,7 +36,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	// Initialize services
 	contentService := service.NewContentService(contentRepo, db.DB)
 	urlDetector := service.NewURLDetector()
-	ingestRSSClient := service.NewIngestRSSClient(ingestRSSServiceURL)
+	ingestRSSClient := service.NewIngestRSSClient(ingestRSSServiceURL, internalAPIKey)
 	emailIngestClient := service.NewEmailIngestClient(emailIngestServiceURL, internalAPIKey)
 
 	// Initialize handlers

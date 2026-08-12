@@ -19,14 +19,16 @@ var ErrSubscriptionNotFound = errors.New("subscription not found")
 
 // IngestRSSClient handles communication with the Ingest RSS service
 type IngestRSSClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL        string
+	internalAPIKey string
+	httpClient     *http.Client
 }
 
 // NewIngestRSSClient creates a new Ingest RSS service client
-func NewIngestRSSClient(baseURL string) *IngestRSSClient {
+func NewIngestRSSClient(baseURL, internalAPIKey string) *IngestRSSClient {
 	return &IngestRSSClient{
-		baseURL: baseURL,
+		baseURL:        baseURL,
+		internalAPIKey: internalAPIKey,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -103,6 +105,7 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
@@ -159,6 +162,7 @@ func (c *IngestRSSClient) UnsubscribeUserFromFeed(ctx context.Context, userID, f
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)
@@ -196,6 +200,7 @@ func (c *IngestRSSClient) ListUserSubscriptions(ctx context.Context, userID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
 	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)

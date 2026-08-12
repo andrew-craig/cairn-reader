@@ -1194,7 +1194,9 @@ unauthenticated, contrary to what some drifted docs claim.
 - robfig/cron for job scheduling
 - sony/gobreaker for circuit breaker
 
-**Endpoints** (all under `/api/v1/source/rss`; see `services/read/fetcher/api/openapi.yaml`):
+**Endpoints** (all under `/api/v1/source/rss`, requiring the `X-Internal-API-Key` header — this
+service has no JWT context of its own and is only reached through the Content Service gateway;
+see `services/read/fetcher/api/openapi.yaml`):
 ```
 POST   /api/v1/source/rss/user/{user_id}/subscription           # Subscribe to feed
 GET    /api/v1/source/rss/user/{user_id}/subscription           # List user's feeds

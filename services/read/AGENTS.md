@@ -443,26 +443,39 @@ GET  /health/live                                               → Liveness che
 GET  /health/ready                                              → Readiness check (includes DB)
 ```
 
-**Feed Subscriptions**:
+**Feed Subscriptions** (⚠️ Internal only — requires `X-Internal-API-Key` header):
 ```
 POST   /api/v1/source/rss/user/{user_id}/subscription          → Subscribe to feed
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: {"feed_url": "https://..."}
+       Returns: 401 if missing/invalid internal API key
 
 DELETE /api/v1/source/rss/user/{user_id}/subscription/{feed_id} → Unsubscribe
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
+       Returns: 401 if missing/invalid internal API key
 
 GET    /api/v1/source/rss/user/{user_id}/subscription          → List user's feeds
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
+       Returns: 401 if missing/invalid internal API key
 ```
 
-**Feed Management**:
+**Feed Management** (⚠️ Internal only — requires `X-Internal-API-Key` header):
 ```
 PATCH  /api/v1/source/rss/feed/{feed_id}                       → Enable feed
+       Auth: X-Internal-API-Key header (must match INTERNAL_API_KEY)
        Body: {"enabled": true}
        Note: {"enabled": false} is accepted but currently a no-op (disabling isn't wired up yet)
+       Returns: 401 if missing/invalid internal API key
 ```
 
 Note: there is no `GET /api/v1/source/rss/feed` (list all), `GET /api/v1/source/rss/feed/{feed_id}`
 (get details), or `POST /api/v1/source/rss/feed/{feed_id}/refresh` endpoint — these are not
 implemented in `fetcher/internal/api/router.go`.
+
+This service has no JWT context of its own — every route under `/api/v1/source/rss` is reached
+only through the Content Service gateway, which validates the caller's JWT and matches `user_id`
+before proxying. `user_id` in the path is never trusted on its own; the `X-Internal-API-Key`
+header is what proves the caller is Content Service.
 
 ## JWT Authentication
 
@@ -916,6 +929,7 @@ DB_USER=cairn_rss
 DB_PASSWORD=...
 DB_NAME=rss_fetcher_service
 LOG_LEVEL=info
+INTERNAL_API_KEY=...                   # Required; validates X-Internal-API-Key on /api/v1/source/rss
 ```
 
 ### Ingest RSS Worker (`cmd/ingest_rss_worker`)

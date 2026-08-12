@@ -267,6 +267,7 @@ services:
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSL_MODE=disable
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy
