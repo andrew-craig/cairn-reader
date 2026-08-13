@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	fetcherMigrations "github.com/cairn-app/cairn-reader/services/explore/fetcher/migrations"
 	fetcherSelfhost "github.com/cairn-app/cairn-reader/services/explore/fetcher/selfhost"
 )
@@ -17,7 +18,7 @@ func runFetcherMigrations(cfg *Config) error {
 	return fetcherSelfhost.RunMigrations(connStr, fetcherMigrations.FS)
 }
 
-func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, health *healthChecker, logger *slog.Logger) (func(), error) {
+func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
 	return fetcherSelfhost.Mount(ctx, fetcherSelfhost.FetcherConfig{
 		DBHost:         cfg.DB.Host,
 		DBPort:         fmt.Sprintf("%d", cfg.DB.Port),
@@ -28,5 +29,6 @@ func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, health 
 		FeedListURL:    cfg.FeedListURL,
 		FetchInterval:  cfg.FetchInterval,
 		RecommenderURL: fmt.Sprintf("http://localhost:%s", cfg.Port),
-	}, r, logger)
+		InternalAPIKey: cfg.InternalAPIKey,
+	}, r, internalAuthMiddleware, logger)
 }

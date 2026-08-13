@@ -155,16 +155,16 @@ curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
 ```
 
-#### Feed Management
+#### Feed Management (⚠️ Internal only — requires `X-Internal-API-Key` header)
 ```bash
 # Manually trigger feed fetch
-curl -X POST http://localhost:8080/api/v1/explore/feed/fetch
+curl -X POST -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/fetch
 
 # Sync feeds from Kagi Small Web
-curl -X POST http://localhost:8080/api/v1/explore/feed/sync
+curl -X POST -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/sync
 
 # Get feed statistics
-curl http://localhost:8080/api/v1/explore/feed/stats
+curl -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/stats
 ```
 
 ### Explore Recommender (port 8081)
@@ -178,7 +178,7 @@ curl http://localhost:8081/health/live
 curl http://localhost:8081/health/ready
 ```
 
-#### Article Management
+#### Article Management (⚠️ Internal only — requires `X-Internal-API-Key` header)
 ```bash
 # Submit articles (from fetcher) — note the request wraps articles in an
 # "articles" array, and fields are "published"/"feed_url"/"feed_title"/
@@ -186,6 +186,7 @@ curl http://localhost:8081/health/ready
 # not a hash of the link (see Article ID Generation below)
 curl -X POST http://localhost:8081/api/v1/explore/article \
   -H "Content-Type: application/json" \
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY" \
   -d '{
     "articles": [{
       "id": "...",
@@ -493,9 +494,19 @@ go run recommender/cmd/explore_cleanup/main.go
 - Middleware: `pkg/auth/middleware.go` (shared package, not local to the recommender)
 - Extracts `user_id` from JWT claims
 
+**Internal API key authentication** (both services):
+- The fetcher's manual trigger endpoints and the recommender's article-submission
+  endpoint require the `X-Internal-API-Key` header (shared `INTERNAL_API_KEY` secret)
+- Middleware: `pkg/auth/internal_auth.go` (`RequireInternalAPIKey`, shared package)
+
 **Public Endpoints**:
 - Health checks (`/health/live`, `/health/ready`)
-- Article submission (`POST /api/v1/explore/article`)
+
+**Internal-only Endpoints** (require `X-Internal-API-Key`):
+- Article submission (`POST /api/v1/explore/article`) — recommender
+- Trigger feed fetch (`POST /api/v1/explore/feed/fetch`) — fetcher
+- Trigger feed sync (`POST /api/v1/explore/feed/sync`) — fetcher
+- Feed statistics (`GET /api/v1/explore/feed/stats`) — fetcher
 
 **Protected Endpoints** (require JWT):
 - Recommendations (`GET /api/v1/explore/recommendation`)
@@ -755,6 +766,7 @@ DB_PASSWORD=fetcher_password       # Database password
 DB_NAME=fetcher_db                 # Database name
 FEED_LIST_PATH=/app/feeds/feeds.txt   # Mount your own list here to override the default
 FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+INTERNAL_API_KEY=...                  # Required; validates X-Internal-API-Key on manual triggers, and sent to the recommender's article-submission endpoint
 ```
 Note: the 30-second per-fetch HTTP timeout and the 10-consecutive-failure auto-disable
 threshold are hardcoded (`pkg/rss/fetch` and `feed_repository.go` respectively), not
@@ -776,6 +788,8 @@ ARTICLE_RETENTION_DAYS=90          # Delete articles after N days
 VAULT_ADDR=http://localhost:8200              # HashiCorp Vault address
 VAULT_TOKEN=dev-root-token                    # Vault token
 JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key  # Path to JWT public key
+
+INTERNAL_API_KEY=...                          # Required; validates X-Internal-API-Key on article submission
 ```
 
 ## Common Development Tasks

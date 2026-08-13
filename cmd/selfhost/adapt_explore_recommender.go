@@ -18,7 +18,7 @@ func runRecommenderMigrations(cfg *Config) error {
 	return recSelfhost.RunMigrations(connStr, recMigrations.FS)
 }
 
-func mountExploreRecommender(ctx context.Context, cfg *Config, r chi.Router, authMiddleware *auth.Middleware, health *healthChecker, logger *slog.Logger) (func(), error) {
+func mountExploreRecommender(ctx context.Context, cfg *Config, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
 	return recSelfhost.Mount(ctx, recSelfhost.RecommenderConfig{
 		DBHost:               cfg.DB.Host,
 		DBPort:               fmt.Sprintf("%d", cfg.DB.Port),
@@ -26,5 +26,5 @@ func mountExploreRecommender(ctx context.Context, cfg *Config, r chi.Router, aut
 		DBPassword:           cfg.DB.Password,
 		DBName:               cfg.DBNameRecommender,
 		ArticleRetentionDays: cfg.ArticleRetentionDays,
-	}, r, authMiddleware, logger)
+	}, r, authMiddleware, internalAuthMiddleware, logger)
 }

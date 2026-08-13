@@ -45,6 +45,7 @@ type Config struct {
 	Logging              sharedconfig.LoggingConfig
 	Vault                VaultConfig
 	ArticleRetentionDays int
+	InternalAPIKey       string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -63,6 +64,7 @@ func Load() (*Config, error) {
 			PublicKeyRefreshInterval: sharedconfig.GetDuration("JWT_PUBLIC_KEY_REFRESH_INTERVAL", 5*time.Minute),
 		},
 		ArticleRetentionDays: sharedconfig.GetInt("ARTICLE_RETENTION_DAYS", 90),
+		InternalAPIKey:       sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -99,6 +101,10 @@ func (c *Config) Validate() error {
 
 	if c.ArticleRetentionDays <= 0 {
 		return fmt.Errorf("ARTICLE_RETENTION_DAYS must be greater than 0")
+	}
+
+	if c.InternalAPIKey == "" {
+		return fmt.Errorf("INTERNAL_API_KEY is required for service-to-service authentication")
 	}
 
 	return nil

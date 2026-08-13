@@ -139,7 +139,8 @@ func main() {
 	)
 
 	// Initialize API server with auth middleware
-	server := api.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, logger)
+	internalAuthMiddleware := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
+	server := api.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, internalAuthMiddleware, logger)
 	httpServer := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
 		Handler:      server.Routes(),

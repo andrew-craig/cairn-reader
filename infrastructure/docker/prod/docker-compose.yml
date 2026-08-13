@@ -256,6 +256,7 @@ services:
       - VAULT_SECRET_ID=${EXPLORE_RECOMMENDER_SECRET_ID}
       - VAULT_AUTH_PATH=approle
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -295,6 +296,7 @@ services:
       # at startup. Mount your own curated list as a volume to override.
       - FEED_LIST_PATH=/app/feeds/feeds.txt
       - FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy

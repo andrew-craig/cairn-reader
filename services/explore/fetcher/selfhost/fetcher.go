@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/auth"
 	fetcherClient "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
 	fetcherDB "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
@@ -27,6 +28,7 @@ type FetcherConfig struct {
 	FeedListURL    string
 	FetchInterval  time.Duration
 	RecommenderURL string
+	InternalAPIKey string
 }
 
 // RunMigrations runs embedded migrations for the fetcher database.
@@ -35,7 +37,7 @@ func RunMigrations(connString string, migrations fs.FS) error {
 }
 
 // Mount initializes the fetcher service and mounts routes.
-func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, logger *slog.Logger) (func(), error) {
+func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (func(), error) {
 	dbConfig := &fetcherDB.Config{
 		Host:     cfg.DBHost,
 		Port:     cfg.DBPort,
@@ -58,7 +60,7 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, logger *slog.Lo
 		}
 	}()
 
-	recommenderClient := fetcherClient.NewRecommenderClient(cfg.RecommenderURL)
+	recommenderClient := fetcherClient.NewRecommenderClient(cfg.RecommenderURL, cfg.InternalAPIKey)
 	feedFetcher := fetcher.NewFetcher(feedRepo, recommenderClient, cfg.FetchInterval)
 
 	go func() {
@@ -68,6 +70,7 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, logger *slog.Lo
 	}()
 
 	r.Route("/api/v1/explore/feed", func(r chi.Router) {
+		r.Use(internalAuthMiddleware.RequireInternalAPIKey)
 		r.Post("/fetch", func(w http.ResponseWriter, req *http.Request) {
 			go func() {
 				if err := feedFetcher.FetchSingleFeed(ctx); err != nil {

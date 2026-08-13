@@ -17,25 +17,27 @@ import (
 
 // Server holds the API server dependencies
 type Server struct {
-	db             *pgxpool.Pool
-	articleRepo    db.ArticleRepositoryInterface
-	userRepo       db.UserRepositoryInterface
-	voteRepo       db.VoteRepositoryInterface
-	engine         *recommend.Engine
-	authMiddleware *auth.Middleware
-	logger         *slog.Logger
+	db                     *pgxpool.Pool
+	articleRepo            db.ArticleRepositoryInterface
+	userRepo               db.UserRepositoryInterface
+	voteRepo               db.VoteRepositoryInterface
+	engine                 *recommend.Engine
+	authMiddleware         *auth.Middleware
+	internalAuthMiddleware *auth.InternalAuthMiddleware
+	logger                 *slog.Logger
 }
 
 // NewServer creates a new API server
-func NewServer(database *pgxpool.Pool, articleRepo db.ArticleRepositoryInterface, userRepo db.UserRepositoryInterface, voteRepo db.VoteRepositoryInterface, engine *recommend.Engine, authMiddleware *auth.Middleware, logger *slog.Logger) *Server {
+func NewServer(database *pgxpool.Pool, articleRepo db.ArticleRepositoryInterface, userRepo db.UserRepositoryInterface, voteRepo db.VoteRepositoryInterface, engine *recommend.Engine, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) *Server {
 	return &Server{
-		db:             database,
-		articleRepo:    articleRepo,
-		userRepo:       userRepo,
-		voteRepo:       voteRepo,
-		engine:         engine,
-		authMiddleware: authMiddleware,
-		logger:         logger,
+		db:                     database,
+		articleRepo:            articleRepo,
+		userRepo:               userRepo,
+		voteRepo:               voteRepo,
+		engine:                 engine,
+		authMiddleware:         authMiddleware,
+		internalAuthMiddleware: internalAuthMiddleware,
+		logger:                 logger,
 	}
 }
 
@@ -61,8 +63,9 @@ func (s *Server) Routes() http.Handler {
 	// API v1 routes
 	r.Route("/api/v1/explore", func(r chi.Router) {
 		r.Use(sharedmw.RequireHTTPS)
-		// Public API routes - no authentication required
-		r.Post("/article", s.handleArticles)
+
+		// Internal service-to-service route - the fetcher submits articles here.
+		r.With(s.internalAuthMiddleware.RequireInternalAPIKey).Post("/article", s.handleArticles)
 
 		// Protected recommendation route - user identified by JWT
 		r.With(s.authMiddleware.RequireAuth).Get("/recommendation", s.handleRecommendations)
