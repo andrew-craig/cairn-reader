@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 	"golang.org/x/net/html"
 )
@@ -51,6 +52,9 @@ func NewURLDetector() URLDetector {
 	return &urlDetectorImpl{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				DialContext: fetch.DialContext,
+			},
 		},
 	}
 }

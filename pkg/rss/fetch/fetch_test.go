@@ -27,7 +27,7 @@ func TestFetch_SetsUserAgent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	resp, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	require.NoError(t, err)
 	assert.Equal(t, fetch.UserAgent, gotUA)
 	assert.Equal(t, []byte("body"), resp.Body)
@@ -48,13 +48,13 @@ func TestFetch_ConditionalGet_ETag(t *testing.T) {
 	defer srv.Close()
 
 	// First fetch — no ETag yet
-	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	resp, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	require.NoError(t, err)
 	assert.False(t, resp.NotModified)
 	assert.Equal(t, etag, resp.ETag)
 
 	// Second fetch — sends ETag, gets 304
-	resp2, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{ETag: resp.ETag})
+	resp2, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{ETag: resp.ETag})
 	require.NoError(t, err)
 	assert.True(t, resp2.NotModified)
 	assert.Equal(t, http.StatusNotModified, resp2.StatusCode)
@@ -74,11 +74,11 @@ func TestFetch_ConditionalGet_LastModified(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	resp, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	require.NoError(t, err)
 	assert.Equal(t, lastMod, resp.LastModified)
 
-	resp2, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{LastModified: resp.LastModified})
+	resp2, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{LastModified: resp.LastModified})
 	require.NoError(t, err)
 	assert.True(t, resp2.NotModified)
 }
@@ -89,7 +89,7 @@ func TestFetch_Non2xxError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	_, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
@@ -100,7 +100,7 @@ func TestFetch_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	_, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	assert.Error(t, err)
 }
 
@@ -111,7 +111,7 @@ func TestFetch_ContextCancellation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(fetch.AllowLoopbackForTesting(context.Background()))
 	cancel() // cancel immediately
 
 	_, err := fetch.Fetch(ctx, srv.URL, fetch.FetchOpts{})
@@ -130,7 +130,7 @@ func TestFetch_BodyExceedsLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
+	_, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds limit")
 }
@@ -141,7 +141,7 @@ func TestFetch_BodyAtLimit(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
+	resp, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{MaxBodySize: 10})
 	require.NoError(t, err)
 	assert.Equal(t, 10, len(resp.Body))
 }
@@ -153,7 +153,7 @@ func TestFetch_DefaultLimitApplied(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := fetch.Fetch(context.Background(), srv.URL, fetch.FetchOpts{})
+	resp, err := fetch.Fetch(fetch.AllowLoopbackForTesting(context.Background()), srv.URL, fetch.FetchOpts{})
 	require.NoError(t, err)
 	assert.Equal(t, []byte("small"), resp.Body)
 }

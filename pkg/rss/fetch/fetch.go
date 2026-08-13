@@ -39,6 +39,7 @@ var sharedClient = &http.Client{
 	Transport: &http.Transport{
 		MaxIdleConnsPerHost: maxIdlePerHost,
 		IdleConnTimeout:     idleConnTimeout,
+		DialContext:         DialContext,
 	},
 }
 

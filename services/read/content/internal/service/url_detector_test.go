@@ -4,10 +4,35 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 )
+
+// TestNewURLDetector_UsesGuardedDialer proves the detector's HTTP client is
+// wired to the shared SSRF guard (pkg/rss/fetch.DialContext) rather than a
+// plain dialer that would follow caller-supplied URLs into loopback/RFC1918/
+// link-local/metadata addresses.
+func TestNewURLDetector_UsesGuardedDialer(t *testing.T) {
+	detector, ok := NewURLDetector().(*urlDetectorImpl)
+	if !ok {
+		t.Fatal("expected NewURLDetector() to return *urlDetectorImpl")
+	}
+
+	transport, ok := detector.httpClient.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		t.Fatal("expected httpClient.Transport to be a configured *http.Transport")
+	}
+
+	got := reflect.ValueOf(transport.DialContext).Pointer()
+	want := reflect.ValueOf(fetch.DialContext).Pointer()
+	if got != want {
+		t.Error("expected httpClient.Transport.DialContext to be fetch.DialContext")
+	}
+}
 
 func TestDetectURL_RSSFeed(t *testing.T) {
 	// Create test server that returns RSS feed
@@ -30,7 +55,7 @@ func TestDetectURL_RSSFeed(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	result, err := detector.DetectURL(context.Background(), server.URL)
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -65,7 +90,7 @@ func TestDetectURL_AtomFeed(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	result, err := detector.DetectURL(context.Background(), server.URL)
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -100,7 +125,7 @@ func TestDetectURL_HTMLPage(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	result, err := detector.DetectURL(context.Background(), server.URL)
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -131,7 +156,7 @@ func TestDetectURL_HTMLPageNoTitle(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	result, err := detector.DetectURL(context.Background(), server.URL)
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -155,7 +180,7 @@ func TestDetectURL_Timeout(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(fetch.AllowLoopbackForTesting(context.Background()), 10*time.Second)
 	defer cancel()
 
 	result, err := detector.DetectURL(ctx, server.URL)
@@ -207,7 +232,7 @@ func TestDetectURL_FeedByURL(t *testing.T) {
 
 	detector := NewURLDetector()
 	// Add /feed.xml to URL to trigger URL pattern detection
-	result, err := detector.DetectURL(context.Background(), server.URL+"/feed.xml")
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), server.URL+"/feed.xml")
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -241,7 +266,7 @@ func TestDetectURL_Redirect(t *testing.T) {
 	defer redirectServer.Close()
 
 	detector := NewURLDetector()
-	result, err := detector.DetectURL(context.Background(), redirectServer.URL)
+	result, err := detector.DetectURL(fetch.AllowLoopbackForTesting(context.Background()), redirectServer.URL)
 
 	if err != nil {
 		t.Fatalf("DetectURL() error = %v", err)
@@ -419,7 +444,7 @@ func TestDiscoverFeeds_HTMLWithLinkTags(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+	feeds, err := detector.DiscoverFeeds(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DiscoverFeeds() error = %v", err)
@@ -467,7 +492,7 @@ func TestDiscoverFeeds_NoFeeds(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+	feeds, err := detector.DiscoverFeeds(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DiscoverFeeds() error = %v", err)
@@ -493,7 +518,7 @@ func TestDiscoverFeeds_DirectFeed(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+	feeds, err := detector.DiscoverFeeds(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DiscoverFeeds() error = %v", err)
@@ -538,7 +563,7 @@ func TestDiscoverFeeds_CommonPathFallback(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+	feeds, err := detector.DiscoverFeeds(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DiscoverFeeds() error = %v", err)
@@ -584,7 +609,7 @@ func TestDiscoverFeeds_Deduplication(t *testing.T) {
 	defer server.Close()
 
 	detector := NewURLDetector()
-	feeds, err := detector.DiscoverFeeds(context.Background(), server.URL)
+	feeds, err := detector.DiscoverFeeds(fetch.AllowLoopbackForTesting(context.Background()), server.URL)
 
 	if err != nil {
 		t.Fatalf("DiscoverFeeds() error = %v", err)
