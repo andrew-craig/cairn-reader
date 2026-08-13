@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
 	"golang.org/x/net/html"
 )
@@ -51,6 +52,13 @@ func NewURLDetector() URLDetector {
 	return &urlDetectorImpl{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
+			// No Proxy is set (deliberately, not an oversight): honoring
+			// HTTP(S)_PROXY would send the request to the proxy without
+			// ever invoking DialContext on the target host, bypassing the
+			// SSRF guard entirely.
+			Transport: &http.Transport{
+				DialContext: fetch.DialContext,
+			},
 		},
 	}
 }
