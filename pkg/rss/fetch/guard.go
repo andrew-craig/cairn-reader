@@ -13,10 +13,14 @@ import (
 // cloud-metadata address, which lives in the link-local range.
 var ErrBlockedAddress = errors.New("fetch: blocked address (loopback, private, link-local, or unspecified)")
 
-// Resolver resolves a hostname to its IP addresses. Satisfied by
-// *net.Resolver; tests may substitute a fake to exercise DNS-based bypass
-// attempts without a real DNS server.
-type Resolver interface {
+// resolver resolves a hostname to its IP addresses. Satisfied by
+// *net.Resolver; unexported because the only production caller is DialContext
+// itself — tests substitute a fake via ContextWithResolver/fetchtest to
+// exercise DNS-based bypass attempts without a real DNS server. An unexported
+// interface can still be implemented and passed in from another package
+// (Go's interface satisfaction is structural), which is how fetchtest.
+// FakeResolver works.
+type resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
@@ -30,34 +34,19 @@ const (
 // AllowLoopbackForTesting returns a context that permits the guarded dialer
 // to dial loopback addresses. It exists solely so httptest-based tests (which
 // bind their servers to 127.0.0.1) can exercise a real fetch; RFC1918,
-// link-local, and unspecified ranges are still blocked. Never call this
-// outside a test.
+// link-local, and unspecified ranges are still blocked. Production code must
+// never call this — see fetchtest.AllowLoopback for the intended test-only
+// entry point.
 func AllowLoopbackForTesting(ctx context.Context) context.Context {
 	return context.WithValue(ctx, allowLoopbackContextKey, true)
 }
 
-// ContextWithResolver overrides the Resolver the guarded dialer uses to look
+// ContextWithResolver overrides the resolver the guarded dialer uses to look
 // up hostnames. It exists for tests that need to exercise a hostname
-// resolving to a blocked IP without standing up a real DNS server.
-func ContextWithResolver(ctx context.Context, r Resolver) context.Context {
+// resolving to a blocked IP without standing up a real DNS server — see
+// fetchtest.WithResolver for the intended test-only entry point.
+func ContextWithResolver(ctx context.Context, r resolver) context.Context {
 	return context.WithValue(ctx, resolverContextKey, r)
-}
-
-// FakeResolver is a Resolver returning a fixed set of IPs per hostname, for
-// tests exercising DNS-based bypass scenarios.
-type FakeResolver map[string][]net.IP
-
-// LookupIPAddr implements Resolver.
-func (f FakeResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAddr, error) {
-	ips, ok := f[host]
-	if !ok {
-		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
-	}
-	addrs := make([]net.IPAddr, len(ips))
-	for i, ip := range ips {
-		addrs[i] = net.IPAddr{IP: ip}
-	}
-	return addrs, nil
 }
 
 func isBlockedIP(ip net.IP, allowLoopback bool) bool {
@@ -83,11 +72,11 @@ func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if literal := net.ParseIP(host); literal != nil {
 		ips = []net.IP{literal}
 	} else {
-		resolver := Resolver(net.DefaultResolver)
-		if r, ok := ctx.Value(resolverContextKey).(Resolver); ok && r != nil {
-			resolver = r
+		res := resolver(net.DefaultResolver)
+		if r, ok := ctx.Value(resolverContextKey).(resolver); ok && r != nil {
+			res = r
 		}
-		resolved, err := resolver.LookupIPAddr(ctx, host)
+		resolved, err := res.LookupIPAddr(ctx, host)
 		if err != nil {
 			return nil, fmt.Errorf("fetch: resolve %q: %w", host, err)
 		}

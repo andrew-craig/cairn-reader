@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,17 +46,17 @@ func TestFetch_BlocksRedirectToInternalAddress(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ctx := fetch.AllowLoopbackForTesting(context.Background())
+	ctx := fetchtest.AllowLoopback(context.Background())
 	_, err := fetch.Fetch(ctx, srv.URL, fetch.FetchOpts{})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, fetch.ErrBlockedAddress)
 }
 
 func TestFetch_BlocksHostnameResolvingToInternalIP(t *testing.T) {
-	resolver := fetch.FakeResolver{
+	resolver := fetchtest.FakeResolver{
 		"internal.example.test": {net.ParseIP("169.254.169.254")},
 	}
-	ctx := fetch.ContextWithResolver(context.Background(), resolver)
+	ctx := fetchtest.WithResolver(context.Background(), resolver)
 
 	_, err := fetch.Fetch(ctx, "http://internal.example.test/", fetch.FetchOpts{})
 	require.Error(t, err)
@@ -66,10 +67,10 @@ func TestFetch_BlocksHostnameWithAnyResolvedIPInternal(t *testing.T) {
 	// DNS can return multiple addresses; if any one of them is internal the
 	// whole lookup must be refused rather than silently dialing whichever
 	// address happens to look safe.
-	resolver := fetch.FakeResolver{
+	resolver := fetchtest.FakeResolver{
 		"mixed.example.test": {net.ParseIP("93.184.216.34"), net.ParseIP("10.0.0.1")},
 	}
-	ctx := fetch.ContextWithResolver(context.Background(), resolver)
+	ctx := fetchtest.WithResolver(context.Background(), resolver)
 
 	_, err := fetch.Fetch(ctx, "http://mixed.example.test/", fetch.FetchOpts{})
 	require.Error(t, err)
@@ -88,8 +89,8 @@ func TestFetch_AllowsHostnameResolvingToPublicIP(t *testing.T) {
 	host, port, err := net.SplitHostPort(srv.Listener.Addr().String())
 	require.NoError(t, err)
 
-	resolver := fetch.FakeResolver{"public.example.test": {net.ParseIP(host)}}
-	ctx := fetch.ContextWithResolver(fetch.AllowLoopbackForTesting(context.Background()), resolver)
+	resolver := fetchtest.FakeResolver{"public.example.test": {net.ParseIP(host)}}
+	ctx := fetchtest.WithResolver(fetchtest.AllowLoopback(context.Background()), resolver)
 
 	resp, err := fetch.Fetch(ctx, "http://public.example.test:"+port+"/", fetch.FetchOpts{})
 	require.NoError(t, err)
