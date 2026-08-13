@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	fetcherAPI "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/api"
 	fetcherClient "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
 	fetcherDB "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
@@ -69,42 +69,12 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMid
 		}
 	}()
 
-	r.Route("/api/v1/explore/feed", func(r chi.Router) {
-		r.Use(internalAuthMiddleware.RequireInternalAPIKey)
-		r.Post("/fetch", func(w http.ResponseWriter, req *http.Request) {
-			go func() {
-				if err := feedFetcher.FetchSingleFeed(ctx); err != nil {
-					slog.Error("error in fetch goroutine", slog.Any("error", err))
-				}
-			}()
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusAccepted)
-			_, _ = w.Write([]byte(`{"data":{"status":"fetch triggered"}}`))
-		})
-
-		r.Get("/stats", func(w http.ResponseWriter, req *http.Request) {
-			total, enabled, disabled, neverFetched, err := feedRepo.GetFeedStats(req.Context())
-			if err != nil {
-				http.Error(w, "Failed to retrieve feed statistics", http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = fmt.Fprintf(w, `{"data":{"total":%d,"enabled":%d,"disabled":%d,"never_fetched":%d}}`,
-				total, enabled, disabled, neverFetched)
-		})
-
-		r.Post("/sync", func(w http.ResponseWriter, req *http.Request) {
-			go func() {
-				if err := feedSyncer.SyncOnce(ctx); err != nil {
-					slog.Error("error in sync goroutine", slog.Any("error", err))
-				}
-			}()
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusAccepted)
-			_, _ = w.Write([]byte(`{"data":{"status":"sync triggered"}}`))
-		})
-	})
+	// Mount the same router the standalone binary uses (rather than
+	// re-declaring the routes here) so the router-inventory auth ratchet in
+	// internal/api/router_auth_test.go covers this deployment path too.
+	handler := fetcherAPI.NewRouter(ctx, database, feedRepo, feedFetcher, feedSyncer, internalAuthMiddleware, logger)
+	r.Handle("/api/v1/explore/feed", handler)
+	r.Handle("/api/v1/explore/feed/*", handler)
 
 	return func() { database.Close() }, nil
 }
