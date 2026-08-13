@@ -28,6 +28,7 @@ type Config struct {
 	FetchInterval  time.Duration
 	FeedListPath   string
 	FeedListURL    string
+	InternalAPIKey string
 }
 
 // Load reads configuration from environment variables and validates it
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 		FetchInterval:  sharedconfig.GetDuration("FETCH_INTERVAL", 60*time.Second),
 		FeedListPath:   sharedconfig.GetString("FEED_LIST_PATH", DefaultFeedListPath),
 		FeedListURL:    sharedconfig.GetString("FEED_LIST_URL", DefaultFeedListURL),
+		InternalAPIKey: sharedconfig.GetString("INTERNAL_API_KEY", ""),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -73,6 +75,10 @@ func (c *Config) Validate() error {
 
 	if c.FeedListPath == "" && c.FeedListURL == "" {
 		return fmt.Errorf("one of FEED_LIST_PATH or FEED_LIST_URL must be set")
+	}
+
+	if c.InternalAPIKey == "" {
+		return fmt.Errorf("INTERNAL_API_KEY is required for service-to-service authentication")
 	}
 
 	return nil

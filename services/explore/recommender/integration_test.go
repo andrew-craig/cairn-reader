@@ -25,6 +25,31 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// testInternalAPIKey is the shared secret these tests use to authenticate
+// as the fetcher against the recommender's internal article-submission endpoint.
+const testInternalAPIKey = "test-internal-key"
+
+// postArticles submits articles to the recommender's internal endpoint,
+// authenticating as the fetcher via X-Internal-API-Key.
+func postArticles(t *testing.T, serverURL string, articles []models.Article) *http.Response {
+	t.Helper()
+	payload, err := json.Marshal(map[string][]models.Article{"articles": articles})
+	if err != nil {
+		t.Fatalf("Failed to marshal articles: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/v1/explore/article", bytes.NewBuffer(payload))
+	if err != nil {
+		t.Fatalf("Failed to build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", testInternalAPIKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to submit articles: %v", err)
+	}
+	return resp
+}
+
 // Integration test configuration
 type IntegrationTestSuite struct {
 	database    *pgxpool.Pool
@@ -80,12 +105,13 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 
 	// Create auth middleware with test validator
 	authMiddleware := auth.NewMiddleware(validator)
+	internalAuthMiddleware := auth.NewInternalAuthMiddleware(testInternalAPIKey)
 
 	// Create a test logger
 	testLogger := slog.Default()
 
 	// Setup HTTP server
-	apiServer := api.NewServer(database, articleRepo, userRepo, voteRepo, engine, authMiddleware, testLogger)
+	apiServer := api.NewServer(database, articleRepo, userRepo, voteRepo, engine, authMiddleware, internalAuthMiddleware, testLogger)
 	server := httptest.NewServer(apiServer.Routes())
 
 	return &IntegrationTestSuite{
@@ -270,11 +296,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	}
 
 	// Submit article via HTTP API (simulating fetcher)
-	payload, _ := json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err := http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatalf("Failed to submit article: %v", err)
-	}
+	resp := postArticles(t, suite.server.URL, []models.Article{article})
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
 			t.Logf("error closing response body: %v", err)
@@ -297,11 +319,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 
 	// Submit same article again (test deduplication)
 	article.Title = "Updated Title"
-	payload, _ = json.Marshal(map[string][]models.Article{"articles": {article}})
-	resp, err = http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatalf("Failed to submit duplicate article: %v", err)
-	}
+	resp = postArticles(t, suite.server.URL, []models.Article{article})
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
 			t.Logf("error closing response body: %v", err)
@@ -687,11 +705,7 @@ func TestEndToEndFlow(t *testing.T) {
 		},
 	}
 
-	payload, _ := json.Marshal(map[string][]models.Article{"articles": articles})
-	resp, err := http.Post(suite.server.URL+"/api/v1/explore/article", "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		t.Fatalf("Failed to submit articles: %v", err)
-	}
+	resp := postArticles(t, suite.server.URL, articles)
 	if err := resp.Body.Close(); err != nil {
 		t.Logf("error closing response body: %v", err)
 	}

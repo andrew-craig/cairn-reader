@@ -750,9 +750,9 @@ Dev host ports differ from the container-internal ports shown above: the central
 ```
 GET  /health/live                    # Liveness check
 GET  /health/ready                   # Readiness check (DB connectivity)
-POST /api/v1/explore/feed/fetch      # Manually trigger a single feed fetch
-POST /api/v1/explore/feed/sync       # Manually trigger a Kagi feed-list sync
-GET  /api/v1/explore/feed/stats      # Feed counts (total/enabled/disabled/never-fetched)
+POST /api/v1/explore/feed/fetch      # Manually trigger a single feed fetch (X-Internal-API-Key)
+POST /api/v1/explore/feed/sync       # Manually trigger a Kagi feed-list sync (X-Internal-API-Key)
+GET  /api/v1/explore/feed/stats      # Feed counts (total/enabled/disabled/never-fetched) (X-Internal-API-Key)
 ```
 
 ### Recommender Service
@@ -778,7 +778,7 @@ GET  /api/v1/explore/feed/stats      # Feed counts (total/enabled/disabled/never
 ```
 GET    /health/live                                  # Liveness check
 GET    /health/ready                                 # Readiness check
-POST   /api/v1/explore/article                       # Submit articles (from fetcher; batch, no auth)
+POST   /api/v1/explore/article                       # Submit articles (from fetcher; batch, requires X-Internal-API-Key)
 GET    /api/v1/explore/recommendation?offset=N        # Get a ranked page of recommendations (requires auth)
 GET    /api/v1/explore/search?q=...                   # Full-text search over articles (requires auth)
 POST   /api/v1/explore/shown                          # Record articles shown to the user (requires auth)
@@ -1780,7 +1780,8 @@ CREATE TABLE content_outbox (
 | Endpoint | Auth Required |
 |---|---|
 | `GET /health/live`, `GET /health/ready` | No |
-| `POST /api/v1/explore/article` | No |
+| `POST /api/v1/explore/article` | Internal API key |
+| `POST /api/v1/explore/feed/fetch`, `/sync`, `GET /stats` (fetcher) | Internal API key |
 | `GET /api/v1/explore/recommendation` | Yes |
 | `GET /api/v1/explore/user/votes` | Yes |
 | `POST/DELETE /api/v1/explore/article/:id/vote` | Yes |

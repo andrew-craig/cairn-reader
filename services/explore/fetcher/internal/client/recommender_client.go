@@ -25,16 +25,19 @@ type RecommenderClientInterface interface {
 // RecommenderClient handles HTTP communication with the recommender service.
 // It implements RecommenderClientInterface and submits articles via POST requests.
 type RecommenderClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL        string
+	internalAPIKey string
+	httpClient     *http.Client
 }
 
 // NewRecommenderClient creates a new recommender client.
 // The client has a 30-second timeout for HTTP requests to prevent
-// hanging connections from blocking the fetcher.
-func NewRecommenderClient(baseURL string) *RecommenderClient {
+// hanging connections from blocking the fetcher. internalAPIKey is sent as
+// X-Internal-API-Key, required by the recommender's article-submission endpoint.
+func NewRecommenderClient(baseURL, internalAPIKey string) *RecommenderClient {
 	return &RecommenderClient{
-		baseURL: baseURL,
+		baseURL:        baseURL,
+		internalAPIKey: internalAPIKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -66,6 +69,9 @@ func (c *RecommenderClient) SubmitArticles(ctx context.Context, articles []model
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	if c.internalAPIKey != "" {
+		req.Header.Set("X-Internal-API-Key", c.internalAPIKey)
+	}
 	logging.SetRequestIDHeader(ctx, req)
 
 	resp, err := c.httpClient.Do(req)

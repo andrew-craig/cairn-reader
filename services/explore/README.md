@@ -161,7 +161,7 @@ Integration tests require Docker to run. In CI/CD pipelines:
 - `GET /health/live` - Liveness check
 - `GET /health/ready` - Readiness check (includes database connectivity)
 
-#### Feed Management
+#### Feed Management (requires `X-Internal-API-Key` header)
 - `POST /api/v1/explore/feed/fetch` - Manually trigger feed fetch
 - `POST /api/v1/explore/feed/sync` - Sync feeds from Kagi Small Web
 - `GET /api/v1/explore/feed/stats` - Get feed statistics
@@ -174,13 +174,13 @@ curl http://localhost:8080/health/live
 curl http://localhost:8080/health/ready
 
 # Manual feed fetch
-curl -X POST http://localhost:8080/api/v1/explore/feed/fetch
+curl -X POST -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/fetch
 
 # Feed statistics
-curl http://localhost:8080/api/v1/explore/feed/stats
+curl -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/stats
 
 # Sync feeds
-curl -X POST http://localhost:8080/api/v1/explore/feed/sync
+curl -X POST -H "X-Internal-API-Key: $INTERNAL_API_KEY" http://localhost:8080/api/v1/explore/feed/sync
 ```
 
 ### Explore Recommender (explore_recommender, port 8081)
@@ -189,7 +189,7 @@ curl -X POST http://localhost:8080/api/v1/explore/feed/sync
 - `GET /health/live` - Liveness check
 - `GET /health/ready` - Readiness check (includes database connectivity)
 
-#### Article Management
+#### Article Management (requires `X-Internal-API-Key` header)
 - `POST /api/v1/explore/article` - Submit article (from fetcher)
 
 #### Recommendations

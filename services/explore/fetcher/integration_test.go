@@ -90,7 +90,7 @@ https://example.com/feed3.xml`))
 	}))
 	defer recommenderServer.Close()
 
-	recommenderClient := client.NewRecommenderClient(recommenderServer.URL)
+	recommenderClient := client.NewRecommenderClient(recommenderServer.URL, "test-internal-key")
 
 	// Step 4: Fetch feeds one by one
 	f := fetcher.NewFetcher(repo, recommenderClient, 60*time.Second)
@@ -183,7 +183,7 @@ func TestFeedHealthTracking(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer recommenderServer.Close()
-	recommenderClient := client.NewRecommenderClient(recommenderServer.URL)
+	recommenderClient := client.NewRecommenderClient(recommenderServer.URL, "test-internal-key")
 
 	// Create fetcher
 	f := fetcher.NewFetcher(repo, recommenderClient, 60*time.Second)

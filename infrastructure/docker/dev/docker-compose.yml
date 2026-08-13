@@ -137,6 +137,7 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -175,6 +176,7 @@ services:
       # repository's default curated list) at startup.
       - FEED_LIST_PATH=/app/feeds/feeds.txt
       - FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     # To override with a local feed list, add a volumes: entry such as:
     #   volumes:
     #     - ../../../services/explore/feeds/default-feeds.txt:/app/feeds/feeds.txt:ro

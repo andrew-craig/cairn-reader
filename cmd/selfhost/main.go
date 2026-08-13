@@ -105,7 +105,7 @@ func main() {
 	closers = append(closers, userCloser)
 
 	slog.Info("initializing explore recommender")
-	recCloser, err := mountExploreRecommender(ctx, cfg, r, authMiddleware, health, logger)
+	recCloser, err := mountExploreRecommender(ctx, cfg, r, authMiddleware, internalAuthMiddleware, health, logger)
 	if err != nil {
 		slog.Error("failed to initialize explore recommender", slog.Any("error", err))
 		os.Exit(1)
@@ -113,7 +113,7 @@ func main() {
 	closers = append(closers, recCloser)
 
 	slog.Info("initializing explore fetcher")
-	fetchCloser, err := mountExploreFetcher(ctx, cfg, r, health, logger)
+	fetchCloser, err := mountExploreFetcher(ctx, cfg, r, internalAuthMiddleware, health, logger)
 	if err != nil {
 		slog.Error("failed to initialize explore fetcher", slog.Any("error", err))
 		os.Exit(1)

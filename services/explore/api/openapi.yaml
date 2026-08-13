@@ -15,7 +15,9 @@ info:
 
     ## Authentication
     Most recommender endpoints require JWT authentication with Bearer tokens.
-    The JWT must contain a valid `user_id` claim.
+    The JWT must contain a valid `user_id` claim. Internal service-to-service
+    endpoints (article submission, fetcher triggers) require the
+    `X-Internal-API-Key` header instead.
   contact:
     name: Cairn API Support
     url: https://github.com/cairn-app/cairn-reader
@@ -104,8 +106,14 @@ paths:
       tags:
         - Fetcher
       summary: Trigger manual feed fetch
-      description: Triggers a single feed fetch asynchronously
+      description: |
+        Triggers a single feed fetch asynchronously.
+
+        **Internal endpoint** - for internal/operator use only. Requires the
+        `X-Internal-API-Key` header.
       operationId: triggerFetch
+      security:
+        - internalApiKey: []
       responses:
         '202':
           description: Fetch triggered successfully
@@ -117,6 +125,8 @@ paths:
                   status:
                     type: string
                     example: fetch triggered
+        '401':
+          description: Unauthorized - missing or invalid internal API key
         '405':
           description: Method not allowed
 
@@ -125,8 +135,14 @@ paths:
       tags:
         - Fetcher
       summary: Get feed statistics
-      description: Returns statistics about feeds (total, enabled, disabled, never fetched)
+      description: |
+        Returns statistics about feeds (total, enabled, disabled, never fetched).
+
+        **Internal endpoint** - for internal/operator use only. Requires the
+        `X-Internal-API-Key` header.
       operationId: getFeedStats
+      security:
+        - internalApiKey: []
       responses:
         '200':
           description: Feed statistics
@@ -151,6 +167,8 @@ paths:
                     type: integer
                     description: Number of feeds never fetched
                     example: 5
+        '401':
+          description: Unauthorized - missing or invalid internal API key
         '500':
           description: Internal server error
 
@@ -159,8 +177,14 @@ paths:
       tags:
         - Fetcher
       summary: Trigger feed sync
-      description: Triggers feed list synchronization from Kagi Small Web collection (async)
+      description: |
+        Triggers feed list synchronization from Kagi Small Web collection (async).
+
+        **Internal endpoint** - for internal/operator use only. Requires the
+        `X-Internal-API-Key` header.
       operationId: triggerFeedSync
+      security:
+        - internalApiKey: []
       responses:
         '202':
           description: Sync triggered successfully
@@ -172,6 +196,8 @@ paths:
                   status:
                     type: string
                     example: sync triggered
+        '401':
+          description: Unauthorized - missing or invalid internal API key
         '405':
           description: Method not allowed
 
@@ -280,8 +306,10 @@ paths:
       summary: Submit articles (internal)
       description: |
         Internal endpoint for the fetcher to submit articles to the recommender.
-        Not intended for external use.
+        Requires the `X-Internal-API-Key` header. Not intended for external use.
       operationId: submitArticles
+      security:
+        - internalApiKey: []
       requestBody:
         required: true
         content:
@@ -314,6 +342,8 @@ paths:
                     example: Articles stored successfully
         '400':
           description: Invalid request body
+        '401':
+          description: Unauthorized - missing or invalid internal API key
         '413':
           description: Request body too large (max 10MB)
         '500':
@@ -659,6 +689,11 @@ components:
       description: |
         JWT token obtained from the User Service.
         The token must contain a valid `user_id` claim.
+    internalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+      description: Shared secret for internal service-to-service calls (the fetcher, operator tooling)
 
   schemas:
     Article:

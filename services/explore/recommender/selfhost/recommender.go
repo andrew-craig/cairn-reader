@@ -32,7 +32,7 @@ func RunMigrations(connString string, migrations fs.FS) error {
 }
 
 // Mount initializes the recommender service and mounts routes.
-func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddleware *auth.Middleware, logger *slog.Logger) (func(), error) {
+func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (func(), error) {
 	dbConfig := recDB.Config{
 		Host:     cfg.DBHost,
 		Port:     cfg.DBPort,
@@ -56,7 +56,7 @@ func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddlew
 	cleanupJob := cleanup.NewArticleCleanup(articleRepo, cfg.ArticleRetentionDays, 24*time.Hour, logger)
 	cleanupJob.Start()
 
-	server := recAPI.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, logger)
+	server := recAPI.NewServer(database, articleRepo, userRepo, voteRepo, recommendEngine, authMiddleware, internalAuthMiddleware, logger)
 	handler := server.Routes()
 	r.Handle("/api/v1/explore", handler)
 	r.Handle("/api/v1/explore/*", handler)

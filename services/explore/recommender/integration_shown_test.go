@@ -64,8 +64,9 @@ func setupShownSuite(t *testing.T) *shownSuite {
 
 	validator := auth.NewValidator(&privateKey.PublicKey)
 	middleware := auth.NewMiddleware(validator)
+	internalAuthMiddleware := auth.NewInternalAuthMiddleware("test-internal-key")
 
-	apiServer := api.NewServer(pool, articleRepo, userRepo, voteRepo, engine, middleware, slog.Default())
+	apiServer := api.NewServer(pool, articleRepo, userRepo, voteRepo, engine, middleware, internalAuthMiddleware, slog.Default())
 	server := httptest.NewServer(apiServer.Routes())
 
 	cleanup := func() {
