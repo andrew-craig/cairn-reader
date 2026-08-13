@@ -25,9 +25,9 @@ const (
 
 // EmailVerificationService handles email verification token generation and validation.
 type EmailVerificationService interface {
-	// SendVerificationEmail generates a verification token for the given user,
-	// stores it in the database, and logs the verification URL (actual email
-	// sending is not yet implemented and can be wired up later).
+	// SendVerificationEmail generates a verification token for the given user
+	// and stores its hash (actual email sending is not yet implemented and
+	// can be wired up later).
 	SendVerificationEmail(ctx context.Context, userID uuid.UUID) error
 
 	// VerifyEmail consumes a verification token and marks the user's email as verified.
@@ -38,19 +38,16 @@ type EmailVerificationService interface {
 // emailVerificationService is the concrete implementation.
 type emailVerificationService struct {
 	userRepo database.UserRepository
-	baseURL  string // e.g. "https://api.cairn.example.com"
 }
 
 // NewEmailVerificationService creates a new EmailVerificationService.
-// baseURL is used when logging the verification URL.
-func NewEmailVerificationService(userRepo database.UserRepository, baseURL string) EmailVerificationService {
+func NewEmailVerificationService(userRepo database.UserRepository) EmailVerificationService {
 	return &emailVerificationService{
 		userRepo: userRepo,
-		baseURL:  baseURL,
 	}
 }
 
-// SendVerificationEmail generates a secure token, stores its hash, and logs the URL.
+// SendVerificationEmail generates a secure token and stores its hash.
 func (s *emailVerificationService) SendVerificationEmail(ctx context.Context, userID uuid.UUID) error {
 	// Check user exists and has an email
 	user, err := s.userRepo.GetUserByID(ctx, userID)
@@ -81,12 +78,12 @@ func (s *emailVerificationService) SendVerificationEmail(ctx context.Context, us
 		return fmt.Errorf("failed to store verification token: %w", err)
 	}
 
-	// Log the verification URL (email sending is not implemented yet)
-	verificationURL := fmt.Sprintf("%s/api/v1/auth/verify-email?token=%s", s.baseURL, token)
+	// Token generated and stored (email sending is not implemented yet).
+	// Never log the raw token, the assembled verification URL, or the
+	// user's email address here - it would be a working account-takeover
+	// exploit for anyone with log access.
 	slog.Info("email verification token generated",
 		slog.String("user_id", userID.String()),
-		slog.String("email", *user.Email),
-		slog.String("verification_url", verificationURL),
 		slog.Time("expires_at", expiresAt),
 	)
 

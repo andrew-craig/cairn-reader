@@ -1,10 +1,14 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"regexp"
 	"testing"
 	"time"
 
@@ -127,7 +131,7 @@ func TestSendVerificationEmail(t *testing.T) {
 			EmailVerified: false,
 		})
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		err := svc.SendVerificationEmail(ctx, userID)
 		require.NoError(t, err)
 		// A token should now be stored
@@ -142,7 +146,7 @@ func TestSendVerificationEmail(t *testing.T) {
 			Email: nil,
 		})
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		err := svc.SendVerificationEmail(ctx, userID)
 		assert.ErrorIs(t, err, ErrInvalidInput)
 	})
@@ -156,14 +160,14 @@ func TestSendVerificationEmail(t *testing.T) {
 			EmailVerified: true,
 		})
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		err := svc.SendVerificationEmail(ctx, userID)
 		assert.ErrorIs(t, err, ErrEmailAlreadyVerified)
 	})
 
 	t.Run("returns error for unknown user", func(t *testing.T) {
 		repo := newMockUserRepo()
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		err := svc.SendVerificationEmail(ctx, uuid.New())
 		assert.Error(t, err)
 	})
@@ -176,12 +180,65 @@ func TestSendVerificationEmail(t *testing.T) {
 			Email: emailPtr("user@example.com"),
 		})
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		require.NoError(t, svc.SendVerificationEmail(ctx, userID))
 		require.NoError(t, svc.SendVerificationEmail(ctx, userID))
 		// Should still be exactly one token
 		assert.Len(t, repo.tokens, 1)
 	})
+}
+
+// hexRunPattern matches any run of 16+ hex characters, long enough to catch
+// a raw or partial verification token (64 hex chars) leaking into a log line,
+// while not matching shorter incidental hex-looking substrings like UUID segments.
+var hexRunPattern = regexp.MustCompile(`[0-9a-fA-F]{16,}`)
+
+// TestSendVerificationEmail_DoesNotLogSecretMaterial guards against P2-C2/H2:
+// the verification token, the assembled verification URL, and the user's
+// plaintext email must never appear in the logs emitted by SendVerificationEmail.
+func TestSendVerificationEmail_DoesNotLogSecretMaterial(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	prevDefault := slog.Default()
+	slog.SetDefault(logger)
+	defer slog.SetDefault(prevDefault)
+
+	repo := newMockUserRepo()
+	userID := uuid.New()
+	email := "verify-target@example.com"
+	repo.addUser(&models.User{
+		ID:            userID,
+		Email:         emailPtr(email),
+		EmailVerified: false,
+	})
+
+	svc := NewEmailVerificationService(repo)
+	require.NoError(t, svc.SendVerificationEmail(context.Background(), userID))
+
+	output := buf.String()
+	assert.NotContains(t, output, email, "log output must not contain the user's plaintext email")
+	assert.NotContains(t, output, "verify-email", "log output must not contain a verification URL")
+	assert.NotContains(t, output, "token=", "log output must not contain a token query parameter")
+	assert.False(t, hexRunPattern.MatchString(output), "log output must not contain a raw or partial token: %s", output)
+
+	// Every emitted record must stick to the non-secret allowlist of fields.
+	allowedKeys := map[string]bool{
+		"time": true, "level": true, "msg": true,
+		"user_id": true, "expires_at": true,
+	}
+	decoder := json.NewDecoder(bytes.NewReader(buf.Bytes()))
+	sawRecord := false
+	for {
+		var entry map[string]interface{}
+		if err := decoder.Decode(&entry); err != nil {
+			break
+		}
+		sawRecord = true
+		for key := range entry {
+			assert.True(t, allowedKeys[key], "unexpected log field %q may carry secret material: %v", key, entry)
+		}
+	}
+	require.True(t, sawRecord, "expected SendVerificationEmail to emit a log record")
 }
 
 func TestVerifyEmail(t *testing.T) {
@@ -196,7 +253,7 @@ func TestVerifyEmail(t *testing.T) {
 			EmailVerified: false,
 		})
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		require.NoError(t, svc.SendVerificationEmail(ctx, userID))
 
 		// Extract the raw token by reversing the stored hash (we need the real token).
@@ -218,7 +275,7 @@ func TestVerifyEmail(t *testing.T) {
 
 	t.Run("returns ErrInvalidVerificationToken for unknown token", func(t *testing.T) {
 		repo := newMockUserRepo()
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 
 		_, err := svc.VerifyEmail(ctx, "nonexistent-token")
 		assert.ErrorIs(t, err, ErrInvalidVerificationToken)
@@ -226,7 +283,7 @@ func TestVerifyEmail(t *testing.T) {
 
 	t.Run("returns ErrInvalidInput for empty token", func(t *testing.T) {
 		repo := newMockUserRepo()
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 
 		_, err := svc.VerifyEmail(ctx, "")
 		assert.ErrorIs(t, err, ErrInvalidInput)
@@ -246,7 +303,7 @@ func TestVerifyEmail(t *testing.T) {
 			expiresAt: time.Now().Add(-1 * time.Hour),
 		}
 
-		svc := NewEmailVerificationService(repo, "http://localhost:8082")
+		svc := NewEmailVerificationService(repo)
 		_, err := svc.VerifyEmail(ctx, expiredToken)
 		assert.ErrorIs(t, err, ErrInvalidVerificationToken)
 	})

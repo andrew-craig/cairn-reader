@@ -157,11 +157,7 @@ func main() {
 		RequireComplexity: cfg.Security.RequirePasswordComplexity,
 	})
 
-	baseURL := cfg.Server.BaseURL
-	if baseURL == "" {
-		baseURL = fmt.Sprintf("http://localhost:%s", cfg.Server.Port)
-	}
-	emailVerificationService := services.NewEmailVerificationService(userRepo, baseURL)
+	emailVerificationService := services.NewEmailVerificationService(userRepo)
 	slog.Info("services initialized")
 
 	// Set up key rotation manager

@@ -64,7 +64,7 @@ Everything here is reachable by an anonymous request or fires on a timer. Small,
 | [x] #314 | P2 IDOR | read/fetcher has **zero** inbound auth; user_id taken from URL path → cross-tenant read/write/delete of subscriptions | 0 | [R1](#r1--closing-an-authorization-gap) |
 | [ ] | Explore auth | explore article-inject + fetch/sync trigger endpoints unauthenticated | 1 | [R1](#r1--closing-an-authorization-gap) |
 | [ ] | SSRF dialer | Shared fetch path follows any URL (loopback/RFC1918/metadata) — 4+ copies of the fetch logic | 0 | [R2](#r2--ssrf-safe-fetching) |
-| [ ] | P2-C2, H1, H2, H14 | Credential material in logs: full verification URL at INFO, refresh-token prefixes, mobile token logging | 0 | [R3](#r3--credential-material-in-logs) |
+| [x] #315 | P2-C2, H1, H2, H14 | Credential material in logs: full verification URL at INFO, refresh-token prefixes, mobile token logging | 0 | [R3](#r3--credential-material-in-logs) |
 | [x] #313 | P3-C1, P3-H1, P3-H2, toolchain | Dependency bumps: `x/net` ≥ v0.55.0 (live XSS on ingestion path), `pgx` ≥ v5.9.2 (SQLi), Go toolchain patch bump — all 12 modules | 0 | [R4](#r4--dependency-bumps) |
 | [ ] | P3-C2, H6, uncapped bodies | `http.MaxBytesReader` on all JSON endpoints in users/read/fetcher/email + depth guards on the two recursive email HTML walkers | 1 | [R5](#r5--resource-bounding) |
 
