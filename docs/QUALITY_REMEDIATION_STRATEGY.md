@@ -62,7 +62,7 @@ Everything here is reachable by an anonymous request or fires on a timer. Small,
 | [x] #309 | P2-C1 | Downstream services fetch the JWT public key once at startup; users service rotates it every 24h → scheduled auth outage | 0 | [R6](#r6--operational-fixes) |
 | [x] #311 | C2 + C1 (routes) | read/content write + URL-detection endpoints have no auth: anonymous content overwrite + SSRF | 0 | [R1](#r1--closing-an-authorization-gap) |
 | [x] #314 | P2 IDOR | read/fetcher has **zero** inbound auth; user_id taken from URL path → cross-tenant read/write/delete of subscriptions | 0 | [R1](#r1--closing-an-authorization-gap) |
-| [x] | Explore auth | explore article-inject + fetch/sync trigger endpoints unauthenticated | 1 | [R1](#r1--closing-an-authorization-gap) |
+| [x] #317 | Explore auth | explore article-inject + fetch/sync trigger endpoints unauthenticated | 1 | [R1](#r1--closing-an-authorization-gap) |
 | [x] #316 | SSRF dialer | Shared fetch path follows any URL (loopback/RFC1918/metadata) — 4+ copies of the fetch logic | 0 | [R2](#r2--ssrf-safe-fetching) |
 | [x] #315 | P2-C2, H1, H2, H14 | Credential material in logs: full verification URL at INFO, refresh-token prefixes, mobile token logging | 0 | [R3](#r3--credential-material-in-logs) |
 | [x] #313 | P3-C1, P3-H1, P3-H2, toolchain | Dependency bumps: `x/net` ≥ v0.55.0 (live XSS on ingestion path), `pgx` ≥ v5.9.2 (SQLi), Go toolchain patch bump — all 12 modules | 0 | [R4](#r4--dependency-bumps) |
