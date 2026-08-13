@@ -388,10 +388,14 @@ export class AuthService {
       }
 
       if (!response.ok) {
-        console.error('[Auth] Refresh failed with error response:', {
-          status: response.status,
-          message: result.message || result.error,
-        });
+        if (__DEV__) {
+          console.error('[Auth] Refresh failed with error response:', {
+            status: response.status,
+            message: result.message || result.error,
+          });
+        } else {
+          console.error('[Auth] Refresh failed with error response, status:', response.status);
+        }
         throw new Error(result.message || result.error || 'Failed to refresh token');
       }
 

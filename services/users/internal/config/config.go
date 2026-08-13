@@ -29,7 +29,6 @@ type ServerConfig struct {
 	Port            string
 	Environment     string // "development", "staging", "production"
 	ShutdownTimeout time.Duration
-	BaseURL         string
 }
 
 // DatabaseConfig contains database connection configuration
@@ -91,7 +90,6 @@ func Load() (*Config, error) {
 			Port:            env.GetString("PORT", "8080"),
 			Environment:     env.GetString("ENVIRONMENT", "development"),
 			ShutdownTimeout: env.GetDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
-			BaseURL:         env.GetString("BASE_URL", ""),
 		},
 		Database: DatabaseConfig{
 			Host:             env.GetString("DB_HOST", "localhost"),
