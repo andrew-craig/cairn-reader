@@ -383,7 +383,6 @@ func TestUpdateUser(t *testing.T) {
 	})
 }
 
-// TestUpgradeAccount tests the POST /users/:id/upgrade endpoint
 // TestUpdateUser_BodyTooLarge tests that an oversized body is rejected
 // with 413 before reaching the user service. Uses the "user_id" route
 // param key, which is what router.go actually registers (see
@@ -416,6 +415,7 @@ func TestUpdateUser_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestUpgradeAccount tests the POST /users/:id/upgrade endpoint
 func TestUpgradeAccount(t *testing.T) {
 	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
 	defer cleanup()
@@ -635,7 +635,6 @@ func TestUpgradeAccount(t *testing.T) {
 	})
 }
 
-// TestDeleteUser tests the DELETE /users/:id endpoint
 // TestUpgradeAccount_BodyTooLarge tests that an oversized body is rejected
 // with 413 before reaching the user service.
 func TestUpgradeAccount_BodyTooLarge(t *testing.T) {
@@ -699,6 +698,7 @@ func TestChangePassword_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestDeleteUser tests the DELETE /users/:id endpoint
 func TestDeleteUser(t *testing.T) {
 	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
 	defer cleanup()

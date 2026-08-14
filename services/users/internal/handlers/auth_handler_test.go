@@ -563,7 +563,6 @@ func TestLogin(t *testing.T) {
 	})
 }
 
-// TestLoginMobile tests the POST /auth/login/mobile endpoint
 // TestLogin_BodyTooLarge tests that an oversized body is rejected with 413
 // before reaching the auth service.
 func TestLogin_BodyTooLarge(t *testing.T) {
@@ -585,6 +584,7 @@ func TestLogin_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestLoginMobile tests the POST /auth/login/mobile endpoint
 func TestLoginMobile(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -667,7 +667,6 @@ func TestLoginMobile(t *testing.T) {
 	})
 }
 
-// TestRefresh tests the POST /auth/refresh endpoint
 // TestLoginMobile_BodyTooLarge tests that an oversized body is rejected
 // with 413 before reaching the auth service.
 func TestLoginMobile_BodyTooLarge(t *testing.T) {
@@ -688,6 +687,7 @@ func TestLoginMobile_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestRefresh tests the POST /auth/refresh endpoint
 func TestRefresh(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -774,9 +774,6 @@ func TestRefresh(t *testing.T) {
 	})
 }
 
-// TestRefresh_DoesNotLogTokenMaterial guards against H1: the /auth/refresh
-// handler must never log the raw refresh token or a prefix of it, on success
-// or on any error branch.
 // TestRefresh_BodyTooLarge tests that an oversized body is rejected with
 // 413 before reaching the auth service.
 func TestRefresh_BodyTooLarge(t *testing.T) {
@@ -797,6 +794,9 @@ func TestRefresh_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestRefresh_DoesNotLogTokenMaterial guards against H1: the /auth/refresh
+// handler must never log the raw refresh token or a prefix of it, on success
+// or on any error branch.
 func TestRefresh_DoesNotLogTokenMaterial(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -866,7 +866,6 @@ func TestRefresh_DoesNotLogTokenMaterial(t *testing.T) {
 	assert.NotContains(t, output, "token_preview", "refresh handler logging must not carry a token_preview field")
 }
 
-// TestLogout tests the POST /auth/logout endpoint
 // TestLogout_BodyTooLarge tests that an oversized body is rejected with
 // 413 before reaching the auth service.
 func TestLogout_BodyTooLarge(t *testing.T) {
@@ -887,6 +886,7 @@ func TestLogout_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
+// TestLogout tests the POST /auth/logout endpoint
 func TestLogout(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
