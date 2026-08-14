@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -74,11 +76,62 @@ func (r *articleRepository) Create(ctx context.Context, article models.Article) 
 // CreateBatch inserts multiple articles in a single multi-row INSERT.
 // Implements Phase 2 deduplication: ON CONFLICT (link) DO UPDATE
 // Preserves vote counts, recommends, and deleted status on updates
+//
+// Article ids are content hashes (SHA256 of cleaned content), so syndicated
+// or re-published content can arrive under a different link but the same
+// id as an article already stored. Postgres allows only one ON CONFLICT
+// arbiter per statement, and this table enforces uniqueness on both id
+// (primary key) and link, so an id collision would otherwise raise an
+// unhandled primary-key violation and roll back the whole batch. Articles
+// whose id already exists under a *different* link — in the database or
+// earlier in this same batch — are dropped before the INSERT runs: the
+// first-seen link for that content stays canonical and the rest of the
+// batch is still written. An article whose id exists under the *same*
+// link is kept (it's an ordinary re-fetch, not a collision) and still
+// flows through ON CONFLICT (link) DO UPDATE to refresh its metadata.
+// Articles with an empty link, or a link repeated later in the batch, are
+// dropped for the same reason (an empty/duplicate link makes two source
+// rows target the same ON CONFLICT (link) row, which Postgres rejects
+// outright).
+//
+// A concurrent writer can insert one of these ids (under a different link)
+// between dedupeForInsert's check and the INSERT below, so on a PK conflict
+// we re-filter against the now-current table state and retry, bounded to
+// maxCreateBatchAttempts rounds of concurrent collisions.
 func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
-	if len(articles) == 0 {
-		return nil
+	const maxCreateBatchAttempts = 3
+
+	articles, err := r.dedupeForInsert(ctx, articles)
+	if err != nil {
+		return err
 	}
 
+	var lastErr error
+	for attempt := 0; attempt < maxCreateBatchAttempts; attempt++ {
+		if len(articles) == 0 {
+			return nil
+		}
+
+		lastErr = r.execBatchInsert(ctx, articles)
+		if lastErr == nil {
+			return nil
+		}
+		if !isArticlesPKConflict(lastErr) {
+			return lastErr
+		}
+
+		articles, err = r.dedupeForInsert(ctx, articles)
+		if err != nil {
+			return err
+		}
+	}
+
+	return lastErr
+}
+
+// execBatchInsert runs the multi-row upsert for an already-deduplicated
+// batch (see dedupeForInsert).
+func (r *articleRepository) execBatchInsert(ctx context.Context, articles []models.Article) error {
 	// Build argument list and placeholder rows for a single INSERT statement.
 	const colsPerRow = 11
 	valueRows := make([]string, len(articles))
@@ -124,6 +177,79 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 	}
 
 	return nil
+}
+
+// isArticlesPKConflict reports whether err is a unique-violation on the
+// articles primary key (id), as opposed to the link constraint that
+// ON CONFLICT (link) already handles.
+func isArticlesPKConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "articles_pkey"
+}
+
+// dedupeForInsert collapses a batch to the rows CreateBatch's single
+// multi-row INSERT can safely handle: at most one row per id and per link,
+// and none whose id already exists in the database under a different link
+// (see CreateBatch).
+func (r *articleRepository) dedupeForInsert(ctx context.Context, articles []models.Article) ([]models.Article, error) {
+	if len(articles) == 0 {
+		return nil, nil
+	}
+
+	seenIDs := make(map[string]struct{}, len(articles))
+	seenLinks := make(map[string]struct{}, len(articles))
+	deduped := make([]models.Article, 0, len(articles))
+
+	for _, article := range articles {
+		if article.Link == "" {
+			continue
+		}
+		if _, ok := seenIDs[article.ID]; ok {
+			continue
+		}
+		if _, ok := seenLinks[article.Link]; ok {
+			continue
+		}
+		seenIDs[article.ID] = struct{}{}
+		seenLinks[article.Link] = struct{}{}
+		deduped = append(deduped, article)
+	}
+	if len(deduped) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]string, len(deduped))
+	for i, article := range deduped {
+		ids[i] = article.ID
+	}
+
+	rows, err := r.db.Query(ctx, `SELECT id, link FROM articles WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing article ids: %w", err)
+	}
+	defer rows.Close()
+
+	existingLinks := make(map[string]string, len(ids))
+	for rows.Next() {
+		var id, link string
+		if err := rows.Scan(&id, &link); err != nil {
+			return nil, fmt.Errorf("failed to scan existing article id: %w", err)
+		}
+		existingLinks[id] = link
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating existing article ids: %w", err)
+	}
+
+	insertable := deduped[:0]
+	for _, article := range deduped {
+		if existingLink, ok := existingLinks[article.ID]; ok && existingLink != article.Link {
+			continue
+		}
+		insertable = append(insertable, article)
+	}
+
+	return insertable, nil
 }
 
 // GetByID retrieves an article by its ID
