@@ -488,13 +488,13 @@ func TestIntegration_CreateBatch_SameLinkSameID_MetadataRefreshed(t *testing.T) 
 
 // TestIntegration_CreateBatch_ConcurrentContentHashCollision exercises the
 // TOCTOU window between dedupeForInsert's existence check and the INSERT:
-// two batches deliver the same brand-new content hash under different
+// four batches deliver the same brand-new content hash under different
 // links at the same time (the recommender's HTTP server handles fetcher
-// POSTs concurrently). Whichever writer loses the race must retry rather
-// than surface the original whole-batch PK violation, and exactly one
-// canonical row must survive for the id. Four concurrent writers (more
-// than CreateBatch's bounded retry count) push on the retry loop itself,
-// not just a single retry.
+// POSTs concurrently). All four writers share one content-hash id, so at
+// most one can insert; the losing writers must re-run dedupeForInsert,
+// see the winner's id under a different link, and drop to an empty batch
+// instead of surfacing the original whole-batch PK violation. Exactly one
+// canonical row must survive for the id.
 func TestIntegration_CreateBatch_ConcurrentContentHashCollision(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
