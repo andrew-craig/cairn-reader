@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -32,8 +33,15 @@ func NewBulkHandler(contentService service.ContentService, userContentRepo repos
 
 // BulkCreateContent handles POST /api/v1/contents/bulk
 func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBulkContentBodySize)
+
 	var req dto.BulkCreateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
@@ -100,8 +108,15 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 
 // CheckDuplicates handles POST /api/v1/contents/check-duplicates
 func (h *BulkHandler) CheckDuplicates(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSmallBatchBodySize)
+
 	var req dto.CheckDuplicatesRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
@@ -162,8 +177,15 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxSmallBatchBodySize)
+
 	var req dto.BulkAddToUsersRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
@@ -189,8 +211,15 @@ func (h *BulkHandler) BulkAddToUsers(w http.ResponseWriter, r *http.Request) {
 // For internal services only - no authentication required
 // This endpoint is used by Ingest RSS Service and other internal services
 func (h *BulkHandler) BulkAddToUsersInternal(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSmallBatchBodySize)
+
 	var req dto.BulkAddToUsersRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}

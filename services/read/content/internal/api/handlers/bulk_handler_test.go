@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,6 +83,34 @@ func TestBulkCreateContent_Success(t *testing.T) {
 	failed := response["failed"].([]interface{})
 	assert.Len(t, failed, 0)
 	mockService.AssertExpectations(t)
+}
+
+// TestBulkCreateContent_BodyTooLarge tests that an oversized body is
+// rejected with 413 before reaching the service layer.
+func TestBulkCreateContent_BodyTooLarge(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	reqBody := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"url":         "https://example.com/1",
+				"html":        strings.Repeat("a", maxBulkContentBodySize+1),
+				"source_type": "rss",
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/contents/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.BulkCreateContent(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockService.AssertNotCalled(t, "BulkCreateFromHTML")
 }
 
 // TestBulkCreateContent_PartialFailure tests bulk creation with some failures
@@ -329,6 +358,33 @@ func TestCheckDuplicates_Success(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
+// TestCheckDuplicates_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the service layer.
+func TestCheckDuplicates_BodyTooLarge(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	reqBody := map[string]interface{}{
+		"items": []map[string]interface{}{
+			{
+				"content_hash":   strings.Repeat("a", maxSmallBatchBodySize+1),
+				"source_feed_id": uuid.New().String(),
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/contents/check-duplicates", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.CheckDuplicates(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockService.AssertNotCalled(t, "CheckDuplicates")
+}
+
 // TestCheckDuplicates_EmptyArray tests validation of empty array
 func TestCheckDuplicates_EmptyArray(t *testing.T) {
 	mockService := new(MockContentService)
@@ -468,6 +524,34 @@ func TestBulkAddToUsers_Success(t *testing.T) {
 	failed := response["failed"].([]interface{})
 	assert.Len(t, failed, 0)
 	mockUserContentRepo.AssertExpectations(t)
+}
+
+// TestBulkAddToUsers_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the repository layer.
+func TestBulkAddToUsers_BodyTooLarge(t *testing.T) {
+	mockService := new(MockContentService)
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewBulkHandler(mockService, mockUserContentRepo, mockContentRepo)
+
+	reqBody := map[string]interface{}{
+		"items": []map[string]interface{}{
+			{
+				"user_id":    uuid.New().String(),
+				"content_id": uuid.New().String(),
+				"status":     strings.Repeat("a", maxSmallBatchBodySize+1),
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/internal/content/user/bulk", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.BulkAddToUsersInternal(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockUserContentRepo.AssertNotCalled(t, "BulkCreate")
 }
 
 // TestBulkAddToUsers_EmptyArray tests validation of empty array

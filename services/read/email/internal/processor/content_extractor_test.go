@@ -107,3 +107,23 @@ func TestContentExtractor_PlainText(t *testing.T) {
 	assert.NotContains(t, result.PlainText, "<h1>")
 	assert.NotContains(t, result.PlainText, "<p>")
 }
+
+// TestHTMLToPlainText_DeepNestingIsBounded exercises htmlToPlainText's walk
+// directly (bypassing bluemonday, which would otherwise strip the <span>
+// nesting) with HTML nested past maxHTMLWalkDepth. It proves the walk
+// doesn't keep recursing past the bound: content past it is dropped rather
+// than processed. The nesting depth (300) is deliberately kept under
+// golang.org/x/net/html's own hard cap of 512 open elements (Parse returns
+// a clean error beyond that — see parse.go) so this test exercises our
+// walk's bound specifically, not the parser's.
+func TestHTMLToPlainText_DeepNestingIsBounded(t *testing.T) {
+	const nestDepth = 300
+	input := "<p>ShallowMarker</p>" +
+		strings.Repeat("<span>", nestDepth) + "DeepMarker" + strings.Repeat("</span>", nestDepth)
+
+	text, err := htmlToPlainText(input)
+	require.NoError(t, err)
+
+	assert.Contains(t, text, "ShallowMarker")
+	assert.NotContains(t, text, "DeepMarker")
+}

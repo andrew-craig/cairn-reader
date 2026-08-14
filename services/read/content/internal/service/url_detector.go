@@ -23,6 +23,11 @@ const (
 	URLTypeUnknown URLType = "unknown"
 )
 
+// maxHTMLWalkDepth bounds the recursive HTML tree walks below so
+// attacker-controlled nesting depth can't grow the traversal without bound.
+// 100 is generous for real-world HTML.
+const maxHTMLWalkDepth = 100
+
 // URLDetectionResult contains the result of URL detection
 type URLDetectionResult struct {
 	URL   string  `json:"url"`
@@ -233,8 +238,11 @@ func (d *urlDetectorImpl) extractFeedLinks(htmlContent, baseURL string) []Discov
 	}
 
 	var feeds []DiscoveredFeed
-	var traverse func(*html.Node)
-	traverse = func(n *html.Node) {
+	var traverse func(*html.Node, int)
+	traverse = func(n *html.Node, depth int) {
+		if depth > maxHTMLWalkDepth {
+			return
+		}
 		if n.Type == html.ElementNode && n.Data == "link" {
 			var rel, linkType, href, title string
 
@@ -272,11 +280,11 @@ func (d *urlDetectorImpl) extractFeedLinks(htmlContent, baseURL string) []Discov
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			traverse(c)
+			traverse(c, depth+1)
 		}
 	}
 
-	traverse(doc)
+	traverse(doc, 0)
 	return feeds
 }
 
@@ -396,8 +404,11 @@ func extractHTMLTitle(htmlContent string) *string {
 	}
 
 	var title *string
-	var traverse func(*html.Node)
-	traverse = func(n *html.Node) {
+	var traverse func(*html.Node, int)
+	traverse = func(n *html.Node, depth int) {
+		if depth > maxHTMLWalkDepth {
+			return
+		}
 		if n.Type == html.ElementNode && n.Data == "title" {
 			if n.FirstChild != nil && n.FirstChild.Type == html.TextNode {
 				titleText := strings.TrimSpace(n.FirstChild.Data)
@@ -413,10 +424,10 @@ func extractHTMLTitle(htmlContent string) *string {
 			if title != nil {
 				return
 			}
-			traverse(c)
+			traverse(c, depth+1)
 		}
 	}
-	traverse(doc)
+	traverse(doc, 0)
 
 	return title
 }

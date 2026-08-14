@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -209,6 +210,63 @@ func TestIngestEmail_ServiceError(t *testing.T) {
 	err := json.NewDecoder(rec.Body).Decode(&resp)
 	assert.NoError(t, err)
 	assert.Equal(t, api.ErrCodeInternal, resp.Error)
+}
+
+func TestIngestEmail_BodyTooLarge(t *testing.T) {
+	mock := &mockEmailService{
+		ingestFn: func(_ context.Context, _ service.IngestEmailInput) (bool, error) {
+			t.Fatal("should not be called")
+			return false, nil
+		},
+	}
+
+	handler := NewIngestHandler(mock)
+
+	// Pad well past the 10MB cap with a large HTML body.
+	body := map[string]string{
+		"recipient": "user123@cairn.email",
+		"sender":    "newsletter@example.com",
+		"html_body": strings.Repeat("a", 11<<20),
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/email/ingest", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.IngestEmail(rec, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+
+	var resp api.ErrorResponse
+	err := json.NewDecoder(rec.Body).Decode(&resp)
+	assert.NoError(t, err)
+	assert.Equal(t, api.ErrCodeBadRequest, resp.Error)
+}
+
+func TestIngestEmail_BodyUnderLimitSucceeds(t *testing.T) {
+	mock := &mockEmailService{
+		ingestFn: func(_ context.Context, _ service.IngestEmailInput) (bool, error) {
+			return true, nil
+		},
+	}
+
+	handler := NewIngestHandler(mock)
+
+	body := map[string]string{
+		"recipient": "user123@cairn.email",
+		"sender":    "newsletter@example.com",
+		"html_body": strings.Repeat("a", 1<<20), // 1MB, well under the 10MB cap
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/email/ingest", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.IngestEmail(rec, req)
+
+	assert.Equal(t, http.StatusAccepted, rec.Code)
 }
 
 func TestIngestEmail_InvalidReceivedAtFallsBackToNow(t *testing.T) {

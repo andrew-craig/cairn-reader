@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
@@ -182,6 +183,26 @@ func TestDetectURL_InvalidRequest(t *testing.T) {
 	assert.Equal(t, "bad_request", response["error"])
 }
 
+// TestDetectURL_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the detector.
+func TestDetectURL_BodyTooLarge(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	reqBody := dto.DetectURLRequest{
+		URL: "https://example.com/" + strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/detect", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DetectURL(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockDetector.AssertNotCalled(t, "DetectURL")
+}
+
 // TestDetectURL_MissingURL tests missing URL validation
 func TestDetectURL_MissingURL(t *testing.T) {
 	// Setup mock
@@ -311,6 +332,26 @@ func TestDiscoverFeed_NoFeedsFound(t *testing.T) {
 	assert.Len(t, envelope.Data.Feeds, 0)
 
 	mockDetector.AssertExpectations(t)
+}
+
+// TestDiscoverFeed_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the detector.
+func TestDiscoverFeed_BodyTooLarge(t *testing.T) {
+	mockDetector := new(MockURLDetector)
+	handler := NewDetectionHandler(mockDetector)
+
+	reqBody := dto.DiscoverFeedRequest{
+		URL: "https://example.com/" + strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/content/discover-feed", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.DiscoverFeed(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockDetector.AssertNotCalled(t, "DiscoverFeeds")
 }
 
 // TestDiscoverFeed_MissingURL tests missing URL validation

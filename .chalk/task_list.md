@@ -7,7 +7,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_1924** · P1 · open · [P2-C3+C4] Two dead tests (outbox delivery, CORS) + the CORS wildcard-suffix bypass they hid  (parent: epic_fefa)
 - **task_2ff6** · P1 · open · [Dedup index] idx_contents_rss_dedup is not UNIQUE; email/manual content path has no dedup at all  (parent: epic_fefa)
-- **task_40b2** · P1 · open · [P3-C2/H6] MaxBytesReader on all JSON endpoints + depth guards on the recursive email HTML walkers  (parent: epic_fefa)
 - **task_7fbe** · P1 · open · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
 - **task_963d** · P1 · open · [P2-C8] Feed-subscribe client unmarshals the wrong response shape → app gets empty data with HTTP 201  (parent: epic_fefa)
 - **task_ac75** · P1 · open · [Integration tier] Add a CI job running //go:build integration tests against a real Postgres  (parent: epic_fefa)

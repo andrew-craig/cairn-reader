@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -171,6 +172,29 @@ func TestCreateContent_FromURL(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	mockService.AssertExpectations(t)
+}
+
+// TestCreateContent_BodyTooLarge tests that an oversized body is rejected
+// with 413 before ever reaching the service layer.
+func TestCreateContent_BodyTooLarge(t *testing.T) {
+	mockService := new(MockContentService)
+	handler := NewContentHandler(mockService)
+
+	reqBody := map[string]interface{}{
+		"url":         "https://example.com",
+		"html":        strings.Repeat("a", maxContentBodySize+1),
+		"source_type": "web",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.CreateContent(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockService.AssertNotCalled(t, "CreateFromHTML")
+	mockService.AssertNotCalled(t, "CreateFromURL")
 }
 
 // TestCreateContent_InvalidJSON tests handling of invalid JSON

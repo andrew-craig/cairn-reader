@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,6 +11,10 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/dto"
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/service"
 )
+
+// maxIngestEmailBodySize bounds the ingest request body (email HTML + text
+// bodies) to prevent unbounded memory use from an oversized POST.
+const maxIngestEmailBodySize = 10 << 20 // 10MB
 
 // IngestHandler handles email ingestion from Cloudflare Email Worker.
 type IngestHandler struct {
@@ -23,8 +28,15 @@ func NewIngestHandler(emailService service.EmailService) *IngestHandler {
 
 // IngestEmail handles POST /api/v1/source/email/ingest
 func (h *IngestHandler) IngestEmail(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxIngestEmailBodySize)
+
 	var req dto.IngestEmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}

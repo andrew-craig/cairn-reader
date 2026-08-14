@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -382,6 +383,38 @@ func TestUpdateUser(t *testing.T) {
 	})
 }
 
+// TestUpdateUser_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the user service. Uses the "user_id" route
+// param key, which is what router.go actually registers (see
+// router.go:111 "/{user_id}") and what the handler reads via
+// chi.URLParam(r, "user_id").
+func TestUpdateUser_BodyTooLarge(t *testing.T) {
+	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
+	defer cleanup()
+
+	userID, _ := createTestUser(t, db, "updatetoolarge@example.com", "SecurePass123!")
+	defer cleanupTestUser(t, db, userID)
+
+	accessToken, err := jwtManager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	newEmail := strings.Repeat("a", maxRequestBodySize+1) + "@example.com"
+	updateReq := UpdateUserRequest{Email: &newEmail}
+	body, _ := json.Marshal(updateReq)
+
+	req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
+	ctx := auth.SetUserIDInContext(req.Context(), userID)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.UpdateUser(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 // TestUpgradeAccount tests the POST /users/:id/upgrade endpoint
 func TestUpgradeAccount(t *testing.T) {
 	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
@@ -600,6 +633,69 @@ func TestUpgradeAccount(t *testing.T) {
 		assert.True(t, user.IsHybrid())
 		assert.False(t, user.IsMobileOnly())
 	})
+}
+
+// TestUpgradeAccount_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the user service.
+func TestUpgradeAccount_BodyTooLarge(t *testing.T) {
+	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
+	defer cleanup()
+
+	deviceID := "upgrade-toolarge-device"
+	userID := createTestMobileUser(t, db, deviceID)
+	defer cleanupTestUser(t, db, userID)
+
+	accessToken, err := jwtManager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	upgradeReq := UpgradeAccountRequest{
+		Email:    "upgraded-toolarge@example.com",
+		Password: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(upgradeReq)
+
+	req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
+	ctx := auth.SetUserIDInContext(req.Context(), userID)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.UpgradeAccount(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
+// TestChangePassword_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the user service.
+func TestChangePassword_BodyTooLarge(t *testing.T) {
+	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
+	defer cleanup()
+
+	userID, _ := createTestUser(t, db, "changepwtoolarge@example.com", "SecurePass123!")
+	defer cleanupTestUser(t, db, userID)
+
+	accessToken, err := jwtManager.GenerateToken(userID)
+	require.NoError(t, err)
+
+	changeReq := ChangePasswordRequest{
+		CurrentPassword: "SecurePass123!",
+		NewPassword:     strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(changeReq)
+
+	req := httptest.NewRequest(http.MethodPut, "/users/"+userID.String()+"/password", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
+	ctx := auth.SetUserIDInContext(req.Context(), userID)
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.ChangePassword(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
 // TestDeleteUser tests the DELETE /users/:id endpoint

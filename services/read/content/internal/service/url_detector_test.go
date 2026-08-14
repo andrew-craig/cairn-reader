@@ -403,6 +403,24 @@ func stringPtr(s string) *string {
 	return &s
 }
 
+// TestExtractHTMLTitle_DeepNestingIsBounded proves the traverse walk stops
+// past maxHTMLWalkDepth rather than recursing indefinitely: a <title> tag
+// nested past the bound is never found. The nesting depth (300) is kept
+// under golang.org/x/net/html's own hard cap of 512 open elements (Parse
+// returns a clean error beyond that), so this exercises our walk's bound
+// specifically, not the parser's.
+func TestExtractHTMLTitle_DeepNestingIsBounded(t *testing.T) {
+	const nestDepth = 300
+	html := "<html><head>" +
+		strings.Repeat("<div>", nestDepth) + "<title>Buried Title</title>" + strings.Repeat("</div>", nestDepth) +
+		"</head></html>"
+
+	got := extractHTMLTitle(html)
+	if got != nil {
+		t.Errorf("extractHTMLTitle() = %v, want nil (title past depth bound should not be found)", *got)
+	}
+}
+
 func TestDiscoverFeeds_HTMLWithLinkTags(t *testing.T) {
 	// Server that serves HTML with <link rel="alternate"> feed tags
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -622,5 +640,27 @@ func TestDiscoverFeeds_Deduplication(t *testing.T) {
 
 	if len(feeds) > 0 && feeds[0].Title != "Dedup Feed" {
 		t.Errorf("expected title 'Dedup Feed', got '%s'", feeds[0].Title)
+	}
+}
+
+// TestExtractFeedLinks_DeepNestingIsBounded proves the traverse walk in
+// extractFeedLinks stops past maxHTMLWalkDepth: a <link rel="alternate">
+// nested past the bound is never found. The nesting depth (300) is kept
+// under golang.org/x/net/html's own hard cap of 512 open elements (Parse
+// returns a clean error beyond that), so this exercises our walk's bound
+// specifically, not the parser's.
+func TestExtractFeedLinks_DeepNestingIsBounded(t *testing.T) {
+	const nestDepth = 300
+	html := "<html><head>" +
+		strings.Repeat("<div>", nestDepth) +
+		`<link rel="alternate" type="application/rss+xml" href="/feed">` +
+		strings.Repeat("</div>", nestDepth) +
+		"</head></html>"
+
+	d := &urlDetectorImpl{}
+	feeds := d.extractFeedLinks(html, "https://example.com")
+
+	if len(feeds) != 0 {
+		t.Errorf("extractFeedLinks() = %v, want no feeds (link past depth bound should not be found)", feeds)
 	}
 }
