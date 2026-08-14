@@ -251,6 +251,7 @@ func (s *contentService) ListContents(ctx context.Context, limit, offset int) ([
 // BulkCreateFromHTML processes multiple raw HTML contents and stores them
 func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkContentItem) ([]*models.Content, []BulkCreateError, error) {
 	var contents []*models.Content
+	var newContents []*models.Content
 	var errors []BulkCreateError
 
 	// Process each item
@@ -319,11 +320,13 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 		}
 
 		contents = append(contents, content)
+		newContents = append(newContents, content)
 	}
 
-	// Bulk create all new contents
-	if len(contents) > 0 {
-		err := s.contentRepo.BulkCreate(ctx, contents)
+	// Bulk create only the genuinely new contents — items already found via
+	// GetByContentHashAndFeedID carry a real DB id and must not be re-inserted.
+	if len(newContents) > 0 {
+		err := s.contentRepo.BulkCreate(ctx, newContents)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to bulk create contents: %w", err)
 		}

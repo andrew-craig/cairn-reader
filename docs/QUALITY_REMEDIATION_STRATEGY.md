@@ -74,7 +74,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 
 | Done | Finding | Summary | P | Recipe |
 |---|---|---|---|---|
-| [ ] | P2-C6 | Bulk content insert PK-collides on any mixed new+seen batch → whole RSS batch fails | 1 | [R7](#r7--db-write-path-bugs) |
+| [x] #321 | P2-C6 | Bulk content insert PK-collides on any mixed new+seen batch → whole RSS batch fails | 1 | [R7](#r7--db-write-path-bugs) |
 | [ ] | P2-C7 / H8 | Recommender upsert conflicts on content-hash `id`, not just `link` → batch dropped every poll cycle | 1 | [R7](#r7--db-write-path-bugs) |
 | [ ] | Dedup index | `idx_contents_rss_dedup` is not UNIQUE → concurrent deliveries create duplicate content rows; email/manual path has no dedup at all | 1 | [R7](#r7--db-write-path-bugs) |
 | [ ] | P2-C8 | Feed-subscribe client unmarshals wrong response shape → app gets empty data with HTTP 201 | 1 | [R8](#r8--cross-service-contract-drift) |
