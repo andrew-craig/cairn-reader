@@ -89,6 +89,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -221,6 +227,12 @@ paths:
                 $ref: '#/components/schemas/FeedResponse'
         '404':
           description: Feed not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Request body too large (max 16KB)
           content:
             application/json:
               schema:

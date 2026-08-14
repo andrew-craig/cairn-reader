@@ -153,6 +153,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -197,6 +203,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '409':
           description: Account with this device ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
           content:
             application/json:
               schema:
@@ -254,6 +266,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -304,6 +322,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Device login not allowed for hybrid accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
           content:
             application/json:
               schema:
@@ -369,6 +393,12 @@ paths:
                 invalid:
                   value:
                     error: "invalid or expired refresh token"
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -409,6 +439,12 @@ paths:
                     example: successfully logged out
         '400':
           description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
           content:
             application/json:
               schema:
@@ -580,6 +616,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -726,6 +768,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -805,6 +853,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
           content:
             application/json:
               schema:

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -455,6 +456,36 @@ func TestAddContentToUser_Success(t *testing.T) {
 	mockContentRepo.AssertExpectations(t)
 }
 
+// TestAddContentToUser_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the repository/service layers.
+func TestAddContentToUser_BodyTooLarge(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	userID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"title": strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockUserContentRepo.AssertNotCalled(t, "Create")
+}
+
 // TestAddContentToUser_DuplicatePrevention tests duplicate prevention
 func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
@@ -613,6 +644,37 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	assert.Equal(t, true, data["is_favorite"])
 	mockUserContentRepo.AssertExpectations(t)
 	mockContentRepo.AssertExpectations(t)
+}
+
+// TestUpdateUserContent_BodyTooLarge tests that an oversized body is
+// rejected with 413 before reaching the repository layer.
+func TestUpdateUserContent_BodyTooLarge(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	userID := uuid.New()
+	contentID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"status": strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/users/"+userID.String()+"/contents/"+contentID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	rctx.URLParams.Add("content_id", contentID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.UpdateUserContent(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockUserContentRepo.AssertNotCalled(t, "UpdateMetadata")
 }
 
 // TestUpdateUserContent_NotFound tests handling when user-content doesn't exist

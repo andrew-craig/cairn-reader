@@ -17,6 +17,11 @@ type ProcessedEmailContent struct {
 	ContentHash   string // SHA-256 hex of sanitized HTML
 }
 
+// maxHTMLWalkDepth bounds recursive HTML tree walks so attacker-controlled
+// nesting depth (e.g. millions of nested <div>s) can't stack-overflow the
+// process. 100 is generous for real-world HTML.
+const maxHTMLWalkDepth = 100
+
 // ContentExtractor sanitizes email HTML and generates a content hash.
 // No readability extraction — sanitize only.
 type ContentExtractor struct {
@@ -81,8 +86,11 @@ func htmlToPlainText(htmlContent string) (string, error) {
 	}
 
 	var buf strings.Builder
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
+	var walk func(*html.Node, int)
+	walk = func(n *html.Node, depth int) {
+		if depth > maxHTMLWalkDepth {
+			return
+		}
 		if n.Type == html.TextNode {
 			text := strings.TrimSpace(n.Data)
 			if text != "" {
@@ -93,10 +101,10 @@ func htmlToPlainText(htmlContent string) (string, error) {
 			}
 		}
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+			walk(c, depth+1)
 		}
 	}
-	walk(doc)
+	walk(doc, 0)
 
 	return buf.String(), nil
 }

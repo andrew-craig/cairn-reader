@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,4 +70,31 @@ func TestEmailCleaner_HiddenPreheaderRemoval(t *testing.T) {
 
 	assert.NotContains(t, result, "Preview text for email client")
 	assert.Contains(t, result, "Real content")
+}
+
+// TestEmailCleaner_DeepNestingIsBounded feeds Clean an HTML body nested past
+// maxHTMLWalkDepth and proves walkForRemoval doesn't keep recursing past the
+// bound. A hidden preheader placed past the depth bound is never reached, so
+// it survives — the accepted trade-off of truncating the walk rather than
+// processing unbounded depth. The nesting depth (300) is deliberately kept
+// under golang.org/x/net/html's own hard cap of 512 open elements (Parse
+// returns a clean error beyond that — see parse.go) so this test exercises
+// our walk's bound specifically, not the parser's.
+func TestEmailCleaner_DeepNestingIsBounded(t *testing.T) {
+	c := NewEmailCleaner()
+
+	const nestDepth = 300
+	input := "<p>ShallowContent</p>" +
+		strings.Repeat("<div>", nestDepth) +
+		`<span style="display:none">DeepPreheader</span>` +
+		strings.Repeat("</div>", nestDepth)
+
+	result, err := c.Clean(input)
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "ShallowContent")
+	// Past the depth bound, walkForRemoval never inspects this node, so it
+	// is not stripped — proving the walk terminated early rather than
+	// recursing through all 10k levels.
+	assert.Contains(t, result, "DeepPreheader")
 }

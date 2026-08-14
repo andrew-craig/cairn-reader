@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -279,6 +280,27 @@ func TestRegister(t *testing.T) {
 	})
 }
 
+// TestRegister_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the auth service.
+func TestRegister_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := RegisterRequest{
+		Email:    "toolarge@example.com",
+		Password: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.Register(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 // TestRegisterMobile tests the POST /auth/register/mobile endpoint
 func TestRegisterMobile(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
@@ -386,6 +408,26 @@ func TestRegisterMobile(t *testing.T) {
 		json.Unmarshal(w.Body.Bytes(), &resp)
 		defer cleanupTestUser(t, db, resp.User.ID)
 	})
+}
+
+// TestRegisterMobile_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the auth service.
+func TestRegisterMobile_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := RegisterMobileRequest{
+		ExpoDeviceID: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/register/mobile", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.RegisterMobile(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
 
 // TestLogin tests the POST /auth/login endpoint
@@ -522,6 +564,27 @@ func TestLogin(t *testing.T) {
 }
 
 // TestLoginMobile tests the POST /auth/login/mobile endpoint
+// TestLogin_BodyTooLarge tests that an oversized body is rejected with 413
+// before reaching the auth service.
+func TestLogin_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	loginBody := LoginRequest{
+		Email:    "toolarge@example.com",
+		Password: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(loginBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.Login(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 func TestLoginMobile(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -605,6 +668,26 @@ func TestLoginMobile(t *testing.T) {
 }
 
 // TestRefresh tests the POST /auth/refresh endpoint
+// TestLoginMobile_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the auth service.
+func TestLoginMobile_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	loginBody := LoginMobileRequest{
+		ExpoDeviceID: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(loginBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/login/mobile", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.LoginMobile(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 func TestRefresh(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -694,6 +777,26 @@ func TestRefresh(t *testing.T) {
 // TestRefresh_DoesNotLogTokenMaterial guards against H1: the /auth/refresh
 // handler must never log the raw refresh token or a prefix of it, on success
 // or on any error branch.
+// TestRefresh_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the auth service.
+func TestRefresh_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := RefreshRequest{
+		RefreshToken: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.Refresh(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 func TestRefresh_DoesNotLogTokenMaterial(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -764,6 +867,26 @@ func TestRefresh_DoesNotLogTokenMaterial(t *testing.T) {
 }
 
 // TestLogout tests the POST /auth/logout endpoint
+// TestLogout_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the auth service.
+func TestLogout_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := LogoutRequest{
+		RefreshToken: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/logout", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.Logout(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
 func TestLogout(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
 	defer cleanup()
@@ -898,4 +1021,66 @@ func TestLogoutAll(t *testing.T) {
 
 	// Verify jwtManager is used (prevents unused variable warning)
 	_ = jwtManager
+}
+
+// TestVerifyEmail_BodyTooLarge tests that an oversized JSON body (the
+// non-query-param path) is rejected with 413 before reaching the
+// verification service.
+func TestVerifyEmail_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := VerifyEmailRequest{
+		Token: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/verify-email", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.VerifyEmail(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
+// TestForgotPassword_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the auth service.
+func TestForgotPassword_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := ForgotPasswordRequest{
+		Email: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/forgot-password", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.ForgotPassword(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
+// TestResetPassword_BodyTooLarge tests that an oversized body is rejected
+// with 413 before reaching the auth service.
+func TestResetPassword_BodyTooLarge(t *testing.T) {
+	handler, _, _, cleanup := setupTestAuthHandler(t)
+	defer cleanup()
+
+	reqBody := ResetPasswordRequest{
+		Token:       "some-token",
+		NewPassword: strings.Repeat("a", maxRequestBodySize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/reset-password", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	handler.ResetPassword(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }

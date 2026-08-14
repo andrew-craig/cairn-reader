@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -215,6 +216,33 @@ func TestSubscribe_InvalidJSON(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "bad_request", response["error"])
+}
+
+// TestSubscribe_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the feed service.
+func TestSubscribe_BodyTooLarge(t *testing.T) {
+	mockService := new(MockFeedService)
+	handler := NewSubscriptionHandler(mockService)
+
+	userID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"feed_url": "https://example.com/" + strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/feeds/subscribe", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+
+	handler.Subscribe(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockService.AssertNotCalled(t, "Subscribe")
 }
 
 // TestSubscribe_EmptyFeedURL tests handling of empty feed URL
@@ -668,4 +696,32 @@ func TestEnableFeed_AlreadyActive(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "bad_request", response["error"])
 	mockService.AssertExpectations(t)
+}
+
+// TestUpdateFeed_BodyTooLarge tests that an oversized body is rejected with
+// 413 before reaching the feed service.
+func TestUpdateFeed_BodyTooLarge(t *testing.T) {
+	mockService := new(MockFeedService)
+	handler := NewSubscriptionHandler(mockService)
+
+	feedID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"enabled": true,
+		"padding": strings.Repeat("a", maxSimpleRequestSize+1),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/feeds/"+feedID.String(), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("feed_id", feedID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+
+	handler.UpdateFeed(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	mockService.AssertNotCalled(t, "EnableFeed")
 }

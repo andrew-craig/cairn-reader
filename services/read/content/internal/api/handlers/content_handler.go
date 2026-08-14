@@ -28,8 +28,15 @@ func NewContentHandler(contentService service.ContentService) *ContentHandler {
 
 // CreateContent handles POST /api/v1/contents
 func (h *ContentHandler) CreateContent(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxContentBodySize)
+
 	var req dto.CreateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
@@ -81,8 +88,15 @@ func (h *ContentHandler) UpdateContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxContentBodySize)
+
 	var req dto.UpdateContentRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}

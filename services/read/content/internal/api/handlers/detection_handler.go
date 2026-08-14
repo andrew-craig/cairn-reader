@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -25,8 +26,15 @@ func NewDetectionHandler(urlDetector service.URLDetector) *DetectionHandler {
 
 // DetectURL handles POST /api/v1/content/detect
 func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+
 	var req dto.DetectURLRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}
@@ -64,8 +72,15 @@ func (h *DetectionHandler) DetectURL(w http.ResponseWriter, r *http.Request) {
 
 // DiscoverFeed handles POST /api/v1/content/discover-feed
 func (h *DetectionHandler) DiscoverFeed(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+
 	var req dto.DiscoverFeedRequest
 	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
+			return
+		}
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
 		return
 	}

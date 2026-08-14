@@ -40,7 +40,7 @@ func (c *EmailCleaner) Clean(htmlBody string) (string, error) {
 	}
 
 	var nodesToRemove []*html.Node
-	walkForRemoval(doc, &nodesToRemove)
+	walkForRemoval(doc, &nodesToRemove, 0)
 	for _, n := range nodesToRemove {
 		if n.Parent != nil {
 			n.Parent.RemoveChild(n)
@@ -55,13 +55,17 @@ func (c *EmailCleaner) Clean(htmlBody string) (string, error) {
 }
 
 // walkForRemoval traverses the HTML tree and collects nodes that should be removed.
-func walkForRemoval(n *html.Node, remove *[]*html.Node) {
+// depth is bounded by maxHTMLWalkDepth to guard against attacker-controlled nesting.
+func walkForRemoval(n *html.Node, remove *[]*html.Node, depth int) {
+	if depth > maxHTMLWalkDepth {
+		return
+	}
 	if shouldRemove(n) {
 		*remove = append(*remove, n)
 		return // skip children — whole subtree goes away
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		walkForRemoval(c, remove)
+		walkForRemoval(c, remove, depth+1)
 	}
 }
 
