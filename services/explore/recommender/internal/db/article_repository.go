@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -81,12 +83,16 @@ func (r *articleRepository) Create(ctx context.Context, article models.Article) 
 // arbiter per statement, and this table enforces uniqueness on both id
 // (primary key) and link, so an id collision would otherwise raise an
 // unhandled primary-key violation and roll back the whole batch. Articles
-// whose id already exists — in the database or earlier in this same batch —
-// are dropped before the INSERT runs: the first-seen link for that content
-// stays canonical and the rest of the batch is still written. Articles with
-// an empty link, or a link repeated later in the batch, are dropped for the
-// same reason (an empty/duplicate link makes two source rows target the
-// same ON CONFLICT (link) row, which Postgres rejects outright).
+// whose id already exists under a *different* link — in the database or
+// earlier in this same batch — are dropped before the INSERT runs: the
+// first-seen link for that content stays canonical and the rest of the
+// batch is still written. An article whose id exists under the *same*
+// link is kept (it's an ordinary re-fetch, not a collision) and still
+// flows through ON CONFLICT (link) DO UPDATE to refresh its metadata.
+// Articles with an empty link, or a link repeated later in the batch, are
+// dropped for the same reason (an empty/duplicate link makes two source
+// rows target the same ON CONFLICT (link) row, which Postgres rejects
+// outright).
 func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
 	articles, err := r.dedupeForInsert(ctx, articles)
 	if err != nil {
@@ -96,6 +102,31 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 		return nil
 	}
 
+	if err := r.execBatchInsert(ctx, articles); err != nil {
+		if !isArticlesPKConflict(err) {
+			return err
+		}
+
+		// A concurrent writer inserted one of these ids (under a
+		// different link) between the check in dedupeForInsert and this
+		// INSERT. Re-filter against the now-current table state and
+		// retry once.
+		articles, err = r.dedupeForInsert(ctx, articles)
+		if err != nil {
+			return err
+		}
+		if len(articles) == 0 {
+			return nil
+		}
+		return r.execBatchInsert(ctx, articles)
+	}
+
+	return nil
+}
+
+// execBatchInsert runs the multi-row upsert for an already-deduplicated
+// batch (see dedupeForInsert).
+func (r *articleRepository) execBatchInsert(ctx context.Context, articles []models.Article) error {
 	// Build argument list and placeholder rows for a single INSERT statement.
 	const colsPerRow = 11
 	valueRows := make([]string, len(articles))
@@ -143,9 +174,18 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 	return nil
 }
 
+// isArticlesPKConflict reports whether err is a unique-violation on the
+// articles primary key (id), as opposed to the link constraint that
+// ON CONFLICT (link) already handles.
+func isArticlesPKConflict(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "articles_pkey"
+}
+
 // dedupeForInsert collapses a batch to the rows CreateBatch's single
 // multi-row INSERT can safely handle: at most one row per id and per link,
-// and none whose id already exists in the database (see CreateBatch).
+// and none whose id already exists in the database under a different link
+// (see CreateBatch).
 func (r *articleRepository) dedupeForInsert(ctx context.Context, articles []models.Article) ([]models.Article, error) {
 	if len(articles) == 0 {
 		return nil, nil
@@ -178,19 +218,19 @@ func (r *articleRepository) dedupeForInsert(ctx context.Context, articles []mode
 		ids[i] = article.ID
 	}
 
-	rows, err := r.db.Query(ctx, `SELECT id FROM articles WHERE id = ANY($1)`, ids)
+	rows, err := r.db.Query(ctx, `SELECT id, link FROM articles WHERE id = ANY($1)`, ids)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check existing article ids: %w", err)
 	}
 	defer rows.Close()
 
-	existingIDs := make(map[string]struct{})
+	existingLinks := make(map[string]string, len(ids))
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var id, link string
+		if err := rows.Scan(&id, &link); err != nil {
 			return nil, fmt.Errorf("failed to scan existing article id: %w", err)
 		}
-		existingIDs[id] = struct{}{}
+		existingLinks[id] = link
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating existing article ids: %w", err)
@@ -198,7 +238,7 @@ func (r *articleRepository) dedupeForInsert(ctx context.Context, articles []mode
 
 	insertable := deduped[:0]
 	for _, article := range deduped {
-		if _, ok := existingIDs[article.ID]; ok {
+		if existingLink, ok := existingLinks[article.ID]; ok && existingLink != article.Link {
 			continue
 		}
 		insertable = append(insertable, article)

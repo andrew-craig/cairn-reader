@@ -5,6 +5,7 @@ package db
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -434,5 +435,102 @@ func TestIntegration_CreateBatch_DuplicateAndEmptyLinksWithinBatch(t *testing.T)
 	}
 	if _, err := repo.GetByID(ctx, emptyLinkSecond.ID); err == nil {
 		t.Errorf("expected second empty-link article to be dropped, but it was created")
+	}
+}
+
+// TestIntegration_CreateBatch_SameLinkSameID_MetadataRefreshed guards
+// against a regression in the P2-C7/H8 fix: an article re-delivered under
+// the *same* link (and therefore the same content-hash id, since the
+// content hasn't changed) is an ordinary re-fetch, not a syndicated
+// duplicate. It must still hit ON CONFLICT (link) DO UPDATE and refresh
+// metadata rather than being dropped by the existing-id pre-filter.
+func TestIntegration_CreateBatch_SameLinkSameID_MetadataRefreshed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
+	ctx := context.Background()
+
+	original := createIntegrationTestArticle("test-refetch-same-id", "https://example.com/test/refetch/same-link", "Original Title")
+	if err := repo.Create(ctx, original); err != nil {
+		t.Fatalf("failed to seed original article: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE articles SET upvotes = 4, downvotes = 1, recommends = 9 WHERE id = $1", original.ID); err != nil {
+		t.Fatalf("failed to update metrics: %v", err)
+	}
+
+	// Re-delivered with the same id and link (content unchanged) but a
+	// corrected title, as if the source site fixed a typo without
+	// touching the article body.
+	refetched := createIntegrationTestArticle(original.ID, original.Link, "Corrected Title")
+
+	if err := repo.CreateBatch(ctx, []models.Article{refetched}); err != nil {
+		t.Fatalf("CreateBatch returned an error re-delivering the same link/id: %v", err)
+	}
+
+	retrieved, err := repo.GetByID(ctx, original.ID)
+	if err != nil {
+		t.Fatalf("failed to retrieve article: %v", err)
+	}
+	if retrieved.Title != "Corrected Title" {
+		t.Errorf("expected title to be refreshed to 'Corrected Title', got %s", retrieved.Title)
+	}
+	if retrieved.Upvotes != 4 || retrieved.Downvotes != 1 || retrieved.Recommends != 9 {
+		t.Errorf("expected engagement metrics to be preserved, got upvotes=%d downvotes=%d recommends=%d",
+			retrieved.Upvotes, retrieved.Downvotes, retrieved.Recommends)
+	}
+}
+
+// TestIntegration_CreateBatch_ConcurrentContentHashCollision exercises the
+// TOCTOU window between dedupeForInsert's existence check and the INSERT:
+// two batches deliver the same brand-new content hash under different
+// links at the same time (the recommender's HTTP server handles fetcher
+// POSTs concurrently). Whichever writer loses the race must retry rather
+// than surface the original whole-batch PK violation, and exactly one
+// canonical row must survive for the id.
+func TestIntegration_CreateBatch_ConcurrentContentHashCollision(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
+	ctx := context.Background()
+
+	first := createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/first", "First Writer")
+	second := createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/second", "Second Writer")
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, article := range []models.Article{first, second} {
+		wg.Add(1)
+		go func(a models.Article) {
+			defer wg.Done()
+			errs <- repo.CreateBatch(ctx, []models.Article{a})
+		}(article)
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		if err != nil {
+			t.Errorf("concurrent CreateBatch returned an error: %v", err)
+		}
+	}
+
+	var count int
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM articles WHERE id = $1", first.ID).Scan(&count); err != nil {
+		t.Fatalf("failed to count articles for shared id: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected exactly one canonical row for the shared id, found %d", count)
 	}
 }
