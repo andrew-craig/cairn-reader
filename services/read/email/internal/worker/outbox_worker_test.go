@@ -3,6 +3,9 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -75,35 +78,44 @@ func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 	entry := makeOutboxEntry()
 	contentID := uuid.New()
 
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/content/bulk":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"data":{"created":[{"id":%q}],"existing":[],"failed":[]}}`, contentID)
+		case "/api/v1/internal/content/user/bulk":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"data":{},"meta":{}}`)
+		default:
+			t.Fatalf("unexpected request to %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
 	var deliveredStatus models.DeliveryStatus
 	var deliveredContentID *uuid.UUID
+	updateDeliveryCalled := false
 
 	repo := &mockFullOutboxRepo{
-		updateDeliveryFunc: func(_ context.Context, _ uuid.UUID, status models.DeliveryStatus, id *uuid.UUID, _ *time.Time) error {
+		updateDeliveryFunc: func(_ context.Context, id uuid.UUID, status models.DeliveryStatus, cid *uuid.UUID, deliveredAt *time.Time) error {
+			updateDeliveryCalled = true
+			assert.Equal(t, entry.ID, id)
+			assert.NotNil(t, deliveredAt)
 			deliveredStatus = status
-			deliveredContentID = id
+			deliveredContentID = cid
 			return nil
 		},
 	}
-	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: "http://test"})
-	_ = cc
 
-	// Use a real client but override deliver via the outboxToContentItem helper
-	// We test the logic by verifying the repo is called correctly
-	_ = contentID // Provide via closure
-	_ = deliveredContentID
+	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: server.URL, InternalAPIKey: "test-key"})
+	w := NewOutboxWorker(repo, cc, OutboxWorkerConfig{BatchSize: 10, PollInterval: time.Second})
 
-	// Verify outboxToContentItem works correctly
-	item, err := outboxToContentItem(entry)
-	require.NoError(t, err)
-	assert.Equal(t, "email://abc123", item.URL)
-	assert.Equal(t, "Test Email", item.Title)
-	assert.Equal(t, "email", item.Type)
-	assert.Equal(t, "email", item.SourceType)
-	assert.Equal(t, entry.UserID, item.UserID)
+	w.deliverEntry(context.Background(), entry)
 
-	_ = repo
-	_ = deliveredStatus
+	require.True(t, updateDeliveryCalled, "deliverEntry must call UpdateDeliveryStatus on success")
+	assert.Equal(t, models.DeliveryStatusDelivered, deliveredStatus)
+	require.NotNil(t, deliveredContentID)
+	assert.Equal(t, contentID, *deliveredContentID)
 }
 
 func TestOutboxWorker_DeliverEntry_MissingURL(t *testing.T) {

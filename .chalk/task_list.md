@@ -5,7 +5,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **task_1924** · P1 · open · [P2-C3+C4] Two dead tests (outbox delivery, CORS) + the CORS wildcard-suffix bypass they hid  (parent: epic_fefa)
 - **task_2ff6** · P1 · open · [Dedup index] idx_contents_rss_dedup is not UNIQUE; email/manual content path has no dedup at all  (parent: epic_fefa)
 - **task_7fbe** · P1 · open · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
 - **task_963d** · P1 · open · [P2-C8] Feed-subscribe client unmarshals the wrong response shape → app gets empty data with HTTP 201  (parent: epic_fefa)

@@ -182,6 +182,32 @@ func TestCORSWithWildcard(t *testing.T) {
 		}
 	})
 
+	t.Run("blocks suffix-bypass origin sharing no dot boundary", func(t *testing.T) {
+		mw := CORSWithWildcard([]string{"*.example.com"})
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://evilexample.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Error("should not set origin for a host that merely shares the domain as a suffix without a dot boundary")
+		}
+	})
+
+	t.Run("blocks lookalike origin with domain as a prefix of a longer host", func(t *testing.T) {
+		mw := CORSWithWildcard([]string{"*.example.com"})
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "http://example.com.evil.com")
+		w := httptest.NewRecorder()
+
+		mw(handler).ServeHTTP(w, req)
+
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Error("should not set origin for a host where the allowed domain appears as a prefix segment")
+		}
+	})
+
 	t.Run("handles preflight for wildcard", func(t *testing.T) {
 		mw := CORSWithWildcard([]string{"*.example.com"})
 		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
@@ -210,6 +236,8 @@ func TestIsOriginAllowed(t *testing.T) {
 		{"wildcard", "http://anything.com", []string{"*"}, true},
 		{"wildcard subdomain", "http://app.example.com", []string{"*.example.com"}, true},
 		{"no match", "http://evil.com", []string{"http://example.com"}, false},
+		{"suffix-bypass without dot boundary", "http://evilexample.com", []string{"*.example.com"}, false},
+		{"domain as prefix segment of longer host", "http://example.com.evil.com", []string{"*.example.com"}, false},
 	}
 
 	for _, tt := range tests {
