@@ -444,10 +444,13 @@ func TestBulkCreateFromHTML_WithDuplicates(t *testing.T) {
 	mockRepo.On("GetByContentHashAndFeedID", ctx, mock.Anything, feedID).Return(existingContent, nil).Once()
 	mockRepo.On("GetByContentHashAndFeedID", ctx, mock.Anything, feedID).Return(nil, nil).Once()
 
-	// BulkCreate will be called with both - existing and new (existing one has ID set)
+	// BulkCreate must only receive the genuinely new item — the existing one
+	// already carries a real DB id and re-inserting it would PK-collide.
 	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
-		// Both items should be in the array - existing one was added first, new one second
-		return len(contents) == 2
+		if len(contents) != 1 {
+			return false
+		}
+		return contents[0].ID != existingContent.ID
 	})).Return(nil)
 
 	contents, errs, err := service.BulkCreateFromHTML(ctx, items)
