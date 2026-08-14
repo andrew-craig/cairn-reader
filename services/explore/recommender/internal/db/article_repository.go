@@ -74,7 +74,24 @@ func (r *articleRepository) Create(ctx context.Context, article models.Article) 
 // CreateBatch inserts multiple articles in a single multi-row INSERT.
 // Implements Phase 2 deduplication: ON CONFLICT (link) DO UPDATE
 // Preserves vote counts, recommends, and deleted status on updates
+//
+// Article ids are content hashes (SHA256 of cleaned content), so syndicated
+// or re-published content can arrive under a different link but the same
+// id as an article already stored. Postgres allows only one ON CONFLICT
+// arbiter per statement, and this table enforces uniqueness on both id
+// (primary key) and link, so an id collision would otherwise raise an
+// unhandled primary-key violation and roll back the whole batch. Articles
+// whose id already exists — in the database or earlier in this same batch —
+// are dropped before the INSERT runs: the first-seen link for that content
+// stays canonical and the rest of the batch is still written. Articles with
+// an empty link, or a link repeated later in the batch, are dropped for the
+// same reason (an empty/duplicate link makes two source rows target the
+// same ON CONFLICT (link) row, which Postgres rejects outright).
 func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
+	articles, err := r.dedupeForInsert(ctx, articles)
+	if err != nil {
+		return err
+	}
 	if len(articles) == 0 {
 		return nil
 	}
@@ -124,6 +141,70 @@ func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.A
 	}
 
 	return nil
+}
+
+// dedupeForInsert collapses a batch to the rows CreateBatch's single
+// multi-row INSERT can safely handle: at most one row per id and per link,
+// and none whose id already exists in the database (see CreateBatch).
+func (r *articleRepository) dedupeForInsert(ctx context.Context, articles []models.Article) ([]models.Article, error) {
+	if len(articles) == 0 {
+		return nil, nil
+	}
+
+	seenIDs := make(map[string]struct{}, len(articles))
+	seenLinks := make(map[string]struct{}, len(articles))
+	deduped := make([]models.Article, 0, len(articles))
+
+	for _, article := range articles {
+		if article.Link == "" {
+			continue
+		}
+		if _, ok := seenIDs[article.ID]; ok {
+			continue
+		}
+		if _, ok := seenLinks[article.Link]; ok {
+			continue
+		}
+		seenIDs[article.ID] = struct{}{}
+		seenLinks[article.Link] = struct{}{}
+		deduped = append(deduped, article)
+	}
+	if len(deduped) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]string, len(deduped))
+	for i, article := range deduped {
+		ids[i] = article.ID
+	}
+
+	rows, err := r.db.Query(ctx, `SELECT id FROM articles WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing article ids: %w", err)
+	}
+	defer rows.Close()
+
+	existingIDs := make(map[string]struct{})
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan existing article id: %w", err)
+		}
+		existingIDs[id] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating existing article ids: %w", err)
+	}
+
+	insertable := deduped[:0]
+	for _, article := range deduped {
+		if _, ok := existingIDs[article.ID]; ok {
+			continue
+		}
+		insertable = append(insertable, article)
+	}
+
+	return insertable, nil
 }
 
 // GetByID retrieves an article by its ID

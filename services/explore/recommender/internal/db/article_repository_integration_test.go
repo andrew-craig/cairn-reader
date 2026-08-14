@@ -319,3 +319,120 @@ func TestIntegration_CreateBatch_WithDuplicates(t *testing.T) {
 		t.Errorf("expected title 'New Article 2', got %s", retrieved3.Title)
 	}
 }
+
+// TestIntegration_CreateBatch_ContentHashCollision_BatchSurvives covers P2-C7/H8:
+// article ids are content hashes, independent of link, so syndicated content
+// re-published under a new link collides on the id (primary key) rather than
+// the link. Before the fix, that PK violation rolled back the whole
+// multi-row INSERT and silently dropped every other article in the batch.
+func TestIntegration_CreateBatch_ContentHashCollision_BatchSurvives(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
+	ctx := context.Background()
+
+	// A previous poll already stored this content under one link.
+	original := createIntegrationTestArticle("test-hash-collision-shared-id", "https://example.com/test/hash-collision/original", "Original Source")
+	if err := repo.Create(ctx, original); err != nil {
+		t.Fatalf("failed to seed original article: %v", err)
+	}
+
+	// The next poll delivers the same content syndicated under a different
+	// link (shares only the id with the existing row), alongside a
+	// genuinely new, unrelated article.
+	syndicated := createIntegrationTestArticle("test-hash-collision-shared-id", "https://example.com/test/hash-collision/syndicated", "Syndicated Copy")
+	freshArticle := createIntegrationTestArticle("test-hash-collision-new", "https://example.com/test/hash-collision/new", "Brand New Article")
+
+	err := repo.CreateBatch(ctx, []models.Article{syndicated, freshArticle})
+	if err != nil {
+		t.Fatalf("CreateBatch returned an error on a content-hash collision: %v", err)
+	}
+
+	// The fresh article must not have been dropped by the collision.
+	if _, err := repo.GetByID(ctx, freshArticle.ID); err != nil {
+		t.Errorf("expected fresh article to survive the batch, got error: %v", err)
+	}
+
+	// Deliberate choice: the first-seen link stays canonical for a given
+	// content hash; the syndicated duplicate is dropped rather than
+	// overwriting it.
+	retrieved, err := repo.GetByID(ctx, original.ID)
+	if err != nil {
+		t.Fatalf("failed to retrieve original article: %v", err)
+	}
+	if retrieved.Link != original.Link {
+		t.Errorf("expected canonical link to remain %s, got %s", original.Link, retrieved.Link)
+	}
+
+	// No second row was created for the syndicated link.
+	rows, err := pool.Query(ctx, "SELECT COUNT(*) FROM articles WHERE link = $1", syndicated.Link)
+	if err != nil {
+		t.Fatalf("failed to count articles by syndicated link: %v", err)
+	}
+	defer rows.Close()
+	var count int
+	if rows.Next() {
+		if err := rows.Scan(&count); err != nil {
+			t.Fatalf("failed to scan count: %v", err)
+		}
+	}
+	if count != 0 {
+		t.Errorf("expected no article stored under the syndicated link, found %d", count)
+	}
+}
+
+// TestIntegration_CreateBatch_DuplicateAndEmptyLinksWithinBatch covers the
+// H8 "empty or duplicate link" batch-poisoning mode: a single multi-row
+// INSERT can't target the same ON CONFLICT (link) row twice, so two
+// in-batch rows sharing a link (including two empty links) previously
+// failed the whole batch with "cannot affect row a second time".
+func TestIntegration_CreateBatch_DuplicateAndEmptyLinksWithinBatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	pool, cleanup := testutil.SetupTestDB(t)
+	defer cleanup()
+	defer cleanupTestData(t, pool)
+
+	repo := NewArticleRepository(pool)
+	ctx := context.Background()
+
+	sameLinkFirst := createIntegrationTestArticle("test-batch-dup-link-1", "https://example.com/test/batch-dup/shared-link", "First Appearance")
+	sameLinkSecond := createIntegrationTestArticle("test-batch-dup-link-2", "https://example.com/test/batch-dup/shared-link", "Second Appearance")
+	emptyLinkFirst := createIntegrationTestArticle("test-batch-dup-empty-1", "", "No Link 1")
+	emptyLinkSecond := createIntegrationTestArticle("test-batch-dup-empty-2", "", "No Link 2")
+	freshArticle := createIntegrationTestArticle("test-batch-dup-fresh", "https://example.com/test/batch-dup/fresh", "Fresh Article")
+
+	err := repo.CreateBatch(ctx, []models.Article{sameLinkFirst, sameLinkSecond, emptyLinkFirst, emptyLinkSecond, freshArticle})
+	if err != nil {
+		t.Fatalf("CreateBatch returned an error on in-batch duplicate/empty links: %v", err)
+	}
+
+	// The fresh article must not have been dropped.
+	if _, err := repo.GetByID(ctx, freshArticle.ID); err != nil {
+		t.Errorf("expected fresh article to survive the batch, got error: %v", err)
+	}
+
+	// First-seen of the shared link wins; the second is dropped.
+	if _, err := repo.GetByID(ctx, sameLinkFirst.ID); err != nil {
+		t.Errorf("expected first-seen duplicate-link article to be created, got error: %v", err)
+	}
+	if _, err := repo.GetByID(ctx, sameLinkSecond.ID); err == nil {
+		t.Errorf("expected second duplicate-link article to be dropped, but it was created")
+	}
+
+	// Both empty-link articles are dropped.
+	if _, err := repo.GetByID(ctx, emptyLinkFirst.ID); err == nil {
+		t.Errorf("expected first empty-link article to be dropped, but it was created")
+	}
+	if _, err := repo.GetByID(ctx, emptyLinkSecond.ID); err == nil {
+		t.Errorf("expected second empty-link article to be dropped, but it was created")
+	}
+}

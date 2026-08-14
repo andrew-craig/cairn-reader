@@ -9,7 +9,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7fbe** · P1 · open · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
 - **task_963d** · P1 · open · [P2-C8] Feed-subscribe client unmarshals the wrong response shape → app gets empty data with HTTP 201  (parent: epic_fefa)
 - **task_ac75** · P1 · open · [Integration tier] Add a CI job running //go:build integration tests against a real Postgres  (parent: epic_fefa)
-- **task_b174** · P1 · open · [P2-C7/H8] Recommender upsert conflicts on content-hash id, not just link → batch dropped every poll  (parent: epic_fefa)
 - **task_cef5** · P1 · open · [C3] Refresh-token reuse detection never fires for its actual threat; its test asserts the wrong path  (parent: epic_fefa)
 - **task_dbcf** · P1 · open · [Web CI] apps/web has no CI at all — add web-checks.yml (tsc, eslint, vitest)  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
