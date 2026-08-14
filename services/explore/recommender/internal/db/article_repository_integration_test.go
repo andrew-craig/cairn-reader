@@ -492,7 +492,9 @@ func TestIntegration_CreateBatch_SameLinkSameID_MetadataRefreshed(t *testing.T) 
 // links at the same time (the recommender's HTTP server handles fetcher
 // POSTs concurrently). Whichever writer loses the race must retry rather
 // than surface the original whole-batch PK violation, and exactly one
-// canonical row must survive for the id.
+// canonical row must survive for the id. Four concurrent writers (more
+// than CreateBatch's bounded retry count) push on the retry loop itself,
+// not just a single retry.
 func TestIntegration_CreateBatch_ConcurrentContentHashCollision(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")
@@ -505,12 +507,16 @@ func TestIntegration_CreateBatch_ConcurrentContentHashCollision(t *testing.T) {
 	repo := NewArticleRepository(pool)
 	ctx := context.Background()
 
-	first := createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/first", "First Writer")
-	second := createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/second", "Second Writer")
+	writers := []models.Article{
+		createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/first", "First Writer"),
+		createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/second", "Second Writer"),
+		createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/third", "Third Writer"),
+		createIntegrationTestArticle("test-concurrent-collision", "https://example.com/test/concurrent/fourth", "Fourth Writer"),
+	}
 
 	var wg sync.WaitGroup
-	errs := make(chan error, 2)
-	for _, article := range []models.Article{first, second} {
+	errs := make(chan error, len(writers))
+	for _, article := range writers {
 		wg.Add(1)
 		go func(a models.Article) {
 			defer wg.Done()
@@ -527,7 +533,7 @@ func TestIntegration_CreateBatch_ConcurrentContentHashCollision(t *testing.T) {
 	}
 
 	var count int
-	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM articles WHERE id = $1", first.ID).Scan(&count); err != nil {
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM articles WHERE id = $1", writers[0].ID).Scan(&count); err != nil {
 		t.Fatalf("failed to count articles for shared id: %v", err)
 	}
 	if count != 1 {

@@ -93,35 +93,40 @@ func (r *articleRepository) Create(ctx context.Context, article models.Article) 
 // dropped for the same reason (an empty/duplicate link makes two source
 // rows target the same ON CONFLICT (link) row, which Postgres rejects
 // outright).
+//
+// A concurrent writer can insert one of these ids (under a different link)
+// between dedupeForInsert's check and the INSERT below, so on a PK conflict
+// we re-filter against the now-current table state and retry, bounded to
+// maxCreateBatchAttempts rounds of concurrent collisions.
 func (r *articleRepository) CreateBatch(ctx context.Context, articles []models.Article) error {
+	const maxCreateBatchAttempts = 3
+
 	articles, err := r.dedupeForInsert(ctx, articles)
 	if err != nil {
 		return err
 	}
-	if len(articles) == 0 {
-		return nil
-	}
 
-	if err := r.execBatchInsert(ctx, articles); err != nil {
-		if !isArticlesPKConflict(err) {
-			return err
+	var lastErr error
+	for attempt := 0; attempt < maxCreateBatchAttempts; attempt++ {
+		if len(articles) == 0 {
+			return nil
 		}
 
-		// A concurrent writer inserted one of these ids (under a
-		// different link) between the check in dedupeForInsert and this
-		// INSERT. Re-filter against the now-current table state and
-		// retry once.
+		lastErr = r.execBatchInsert(ctx, articles)
+		if lastErr == nil {
+			return nil
+		}
+		if !isArticlesPKConflict(lastErr) {
+			return lastErr
+		}
+
 		articles, err = r.dedupeForInsert(ctx, articles)
 		if err != nil {
 			return err
 		}
-		if len(articles) == 0 {
-			return nil
-		}
-		return r.execBatchInsert(ctx, articles)
 	}
 
-	return nil
+	return lastErr
 }
 
 // execBatchInsert runs the multi-row upsert for an already-deduplicated
