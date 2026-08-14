@@ -78,6 +78,7 @@ func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 	entry := makeOutboxEntry()
 	contentID := uuid.New()
 
+	var unexpectedPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v1/content/bulk":
@@ -87,7 +88,8 @@ func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprint(w, `{"data":{},"meta":{}}`)
 		default:
-			t.Fatalf("unexpected request to %s", r.URL.Path)
+			unexpectedPath = r.URL.Path
+			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
@@ -112,6 +114,7 @@ func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 
 	w.deliverEntry(context.Background(), entry)
 
+	require.Empty(t, unexpectedPath, "unexpected request path")
 	require.True(t, updateDeliveryCalled, "deliverEntry must call UpdateDeliveryStatus on success")
 	assert.Equal(t, models.DeliveryStatusDelivered, deliveredStatus)
 	require.NotNil(t, deliveredContentID)
