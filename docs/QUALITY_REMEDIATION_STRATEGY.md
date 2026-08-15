@@ -89,7 +89,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 
 | Done | Finding | Summary | P | Recipe |
 |---|---|---|---|---|
-| [ ] | Web CI | `apps/web` has **no CI at all** (verified 2026-08-09): add a workflow running `tsc --noEmit`, `eslint`, `vitest` on PRs touching `apps/web/**` — mirror `mobile-checks.yml` | 1 | [R10](#r10--ci-ratchets) |
+| [x] #328 | Web CI | `apps/web` has **no CI at all** (verified 2026-08-09): add a workflow running `tsc --noEmit`, `eslint`, `vitest` on PRs touching `apps/web/**` — mirror `mobile-checks.yml` | 1 | [R10](#r10--ci-ratchets) |
 | [ ] | Integration tier | Add a CI job running the `//go:build integration`-tagged tests against a real Postgres service container (repository-layer tests from Wave 2 live here) | 1 | [R10](#r10--ci-ratchets) |
 | [ ] | users build tag | `services/users/test/integration` lacks the `//go:build integration` tag every sibling uses → bare `go test ./...` hangs | 2 | [R10](#r10--ci-ratchets) |
 | [ ] | H10 + logging | Recovery middleware registered before request-ID middleware in all 6 routers → panics logged with `request_id=unknown`; per-request logger used in only one handler repo-wide | 2 | [R6](#r6--operational-fixes) |
@@ -203,7 +203,7 @@ govulncheck ./...        # per Go module
 npm audit                # per JS workspace
 ```
 
-CI runs gofmt, golangci-lint, go vet, and `go test -race` per service (`go-checks.yml`) and typecheck/lint/jest for mobile (`mobile-checks.yml`). Until the Wave 3 web-CI task lands, **web checks are your responsibility locally**.
+CI runs gofmt, golangci-lint, go vet, and `go test -race` per service (`go-checks.yml`), typecheck/lint/jest for mobile (`mobile-checks.yml`), and typecheck/lint/vitest for web (`web-checks.yml`).
 
 ### 2.5 Recipes by finding class
 
