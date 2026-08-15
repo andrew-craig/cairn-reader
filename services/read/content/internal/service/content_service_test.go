@@ -44,6 +44,14 @@ func (m *MockContentRepository) GetByContentHashAndFeedID(ctx context.Context, c
 	return args.Get(0).(*models.Content), args.Error(1)
 }
 
+func (m *MockContentRepository) GetByContentHashAndURL(ctx context.Context, contentHash string, originalURL string) (*models.Content, error) {
+	args := m.Called(ctx, contentHash, originalURL)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Content), args.Error(1)
+}
+
 func (m *MockContentRepository) GetByContentHashesAndFeedID(ctx context.Context, hashes []string, feedID uuid.UUID) (map[string]*models.Content, error) {
 	args := m.Called(ctx, hashes, feedID)
 	if args.Get(0) == nil {
@@ -99,7 +107,7 @@ func TestCreateFromHTML_Success(t *testing.T) {
 	sourceType := "web"
 
 	// Mock repository to return nil for duplicate check (no duplicate)
-	mockRepo.On("GetByContentHashAndFeedID", ctx, mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, url).Return(nil, nil)
 
 	// Mock repository to succeed on Create
 	mockRepo.On("Create", ctx, mock.MatchedBy(func(c *models.Content) bool {
@@ -210,6 +218,9 @@ func TestCreateFromHTML_CreateError(t *testing.T) {
 	url := "https://example.com/article"
 	html := "<html><head><title>Article</title></head><body><p>Content</p></body></html>"
 	sourceType := "web"
+
+	// Mock repository to return nil for duplicate check (no duplicate)
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, url).Return(nil, nil)
 
 	// Mock repository to return error on Create
 	mockRepo.On("Create", ctx, mock.Anything).Return(errors.New("insert failed"))
@@ -398,6 +409,9 @@ func TestBulkCreateFromHTML_Success(t *testing.T) {
 		},
 	}
 
+	// Mock repository to return nil for duplicate check (no duplicate)
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, mock.Anything).Return(nil, nil)
+
 	// Mock BulkCreate to succeed
 	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
 		return len(contents) == 2 && contents[0].Title == "Article 1" && contents[1].Title == "Article 2"
@@ -480,6 +494,8 @@ func TestBulkCreateFromHTML_CallerSuppliedTitleWins(t *testing.T) {
 		},
 	}
 
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, mock.Anything).Return(nil, nil)
+
 	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
 		if len(contents) != 1 {
 			return false
@@ -520,6 +536,8 @@ func TestBulkCreateFromHTML_FallsBackToReadabilityTitle(t *testing.T) {
 		},
 	}
 
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, mock.Anything).Return(nil, nil)
+
 	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
 		return len(contents) == 1 && contents[0].Title == "Readability Title"
 	})).Return(nil)
@@ -551,6 +569,8 @@ func TestBulkCreateFromHTML_EmptyCallerTitleFallsBack(t *testing.T) {
 		},
 	}
 
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, mock.Anything).Return(nil, nil)
+
 	mockRepo.On("BulkCreate", ctx, mock.MatchedBy(func(contents []*models.Content) bool {
 		return len(contents) == 1 && contents[0].Title == "Readability Title"
 	})).Return(nil)
@@ -575,6 +595,8 @@ func TestBulkCreateFromHTML_BulkCreateError(t *testing.T) {
 			SourceType: "web",
 		},
 	}
+
+	mockRepo.On("GetByContentHashAndURL", ctx, mock.Anything, mock.Anything).Return(nil, nil)
 
 	// Mock BulkCreate to fail
 	mockRepo.On("BulkCreate", ctx, mock.Anything).Return(errors.New("bulk insert failed"))

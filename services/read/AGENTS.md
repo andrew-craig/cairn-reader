@@ -198,7 +198,8 @@ orphaned_at       TIMESTAMP WITH TIME ZONE      -- Set when last user_contents r
 
 -- Constraints & Indexes
 CHECK (octet_length(cleaned_html) <= 5242880)                       -- 5MB, hardcoded (not env-configurable)
-INDEX(content_hash, source_feed_id) WHERE source_type = 'rss'       -- RSS deduplication
+UNIQUE INDEX(content_hash, source_feed_id) WHERE source_type = 'rss'      -- RSS deduplication
+UNIQUE INDEX(content_hash, original_url) WHERE source_type != 'rss'      -- email/manual deduplication
 INDEX(orphaned_at) WHERE orphaned_at IS NOT NULL
 INDEX(original_url)
 INDEX(canonical_url) WHERE canonical_url IS NOT NULL
@@ -605,14 +606,20 @@ should not be exposed to clients.
 
 ### Deduplication Strategy
 
-Content is deduplicated using: `(content_hash, source_feed_id)`
+RSS content is deduplicated using `(content_hash, source_feed_id)`; email/manual content has no
+feed to key off, so it dedupes on `(content_hash, original_url)` instead (the URL is stable per
+source item — the RSS item link, or `email://<raw_email_id>` for email).
 
-- Same hash + same feed = duplicate (skip)
-- Same hash + different feed = not duplicate (store)
+- Same hash + same feed (RSS) or same hash + same URL (email/manual) = duplicate (skip)
+- Same hash + different feed/URL = not duplicate (store)
 - Multiple users can share the same content with individual metadata
-- Enforced via the `POST /api/v1/content/check-duplicate` endpoint at the application level, backed
-  by a partial index `(content_hash, source_feed_id) WHERE source_type = 'rss'` — not a DB-level
-  UNIQUE constraint
+- Enforced at the DB level by two partial UNIQUE indexes — `idx_contents_rss_dedup
+  (content_hash, source_feed_id) WHERE source_type = 'rss'` and `idx_contents_nonrss_dedup
+  (content_hash, original_url) WHERE source_type != 'rss'` — plus `ON CONFLICT ... DO UPDATE`
+  at every insert site (`Create`, `CreateWithTx`, `BulkCreate`), so concurrent duplicate
+  deliveries resolve to the same row instead of racing past an application-level check. The
+  `POST /api/v1/content/check-duplicate` endpoint is a read-only pre-check on top of this, not
+  the source of truth.
 
 ### Feed Polling Strategy
 
