@@ -346,7 +346,7 @@ func TestFeedSubscriptionIntegration(t *testing.T) {
 		}
 		err = subscriptionRepo.Create(ctx, subscription)
 		assert.Error(t, err, "Should fail due to trigger constraint")
-		assert.Contains(t, err.Error(), "user has reached the maximum of 100 feed subscriptions")
+		assert.Contains(t, err.Error(), "User has reached maximum feed limit of 100")
 	})
 }
 
@@ -361,6 +361,31 @@ func TestOutboxPatternIntegration(t *testing.T) {
 
 	ctx := context.Background()
 	outboxRepo := repository.NewOutboxRepository(testDB.DB)
+	feedRepo := repository.NewFeedRepository(testDB.DB)
+	feedItemRepo := repository.NewFeedItemRepository(testDB.DB)
+
+	// createFeedItem inserts a feed and a feed item so outbox entries in this test
+	// have a real feed_item_id to satisfy content_outbox's foreign key constraint.
+	createFeedItem := func(t *testing.T) uuid.UUID {
+		t.Helper()
+
+		feed := &models.Feed{
+			FeedURL:     fmt.Sprintf("https://example.com/feed-%s.xml", uuid.New()),
+			Title:       strPtr("Test Feed"),
+			Status:      models.FeedStatusActive,
+			PollingTier: models.PollingTierModerate,
+		}
+		require.NoError(t, feedRepo.Create(ctx, feed))
+
+		item := &models.FeedItem{
+			FeedID:           feed.ID,
+			ItemURL:          "https://example.com/article",
+			ProcessingStatus: models.ProcessingStatusPending,
+		}
+		require.NoError(t, feedItemRepo.Create(ctx, item))
+
+		return item.ID
+	}
 
 	t.Run("CreateOutboxEntry", func(t *testing.T) {
 		userIDs := []uuid.UUID{uuid.New(), uuid.New()}
@@ -373,7 +398,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		}
 
 		outboxEntry := &models.ContentOutbox{
-			FeedItemID:     uuid.New(),
+			FeedItemID:     createFeedItem(t),
 			UserIDs:        userIDs,
 			ContentPayload: contentPayload,
 			DeliveryStatus: models.DeliveryStatusPending,
@@ -395,7 +420,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 
 		for i := 0; i < 5; i++ {
 			outboxEntry := &models.ContentOutbox{
-				FeedItemID: uuid.New(),
+				FeedItemID: createFeedItem(t),
 				UserIDs:    []uuid.UUID{uuid.New()},
 				ContentPayload: map[string]interface{}{
 					"title": fmt.Sprintf("Article %d", i),
@@ -416,7 +441,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		testDB.TruncateAll()
 
 		outboxEntry := &models.ContentOutbox{
-			FeedItemID:     uuid.New(),
+			FeedItemID:     createFeedItem(t),
 			UserIDs:        []uuid.UUID{uuid.New()},
 			ContentPayload: map[string]interface{}{"title": "Test"},
 			DeliveryStatus: models.DeliveryStatusPending,
@@ -448,11 +473,12 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		testDB.TruncateAll()
 
 		outboxEntry := &models.ContentOutbox{
-			FeedItemID:     uuid.New(),
+			FeedItemID:     createFeedItem(t),
 			UserIDs:        []uuid.UUID{uuid.New()},
 			ContentPayload: map[string]interface{}{"title": "Test"},
 			DeliveryStatus: models.DeliveryStatusPending,
 			RetryCount:     0,
+			MaxRetries:     6,
 		}
 		err := outboxRepo.Create(ctx, outboxEntry)
 		require.NoError(t, err)

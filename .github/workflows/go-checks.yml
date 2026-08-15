@@ -300,6 +300,26 @@ jobs:
           done
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+  test-integration-explore:
+    name: go test integration (services/explore)
+    needs: [changes]
+    if: needs.changes.outputs.explore == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: services/explore/go.sum
+      # recommender's integration tests provision their own Postgres via testcontainers-go
+      # (internal/testutil.SetupTestDB), so no service container is needed here.
+      # fetcher's integration-tagged tests are excluded: they predate this job and have
+      # accumulated unrelated pre-existing rot (build errors, an SSRF-guard/httptest
+      # conflict, a NULL-scan bug) — tracked separately in chalk task bug_96d7.
+      - name: Run integration tests
+        working-directory: services/explore
+        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/...
+
   test-read:
     name: go test (services/read)
     needs: [changes]
@@ -330,6 +350,41 @@ jobs:
             go tool cover -func="$f" | tail -1 >> "$GITHUB_STEP_SUMMARY"
           done
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test-integration-read:
+    name: go test integration (services/read)
+    needs: [changes]
+    if: needs.changes.outputs.read == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DB_HOST: localhost
+      TEST_DB_PORT: 5432
+      TEST_DB_USER: postgres
+      TEST_DB_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: services/read/go.sum
+      - name: Run integration tests
+        working-directory: services/read
+        run: |
+          cd content && go test -race -tags=integration -count=1 -timeout 10m ./...
+          cd ../fetcher && go test -race -tags=integration -count=1 -timeout 10m ./...
 
   test-email:
     name: go test (services/read/email)
