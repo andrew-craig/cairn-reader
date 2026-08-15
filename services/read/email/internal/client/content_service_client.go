@@ -16,17 +16,6 @@ import (
 	"github.com/sony/gobreaker"
 )
 
-// retryDelays defines the fixed backoff schedule for delivery retries.
-// Mirrors the outbox retry schedule: 1m, 5m, 15m, 1h, 4h, 12h.
-var retryDelays = []time.Duration{
-	1 * time.Minute,
-	5 * time.Minute,
-	15 * time.Minute,
-	1 * time.Hour,
-	4 * time.Hour,
-	12 * time.Hour,
-}
-
 // EmailContentItem represents a single email content item in a bulk delivery request.
 type EmailContentItem struct {
 	UserID     uuid.UUID `json:"user_id"`
@@ -134,7 +123,9 @@ func NewContentServiceClient(cfg ContentServiceConfig) *ContentServiceClient {
 }
 
 // DeliverContent creates the content on the Content Service then links it to the user.
-// Returns the content service ID on success.
+// Returns the content service ID on success. On failure, the caller is responsible for
+// retrying — the outbox's DB-level backoff schedule (see outbox_worker.go) owns retry
+// timing so that one failing entry never blocks the rest of a batch.
 func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
 	if c.internalAPIKey == "" {
 		return uuid.Nil, fmt.Errorf("internal API key is required but not configured")
@@ -143,29 +134,11 @@ func (c *ContentServiceClient) DeliverContent(ctx context.Context, payload []Ema
 		return uuid.Nil, fmt.Errorf("payload must not be empty")
 	}
 
-	var lastErr error
-	// Initial attempt + one entry per retry delay.
-	for attempt := 0; attempt <= len(retryDelays); attempt++ {
-		if attempt > 0 {
-			select {
-			case <-time.After(retryDelays[attempt-1]):
-			case <-ctx.Done():
-				return uuid.Nil, ctx.Err()
-			}
-		}
-
-		id, err := c.attemptDeliver(ctx, payload)
-		if err == nil {
-			return id, nil
-		}
-		lastErr = err
-
-		if isNonRetryable(err) || ctx.Err() != nil {
-			break
-		}
+	id, err := c.attemptDeliver(ctx, payload)
+	if err != nil {
+		return uuid.Nil, err
 	}
-
-	return uuid.Nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+	return id, nil
 }
 
 func (c *ContentServiceClient) attemptDeliver(ctx context.Context, payload []EmailContentItem) (uuid.UUID, error) {
@@ -289,18 +262,4 @@ func (c *ContentServiceClient) addContentToUsers(ctx context.Context, contentID 
 	}
 
 	return nil
-}
-
-// isNonRetryable returns true for 4xx errors that won't be resolved by retrying.
-func isNonRetryable(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	for _, code := range []string{"HTTP 400", "HTTP 401", "HTTP 403", "HTTP 404", "HTTP 422"} {
-		if strings.Contains(msg, code) {
-			return true
-		}
-	}
-	return false
 }

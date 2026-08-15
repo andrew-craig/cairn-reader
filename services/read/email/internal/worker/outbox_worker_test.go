@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -71,6 +72,82 @@ func makeOutboxEntry() *models.ContentOutbox {
 		RetryCount:     0,
 		MaxRetries:     6,
 		NextRetryAt:    time.Now(),
+	}
+}
+
+func makeOutboxEntryWithURL(url string) *models.ContentOutbox {
+	entry := makeOutboxEntry()
+	entry.ContentPayload["url"] = url
+	return entry
+}
+
+// TestOutboxWorker_DeliverBatch_FailedEntryDoesNotBlockSubsequentEntries proves C5:
+// a downstream failure on the first entry must not stall the rest of the batch behind
+// the client's retry schedule. retryDelays is deliberately left at its real production
+// values (1m/5m/15m/1h/4h/12h) — patching it to milliseconds would hide exactly the bug
+// this test exists to catch. On unfixed code, entry 1's failure blocks inside
+// ContentServiceClient.DeliverContent for a full minute before deliverBatch ever reaches
+// entry 2, so this test times out.
+func TestOutboxWorker_DeliverBatch_FailedEntryDoesNotBlockSubsequentEntries(t *testing.T) {
+	entry1 := makeOutboxEntryWithURL("email://entry-1")
+	entry2 := makeOutboxEntryWithURL("email://entry-2")
+
+	entry2Attempted := make(chan struct{}, 1)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/content/bulk" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"data":{},"meta":{}}`)
+			return
+		}
+
+		var body struct {
+			Contents []struct {
+				URL string `json:"url"`
+			} `json:"contents"`
+		}
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NotEmpty(t, body.Contents)
+
+		if body.Contents[0].URL == "email://entry-1" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		select {
+		case entry2Attempted <- struct{}{}:
+		default:
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"data":{"created":[{"id":%q}],"existing":[],"failed":[]}}`, uuid.New())
+	}))
+	defer server.Close()
+
+	repo := &mockFullOutboxRepo{
+		getPendingFunc: func(_ context.Context, _ int) ([]*models.ContentOutbox, error) {
+			return []*models.ContentOutbox{entry1, entry2}, nil
+		},
+	}
+
+	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: server.URL, InternalAPIKey: "test-key"})
+	w := NewOutboxWorker(repo, cc, OutboxWorkerConfig{BatchSize: 10, PollInterval: time.Hour})
+
+	batchDone := make(chan struct{})
+	go func() {
+		w.deliverBatch(context.Background())
+		close(batchDone)
+	}()
+
+	select {
+	case <-entry2Attempted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("entry 2 was not attempted within the same batch pass — entry 1's failure blocked the batch")
+	}
+
+	select {
+	case <-batchDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("deliverBatch did not return promptly after both entries were attempted")
 	}
 }
 

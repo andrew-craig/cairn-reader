@@ -130,33 +130,26 @@ func TestContentServiceClient_DeliverContent_MissingAPIKey(t *testing.T) {
 	assert.Contains(t, err.Error(), "internal API key is required")
 }
 
-func TestContentServiceClient_DeliverContent_RetryOnServerError(t *testing.T) {
+// TestContentServiceClient_DeliverContent_NoInternalRetryOnServerError proves C5: the
+// client must not run its own retry loop on failure. A failing downstream is reported
+// back to the caller after exactly one attempt so the outbox's DB-level backoff (not
+// this client) owns retry timing — otherwise one bad entry can block an entire batch.
+func TestContentServiceClient_DeliverContent_NoInternalRetryOnServerError(t *testing.T) {
 	var createCallCount int32
-	contentID := uuid.New()
 
 	srv := twoStepServer(t,
 		func(w http.ResponseWriter, r *http.Request) {
-			count := atomic.AddInt32(&createCallCount, 1)
-			if count < 3 {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				return
-			}
-			writeCreateResponse(w, contentID)
+			atomic.AddInt32(&createCallCount, 1)
+			w.WriteHeader(http.StatusServiceUnavailable)
 		},
 		func(w http.ResponseWriter, _ *http.Request) { writeAddResponse(w) },
 	)
 	defer srv.Close()
 
-	// Use very short delays for testing by patching retryDelays.
-	original := retryDelays
-	retryDelays = []time.Duration{1 * time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond}
-	defer func() { retryDelays = original }()
-
 	c := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
-	id, err := c.DeliverContent(context.Background(), newTestPayload())
-	require.NoError(t, err)
-	assert.Equal(t, contentID, id)
-	assert.Equal(t, int32(3), atomic.LoadInt32(&createCallCount))
+	_, err := c.DeliverContent(context.Background(), newTestPayload())
+	require.Error(t, err)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&createCallCount), "DeliverContent must not retry internally")
 }
 
 func TestContentServiceClient_DeliverContent_NoRetryOn4xx(t *testing.T) {
@@ -183,10 +176,6 @@ func TestContentServiceClient_CircuitBreaker_OpensAfterConsecutiveFailures(t *te
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
-
-	original := retryDelays
-	retryDelays = []time.Duration{} // no retries so failures are fast
-	defer func() { retryDelays = original }()
 
 	c := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
 
