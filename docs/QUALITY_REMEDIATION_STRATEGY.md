@@ -77,7 +77,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 | [x] #321 | P2-C6 | Bulk content insert PK-collides on any mixed new+seen batch → whole RSS batch fails | 1 | [R7](#r7--db-write-path-bugs) |
 | [x] #322 | P2-C7 / H8 | Recommender upsert conflicts on content-hash `id`, not just `link` → batch dropped every poll cycle | 1 | [R7](#r7--db-write-path-bugs) |
 | [x] #323 | Dedup index | `idx_contents_rss_dedup` is not UNIQUE → concurrent deliveries create duplicate content rows; email/manual path has no dedup at all | 1 | [R7](#r7--db-write-path-bugs) |
-| [ ] | P2-C8 | Feed-subscribe client unmarshals wrong response shape → app gets empty data with HTTP 201 | 1 | [R8](#r8--cross-service-contract-drift) |
+| [x] | P2-C8 | Feed-subscribe client unmarshals wrong response shape → app gets empty data with HTTP 201 | 1 | [R8](#r8--cross-service-contract-drift) |
 | [ ] | 409→500 | Client matches error codes the server never sends → re-subscribe returns 500 instead of 409 | 2 | [R8](#r8--cross-service-contract-drift) |
 | [ ] | C3 | Refresh-token reuse detection never fires for its actual threat; its test asserts through the wrong path | 1 | [R9](#r9--dead-tests-and-inert-security-features) |
 | [x] #320 | P2-C3 | Two dead tests: outbox delivery test never calls the code under test; CORS test can't catch the bypass. Fix C4 (suffix-match bypass) with the test | 1 | [R9](#r9--dead-tests-and-inert-security-features) |

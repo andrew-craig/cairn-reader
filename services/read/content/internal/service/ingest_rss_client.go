@@ -40,26 +40,15 @@ type SubscribeFeedRequest struct {
 	FeedURL string `json:"feed_url"`
 }
 
-// FeedSubscriptionResponse represents a feed subscription from Ingest RSS
+// FeedSubscriptionResponse represents a feed subscription from Ingest RSS.
+// Fields match the flat response from the Ingest RSS service's subscribe endpoint.
 type FeedSubscriptionResponse struct {
-	Subscription struct {
-		ID           string    `json:"id"`
-		UserID       string    `json:"user_id"`
-		FeedID       string    `json:"feed_id"`
-		SubscribedAt time.Time `json:"subscribed_at"`
-	} `json:"subscription"`
-	Feed struct {
-		ID          string    `json:"id"`
-		FeedURL     string    `json:"feed_url"`
-		Title       string    `json:"title"`
-		Description string    `json:"description"`
-		SiteURL     string    `json:"site_url"`
-		PollingTier string    `json:"polling_tier"`
-		Status      string    `json:"status"`
-		CreatedAt   time.Time `json:"created_at"`
-		UpdatedAt   time.Time `json:"updated_at"`
-	} `json:"feed"`
-	IsNewFeed bool `json:"is_new_feed"`
+	SubscriptionID string    `json:"subscription_id"`
+	FeedID         string    `json:"feed_id"`
+	FeedURL        string    `json:"feed_url"`
+	FeedTitle      string    `json:"feed_title"`
+	IsNewFeed      bool      `json:"is_new_feed"`
+	SubscribedAt   time.Time `json:"subscribed_at"`
 }
 
 // IngestRSSError represents an error from the Ingest RSS service
@@ -144,13 +133,15 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 		return nil, fmt.Errorf("ingest RSS service error: %s", apiError.Message)
 	}
 
-	// Parse success response
-	var subscription FeedSubscriptionResponse
-	if err := json.Unmarshal(body, &subscription); err != nil {
+	// Parse the API response wrapper
+	var apiResponse struct {
+		Data FeedSubscriptionResponse `json:"data"`
+	}
+	if err := json.Unmarshal(body, &apiResponse); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	return &subscription, nil
+	return &apiResponse.Data, nil
 }
 
 // UnsubscribeUserFromFeed removes a user's subscription to an RSS feed.

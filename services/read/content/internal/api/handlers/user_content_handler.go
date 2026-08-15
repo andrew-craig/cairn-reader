@@ -374,14 +374,14 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	// Build feed response
 	response := &dto.AddFeedResponse{
 		Type:   "feed",
-		FeedID: subscription.Feed.ID,
+		FeedID: subscription.FeedID,
 		Subscription: dto.FeedSubscriptionDTO{
-			ID:           subscription.Subscription.ID,
-			UserID:       subscription.Subscription.UserID,
-			FeedID:       subscription.Subscription.FeedID,
-			FeedURL:      subscription.Feed.FeedURL,
-			Title:        subscription.Feed.Title,
-			SubscribedAt: subscription.Subscription.SubscribedAt,
+			ID:           subscription.SubscriptionID,
+			UserID:       userID.String(),
+			FeedID:       subscription.FeedID,
+			FeedURL:      subscription.FeedURL,
+			Title:        subscription.FeedTitle,
+			SubscribedAt: subscription.SubscribedAt,
 		},
 	}
 
