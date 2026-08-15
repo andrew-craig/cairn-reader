@@ -309,18 +309,18 @@ func TestRefreshTokenRepository_RevokeAllUserTokens(t *testing.T) {
 		err = tokenRepo.RevokeAllUserTokens(ctx, user.ID)
 		require.NoError(t, err)
 
-		// Verify all tokens are deleted
+		// Rows are retained (not deleted) but marked revoked
 		retrieved1, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash1)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved1)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved1.RevokedAt)
 
 		retrieved2, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash2)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved2)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved2.RevokedAt)
 
 		retrieved3, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash3)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved3)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved3.RevokedAt)
 	})
 
 	t.Run("success - no tokens", func(t *testing.T) {
@@ -375,19 +375,20 @@ func TestRefreshTokenRepository_RevokeTokenFamily(t *testing.T) {
 		err = tokenRepo.RevokeTokenFamily(ctx, family1)
 		require.NoError(t, err)
 
-		// Verify family 1 tokens are deleted
+		// Family 1 tokens are retained (not deleted) but marked revoked
 		retrieved1, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash1)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved1)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved1.RevokedAt)
 
 		retrieved2, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash2)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved2)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved2.RevokedAt)
 
-		// Verify family 2 token still exists
+		// Family 2 token is untouched and still active
 		retrieved3, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash3)
 		require.NoError(t, err)
 		assert.NotNil(t, retrieved3)
+		assert.Nil(t, retrieved3.RevokedAt)
 	})
 
 	t.Run("empty family ID", func(t *testing.T) {
@@ -727,17 +728,17 @@ func TestRefreshTokenRepository_EdgeCases(t *testing.T) {
 		require.NoError(t, err)
 		defer cleanupRefreshToken(t, db, token2.ID)
 
-		// Revoke entire family (should remove both valid and expired)
+		// Revoke entire family (should mark both valid and expired as revoked)
 		err = tokenRepo.RevokeTokenFamily(ctx, family)
 		require.NoError(t, err)
 
-		// Verify both are gone
+		// Both are retained (not deleted) but marked revoked
 		retrieved1, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash1)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved1)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved1.RevokedAt)
 
 		retrieved2, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash2)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved2)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved2.RevokedAt)
 	})
 }

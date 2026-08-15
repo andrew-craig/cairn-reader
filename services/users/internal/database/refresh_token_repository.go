@@ -27,10 +27,10 @@ type RefreshTokenRepository interface {
 	// RevokeToken marks a specific refresh token as revoked (retained until expiry)
 	RevokeToken(ctx context.Context, id uuid.UUID) error
 
-	// RevokeAllUserTokens deletes all refresh tokens for a user
+	// RevokeAllUserTokens marks all refresh tokens for a user as revoked (retained until expiry)
 	RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error
 
-	// RevokeTokenFamily deletes all tokens in a token family (for reuse detection)
+	// RevokeTokenFamily marks all tokens in a token family as revoked (retained until expiry, for reuse detection)
 	RevokeTokenFamily(ctx context.Context, tokenFamily uuid.UUID) error
 
 	// CleanupExpiredTokens removes expired tokens from the database
@@ -199,11 +199,13 @@ func (r *refreshTokenRepository) RevokeToken(ctx context.Context, id uuid.UUID) 
 	return nil
 }
 
-// RevokeAllUserTokens deletes all refresh tokens for a user
+// RevokeAllUserTokens marks all of a user's refresh tokens as revoked. Rows
+// are retained (not deleted), matching RevokeToken, so a replay of any of
+// them is still recognized as reuse instead of a generic "not found".
 func (r *refreshTokenRepository) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
-	query := `DELETE FROM refresh_tokens WHERE user_id = $1`
+	query := `UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL`
 
-	result, err := r.db.Pool.Exec(ctx, query, userID)
+	result, err := r.db.Pool.Exec(ctx, query, time.Now().UTC(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to revoke all user tokens: %w", err)
 	}
@@ -215,7 +217,8 @@ func (r *refreshTokenRepository) RevokeAllUserTokens(ctx context.Context, userID
 	return nil
 }
 
-// RevokeTokenFamily deletes all tokens in a token family
+// RevokeTokenFamily marks all tokens in a token family as revoked (rows
+// retained, not deleted, for the same reason as RevokeToken/RevokeAllUserTokens).
 // This is used for refresh token reuse detection - if a token is reused,
 // all tokens in its family should be revoked as a security measure
 func (r *refreshTokenRepository) RevokeTokenFamily(ctx context.Context, tokenFamily uuid.UUID) error {
@@ -223,9 +226,9 @@ func (r *refreshTokenRepository) RevokeTokenFamily(ctx context.Context, tokenFam
 		return apperrors.ErrInvalidTokenData
 	}
 
-	query := `DELETE FROM refresh_tokens WHERE token_family = $1`
+	query := `UPDATE refresh_tokens SET revoked_at = $1 WHERE token_family = $2 AND revoked_at IS NULL`
 
-	result, err := r.db.Pool.Exec(ctx, query, tokenFamily)
+	result, err := r.db.Pool.Exec(ctx, query, time.Now().UTC(), tokenFamily)
 	if err != nil {
 		return fmt.Errorf("failed to revoke token family: %w", err)
 	}
