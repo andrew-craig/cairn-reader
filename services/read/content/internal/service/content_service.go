@@ -90,7 +90,11 @@ func (s *contentService) CreateFromURL(ctx context.Context, url string, sourceTy
 	}
 
 	// Check for duplicates: RSS dedupes on (hash, feed); everything else
-	// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
+	// (email/manual) has no feed, so it dedupes on (hash, URL) instead. RSS
+	// content without a feed ID falls through to the URL branch, which
+	// won't match it (GetByContentHashAndURL excludes source_type='rss') —
+	// pre-existing gap, not a regression: RSS content always carries a feed
+	// in practice, so this path is unreachable in normal operation.
 	if sourceType == models.SourceTypeRSS && sourceFeedID != nil {
 		existing, err := s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *sourceFeedID)
 		if err != nil {
@@ -152,7 +156,11 @@ func (s *contentService) CreateFromHTML(ctx context.Context, url string, html st
 	}
 
 	// Check for duplicates: RSS dedupes on (hash, feed); everything else
-	// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
+	// (email/manual) has no feed, so it dedupes on (hash, URL) instead. RSS
+	// content without a feed ID falls through to the URL branch, which
+	// won't match it (GetByContentHashAndURL excludes source_type='rss') —
+	// pre-existing gap, not a regression: RSS content always carries a feed
+	// in practice, so this path is unreachable in normal operation.
 	if sourceType == models.SourceTypeRSS && sourceFeedID != nil {
 		existing, err := s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *sourceFeedID)
 		if err != nil {
@@ -289,7 +297,11 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 		}
 
 		// Check for duplicates: RSS dedupes on (hash, feed); everything else
-		// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
+		// (email/manual) has no feed, so it dedupes on (hash, URL) instead. RSS
+		// content without a feed ID falls through to the URL branch, which
+		// won't match it (GetByContentHashAndURL excludes source_type='rss') —
+		// pre-existing gap, not a regression: RSS content always carries a feed
+		// in practice, so this path is unreachable in normal operation.
 		var existing *models.Content
 		if item.SourceType == models.SourceTypeRSS && item.SourceFeedID != nil {
 			existing, err = s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *item.SourceFeedID)

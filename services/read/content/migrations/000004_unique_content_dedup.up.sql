@@ -25,17 +25,22 @@ DELETE FROM content_dedup_map WHERE loser_id = survivor_id;
 
 -- Re-point user_contents from losing rows to the survivor so users keep
 -- their saved item instead of losing it when the loser is deleted below.
--- Skip a reassignment that would collide with a row the user already has
--- for the survivor (unique_user_content) — that duplicate link is simply
--- dropped along with the loser via ON DELETE CASCADE.
-UPDATE user_contents uc
-SET content_id = m.survivor_id
-FROM content_dedup_map m
-WHERE uc.content_id = m.loser_id
-  AND NOT EXISTS (
-      SELECT 1 FROM user_contents uc2
-      WHERE uc2.user_id = uc.user_id AND uc2.content_id = m.survivor_id
-  );
+-- A user can own more than one loser mapping to the same survivor (e.g.
+-- two of the concurrent duplicates this migration is cleaning up), so this
+-- is an INSERT ... ON CONFLICT DO NOTHING of the survivor link followed by
+-- an unconditional DELETE of every loser link, rather than an UPDATE: an
+-- UPDATE's NOT EXISTS guard is evaluated once against the pre-statement
+-- snapshot, so two loser rows for the same user in the same statement would
+-- both pass the guard and then collide with each other on
+-- unique_user_content, aborting the migration.
+INSERT INTO user_contents (user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at)
+SELECT uc.user_id, m.survivor_id, uc.status, uc.scroll_position, uc.is_favorite, uc.added_at, uc.updated_at
+FROM user_contents uc
+JOIN content_dedup_map m ON uc.content_id = m.loser_id
+ON CONFLICT (user_id, content_id) DO NOTHING;
+
+DELETE FROM user_contents
+WHERE content_id IN (SELECT loser_id FROM content_dedup_map);
 
 DELETE FROM contents WHERE id IN (SELECT loser_id FROM content_dedup_map);
 
