@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
@@ -17,6 +18,13 @@ import (
 
 // TestDetectURL_RealFeed tests detection against a real RSS feed
 func TestDetectURL_RealFeed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
+	}
+
 	// Setup real detector (not a mock)
 	detector := service.NewURLDetector()
 	handler := NewDetectionHandler(detector)
@@ -49,6 +57,13 @@ func TestDetectURL_RealFeed(t *testing.T) {
 
 // TestDetectURL_RealPage tests detection against a real HTML page
 func TestDetectURL_RealPage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
+	}
+
 	// Setup real detector (not a mock)
 	detector := service.NewURLDetector()
 	handler := NewDetectionHandler(detector)

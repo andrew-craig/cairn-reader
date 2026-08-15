@@ -5,6 +5,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 )
@@ -15,6 +16,9 @@ import (
 func TestDetectURL_RealRSSFeed_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
+	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
 	}
 
 	detector := NewURLDetector()
@@ -42,6 +46,9 @@ func TestDetectURL_RealHTMLPage_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
+	}
 
 	detector := NewURLDetector()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -68,6 +75,9 @@ func TestDetectURL_RealRedirect_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
+	}
 
 	detector := NewURLDetector()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -92,6 +102,9 @@ func TestDetectURL_RealRedirect_Integration(t *testing.T) {
 func TestDetectURL_RealTimeout_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
+	}
+	if os.Getenv("CAIRN_SKIP_NETWORK_TESTS") == "1" {
+		t.Skip("Skipping network-dependent integration test (CAIRN_SKIP_NETWORK_TESTS=1)")
 	}
 
 	detector := NewURLDetector()

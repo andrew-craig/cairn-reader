@@ -311,14 +311,17 @@ jobs:
         with:
           go-version: '1.25'
           cache-dependency-path: services/explore/go.sum
-      # recommender's integration tests provision their own Postgres via testcontainers-go
-      # (internal/testutil.SetupTestDB), so no service container is needed here.
-      # fetcher's integration-tagged tests are excluded: they predate this job and have
-      # accumulated unrelated pre-existing rot (build errors, an SSRF-guard/httptest
-      # conflict, a NULL-scan bug) — tracked separately in chalk task bug_96d7.
+      # recommender/internal/db's integration tests provision their own Postgres via
+      # testcontainers-go (internal/testutil.SetupTestDB), so no service container is
+      # needed here. The root recommender package's integration_test.go /
+      # integration_shown_test.go use an older, separate hardcoded-connection setup
+      # (TEST_DB_* against a pre-existing "cairn"/"cairn_test_db" database, no
+      # self-migration) instead of that testutil — excluded here, along with all of
+      # fetcher's integration-tagged tests, as pre-existing rot unrelated to Wave 2 —
+      # tracked separately in chalk task bug_96d7.
       - name: Run integration tests
         working-directory: services/explore
-        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/...
+        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/internal/db/...
 
   test-read:
     name: go test (services/read)
@@ -374,6 +377,13 @@ jobs:
       TEST_DB_PORT: 5432
       TEST_DB_USER: postgres
       TEST_DB_PASSWORD: postgres
+      # content/internal/service and content/internal/api/handlers have a handful of
+      # integration tests that hit real external sites (nasa.gov, example.com,
+      # httpstat.us) to exercise URL detection against real responses. That's a live
+      # third-party dependency this required CI job shouldn't be coupled to, so they're
+      # skipped here independently of -short (which would also skip the Wave 2 DB tests
+      # this job exists to run).
+      CAIRN_SKIP_NETWORK_TESTS: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
