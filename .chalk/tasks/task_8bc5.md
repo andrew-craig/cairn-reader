@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [quality,wave2,contracts]
-blocked_by: [task_963d]
+blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:46:25Z
-updated_at: 2026-08-09T06:46:38Z
+updated_at: 2026-08-15T10:45:21Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
