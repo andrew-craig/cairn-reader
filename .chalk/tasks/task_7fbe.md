@@ -2,14 +2,14 @@
 id: task_7fbe
 title: [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h
 type: task
-status: open
+status: in_progress
 priority: 1
 labels: [quality,wave2,ops]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:46:25Z
-updated_at: 2026-08-09T06:46:25Z
+updated_at: 2026-08-15T11:17:26Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -27,4 +27,26 @@ The existing test patches `retryDelays` to millisecond values, so production tim
 
 ## Done when
 - A failing downstream no longer blocks subsequent entries in a batch, proven by a test that fails before the fix.
+
+## Review
+
+Re-verified on main: `content_service_client.go` still ran its own `time.After` retry loop
+(1m/5m/15m/1h/4h/12h) inside `DeliverContent`, on top of the DB-level backoff already applied
+in `outbox_worker.go`'s `recordFailure`/`outboxBackoff`. Finding confirmed as described.
+
+Added `TestOutboxWorker_DeliverBatch_FailedEntryDoesNotBlockSubsequentEntries` in
+`internal/worker/outbox_worker_test.go`, which drives a real (unpatched) `ContentServiceClient`
+against an `httptest` server where entry 1 always 500s and entry 2 succeeds, then asserts entry 2
+is attempted within 2s of `deliverBatch` starting. This fails on unfixed code (times out — entry 1
+blocks inside `DeliverContent` for a full minute before deliverBatch can move on) and passes after
+the fix.
+
+Fix: deleted `retryDelays`, the retry loop, and the now-unused `isNonRetryable` helper from
+`DeliverContent` — it now makes exactly one attempt and returns the error immediately, letting the
+outbox's DB-level backoff own retry timing. Updated
+`TestContentServiceClient_DeliverContent_RetryOnServerError` (renamed to
+`..._NoInternalRetryOnServerError`, now asserts exactly one call) and removed the `retryDelays`
+patching from the circuit-breaker test, since there's no internal retry left to patch around.
+
+Verification: `go test ./...` and `go vet ./...` green in `services/read/email`.
 

@@ -4,8 +4,8 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
+- **task_7fbe** · P1 · in_progress · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **task_7fbe** · P1 · open · [C5] Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h  (parent: epic_fefa)
 - **task_ac75** · P1 · open · [Integration tier] Add a CI job running //go:build integration tests against a real Postgres  (parent: epic_fefa)
 - **task_cef5** · P1 · open · [C3] Refresh-token reuse detection never fires for its actual threat; its test asserts the wrong path  (parent: epic_fefa)
 - **task_dbcf** · P1 · open · [Web CI] apps/web has no CI at all — add web-checks.yml (tsc, eslint, vitest)  (parent: epic_fefa)
