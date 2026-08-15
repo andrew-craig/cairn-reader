@@ -39,6 +39,11 @@ type RefreshToken struct {
 	// TokenFamily is a UUID used to track token rotation chains for reuse detection
 	// All tokens in a rotation chain share the same family ID
 	TokenFamily *uuid.UUID `json:"token_family,omitempty" db:"token_family"`
+
+	// RevokedAt is when this token was revoked (rotated away or logged out).
+	// Nil means the token is still active. Revoked tokens are retained until
+	// expiry (rather than deleted) so a replay of them can be detected as reuse.
+	RevokedAt *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
 }
 
 // IsExpired returns true if the refresh token has expired
@@ -49,11 +54,6 @@ func (rt *RefreshToken) IsExpired() bool {
 // IsValid returns true if the refresh token is not expired
 func (rt *RefreshToken) IsValid() bool {
 	return !rt.IsExpired()
-}
-
-// TimeSinceLastUsed returns the duration since the token was last used
-func (rt *RefreshToken) TimeSinceLastUsed() time.Duration {
-	return time.Since(rt.LastUsedAt)
 }
 
 // TimeUntilExpiry returns the duration until the token expires

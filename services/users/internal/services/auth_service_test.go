@@ -561,31 +561,51 @@ func TestAuthService_RefreshAccessToken(t *testing.T) {
 		assert.Nil(t, resp)
 	})
 
+	// Guards against C3: replaying a refresh token *after* it has already
+	// been legitimately rotated away is the actual threat this feature exists
+	// for, and must revoke the whole token family and emit a
+	// token_reuse_detected audit event - not just return some error. Before
+	// the fix, the old token's DB row was hard-deleted on rotation, so this
+	// replay fell through to the unrelated "not found" path: the old
+	// version of this test only asserted assert.Error (after a 6s sleep),
+	// which passed for that wrong reason without exercising reuse detection
+	// at all.
 	t.Run("token reuse detection", func(t *testing.T) {
 		email := "reuse@example.com"
 		password := "ValidPass123!"
 
 		defer cleanupTestUserByEmail(t, db, email)
 
-		// Register user
 		registerResp, err := service.Register(ctx, email, password)
 		require.NoError(t, err)
 
 		oldRefreshToken := registerResp.RefreshToken
 
-		// First refresh should succeed
+		// Legitimate rotation.
 		refreshResp1, err := service.RefreshAccessToken(ctx, oldRefreshToken, "", "")
 		require.NoError(t, err)
-		assert.NotNil(t, refreshResp1)
+		require.NotNil(t, refreshResp1)
+		rotatedRefreshToken := refreshResp1.RefreshToken
 
-		// Wait for grace period to pass
-		time.Sleep(6 * time.Second)
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewJSONHandler(&buf, nil))
+		prevDefault := slog.Default()
+		slog.SetDefault(logger)
+		defer slog.SetDefault(prevDefault)
 
-		// Try to use the old token again (should be detected as reuse)
+		// Attacker replays the token the victim already rotated away.
 		refreshResp2, err := service.RefreshAccessToken(ctx, oldRefreshToken, "", "")
 		assert.Error(t, err)
 		assert.Nil(t, refreshResp2)
-		// Should detect token reuse
+
+		assert.Contains(t, buf.String(), `"event_type":"token_reuse_detected"`,
+			"replaying a rotated token must emit the token_reuse_detected audit event")
+
+		// The whole family must be revoked, not just the replayed token: the
+		// token issued by the legitimate rotation must stop working too.
+		refreshResp3, err := service.RefreshAccessToken(ctx, rotatedRefreshToken, "", "")
+		assert.Error(t, err, "reuse detection must revoke the whole token family")
+		assert.Nil(t, refreshResp3)
 	})
 }
 

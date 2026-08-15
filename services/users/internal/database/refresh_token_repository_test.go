@@ -252,14 +252,17 @@ func TestRefreshTokenRepository_RevokeToken(t *testing.T) {
 		created, err := tokenRepo.CreateRefreshToken(ctx, user.ID, tokenHash, expiresAt, nil, nil, nil)
 		require.NoError(t, err)
 
+		defer cleanupRefreshToken(t, db, created.ID)
+
 		err = tokenRepo.RevokeToken(ctx, created.ID)
 		require.NoError(t, err)
 
-		// Verify token is deleted
+		// The row is retained (not deleted) so a replay can be detected as
+		// reuse, but it must now be marked revoked.
 		retrieved, err := tokenRepo.GetRefreshTokenByHash(ctx, tokenHash)
-		assert.Error(t, err)
-		assert.Nil(t, retrieved)
-		assert.ErrorIs(t, err, apperrors.ErrTokenNotFound)
+		require.NoError(t, err)
+		require.NotNil(t, retrieved)
+		require.NotNil(t, retrieved.RevokedAt)
 	})
 
 	t.Run("token not found", func(t *testing.T) {

@@ -252,15 +252,18 @@ func TestValidateAndRotateToken(t *testing.T) {
 
 		token, hash, _ := service.GenerateToken()
 
-		// Token that was just used (reuse scenario)
+		// Token already revoked (rotated away) well before this replay - the
+		// real threat this guards against, not a same-request race.
+		revokedAt := time.Now().UTC().Add(-1 * time.Hour)
 		reusedToken := &models.RefreshToken{
 			ID:          uuid.New(),
 			UserID:      userID,
 			TokenHash:   hash,
 			ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
-			CreatedAt:   time.Now().UTC().Add(-1 * time.Hour),
-			LastUsedAt:  time.Now().UTC().Add(-1 * time.Second), // Used 1 second ago (within grace period)
+			CreatedAt:   time.Now().UTC().Add(-2 * time.Hour),
+			LastUsedAt:  time.Now().UTC().Add(-1 * time.Hour),
 			TokenFamily: &tokenFamily,
+			RevokedAt:   &revokedAt,
 		}
 
 		repo.On("GetRefreshTokenByHash", ctx, hash).Return(reusedToken, nil)
@@ -281,15 +284,17 @@ func TestValidateAndRotateToken(t *testing.T) {
 
 		token, hash, _ := service.GenerateToken()
 
-		// Token without family tracking
+		// Token without family tracking, already revoked well before this replay
+		revokedAt := time.Now().UTC().Add(-1 * time.Hour)
 		reusedToken := &models.RefreshToken{
 			ID:          uuid.New(),
 			UserID:      userID,
 			TokenHash:   hash,
 			ExpiresAt:   time.Now().UTC().Add(24 * time.Hour),
-			CreatedAt:   time.Now().UTC().Add(-1 * time.Hour),
-			LastUsedAt:  time.Now().UTC().Add(-1 * time.Second),
+			CreatedAt:   time.Now().UTC().Add(-2 * time.Hour),
+			LastUsedAt:  time.Now().UTC().Add(-1 * time.Hour),
 			TokenFamily: nil, // No family tracking
+			RevokedAt:   &revokedAt,
 		}
 
 		repo.On("GetRefreshTokenByHash", ctx, hash).Return(reusedToken, nil)
@@ -326,34 +331,17 @@ func TestIsTokenReused(t *testing.T) {
 	repo := new(MockRefreshTokenRepository)
 	service := NewRefreshTokenService(repo, DefaultRefreshTokenExpiry)
 
-	t.Run("first use is not reuse", func(t *testing.T) {
-		now := time.Now().UTC()
-		token := &models.RefreshToken{
-			CreatedAt:  now,
-			LastUsedAt: now, // Same as created = first use
-		}
+	t.Run("active token is not reuse", func(t *testing.T) {
+		token := &models.RefreshToken{RevokedAt: nil}
 
 		assert.False(t, service.isTokenReused(token))
 	})
 
-	t.Run("use within grace period is reuse", func(t *testing.T) {
-		now := time.Now().UTC()
-		token := &models.RefreshToken{
-			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-2 * time.Second), // Used 2 seconds ago
-		}
+	t.Run("revoked token is reuse", func(t *testing.T) {
+		revokedAt := time.Now().UTC().Add(-2 * time.Second)
+		token := &models.RefreshToken{RevokedAt: &revokedAt}
 
 		assert.True(t, service.isTokenReused(token))
-	})
-
-	t.Run("use outside grace period is not reuse", func(t *testing.T) {
-		now := time.Now().UTC()
-		token := &models.RefreshToken{
-			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-20 * time.Second), // Used 20 seconds ago (outside 15s grace period)
-		}
-
-		assert.False(t, service.isTokenReused(token))
 	})
 }
 
@@ -673,38 +661,47 @@ func TestIsTokenReused_EdgeCases(t *testing.T) {
 	repo := new(MockRefreshTokenRepository)
 	service := NewRefreshTokenService(repo, DefaultRefreshTokenExpiry)
 
-	t.Run("grace period boundary conditions", func(t *testing.T) {
-		now := time.Now().UTC()
+	t.Run("revoked moments ago is still reuse", func(t *testing.T) {
+		revokedAt := time.Now().UTC().Add(-1 * time.Millisecond)
+		token := &models.RefreshToken{RevokedAt: &revokedAt}
 
-		// Exactly at grace period boundary (15 seconds)
-		token1 := &models.RefreshToken{
-			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-15 * time.Second),
-		}
-		// Should not be considered reuse (>= grace period)
-		assert.False(t, service.isTokenReused(token1))
-
-		// Just inside grace period (14.9 seconds ago)
-		token2 := &models.RefreshToken{
-			CreatedAt:  now.Add(-10 * time.Minute),
-			LastUsedAt: now.Add(-14900 * time.Millisecond),
-		}
-		assert.True(t, service.isTokenReused(token2))
+		assert.True(t, service.isTokenReused(token))
 	})
 
-	t.Run("very old last use is not reuse", func(t *testing.T) {
-		now := time.Now().UTC()
-		token := &models.RefreshToken{
-			CreatedAt:  now.Add(-30 * 24 * time.Hour),
-			LastUsedAt: now.Add(-10 * 24 * time.Hour), // Used 10 days ago
-		}
+	// This is the C3 scenario: an attacker replays a stolen token well after
+	// the victim legitimately rotated it. There is no grace-period cutoff -
+	// a revoked token is reuse for as long as its row is retained (up to its
+	// original expiry).
+	t.Run("revoked long ago is still reuse", func(t *testing.T) {
+		revokedAt := time.Now().UTC().Add(-10 * 24 * time.Hour)
+		token := &models.RefreshToken{RevokedAt: &revokedAt}
 
-		assert.False(t, service.isTokenReused(token))
+		assert.True(t, service.isTokenReused(token))
 	})
 }
 
 func TestRevokeToken_EdgeCases(t *testing.T) {
 	ctx := context.Background()
+
+	t.Run("already-revoked token is treated as not found", func(t *testing.T) {
+		repo := new(MockRefreshTokenRepository)
+		service := NewRefreshTokenService(repo, DefaultRefreshTokenExpiry)
+
+		token, hash, _ := service.GenerateToken()
+		revokedAt := time.Now().UTC().Add(-1 * time.Minute)
+		existingToken := &models.RefreshToken{
+			ID:        uuid.New(),
+			TokenHash: hash,
+			RevokedAt: &revokedAt,
+		}
+
+		repo.On("GetRefreshTokenByHash", ctx, hash).Return(existingToken, nil)
+
+		err := service.RevokeToken(ctx, token)
+
+		assert.Equal(t, ErrRefreshTokenNotFound, err)
+		repo.AssertExpectations(t)
+	})
 
 	t.Run("handles database error during retrieval", func(t *testing.T) {
 		repo := new(MockRefreshTokenRepository)

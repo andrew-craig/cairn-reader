@@ -245,7 +245,8 @@ CREATE TABLE refresh_tokens (
     token_family UUID,                    -- Groups tokens from the same rotation chain (reuse detection)
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    revoked_at TIMESTAMP WITH TIME ZONE   -- Set on rotation/logout; NULL = active. Row is kept until expiry so replay can be detected as reuse.
 );
 
 -- Indexes
@@ -486,12 +487,15 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 1. Client sends refresh token to `/auth/refresh`
 2. Service validates token hash in database
 3. Service issues new access token AND new refresh token
-4. Old refresh token is revoked (deleted from database)
+4. Old refresh token is marked revoked (`revoked_at` set; the row is retained
+   until its natural expiry, not deleted)
 5. New refresh token returned to client
 
 **Why Rotation?**
 - Limits window of exposure if refresh token is compromised
-- Enables detection of token theft (old token reuse)
+- Enables detection of token theft: replaying an already-revoked token (any
+  token whose `revoked_at` is set) is treated as reuse and revokes the whole
+  token family, regardless of how long ago it was revoked
 - Follows OAuth 2.0 best practices
 
 **Metadata Tracking**:
