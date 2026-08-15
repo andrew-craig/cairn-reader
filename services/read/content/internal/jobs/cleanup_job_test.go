@@ -46,6 +46,14 @@ func (m *MockContentRepository) GetByContentHashAndFeedID(ctx context.Context, c
 	return args.Get(0).(*models.Content), args.Error(1)
 }
 
+func (m *MockContentRepository) GetByContentHashAndURL(ctx context.Context, contentHash string, originalURL string) (*models.Content, error) {
+	args := m.Called(ctx, contentHash, originalURL)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Content), args.Error(1)
+}
+
 func (m *MockContentRepository) Update(ctx context.Context, content *models.Content) error {
 	args := m.Called(ctx, content)
 	return args.Error(0)

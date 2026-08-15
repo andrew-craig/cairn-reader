@@ -14,6 +14,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// contentRow builds a sqlmock result row matching contentColumns' order, for
+// tests exercising Create/CreateWithTx/BulkCreate's ON CONFLICT ... DO
+// UPDATE ... RETURNING path (which always returns the full persisted row).
+func contentRow(id uuid.UUID, contentHash, cleanedHTML, originalURL string, canonicalURL interface{},
+	title string, author, publishedAt, description, imageURLs interface{},
+	sourceType string, sourceFeedID, metadata interface{}, createdAt, updatedAt time.Time, orphanedAt interface{}) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{
+		"id", "content_hash", "cleaned_html", "original_url", "canonical_url",
+		"title", "author", "published_at", "description", "image_urls",
+		"source_type", "source_feed_id", "metadata", "created_at", "updated_at", "orphaned_at",
+	}).AddRow(id, contentHash, cleanedHTML, originalURL, canonicalURL,
+		title, author, publishedAt, description, imageURLs,
+		sourceType, sourceFeedID, metadata, createdAt, updatedAt, orphanedAt)
+}
+
 func TestContentRepository_Create_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -54,8 +69,8 @@ func TestContentRepository_Create_Success(t *testing.T) {
 			sqlmock.AnyArg(), // created_at
 			sqlmock.AnyArg(), // updated_at
 		).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-			AddRow(contentID, now, now))
+		WillReturnRows(contentRow(contentID, "hash123", "<p>Test content</p>", "https://example.com/article", nil,
+			"Test Article", nil, nil, nil, nil, "rss", &feedID, nil, now, now, nil))
 
 	err = repo.Create(ctx, content)
 	assert.NoError(t, err)
@@ -73,6 +88,7 @@ func TestContentRepository_Create_GeneratesUUID(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
+	newID := uuid.New()
 
 	content := &models.Content{
 		ContentHash: "hash123",
@@ -83,8 +99,8 @@ func TestContentRepository_Create_GeneratesUUID(t *testing.T) {
 	}
 
 	mock.ExpectQuery(`INSERT INTO contents`).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-			AddRow(uuid.New(), now, now))
+		WillReturnRows(contentRow(newID, "hash123", "<p>Test content</p>", "https://example.com/article", nil,
+			"Test Article", nil, nil, nil, nil, "web", nil, nil, now, now, nil))
 
 	err = repo.Create(ctx, content)
 	assert.NoError(t, err)
@@ -365,8 +381,12 @@ func TestContentRepository_BulkCreate_Success(t *testing.T) {
 		},
 	}
 
-	mock.ExpectExec(`INSERT INTO contents`).
-		WillReturnResult(sqlmock.NewResult(0, 2))
+	now := time.Now()
+	mock.ExpectQuery(`INSERT INTO contents`).
+		WillReturnRows(contentRow(uuid.New(), "hash1", "<p>1</p>", "https://example.com/1", nil,
+			"Title 1", nil, nil, nil, nil, "rss", nil, nil, now, now, nil).
+			AddRow(uuid.New(), "hash2", "<p>2</p>", "https://example.com/2", nil,
+				"Title 2", nil, nil, nil, nil, "rss", nil, nil, now, now, nil))
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.NoError(t, err)
@@ -407,7 +427,7 @@ func TestContentRepository_BulkCreate_ExecError(t *testing.T) {
 		},
 	}
 
-	mock.ExpectExec(`INSERT INTO contents`).
+	mock.ExpectQuery(`INSERT INTO contents`).
 		WillReturnError(sql.ErrConnDone)
 
 	err = repo.BulkCreate(ctx, contents)
@@ -440,8 +460,8 @@ func TestContentRepository_CreateWithTx_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	mock.ExpectQuery(`INSERT INTO contents`).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-			AddRow(contentID, now, now))
+		WillReturnRows(contentRow(contentID, "hash123", "<p>Test</p>", "https://example.com", nil,
+			"Test", nil, nil, nil, nil, "web", nil, nil, now, now, nil))
 
 	err = repo.CreateWithTx(ctx, tx, content)
 	assert.NoError(t, err)

@@ -169,6 +169,10 @@ func (m *mockContentRepo) GetByContentHashAndFeedID(ctx context.Context, content
 	return nil, nil
 }
 
+func (m *mockContentRepo) GetByContentHashAndURL(ctx context.Context, contentHash string, originalURL string) (*models.Content, error) {
+	return nil, nil
+}
+
 func (m *mockContentRepo) Update(ctx context.Context, content *models.Content) error {
 	return nil
 }

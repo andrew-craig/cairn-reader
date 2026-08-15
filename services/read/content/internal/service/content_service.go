@@ -89,9 +89,19 @@ func (s *contentService) CreateFromURL(ctx context.Context, url string, sourceTy
 		return nil, fmt.Errorf("failed to process URL: %w", err)
 	}
 
-	// Check for duplicates if this is from an RSS feed
+	// Check for duplicates: RSS dedupes on (hash, feed); everything else
+	// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
 	if sourceType == models.SourceTypeRSS && sourceFeedID != nil {
 		existing, err := s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *sourceFeedID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check for duplicate: %w", err)
+		}
+		if existing != nil {
+			// Content already exists, return it
+			return existing, nil
+		}
+	} else {
+		existing, err := s.contentRepo.GetByContentHashAndURL(ctx, processed.ContentHash, url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check for duplicate: %w", err)
 		}
@@ -141,9 +151,19 @@ func (s *contentService) CreateFromHTML(ctx context.Context, url string, html st
 		return nil, fmt.Errorf("failed to process HTML: %w", err)
 	}
 
-	// Check for duplicates if this is from an RSS feed
+	// Check for duplicates: RSS dedupes on (hash, feed); everything else
+	// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
 	if sourceType == models.SourceTypeRSS && sourceFeedID != nil {
 		existing, err := s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *sourceFeedID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check for duplicate: %w", err)
+		}
+		if existing != nil {
+			// Content already exists, return it
+			return existing, nil
+		}
+	} else {
+		existing, err := s.contentRepo.GetByContentHashAndURL(ctx, processed.ContentHash, url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check for duplicate: %w", err)
 		}
@@ -268,23 +288,27 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 			continue
 		}
 
-		// Check for duplicates if this is from an RSS feed
+		// Check for duplicates: RSS dedupes on (hash, feed); everything else
+		// (email/manual) has no feed, so it dedupes on (hash, URL) instead.
+		var existing *models.Content
 		if item.SourceType == models.SourceTypeRSS && item.SourceFeedID != nil {
-			existing, err := s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *item.SourceFeedID)
-			if err != nil {
-				errors = append(errors, BulkCreateError{
-					Index:   i,
-					URL:     item.URL,
-					Error:   err,
-					Message: fmt.Sprintf("Failed to check for duplicate: %v", err),
-				})
-				continue
-			}
-			if existing != nil {
-				// Content already exists, add to results
-				contents = append(contents, existing)
-				continue
-			}
+			existing, err = s.contentRepo.GetByContentHashAndFeedID(ctx, processed.ContentHash, *item.SourceFeedID)
+		} else {
+			existing, err = s.contentRepo.GetByContentHashAndURL(ctx, processed.ContentHash, item.URL)
+		}
+		if err != nil {
+			errors = append(errors, BulkCreateError{
+				Index:   i,
+				URL:     item.URL,
+				Error:   err,
+				Message: fmt.Sprintf("Failed to check for duplicate: %v", err),
+			})
+			continue
+		}
+		if existing != nil {
+			// Content already exists, add to results
+			contents = append(contents, existing)
+			continue
 		}
 
 		// Prefer caller-supplied title; fall back to readability output.
