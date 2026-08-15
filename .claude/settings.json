@@ -6,7 +6,8 @@
       "Bash(chalk ready:*)",
       "Bash(chalk close:*)",
       "Bash(chalk list:*)",
-      "Bash(chalk show:*)"
+      "Bash(chalk show:*)",
+      "mcp__Claude_Code_Remote__send_later"
     ]
   },
   "hooks": {
