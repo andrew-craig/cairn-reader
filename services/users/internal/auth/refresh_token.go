@@ -31,11 +31,6 @@ const (
 
 	// DefaultRefreshTokenExpiry is the default lifetime for refresh tokens (30 days)
 	DefaultRefreshTokenExpiry = 30 * 24 * time.Hour
-
-	// TokenReuseGracePeriod is the time window where token reuse is considered acceptable.
-	// If a token is used again within this window after first use, it's allowed to
-	// accommodate network latency and retry logic without triggering false positives.
-	TokenReuseGracePeriod = 15 * time.Second
 )
 
 // RefreshTokenService handles refresh token operations including generation,
@@ -216,24 +211,12 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 	return newToken, tokenModel.UserID, nil
 }
 
-// isTokenReused detects if a token has been used multiple times
-// This is a key security feature to detect token theft
+// isTokenReused detects if a token has been used multiple times.
+// This is a key security feature to detect token theft: a token is only
+// revoked (not deleted) when it's rotated away or logged out, so a replay of
+// an already-revoked-but-not-yet-expired token is unambiguously reuse.
 func (s *RefreshTokenService) isTokenReused(token *models.RefreshToken) bool {
-	// If the token was last used very recently (within grace period),
-	// it's likely being reused (either by an attacker or a race condition)
-	timeSinceLastUse := token.TimeSinceLastUsed()
-
-	// If this is the first use (LastUsedAt == CreatedAt), it's not reuse
-	if token.LastUsedAt.Equal(token.CreatedAt) {
-		return false
-	}
-
-	// If used again within the grace period, consider it reuse
-	if timeSinceLastUse < TokenReuseGracePeriod {
-		return true
-	}
-
-	return false
+	return token.RevokedAt != nil
 }
 
 // RevokeToken revokes a single refresh token
@@ -246,6 +229,11 @@ func (s *RefreshTokenService) RevokeToken(ctx context.Context, token string) err
 			return ErrRefreshTokenNotFound
 		}
 		return fmt.Errorf("failed to retrieve token: %w", err)
+	}
+
+	// Already revoked (e.g. a repeated logout call) - treat the same as not found.
+	if tokenModel.RevokedAt != nil {
+		return ErrRefreshTokenNotFound
 	}
 
 	err = s.repo.RevokeToken(ctx, tokenModel.ID)

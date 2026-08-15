@@ -6,7 +6,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_ac75** · P1 · open · [Integration tier] Add a CI job running //go:build integration tests against a real Postgres  (parent: epic_fefa)
-- **task_cef5** · P1 · open · [C3] Refresh-token reuse detection never fires for its actual threat; its test asserts the wrong path  (parent: epic_fefa)
 - **task_dbcf** · P1 · open · [Web CI] apps/web has no CI at all — add web-checks.yml (tsc, eslint, vitest)  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
