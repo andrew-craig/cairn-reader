@@ -419,7 +419,7 @@ func TestRecommendationAlgorithm(t *testing.T) {
 	}
 
 	// Get recommendations
-	recommendations, err := suite.engine.GetRecommendations(ctx, userID)
+	recommendations, err := suite.engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
@@ -638,7 +638,7 @@ func TestDeletedArticlesExcluded(t *testing.T) {
 	}
 
 	// Get recommendations
-	recommendations, err := suite.engine.GetRecommendations(ctx, userID)
+	recommendations, err := suite.engine.GetRecommendations(ctx, userID, 0)
 	if err != nil {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
