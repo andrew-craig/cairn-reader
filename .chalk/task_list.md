@@ -25,7 +25,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
 - **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
-- **task_d1eb** · P2 · open · [Cleanup batching] RunWithBatching does not batch — unbounded DELETE in one transaction  (parent: epic_fefa)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_dd2d** · P2 · open · [H3+H4] Password-reset tokens never delivered; self-host build panics on reset/verify routes  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)

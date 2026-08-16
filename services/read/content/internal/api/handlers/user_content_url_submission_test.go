@@ -181,7 +181,7 @@ func (m *mockContentRepo) UpdateWithTx(ctx context.Context, tx *sql.Tx, content 
 	return nil
 }
 
-func (m *mockContentRepo) DeleteOrphaned(ctx context.Context, olderThan time.Duration) (int64, error) {
+func (m *mockContentRepo) DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	return 0, nil
 }
 

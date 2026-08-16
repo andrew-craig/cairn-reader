@@ -67,7 +67,7 @@ func (m *mockRawEmailRepo) UpdateError(ctx context.Context, id uuid.UUID, retryC
 	}
 	return nil
 }
-func (m *mockRawEmailRepo) DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error) {
+func (m *mockRawEmailRepo) DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	return 0, nil
 }
 
@@ -93,7 +93,7 @@ func (m *mockOutboxRepo) UpdateDeliveryStatus(ctx context.Context, id uuid.UUID,
 func (m *mockOutboxRepo) UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error {
 	return nil
 }
-func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration) (int64, error) {
+func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	return 0, nil
 }
 

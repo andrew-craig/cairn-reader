@@ -12,12 +12,17 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
 )
 
+// defaultRawEmailCleanupBatchSize bounds each DELETE transaction so cleanup
+// never holds a long lock on the raw_emails table.
+const defaultRawEmailCleanupBatchSize = 1000
+
 // RawEmailCleanupJob periodically cleans up processed raw emails.
 type RawEmailCleanupJob struct {
 	rawEmailRepo  repository.RawEmailRepository
 	retentionDays int
 	hour          int
 	minute        int
+	batchSize     int
 }
 
 // NewRawEmailCleanupJob creates a new RawEmailCleanupJob.
@@ -35,6 +40,7 @@ func NewRawEmailCleanupJob(rawEmailRepo repository.RawEmailRepository, cronExpr 
 		retentionDays: retentionDays,
 		hour:          hour,
 		minute:        minute,
+		batchSize:     defaultRawEmailCleanupBatchSize,
 	}, nil
 }
 
@@ -63,12 +69,28 @@ func (j *RawEmailCleanupJob) Start(ctx context.Context) {
 
 func (j *RawEmailCleanupJob) run(ctx context.Context) {
 	retention := time.Duration(j.retentionDays) * 24 * time.Hour
-	count, err := j.rawEmailRepo.DeleteProcessed(ctx, retention)
-	if err != nil {
-		slog.Error("raw email cleanup failed", slog.Any("error", err))
-		return
+
+	totalDeleted := int64(0)
+	for {
+		count, err := j.rawEmailRepo.DeleteProcessed(ctx, retention, j.batchSize)
+		if err != nil {
+			slog.Error("raw email cleanup failed", slog.Any("error", err), slog.Int64("total_deleted_so_far", totalDeleted))
+			return
+		}
+
+		totalDeleted += count
+		if count == 0 {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
-	slog.Info("raw email cleanup completed", slog.Int64("deleted", count))
+
+	slog.Info("raw email cleanup completed", slog.Int64("deleted", totalDeleted))
 }
 
 // parseDailyCron extracts hour and minute from a "M H * * *" cron expression.

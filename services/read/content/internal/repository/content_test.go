@@ -298,11 +298,11 @@ func TestContentRepository_DeleteOrphaned_Success(t *testing.T) {
 
 	olderThan := 90 * 24 * time.Hour
 
-	mock.ExpectExec(`DELETE FROM contents WHERE orphaned_at IS NOT NULL AND orphaned_at < \$1`).
-		WithArgs(sqlmock.AnyArg()).
+	mock.ExpectExec(`DELETE FROM contents WHERE id IN \( SELECT id FROM contents WHERE orphaned_at IS NOT NULL AND orphaned_at < \$1 LIMIT \$2 \)`).
+		WithArgs(sqlmock.AnyArg(), 1000).
 		WillReturnResult(sqlmock.NewResult(0, 5))
 
-	deleted, err := repo.DeleteOrphaned(ctx, olderThan)
+	deleted, err := repo.DeleteOrphaned(ctx, olderThan, 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(5), deleted)
 	assert.NoError(t, mock.ExpectationsWereMet())

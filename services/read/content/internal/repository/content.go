@@ -34,8 +34,8 @@ type ContentRepository interface {
 	// UpdateWithTx updates an existing content record within a transaction
 	UpdateWithTx(ctx context.Context, tx *sql.Tx, content *models.Content) error
 
-	// DeleteOrphaned deletes orphaned content older than the specified duration
-	DeleteOrphaned(ctx context.Context, olderThan time.Duration) (int64, error)
+	// DeleteOrphaned deletes up to batchSize orphaned content rows older than the specified duration
+	DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 
 	// List retrieves content records with pagination
 	List(ctx context.Context, limit, offset int) ([]*models.Content, error)
@@ -428,16 +428,19 @@ func (r *contentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, conten
 	return nil
 }
 
-// DeleteOrphaned deletes orphaned content older than the specified duration
-func (r *contentRepository) DeleteOrphaned(ctx context.Context, olderThan time.Duration) (int64, error) {
+// DeleteOrphaned deletes up to batchSize orphaned content rows older than the specified duration
+func (r *contentRepository) DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	query := `
 		DELETE FROM contents
-		WHERE orphaned_at IS NOT NULL
-		AND orphaned_at < $1
+		WHERE id IN (
+			SELECT id FROM contents
+			WHERE orphaned_at IS NOT NULL AND orphaned_at < $1
+			LIMIT $2
+		)
 	`
 
 	cutoffTime := time.Now().Add(-olderThan)
-	result, err := r.db.ExecContext(ctx, query, cutoffTime)
+	result, err := r.db.ExecContext(ctx, query, cutoffTime, batchSize)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete orphaned content: %w", err)
 	}

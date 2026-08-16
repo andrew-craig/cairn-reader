@@ -28,8 +28,8 @@ type OutboxRepository interface {
 	// UpdateRetryInfo updates retry information after a failed delivery attempt
 	UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
 
-	// DeleteDelivered deletes delivered entries older than the given duration
-	DeleteDelivered(ctx context.Context, olderThan time.Duration) (int64, error)
+	// DeleteDelivered deletes up to batchSize delivered entries older than the given duration
+	DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 // outboxRepository is the concrete implementation of OutboxRepository
@@ -245,16 +245,19 @@ func (r *outboxRepository) UpdateRetryInfo(ctx context.Context, id uuid.UUID, re
 	return nil
 }
 
-// DeleteDelivered deletes delivered entries older than the given duration
-func (r *outboxRepository) DeleteDelivered(ctx context.Context, olderThan time.Duration) (int64, error) {
+// DeleteDelivered deletes up to batchSize delivered entries older than the given duration
+func (r *outboxRepository) DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	query := `
 		DELETE FROM content_outbox
-		WHERE delivery_status = $1
-		  AND delivered_at < $2
+		WHERE id IN (
+			SELECT id FROM content_outbox
+			WHERE delivery_status = $1 AND delivered_at < $2
+			LIMIT $3
+		)
 	`
 
 	cutoff := time.Now().Add(-olderThan)
-	result, err := r.db.ExecContext(ctx, query, models.DeliveryStatusDelivered, cutoff)
+	result, err := r.db.ExecContext(ctx, query, models.DeliveryStatusDelivered, cutoff, batchSize)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete delivered outbox entries: %w", err)
 	}
