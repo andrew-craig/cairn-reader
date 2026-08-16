@@ -207,8 +207,8 @@ func (m *MockContentRepository) BulkCreate(ctx context.Context, contents []*mode
 	return args.Error(0)
 }
 
-func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan time.Duration) (int64, error) {
-	args := m.Called(ctx, olderThan)
+func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	args := m.Called(ctx, olderThan, batchSize)
 	return args.Get(0).(int64), args.Error(1)
 }
 

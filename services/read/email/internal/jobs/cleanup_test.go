@@ -14,7 +14,7 @@ import (
 // --- mocks ---
 
 type mockRawEmailRepo struct {
-	deleteFunc func(ctx context.Context, olderThan time.Duration) (int64, error)
+	deleteFunc func(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 func (m *mockRawEmailRepo) Create(_ context.Context, _ *models.RawEmail) error { return nil }
@@ -30,15 +30,15 @@ func (m *mockRawEmailRepo) UpdateStatus(_ context.Context, _ uuid.UUID, _ models
 func (m *mockRawEmailRepo) UpdateError(_ context.Context, _ uuid.UUID, _ int, _ string) error {
 	return nil
 }
-func (m *mockRawEmailRepo) DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error) {
+func (m *mockRawEmailRepo) DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	if m.deleteFunc != nil {
-		return m.deleteFunc(ctx, olderThan)
+		return m.deleteFunc(ctx, olderThan, batchSize)
 	}
 	return 0, nil
 }
 
 type mockOutboxRepo struct {
-	deleteFunc func(ctx context.Context, olderThan time.Duration) (int64, error)
+	deleteFunc func(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 func (m *mockOutboxRepo) Create(_ context.Context, _ *models.ContentOutbox) error { return nil }
@@ -54,9 +54,9 @@ func (m *mockOutboxRepo) UpdateDeliveryStatus(_ context.Context, _ uuid.UUID, _ 
 func (m *mockOutboxRepo) UpdateRetryInfo(_ context.Context, _ uuid.UUID, _ int, _ time.Time, _ string) error {
 	return nil
 }
-func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration) (int64, error) {
+func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	if m.deleteFunc != nil {
-		return m.deleteFunc(ctx, olderThan)
+		return m.deleteFunc(ctx, olderThan, batchSize)
 	}
 	return 0, nil
 }
@@ -124,9 +124,9 @@ func TestNewRawEmailCleanupJob_InvalidCron(t *testing.T) {
 func TestRawEmailCleanupJob_Run_UsesRetentionDuration(t *testing.T) {
 	var capturedDuration time.Duration
 	repo := &mockRawEmailRepo{
-		deleteFunc: func(_ context.Context, olderThan time.Duration) (int64, error) {
+		deleteFunc: func(_ context.Context, olderThan time.Duration, _ int) (int64, error) {
 			capturedDuration = olderThan
-			return 5, nil
+			return 0, nil
 		},
 	}
 
@@ -135,6 +135,33 @@ func TestRawEmailCleanupJob_Run_UsesRetentionDuration(t *testing.T) {
 	job.run(context.Background())
 
 	assert.Equal(t, 7*24*time.Hour, capturedDuration)
+}
+
+// TestRawEmailCleanupJob_Run_BatchesUntilExhausted proves the job keeps
+// calling DeleteProcessed with the batch size until a call reports zero
+// deletions, instead of assuming one call clears the whole backlog.
+func TestRawEmailCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
+	var capturedBatchSizes []int
+	calls := 0
+	repo := &mockRawEmailRepo{
+		deleteFunc: func(_ context.Context, _ time.Duration, batchSize int) (int64, error) {
+			capturedBatchSizes = append(capturedBatchSizes, batchSize)
+			calls++
+			if calls < 3 {
+				return int64(batchSize), nil
+			}
+			return 0, nil
+		},
+	}
+
+	job, err := NewRawEmailCleanupJob(repo, "0 5 * * *", 7)
+	require.NoError(t, err)
+	job.run(context.Background())
+
+	assert.Equal(t, 3, calls, "must keep batching until a call returns zero")
+	for _, bs := range capturedBatchSizes {
+		assert.Equal(t, defaultRawEmailCleanupBatchSize, bs, "every call must be bounded by the batch size")
+	}
 }
 
 // --- OutboxCleanupJob ---
@@ -148,9 +175,9 @@ func TestNewOutboxCleanupJob_InvalidCron(t *testing.T) {
 func TestOutboxCleanupJob_Run_UsesRetentionDuration(t *testing.T) {
 	var capturedDuration time.Duration
 	repo := &mockOutboxRepo{
-		deleteFunc: func(_ context.Context, olderThan time.Duration) (int64, error) {
+		deleteFunc: func(_ context.Context, olderThan time.Duration, _ int) (int64, error) {
 			capturedDuration = olderThan
-			return 3, nil
+			return 0, nil
 		},
 	}
 
@@ -159,6 +186,33 @@ func TestOutboxCleanupJob_Run_UsesRetentionDuration(t *testing.T) {
 	job.run(context.Background())
 
 	assert.Equal(t, 14*24*time.Hour, capturedDuration)
+}
+
+// TestOutboxCleanupJob_Run_BatchesUntilExhausted proves the job keeps
+// calling DeleteDelivered with the batch size until a call reports zero
+// deletions, instead of assuming one call clears the whole backlog.
+func TestOutboxCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
+	var capturedBatchSizes []int
+	calls := 0
+	repo := &mockOutboxRepo{
+		deleteFunc: func(_ context.Context, _ time.Duration, batchSize int) (int64, error) {
+			capturedBatchSizes = append(capturedBatchSizes, batchSize)
+			calls++
+			if calls < 3 {
+				return int64(batchSize), nil
+			}
+			return 0, nil
+		},
+	}
+
+	job, err := NewOutboxCleanupJob(repo, "0 6 * * *", 14)
+	require.NoError(t, err)
+	job.run(context.Background())
+
+	assert.Equal(t, 3, calls, "must keep batching until a call returns zero")
+	for _, bs := range capturedBatchSizes {
+		assert.Equal(t, defaultOutboxCleanupBatchSize, bs, "every call must be bounded by the batch size")
+	}
 }
 
 func TestRawEmailCleanupJob_Start_StopsOnContextCancel(t *testing.T) {

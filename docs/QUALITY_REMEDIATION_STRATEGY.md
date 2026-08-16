@@ -83,7 +83,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 | [x] #320 | P2-C3 | Two dead tests: outbox delivery test never calls the code under test; CORS test can't catch the bypass. Fix C4 (suffix-match bypass) with the test | 1 | [R9](#r9--dead-tests-and-inert-security-features) |
 | [x] #326 | C5 | Outbox client's internal 1m→12h retry loop blocks the whole worker for up to ~17h | 1 | [R6](#r6--operational-fixes) |
 | [ ] | H3 + H4 | Password-reset tokens never delivered; self-host build panics on reset/verify routes (missing wiring) — fix or explicitly remove the routes | 2 | [R6](#r6--operational-fixes) |
-| [ ] | Cleanup batching | `RunWithBatching` doesn't batch: unbounded `DELETE` in one transaction (correct pattern exists at `fetcher/.../feed_item.go:379-401`) | 2 | [R7](#r7--db-write-path-bugs) |
+| [x] | Cleanup batching | `RunWithBatching` doesn't batch: unbounded `DELETE` in one transaction (correct pattern exists at `fetcher/.../feed_item.go:379-401`) | 2 | [R7](#r7--db-write-path-bugs) |
 
 #### Wave 3 — Ratchets and observability (make quality stick)
 

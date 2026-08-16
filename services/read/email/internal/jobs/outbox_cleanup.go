@@ -10,12 +10,17 @@ import (
 	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
 )
 
+// defaultOutboxCleanupBatchSize bounds each DELETE transaction so cleanup
+// never holds a long lock on the content_outbox table.
+const defaultOutboxCleanupBatchSize = 1000
+
 // OutboxCleanupJob periodically cleans up delivered outbox entries.
 type OutboxCleanupJob struct {
 	outboxRepo    repository.OutboxRepository
 	retentionDays int
 	hour          int
 	minute        int
+	batchSize     int
 }
 
 // NewOutboxCleanupJob creates a new OutboxCleanupJob.
@@ -33,6 +38,7 @@ func NewOutboxCleanupJob(outboxRepo repository.OutboxRepository, cronExpr string
 		retentionDays: retentionDays,
 		hour:          hour,
 		minute:        minute,
+		batchSize:     defaultOutboxCleanupBatchSize,
 	}, nil
 }
 
@@ -61,10 +67,22 @@ func (j *OutboxCleanupJob) Start(ctx context.Context) {
 
 func (j *OutboxCleanupJob) run(ctx context.Context) {
 	retention := time.Duration(j.retentionDays) * 24 * time.Hour
-	count, err := j.outboxRepo.DeleteDelivered(ctx, retention)
-	if err != nil {
-		slog.Error("outbox cleanup failed", slog.Any("error", err))
-		return
+
+	totalDeleted := int64(0)
+	for {
+		count, err := j.outboxRepo.DeleteDelivered(ctx, retention, j.batchSize)
+		if err != nil {
+			slog.Error("outbox cleanup failed", slog.Any("error", err), slog.Int64("total_deleted_so_far", totalDeleted))
+			return
+		}
+
+		totalDeleted += count
+		if count == 0 {
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
-	slog.Info("outbox cleanup completed", slog.Int64("deleted", count))
+
+	slog.Info("outbox cleanup completed", slog.Int64("deleted", totalDeleted))
 }

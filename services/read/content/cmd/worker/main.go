@@ -51,7 +51,7 @@ func main() {
 	contentRepo := repository.NewContentRepository(db.DB)
 
 	// Initialize jobs
-	cleanupJob := jobs.NewCleanupJob(contentRepo, logger)
+	cleanupJob := jobs.NewCleanupJob(contentRepo, logger, 0)
 
 	// Create cron scheduler
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))

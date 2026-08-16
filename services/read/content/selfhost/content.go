@@ -84,7 +84,7 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 	r.Handle("/api/v1/internal/*", contentRouter)
 
 	contentRepo := repository.NewContentRepository(db.DB)
-	cleanupJob := jobs.NewCleanupJob(contentRepo, logger)
+	cleanupJob := jobs.NewCleanupJob(contentRepo, logger, 0)
 
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
 	_, err = scheduler.AddFunc("0 2 * * *", cleanupJob.Run)

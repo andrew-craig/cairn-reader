@@ -233,11 +233,11 @@ func TestOutboxRepository_DeleteDelivered(t *testing.T) {
 
 	duration := 7 * 24 * time.Hour
 
-	mock.ExpectExec("DELETE FROM content_outbox WHERE delivery_status").
-		WithArgs(models.DeliveryStatusDelivered, sqlmock.AnyArg()).
+	mock.ExpectExec("DELETE FROM content_outbox WHERE id IN").
+		WithArgs(models.DeliveryStatusDelivered, sqlmock.AnyArg(), 1000).
 		WillReturnResult(sqlmock.NewResult(0, 10))
 
-	count, err := repo.DeleteDelivered(ctx, duration)
+	count, err := repo.DeleteDelivered(ctx, duration, 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), count)
 

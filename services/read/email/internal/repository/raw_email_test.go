@@ -227,11 +227,11 @@ func TestRawEmailRepository_DeleteProcessed(t *testing.T) {
 
 	duration := 7 * 24 * time.Hour
 
-	mock.ExpectExec("DELETE FROM raw_emails WHERE processing_status").
-		WithArgs(models.ProcessingStatusCompleted, sqlmock.AnyArg()).
+	mock.ExpectExec("DELETE FROM raw_emails WHERE id IN").
+		WithArgs(models.ProcessingStatusCompleted, sqlmock.AnyArg(), 1000).
 		WillReturnResult(sqlmock.NewResult(0, 5))
 
-	count, err := repo.DeleteProcessed(ctx, duration)
+	count, err := repo.DeleteProcessed(ctx, duration, 1000)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(5), count)
 

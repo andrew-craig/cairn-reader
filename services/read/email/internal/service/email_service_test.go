@@ -60,7 +60,7 @@ func (m *mockRawEmailRepository) UpdateError(_ context.Context, _ uuid.UUID, _ i
 	return nil
 }
 
-func (m *mockRawEmailRepository) DeleteProcessed(_ context.Context, _ time.Duration) (int64, error) {
+func (m *mockRawEmailRepository) DeleteProcessed(_ context.Context, _ time.Duration, _ int) (int64, error) {
 	return 0, nil
 }
 

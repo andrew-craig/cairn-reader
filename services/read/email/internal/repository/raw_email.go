@@ -27,8 +27,8 @@ type RawEmailRepository interface {
 	// UpdateError updates the error information for a failed email
 	UpdateError(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
 
-	// DeleteProcessed deletes processed emails older than the given duration
-	DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error)
+	// DeleteProcessed deletes up to batchSize processed emails older than the given duration
+	DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 // rawEmailRepository is the concrete implementation of RawEmailRepository
@@ -220,16 +220,19 @@ func (r *rawEmailRepository) UpdateError(ctx context.Context, id uuid.UUID, retr
 	return nil
 }
 
-// DeleteProcessed deletes processed emails older than the given duration
-func (r *rawEmailRepository) DeleteProcessed(ctx context.Context, olderThan time.Duration) (int64, error) {
+// DeleteProcessed deletes up to batchSize processed emails older than the given duration
+func (r *rawEmailRepository) DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	query := `
 		DELETE FROM raw_emails
-		WHERE processing_status = $1
-		  AND processed_at < $2
+		WHERE id IN (
+			SELECT id FROM raw_emails
+			WHERE processing_status = $1 AND processed_at < $2
+			LIMIT $3
+		)
 	`
 
 	cutoff := time.Now().Add(-olderThan)
-	result, err := r.db.ExecContext(ctx, query, models.ProcessingStatusCompleted, cutoff)
+	result, err := r.db.ExecContext(ctx, query, models.ProcessingStatusCompleted, cutoff, batchSize)
 	if err != nil {
 		return 0, fmt.Errorf("failed to delete processed emails: %w", err)
 	}
