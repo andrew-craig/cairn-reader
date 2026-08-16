@@ -164,6 +164,41 @@ func TestRawEmailCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 	}
 }
 
+// TestRawEmailCleanupJob_Run_StopsOnContextCancel proves the inter-batch
+// delay is context-aware: with a backlog that would otherwise take many
+// more passes, cancelling ctx must stop the loop instead of sleeping
+// through the shutdown signal.
+func TestRawEmailCleanupJob_Run_StopsOnContextCancel(t *testing.T) {
+	calls := 0
+	repo := &mockRawEmailRepo{
+		deleteFunc: func(_ context.Context, _ time.Duration, batchSize int) (int64, error) {
+			calls++
+			// Always report a full batch, so an unbounded loop would never exit on its own.
+			return int64(batchSize), nil
+		},
+	}
+
+	job, err := NewRawEmailCleanupJob(repo, "0 5 * * *", 7)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		job.run(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not stop after context cancellation")
+	}
+
+	assert.Equal(t, 1, calls, "must stop after the in-flight batch instead of continuing to drain")
+}
+
 // --- OutboxCleanupJob ---
 
 func TestNewOutboxCleanupJob_InvalidCron(t *testing.T) {
@@ -213,6 +248,41 @@ func TestOutboxCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 	for _, bs := range capturedBatchSizes {
 		assert.Equal(t, defaultOutboxCleanupBatchSize, bs, "every call must be bounded by the batch size")
 	}
+}
+
+// TestOutboxCleanupJob_Run_StopsOnContextCancel proves the inter-batch
+// delay is context-aware: with a backlog that would otherwise take many
+// more passes, cancelling ctx must stop the loop instead of sleeping
+// through the shutdown signal.
+func TestOutboxCleanupJob_Run_StopsOnContextCancel(t *testing.T) {
+	calls := 0
+	repo := &mockOutboxRepo{
+		deleteFunc: func(_ context.Context, _ time.Duration, batchSize int) (int64, error) {
+			calls++
+			// Always report a full batch, so an unbounded loop would never exit on its own.
+			return int64(batchSize), nil
+		},
+	}
+
+	job, err := NewOutboxCleanupJob(repo, "0 6 * * *", 14)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		job.run(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not stop after context cancellation")
+	}
+
+	assert.Equal(t, 1, calls, "must stop after the in-flight batch instead of continuing to drain")
 }
 
 func TestRawEmailCleanupJob_Start_StopsOnContextCancel(t *testing.T) {

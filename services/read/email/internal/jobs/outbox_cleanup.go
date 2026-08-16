@@ -81,7 +81,11 @@ func (j *OutboxCleanupJob) run(ctx context.Context) {
 			break
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 
 	slog.Info("outbox cleanup completed", slog.Int64("deleted", totalDeleted))

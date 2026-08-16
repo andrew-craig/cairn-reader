@@ -83,7 +83,11 @@ func (j *RawEmailCleanupJob) run(ctx context.Context) {
 			break
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 
 	slog.Info("raw email cleanup completed", slog.Int64("deleted", totalDeleted))
