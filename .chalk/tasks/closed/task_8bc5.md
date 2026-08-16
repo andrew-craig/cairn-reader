@@ -54,5 +54,5 @@ Verified: `gofmt -l .` clean, `go vet ./...` clean, `golangci-lint run ./...` cl
 `go test -race -count=1 ./...` green (content service). No OpenAPI/CLAUDE.md changes needed — the
 409 response was already documented correctly; only the client's internal code-matching was wrong.
 
-PR: (added after push)
+PR: https://github.com/andrew-craig/cairn-reader/pull/331
 
