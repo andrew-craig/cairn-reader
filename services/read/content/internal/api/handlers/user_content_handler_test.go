@@ -12,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/api"
 	"github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
@@ -574,6 +576,92 @@ func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "not_found", response["error"])
 	mockContentRepo.AssertExpectations(t)
+}
+
+// TestAddContentToUser_FeedAlreadySubscribed reproduces the 409->500
+// mistranslation end-to-end: a real Ingest RSS subscribe handler response for
+// "already subscribed" must surface to the app as 409, not 500. Points the
+// real IngestRSSClient at an httptest server reproducing the real handler's
+// wire response (services/read/fetcher/internal/api/handlers/subscription_handler.go).
+func TestAddContentToUser_FeedAlreadySubscribed(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+
+	fetcherServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "user is already subscribed to this feed", nil, "v1")
+	}))
+	defer fetcherServer.Close()
+
+	ingestRSSClient := service.NewIngestRSSClient(fetcherServer.URL, "test-key")
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, ingestRSSClient)
+
+	userID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"url":  "https://example.com/feed.xml",
+		"type": "feed",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "conflict", response["error"])
+}
+
+// TestAddContentToUser_FeedLimitReached covers the 400 branch of the same
+// fix: asserts the status is 400 (not 500) and that the client-facing
+// message is the server's original text, not the sentinel-wrapped chain
+// ("invalid feed subscription request: <message>").
+func TestAddContentToUser_FeedLimitReached(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+
+	fetcherServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "user has reached maximum feed limit of 100", nil, "v1")
+	}))
+	defer fetcherServer.Close()
+
+	ingestRSSClient := service.NewIngestRSSClient(fetcherServer.URL, "test-key")
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, ingestRSSClient)
+
+	userID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"url":  "https://example.com/feed.xml",
+		"type": "feed",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "bad_request", response["error"])
+	assert.Equal(t, "user has reached maximum feed limit of 100", response["message"])
 }
 
 // TestUpdateUserContent_Success tests successful metadata update
