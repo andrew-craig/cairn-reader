@@ -95,6 +95,7 @@ func TestSubscribeUserToFeed_BadRequestSurfacesAsSentinel(t *testing.T) {
 
 	_, err := client.SubscribeUserToFeed(context.Background(), uuid.New().String(), "https://example.com/feed.xml")
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrInvalidSubscribeRequest), "expected errors.Is(err, ErrInvalidSubscribeRequest), got: %v", err)
-	assert.Contains(t, err.Error(), "user has reached maximum feed limit of 100")
+	var invalidReq *InvalidSubscribeRequestError
+	require.True(t, errors.As(err, &invalidReq), "expected errors.As(err, *InvalidSubscribeRequestError), got: %v", err)
+	assert.Equal(t, "user has reached maximum feed limit of 100", invalidReq.Msg)
 }

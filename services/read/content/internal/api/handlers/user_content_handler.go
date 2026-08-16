@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/api"
@@ -357,14 +356,12 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	// Call Ingest RSS service to subscribe user to feed
 	subscription, err := h.ingestRSSClient.SubscribeUserToFeed(r.Context(), userID.String(), feedURL)
 	if err != nil {
+		var invalidReq *service.InvalidSubscribeRequestError
 		switch {
 		case errors.Is(err, service.ErrAlreadySubscribed):
 			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "Already subscribed to this feed", nil, "v1")
-		case errors.Is(err, service.ErrInvalidSubscribeRequest):
-			// SubscribeUserToFeed wraps this sentinel as "<sentinel>: <server message>";
-			// strip the sentinel prefix so the client sees just the server's message.
-			msg := strings.TrimPrefix(err.Error(), service.ErrInvalidSubscribeRequest.Error()+": ")
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, msg, nil, "v1")
+		case errors.As(err, &invalidReq):
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, invalidReq.Msg, nil, "v1")
 		default:
 			slog.Error("Failed to subscribe to feed", "error", err)
 			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed", nil, "v1")

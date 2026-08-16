@@ -21,10 +21,17 @@ var ErrSubscriptionNotFound = errors.New("subscription not found")
 // is already subscribed to.
 var ErrAlreadySubscribed = errors.New("already subscribed to this feed")
 
-// ErrInvalidSubscribeRequest is returned when Ingest RSS rejects a subscribe
+// InvalidSubscribeRequestError is returned when Ingest RSS rejects a subscribe
 // request as malformed (feed limit reached, or not a valid RSS/Atom feed).
-// The wrapped error carries the server's message for display.
-var ErrInvalidSubscribeRequest = errors.New("invalid feed subscription request")
+// Msg carries the server's message verbatim for display, retrievable via
+// errors.As without parsing Error()'s text.
+type InvalidSubscribeRequestError struct {
+	Msg string
+}
+
+func (e *InvalidSubscribeRequestError) Error() string {
+	return "invalid feed subscription request: " + e.Msg
+}
 
 // IngestRSSClient handles communication with the Ingest RSS service
 type IngestRSSClient struct {
@@ -131,7 +138,7 @@ func (c *IngestRSSClient) SubscribeUserToFeed(ctx context.Context, userID, feedU
 		case http.StatusConflict:
 			return nil, ErrAlreadySubscribed
 		case http.StatusBadRequest:
-			return nil, fmt.Errorf("%w: %s", ErrInvalidSubscribeRequest, apiError.Message)
+			return nil, &InvalidSubscribeRequestError{Msg: apiError.Message}
 		}
 
 		return nil, fmt.Errorf("ingest RSS service error: %s", apiError.Message)
