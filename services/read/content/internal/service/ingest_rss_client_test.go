@@ -78,3 +78,23 @@ func TestSubscribeUserToFeed_AlreadySubscribedSurfacesAsSentinel(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, ErrAlreadySubscribed), "expected errors.Is(err, ErrAlreadySubscribed), got: %v", err)
 }
+
+// TestSubscribeUserToFeed_BadRequestSurfacesAsSentinel covers the other
+// status-matched branch (400): the real handler sends generic codes
+// ("bad_request" for the feed-limit case, "validation_error" for an invalid
+// feed) - neither of which the old client's "feed_limit_reached"/"invalid_feed"
+// code matching ever recognized. The client must recognize the status alone
+// and preserve the server's message.
+func TestSubscribeUserToFeed_BadRequestSurfacesAsSentinel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "user has reached maximum feed limit of 100", nil, "v1")
+	}))
+	defer server.Close()
+
+	client := NewIngestRSSClient(server.URL, "test-key")
+
+	_, err := client.SubscribeUserToFeed(context.Background(), uuid.New().String(), "https://example.com/feed.xml")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrInvalidSubscribeRequest), "expected errors.Is(err, ErrInvalidSubscribeRequest), got: %v", err)
+	assert.Contains(t, err.Error(), "user has reached maximum feed limit of 100")
+}

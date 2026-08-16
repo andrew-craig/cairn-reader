@@ -621,6 +621,49 @@ func TestAddContentToUser_FeedAlreadySubscribed(t *testing.T) {
 	assert.Equal(t, "conflict", response["error"])
 }
 
+// TestAddContentToUser_FeedLimitReached covers the 400 branch of the same
+// fix: asserts the status is 400 (not 500) and that the client-facing
+// message is the server's original text, not the sentinel-wrapped chain
+// ("invalid feed subscription request: <message>").
+func TestAddContentToUser_FeedLimitReached(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+
+	fetcherServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "user has reached maximum feed limit of 100", nil, "v1")
+	}))
+	defer fetcherServer.Close()
+
+	ingestRSSClient := service.NewIngestRSSClient(fetcherServer.URL, "test-key")
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, ingestRSSClient)
+
+	userID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"url":  "https://example.com/feed.xml",
+		"type": "feed",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "bad_request", response["error"])
+	assert.Equal(t, "user has reached maximum feed limit of 100", response["message"])
+}
+
 // TestUpdateUserContent_Success tests successful metadata update
 func TestUpdateUserContent_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
