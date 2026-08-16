@@ -356,17 +356,14 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	// Call Ingest RSS service to subscribe user to feed
 	subscription, err := h.ingestRSSClient.SubscribeUserToFeed(r.Context(), userID.String(), feedURL)
 	if err != nil {
-		// Map errors to user-friendly messages
-		errMsg := err.Error()
-		switch errMsg {
-		case "already subscribed to this feed":
+		switch {
+		case errors.Is(err, service.ErrAlreadySubscribed):
 			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "Already subscribed to this feed", nil, "v1")
-		case "feed limit reached (max 100 feeds per user)":
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Feed limit reached (max 100 feeds per user)", nil, "v1")
-		case "invalid feed URL or not a valid RSS/Atom feed":
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid feed URL or not a valid RSS/Atom feed", nil, "v1")
+		case errors.Is(err, service.ErrInvalidSubscribeRequest):
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, err.Error(), nil, "v1")
 		default:
-			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed: "+err.Error(), nil, "v1")
+			slog.Error("Failed to subscribe to feed", "error", err)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to subscribe to feed", nil, "v1")
 		}
 		return
 	}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -57,4 +58,23 @@ func TestSubscribeUserToFeed_UnwrapsRealServerEnvelope(t *testing.T) {
 	assert.Equal(t, want.FeedTitle, got.FeedTitle)
 	assert.Equal(t, want.IsNewFeed, got.IsNewFeed)
 	assert.True(t, got.SubscribedAt.Equal(want.SubscribedAt), "SubscribedAt: got %v, want %v", got.SubscribedAt, want.SubscribedAt)
+}
+
+// TestSubscribeUserToFeed_AlreadySubscribedSurfacesAsSentinel reproduces the
+// 409->500 mistranslation: the real Ingest RSS subscribe handler sends the
+// generic error code "conflict" (api.ErrCodeConflict) on a duplicate
+// subscribe, not the "already_subscribed" code the client used to look for.
+// The client must recognize the real wire shape (HTTP status, not a made-up
+// code) and hand callers a distinguishable sentinel error.
+func TestSubscribeUserToFeed_AlreadySubscribedSurfacesAsSentinel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "user is already subscribed to this feed", nil, "v1")
+	}))
+	defer server.Close()
+
+	client := NewIngestRSSClient(server.URL, "test-key")
+
+	_, err := client.SubscribeUserToFeed(context.Background(), uuid.New().String(), "https://example.com/feed.xml")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrAlreadySubscribed), "expected errors.Is(err, ErrAlreadySubscribed), got: %v", err)
 }
