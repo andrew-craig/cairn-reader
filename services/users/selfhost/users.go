@@ -118,19 +118,22 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 		RequireComplexity: false,
 	})
 
+	emailVerificationService := services.NewEmailVerificationService(userRepo)
+
 	// Start token cleanup in background
 	go tokenCleanupLoop(ctx, refreshTokenService)
 
 	// Mount routes on master router
 	router := handlers.Router(handlers.RouterConfig{
-		DB:                  db,
-		VaultClient:         nil, // No vault in selfhost mode
-		AuthService:         authService,
-		UserService:         userService,
-		JWTManager:          jwtManager,
-		AuthRateLimit:       10,
-		AuthRateLimitWindow: 1 * time.Minute,
-		Logger:              logger,
+		DB:                       db,
+		VaultClient:              nil, // No vault in selfhost mode
+		AuthService:              authService,
+		UserService:              userService,
+		EmailVerificationService: emailVerificationService,
+		JWTManager:               jwtManager,
+		AuthRateLimit:            10,
+		AuthRateLimitWindow:      1 * time.Minute,
+		Logger:                   logger,
 	})
 
 	// Register at specific path prefixes rather than mounting at "/" to avoid conflicts

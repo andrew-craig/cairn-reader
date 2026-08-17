@@ -26,7 +26,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
-- **task_dd2d** · P2 · open · [H3+H4] Password-reset tokens never delivered; self-host build panics on reset/verify routes  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **decision_4052** · P3 · open · Decide to offer hosted service

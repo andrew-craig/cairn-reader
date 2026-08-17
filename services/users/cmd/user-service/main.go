@@ -116,7 +116,6 @@ func main() {
 	slog.Info("initializing repositories")
 	userRepo := database.NewUserRepository(db)
 	refreshTokenRepo := database.NewRefreshTokenRepository(db)
-	passwordResetTokenRepo := database.NewPasswordResetTokenRepository(db)
 	slog.Info("repositories initialized")
 
 	// Initialize auth components
@@ -140,13 +139,12 @@ func main() {
 	// Initialize services
 	slog.Info("initializing services")
 	authService := services.NewAuthService(services.AuthServiceConfig{
-		UserRepo:               userRepo,
-		RefreshTokenService:    refreshTokenService,
-		PasswordResetTokenRepo: passwordResetTokenRepo,
-		JWTManager:             jwtManager,
-		PasswordHasher:         passwordHasher,
-		PasswordMinLength:      cfg.Security.MinPasswordLength,
-		RequireComplexity:      cfg.Security.RequirePasswordComplexity,
+		UserRepo:            userRepo,
+		RefreshTokenService: refreshTokenService,
+		JWTManager:          jwtManager,
+		PasswordHasher:      passwordHasher,
+		PasswordMinLength:   cfg.Security.MinPasswordLength,
+		RequireComplexity:   cfg.Security.RequirePasswordComplexity,
 	})
 
 	userService := services.NewUserService(services.UserServiceConfig{
