@@ -27,3 +27,14 @@ Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (d
 ## Done when
 - `/health/ready` reflects all 6 databases and the CI smoke test detects a downed one.
 
+---
+
+## Re-confirmed by the Cairn Simplification Audit (2026-08-17)
+
+Independently re-verified at HEAD `a6c56a1` and listed under the audit's Tier 1 (correctness & security). No new task was created — this one owns the finding.
+**Audit report:** https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
+
+**One addition to step 3.** The audit found *why* the CI ratchet is fake, and it is worse than "the smoke test doesn't assert enough": the smoke job **never runs at all**. `.github/workflows/docker-test.yml:326-329` declares `needs: [build-selfhost]` but gates on `if: needs.changes.outputs.selfhost == 'true'` — `changes` is absent from `needs:`, so that expression resolves to empty and the condition can never be true.
+
+So step 3 ("confirm the compose smoke test actually fails when a DB is down") cannot be satisfied until that job is fixed. That fix is tracked separately as **task_7722**. Sequence task_7722 first, or this task's ratchet remains unverifiable.
+

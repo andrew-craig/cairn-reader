@@ -5,12 +5,20 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **task_1958** · P1 · open · [Audit X9/Tier 0] users test suite cannot run: no Postgres in CI + getEnvOrDefault ignores os.Getenv  (parent: epic_fefa)
+- **task_41e2** · P1 · open · [Audit/Tier 1] Key rotation never reaches the users service's own validator — it signs tokens its middleware cannot verify  (parent: epic_fefa)
+- **task_4a81** · P1 · open · [Audit/Tier 1] Rate limiter bypass on the auth endpoints: check-then-act insert lets N concurrent first requests through  (parent: epic_fefa)
+- **task_527a** · P1 · open · [Audit X9/Tier 0] explore integration job runs only recommender/internal/db — 1,183 lines of recommender integration tests never run  (parent: epic_fefa)
+- **task_7722** · P1 · open · [Audit X9/Tier 0] selfhost-compose-smoke is always skipped: needs: omits changes, so its if: can never be true  (parent: epic_fefa)
+- **task_f927** · P1 · open · [Audit X9/Tier 0] No CI job reaches 4 standalone pkg/* modules — 85 tests never run, incl. the SSRF guard suite  (parent: epic_fefa)
+- **task_fe72** · P1 · open · [Audit/Tier 1] SSRF guard wired on url_detector but missing on the content processor that fetches the body  (parent: epic_fefa)
 - **bug_96d7** · P2 · open · [explore/fetcher] Integration-tagged test suite is broken: compile errors, SSRF-guard/httptest conflict, NULL scan bug  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_0849** · P2 · open · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
+- **task_2966** · P2 · open · [Audit/Tier 2] Delete the dead ownership/authorization middleware package services/users/internal/middleware (196 lines)  (parent: epic_fefa)
 - **task_39dd** · P2 · open · [Email sanitizer] Replace email's hand-maintained bluemonday policy with pkg/rss/sanitize  (parent: epic_fefa)
 - **task_3c49** · P2 · open · [FE resilience] Error boundaries, mobile list error states, mobile a11y labels, web destructive-action confirmations  (parent: epic_fefa)
 - **task_47c1** · P2 · open · [FE auth layer] Move the duplicated web/mobile auth.ts into apps/shared; fix H12 + offline-clears-tokens  (parent: epic_fefa)
@@ -20,10 +28,12 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
 - **task_644a** · P2 · open · Add Prometheus metrics and Grafana dashboards  (parent: epic_7c9e)
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
+- **task_764b** · P2 · open · [Audit/Tier 2] Delete the two dead cleanup schedulers in services/read/fetcher/internal/jobs  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_8b77** · P2 · open · [users build tag] services/users/test/integration lacks //go:build integration → bare go test hangs  (parent: epic_fefa)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
 - **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
+- **task_997e** · P2 · open · [Audit/Tier 2] Delete the dead duplicate models package services/explore/pkg/models (98 lines, zero importers)  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_dd2d** · P2 · open · [H3+H4] Password-reset tokens never delivered; self-host build panics on reset/verify routes  (parent: epic_fefa)
@@ -47,6 +57,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
+- **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)

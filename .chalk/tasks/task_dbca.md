@@ -28,3 +28,24 @@ The HTTP fetch + size-cap + User-Agent logic is reimplemented in 4+ independent 
 ## Done when
 - Every HTTP fetch on the article/feed path goes through `pkg/rss/fetch`; no copy remains.
 
+---
+
+## Re-confirmed and sharpened by the Cairn Simplification Audit (2026-08-17)
+
+Re-verified at HEAD `a6c56a1`. **Audit report:** https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
+
+The audit names the **root cause** of the duplication, which changes what "done" should look like here:
+
+> `pkg/rss/fetch` **hardcodes its client with no injection point**, so any caller needing conditional-GET must fork the function — and silently loses the guarded dialer with it.
+
+That is the mechanism, not just an accident of history: the duplication is *structurally required* by the current API, so repointing callers without adding an injection point will regenerate the copies the next time someone needs conditional GET. Add the seam (injectable transport/dialer) as part of step 1's characterization work, before repointing anything.
+
+**A live SSRF hole from exactly this mechanism is still open**, tracked as **task_fe72**:
+```
+url_detector.go:64  →  Transport{DialContext: fetch.DialContext}   ✓ guarded
+content.go:35       →  &http.Client{Timeout, CheckRedirect}        ✗ default transport, no guard
+```
+`services/read/content/internal/processor/content.go` is the component that actually fetches the article body, reached from the same authenticated "add link" flow as the guarded detector.
+
+**Sequencing:** task_fe72 adds the injection point and closes the live hole; this task then consolidates onto it. The existing "Blocked by" note above still holds — `pkg/rss/fetch` must carry the guard before consolidation spreads anything worth spreading.
+
