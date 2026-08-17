@@ -37,5 +37,14 @@ So the scheduling is done elsewhere and these two wrappers were orphaned.
 ## Done when
 - Both files are gone, `services/read` builds, and the cleanup jobs still run from the worker and selfhost entrypoints exactly as before.
 
-## Related
-- The audit separately flags **duplicated cleanup jobs** (Tier 5) — `feed_items_cleanup_job.go` and `outbox_cleanup_job.go` are near-identical in shape (`Run`/`cleanup*`/`logMetrics`/`GetMetrics`/`RunWithCustomRetention`/`String`), and `services/read/email/internal/jobs/outbox_cleanup.go` is a third variant. That is a **separate, later** dedup task — this one only deletes the dead schedulers.
+## Related — corrected 2026-08-17 by the audit author
+
+This task is the audit's **F-S10-1**. An earlier version of this note mapped the Tier 5 "duplicated cleanup jobs" item onto the fetcher's `*_job.go` files. **That was wrong** and would have sent you at live, cron-wired code. The correct mapping:
+
+| Files | State | Finding | Action |
+|---|---|---|---|
+| fetcher `outbox_cleanup_job.go`, `feed_items_cleanup_job.go` | **live** — cron-wired at `cmd/ingest_rss_worker/main.go:87-103` and `selfhost/rss.go:129-138`, with tests | **in no finding** | **leave alone** |
+| fetcher `outbox_cleanup_scheduler.go`, `feed_items_cleanup_scheduler.go` | dead, zero refs, no tests | **F-S10-1** | **this task** — delete |
+| email `outbox_cleanup.go`, `raw_email_cleanup.go` | both live, duplicate **each other** | F-S06-2 | Tier 5 dedup — **task_24fa** |
+
+So: delete only the two fetcher `*_scheduler.go` files here. The fetcher `*_job.go` files are not part of any finding, and the Tier 5 dedup is entirely within the **email** service.

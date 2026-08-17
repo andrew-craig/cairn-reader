@@ -32,3 +32,24 @@ Two live bugs sit inside the duplicated code:
 ## Done when
 - One auth/token-refresh implementation lives in `apps/shared`; tests cover the second-401 and offline cases and fail on the old behavior.
 
+---
+
+## Sequencing note from the Cairn Simplification Audit (2026-08-17)
+
+**Audit report:** https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
+
+**Do task_ca2d first.** The audit found *intra-mobile* duplication that this task's cross-platform move sits on top of: `apps/mobile/src/services/read.ts:25-93` and `apps/mobile/src/services/explore.ts:61-127` each carry a **private** `fetchWithAuth` + `fetchWithAuthAndRetry` pair, byte-identical but for two comment lines. Neither goes through mobile's `AuthService`.
+
+That is adjacent to this task, not the same ground — but landing task_ca2d first collapses three implementations to one, so **this task moves one thing instead of three**.
+
+(For orientation: `apps/web/src/services/auth.ts:312` already carries the shared implementation, and its comment says it "mirrors mobile fetchWithAuth" — i.e. web mirrors a policy mobile itself duplicates twice.)
+
+## ⚠️ Hazard that applies to this task too — error message text is load-bearing
+
+`apps/mobile/src/utils/retry.ts:22-36` decides retryability by **lowercased substring match on the error message**:
+```ts
+const msg = error.message.toLowerCase();
+if (msg.includes('not authenticated') || msg.includes('session expired') || ...) return false;
+```
+The substrings `Session expired. Please log in again.` and `Not authenticated` must survive the move into `apps/shared` intact. Rephrase either message and those auth errors silently become **retryable** — the client retries a request that can never succeed instead of prompting re-login. Pin the message-to-retryability contract with a test before refactoring.
+

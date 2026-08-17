@@ -27,3 +27,28 @@ Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (d
 ## Done when
 - Only `pkg/auth/validator.go` implements JWT validation; the users service builds and tests pass.
 
+---
+
+## Re-confirmed by the Cairn Simplification Audit (2026-08-17) — with a correction to step 3
+
+This task is the audit's **"a validator fork"** item (Tier 3). Re-verified at HEAD `a6c56a1`.
+**Audit report:** https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
+
+**⚠️ Step 3 as written is unsafe. Do not delete `jwt.go` wholesale — only the validation half is dead.**
+
+`JWTManager`'s **signing / key-management half is live** and deleting the file would break the users service and `task_41e2`'s fix surface. Confirmed non-test caller counts at `a6c56a1`:
+
+| Method | Non-test callers | Status |
+|---|---|---|
+| `ValidateToken` | 0 | dead |
+| `GetTokenInfo` | 0 | dead |
+| `ExtractTokenFromHeader` | 0 | dead |
+| `GetKeyID` | 0 | dead |
+| `ParseTokenWithoutValidation` | 0 | dead |
+| **`GetPublicKey`** | **1** | **live** — `internal/handlers/router.go:58` |
+| **`UpdateKeys`** | **1** | **live** — the rotation callback in `cmd/user-service/main.go` |
+
+So the deletion is **method-level, not file-level**: remove the five dead validation methods and their tests, keep the signing and key-management surface.
+
+**Interaction with task_41e2:** that task fixes rotation never reaching the users service's own validator, and its recommended fix routes the rotation callback through `GetPublicKey`/`UpdateKeys` into `pkg/auth.Validator.UpdatePublicKey`. Deleting those two would remove the seam it needs. Coordinate the two tasks; if task_41e2 is unstarted, land it first so the live surface is settled before you prune around it.
+
