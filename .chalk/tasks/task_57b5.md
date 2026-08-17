@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [quality,wave4,consolidation]
-blocked_by: []
+blocked_by: [task_41e2]
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-09T06:53:56Z
+updated_at: 2026-08-17T21:31:20Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -50,5 +50,7 @@ This task is the audit's **"a validator fork"** item (Tier 3). Re-verified at HE
 
 So the deletion is **method-level, not file-level**: remove the five dead validation methods and their tests, keep the signing and key-management surface.
 
-**Interaction with task_41e2:** that task fixes rotation never reaching the users service's own validator, and its recommended fix routes the rotation callback through `GetPublicKey`/`UpdateKeys` into `pkg/auth.Validator.UpdatePublicKey`. Deleting those two would remove the seam it needs. Coordinate the two tasks; if task_41e2 is unstarted, land it first so the live surface is settled before you prune around it.
+**Blocked by task_41e2 (enforced 2026-08-17, owner decision).** That task fixes rotation never reaching the users service's own validator, and its recommended fix routes the rotation callback through `GetPublicKey`/`UpdateKeys` into `pkg/auth.Validator.UpdatePublicKey`. Deleting those two would remove the seam it needs, so the ordering is now a hard dependency rather than a coordination note: **land task_41e2 first**, then prune around the settled surface.
+
+Re-derive the live/dead split after task_41e2 lands — its fix may change which methods have callers, and the table above is a snapshot from before it.
 

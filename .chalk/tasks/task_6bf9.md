@@ -38,5 +38,5 @@ Today the **eager** `trackRecommendation` write in `engine.GetRecommendations` m
 - A failed counter write cannot leave the two representations permanently disagreeing, proven by a test that fails on main.
 
 ## Related
-- **epic_c482** (Phase B: mobile-driven shown tracking) — this is a prerequisite for its cutover, not a follow-up.
-- **task_b5bd** (verify mobile shown-tracking adoption) — see the annotation added there about its gating metric.
+- **epic_c482** (Phase B: mobile-driven shown tracking) — **that epic is now `blocked_by` this task** (enforced 2026-08-17, owner decision), so this is a hard prerequisite for the cutover, not a follow-up. Landing this unblocks Phase B.
+- **task_b5bd** (verify mobile shown-tracking adoption) — see the annotation added there about its gating metric. It and task_f84d are *not* blocked by this task and should proceed in parallel; only the cutover itself waits.
