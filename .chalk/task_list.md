@@ -5,7 +5,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **task_dd2d** · P2 · in_progress · [H3+H4] Password-reset tokens never delivered; self-host build panics on reset/verify routes  (parent: epic_fefa)
 - **bug_96d7** · P2 · open · [explore/fetcher] Integration-tagged test suite is broken: compile errors, SSRF-guard/httptest conflict, NULL scan bug  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
