@@ -77,12 +77,6 @@ func hashToken(token string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
-// HashTokenPublic is the exported version of hashToken, allowing other packages
-// (e.g. the services layer) to hash tokens with the same algorithm.
-func HashTokenPublic(token string) string {
-	return hashToken(token)
-}
-
 // CreateRefreshToken generates and stores a new refresh token
 func (s *RefreshTokenService) CreateRefreshToken(
 	ctx context.Context,

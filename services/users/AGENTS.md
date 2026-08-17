@@ -256,7 +256,7 @@ CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
 ```
 
-There are also `email_verification_tokens` and `password_reset_tokens` tables (added in migrations 000005 and 000006) backing the email verification and password reset endpoints below.
+There is also an `email_verification_tokens` table (added in migration 000005) backing the email verification endpoints below. A `password_reset_tokens` table existed briefly (migration 000006) but was dropped (migration 000008) — see the note under Password reset below.
 
 ### Account Types
 
@@ -379,16 +379,7 @@ curl -X POST http://localhost:8082/api/v1/auth/verify-email \
   -d '{"token": "verification-token-here"}'
 ```
 
-**Password reset**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/forgot-password \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
-
-curl -X POST http://localhost:8082/api/v1/auth/reset-password \
-  -H "Content-Type: application/json" \
-  -d '{"token": "reset-token-here", "password": "newsecurepass123"}'
-```
+**Password reset**: not implemented. `/forgot-password` and `/reset-password` were removed (H3+H4, `epic_fefa`) — the tokens they generated were never delivered to the user by any mailer, and the self-host build panicked on both routes because it never wired up the token repository. Rather than ship a route that appears to work but silently does nothing, the routes were deleted; users with an email/password account who forget their password have no self-service recovery today. Account deletion + re-registration is the only path until a real delivery mechanism (and the routes) are added back deliberately.
 
 ### User Management Endpoints (Authenticated)
 
@@ -588,7 +579,7 @@ Note: `internal/middleware/authorization.go` defines `RequireSameUser`/`RequireO
 
 **Protected Endpoints** (all routes under `/api/v1/auth`):
 - `/register`, `/register/mobile`, `/login`, `/login/mobile`, `/refresh`, `/logout`, `/logout-all`
-- `/verify-email`, `/resend-verification`, `/forgot-password`, `/reset-password`
+- `/verify-email`, `/resend-verification`
 
 ### Mobile Device Authentication
 

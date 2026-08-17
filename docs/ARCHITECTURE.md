@@ -343,7 +343,7 @@ flowchart TD
     end
 
     VaultStore[("HashiCorp Vault :8200<br/>RSA key pair (KV secrets)")]
-    DB[("PostgreSQL: cairn_users<br/>users, refresh_tokens,<br/>email_verification_tokens,<br/>password_reset_tokens")]
+    DB[("PostgreSQL: cairn_users<br/>users, refresh_tokens,<br/>email_verification_tokens")]
     OtherSvcs["Explore / Read services<br/>(validate JWTs independently)"]
 
     MobileApp -- HTTPS --> Router
@@ -553,9 +553,8 @@ POST /api/v1/auth/logout-all           # Revoke all refresh tokens for the user 
 POST /api/v1/auth/verify-email         # Verify email with token (JSON body)
 GET  /api/v1/auth/verify-email         # Verify email with token (query param, for email links)
 POST /api/v1/auth/resend-verification  # Resend verification email (requires auth)
-POST /api/v1/auth/forgot-password      # Initiate password reset
-POST /api/v1/auth/reset-password       # Reset password with token
 ```
+Password reset (`/forgot-password`, `/reset-password`) is not implemented — see `services/users/AGENTS.md`.
 
 **User Management Endpoints** (all under `/api/v1/user`, all require JWT authentication):
 ```
@@ -629,9 +628,9 @@ CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHE
 
 Rotation and revocation (`RevokeToken`, `RevokeAllUserTokens`, `RevokeTokenFamily`, `CleanupExpiredTokens`) all `DELETE` rows — refresh tokens are hard-deleted, not soft-revoked.
 
-#### Email Verification & Password Reset Tokens
+#### Email Verification Tokens
 
-Two smaller single-use-token tables round out the schema (migrations `000005` and `000006`):
+A smaller single-use-token table rounds out the schema (migration `000005`):
 
 ```sql
 CREATE TABLE email_verification_tokens (
@@ -641,18 +640,9 @@ CREATE TABLE email_verification_tokens (
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
-
-CREATE TABLE password_reset_tokens (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL UNIQUE,  -- SHA-256 hash
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    used_at TIMESTAMP WITH TIME ZONE,         -- set once consumed; NULL means unused
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
 ```
 
-A successful password reset revokes all of the user's refresh tokens (`RevokeAllUserTokens`), signing out every device.
+A `password_reset_tokens` table existed briefly (migration `000006`) but was dropped (migration `000008`) along with the `/forgot-password`/`/reset-password` routes — see `services/users/AGENTS.md`.
 
 ### Security Considerations
 
@@ -683,7 +673,7 @@ A successful password reset revokes all of the user's refresh tokens (`RevokeAll
 - Refresh tokens track `device_info` and `ip_address`
 - `last_login_at` on the user row for login monitoring
 - `last_used_at` on refresh tokens for usage tracking
-- Structured audit events (`account_created`, `login_success`, `login_failure`, `token_refreshed`, `token_reuse_detected`, `password_reset_requested`, …) logged via `slog`
+- Structured audit events (`account_created`, `login_success`, `login_failure`, `token_refreshed`, `token_reuse_detected`, …) logged via `slog`
 
 **Status**: Fully implemented. See [services/users/README.md](../services/users/README.md) for deployment details.
 

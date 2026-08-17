@@ -97,9 +97,6 @@ func Router(config RouterConfig) http.Handler {
 			r.Post("/verify-email", authHandler.VerifyEmail)                                                // Verify email with token (JSON body)
 			r.Get("/verify-email", authHandler.VerifyEmail)                                                 // Verify email with token (query param from email link)
 			r.With(authMiddleware.RequireAuth).Post("/resend-verification", authHandler.ResendVerification) // Resend verification email
-			// Password reset endpoints
-			r.Post("/forgot-password", authHandler.ForgotPassword) // Initiate password reset
-			r.Post("/reset-password", authHandler.ResetPassword)   // Reset password with token
 		})
 
 		// User management endpoints - all routes require JWT authentication

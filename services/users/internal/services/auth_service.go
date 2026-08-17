@@ -43,9 +43,6 @@ var (
 
 	// ErrEmailAlreadyVerified is returned when attempting to verify an already-verified email
 	ErrEmailAlreadyVerified = errors.New("email already verified")
-
-	// ErrInvalidOrExpiredToken is returned when a password reset token is invalid, expired, or already used
-	ErrInvalidOrExpiredToken = errors.New("invalid or expired token")
 )
 
 const (
@@ -53,8 +50,6 @@ const (
 	defaultLockoutThreshold = 5
 	// defaultLockoutDuration is how long an account remains locked
 	defaultLockoutDuration = 15 * time.Minute
-	// passwordResetTokenExpiry is the lifetime of a password reset token
-	passwordResetTokenExpiry = 1 * time.Hour
 )
 
 // AuthService defines the interface for authentication operations
@@ -79,12 +74,6 @@ type AuthService interface {
 
 	// LogoutAll revokes all refresh tokens for a user
 	LogoutAll(ctx context.Context, userID uuid.UUID) error
-
-	// ForgotPassword initiates a password reset for the given email.
-	ForgotPassword(ctx context.Context, email string) error
-
-	// ResetPassword uses a valid reset token to set a new password.
-	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
 // AuthResponse contains the response data for authentication operations
@@ -97,28 +86,26 @@ type AuthResponse struct {
 
 // authService is the concrete implementation of AuthService
 type authService struct {
-	userRepo               database.UserRepository
-	refreshTokenService    *auth.RefreshTokenService
-	passwordResetTokenRepo database.PasswordResetTokenRepository
-	jwtManager             *auth.JWTManager
-	passwordHasher         *auth.PasswordHasher
-	passwordMinLength      int
-	requireComplexity      bool
-	lockoutThreshold       int
-	lockoutDuration        time.Duration
+	userRepo            database.UserRepository
+	refreshTokenService *auth.RefreshTokenService
+	jwtManager          *auth.JWTManager
+	passwordHasher      *auth.PasswordHasher
+	passwordMinLength   int
+	requireComplexity   bool
+	lockoutThreshold    int
+	lockoutDuration     time.Duration
 }
 
 // AuthServiceConfig holds configuration for the authentication service
 type AuthServiceConfig struct {
-	UserRepo               database.UserRepository
-	RefreshTokenService    *auth.RefreshTokenService
-	PasswordResetTokenRepo database.PasswordResetTokenRepository
-	JWTManager             *auth.JWTManager
-	PasswordHasher         *auth.PasswordHasher
-	PasswordMinLength      int           // Default: 8
-	RequireComplexity      bool          // Default: true
-	LockoutThreshold       int           // Default: 5 — consecutive failures before lockout
-	LockoutDuration        time.Duration // Default: 15 minutes
+	UserRepo            database.UserRepository
+	RefreshTokenService *auth.RefreshTokenService
+	JWTManager          *auth.JWTManager
+	PasswordHasher      *auth.PasswordHasher
+	PasswordMinLength   int           // Default: 8
+	RequireComplexity   bool          // Default: true
+	LockoutThreshold    int           // Default: 5 — consecutive failures before lockout
+	LockoutDuration     time.Duration // Default: 15 minutes
 }
 
 // NewAuthService creates a new authentication service
@@ -135,15 +122,14 @@ func NewAuthService(config AuthServiceConfig) AuthService {
 	}
 
 	return &authService{
-		userRepo:               config.UserRepo,
-		refreshTokenService:    config.RefreshTokenService,
-		passwordResetTokenRepo: config.PasswordResetTokenRepo,
-		jwtManager:             config.JWTManager,
-		passwordHasher:         config.PasswordHasher,
-		passwordMinLength:      config.PasswordMinLength,
-		requireComplexity:      config.RequireComplexity,
-		lockoutThreshold:       config.LockoutThreshold,
-		lockoutDuration:        config.LockoutDuration,
+		userRepo:            config.UserRepo,
+		refreshTokenService: config.RefreshTokenService,
+		jwtManager:          config.JWTManager,
+		passwordHasher:      config.PasswordHasher,
+		passwordMinLength:   config.PasswordMinLength,
+		requireComplexity:   config.RequireComplexity,
+		lockoutThreshold:    config.LockoutThreshold,
+		lockoutDuration:     config.LockoutDuration,
 	}
 }
 
@@ -505,84 +491,6 @@ func (s *authService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
 	// Revoke all user tokens
 	if err := s.refreshTokenService.RevokeAllUserTokens(ctx, userID); err != nil {
 		return fmt.Errorf("failed to revoke all user tokens: %w", err)
-	}
-
-	return nil
-}
-
-// ForgotPassword initiates a password reset for the given email.
-// Always returns nil to avoid leaking whether the email exists.
-func (s *authService) ForgotPassword(ctx context.Context, email string) error {
-	if email == "" {
-		return ErrInvalidInput
-	}
-
-	user, err := s.userRepo.GetUserByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			return nil
-		}
-		return fmt.Errorf("failed to look up user: %w", err)
-	}
-
-	_, hash, err := s.refreshTokenService.GenerateToken()
-	if err != nil {
-		return fmt.Errorf("failed to generate reset token: %w", err)
-	}
-
-	expiresAt := time.Now().UTC().Add(passwordResetTokenExpiry)
-
-	_, err = s.passwordResetTokenRepo.CreatePasswordResetToken(ctx, user.ID, hash, expiresAt)
-	if err != nil {
-		return fmt.Errorf("failed to store reset token: %w", err)
-	}
-
-	auditEvent("password_reset_requested",
-		slog.String("user_id", user.ID.String()),
-		slog.Time("expires_at", expiresAt),
-	)
-
-	return nil
-}
-
-// ResetPassword validates the reset token and updates the user's password.
-func (s *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
-	if token == "" || newPassword == "" {
-		return ErrInvalidInput
-	}
-
-	if err := auth.ValidatePasswordStrength(newPassword, s.passwordMinLength, s.requireComplexity); err != nil {
-		return fmt.Errorf("%w: %v", ErrWeakPassword, err)
-	}
-
-	hash := auth.HashTokenPublic(token)
-
-	tokenRecord, err := s.passwordResetTokenRepo.GetPasswordResetToken(ctx, hash)
-	if err != nil {
-		if errors.Is(err, apperrors.ErrTokenNotFound) {
-			return ErrInvalidOrExpiredToken
-		}
-		return fmt.Errorf("failed to retrieve reset token: %w", err)
-	}
-
-	if !tokenRecord.IsValid() {
-		return ErrInvalidOrExpiredToken
-	}
-
-	passwordHash, err := s.passwordHasher.HashPassword(newPassword)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
-	}
-
-	if err := s.passwordResetTokenRepo.ResetPasswordAtomically(ctx, tokenRecord.UserID, passwordHash, tokenRecord.ID); err != nil {
-		return fmt.Errorf("failed to reset password: %w", err)
-	}
-
-	if err := s.refreshTokenService.RevokeAllUserTokens(ctx, tokenRecord.UserID); err != nil {
-		slog.Warn("failed to revoke refresh tokens after password reset",
-			slog.String("user_id", tokenRecord.UserID.String()),
-			slog.Any("error", err),
-		)
 	}
 
 	return nil

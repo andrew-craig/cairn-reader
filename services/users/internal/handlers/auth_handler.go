@@ -60,17 +60,6 @@ type LogoutRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// ForgotPasswordRequest represents the request body for forgot-password
-type ForgotPasswordRequest struct {
-	Email string `json:"email"`
-}
-
-// ResetPasswordRequest represents the request body for reset-password
-type ResetPasswordRequest struct {
-	Token       string `json:"token"`
-	NewPassword string `json:"new_password"`
-}
-
 // ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error string `json:"error"`
@@ -534,82 +523,6 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 
 	api.WriteSuccess(w, http.StatusOK, map[string]string{
 		"message": "verification email sent",
-	}, "v1")
-}
-
-// ForgotPassword handles POST /auth/forgot-password.
-// Always returns 200 OK to avoid leaking whether the email is registered.
-func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
-	var req ForgotPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
-		return
-	}
-
-	if req.Email == "" {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "email is required", nil, "v1")
-		return
-	}
-
-	if err := h.authService.ForgotPassword(r.Context(), req.Email); err != nil {
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		slog.Error("forgot password: internal error", slog.String("error", err.Error()))
-	}
-
-	api.WriteSuccess(w, http.StatusOK, map[string]string{
-		"message": "if an account with that email exists, a password reset link has been sent",
-	}, "v1")
-}
-
-// ResetPassword handles POST /auth/reset-password.
-func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
-	var req ResetPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
-		return
-	}
-
-	if req.Token == "" || req.NewPassword == "" {
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "token and new_password are required", nil, "v1")
-		return
-	}
-
-	if err := h.authService.ResetPassword(r.Context(), req.Token, req.NewPassword); err != nil {
-		if errors.Is(err, services.ErrInvalidOrExpiredToken) {
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired reset token", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrWeakPassword) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to reset password", nil, "v1")
-		return
-	}
-
-	api.WriteSuccess(w, http.StatusOK, map[string]string{
-		"message": "password has been reset successfully",
 	}, "v1")
 }
 
