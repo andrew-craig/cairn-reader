@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -37,7 +38,10 @@ func testUsersConfig(t *testing.T) UsersConfig {
 	}
 }
 
-func getEnvOrDefault(_, defaultValue string) string {
+func getEnvOrDefault(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return defaultValue
 }
 
