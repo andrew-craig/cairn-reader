@@ -37,3 +37,21 @@ Suggested commands against production logs (adjust to your log shipping setup, e
    ratio = shown_count / recommendation_count, expect somewhere under 1.0 but not near zero.
 
 3. Client version share — blocked on task_f84d (no version data exists yet).
+
+---
+
+## ⚠️ Metric bias found by the Cairn Simplification Audit (2026-08-17)
+
+**Audit report:** https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
+
+**Metric 2's shown:fetched ratio is biased downward, against a gate whose failure condition is "near zero".** Read this before drawing a conclusion from it.
+
+The `recorded` counter in `handleMarkShown` (`services/explore/recommender/internal/api/handlers.go:226-261`) increments **only when `inserted == true` and both writes succeed** (`recorded++` at :260, gated by the `continue` at :242-246 for `!inserted`). `RecordRecommendation` uses `ON CONFLICT DO NOTHING`, so `inserted` is false for any article the user has already been shown.
+
+So the numerator counts **first-time shows only** — repeat views are silently dropped — while the denominator (`GET /recommendation`) counts **every fetch, including re-fetches of already-shown articles**. The more the client re-requests, the lower the ratio, independent of adoption.
+
+**Consequences for this task:**
+- A genuinely healthy client can read as "near zero" if users re-fetch a lot. Do not fail the gate on the raw ratio alone.
+- Either count distinct articles on both sides over the window, or read the numerator from the `recommendations` table (rows inserted in the window) rather than from request counts.
+
+**Related:** **task_6bf9** (audit F-S17-1) — the same loop's two writes are non-transactional and drift permanently, and the audit revised that finding **upward to a Phase B prerequisite**: today the eager `trackRecommendation` write in `engine.GetRecommendations` masks the drift, and Phase B removes it. Land task_6bf9 before the epic_c482 cutover.
