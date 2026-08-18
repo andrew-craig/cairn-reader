@@ -44,6 +44,7 @@ func postArticles(t *testing.T, serverURL string, articles []models.Article) *ht
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Internal-API-Key", testInternalAPIKey)
+	req.Header.Set("X-Forwarded-Proto", "https")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to submit articles: %v", err)
@@ -194,6 +195,7 @@ func makeAuthenticatedRequest(method, url, userID string, body []byte, jwtHelper
 	// Add auth header
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
 
 	return req, nil
 }
@@ -268,7 +270,7 @@ func TestRecommendationAlgorithm(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-1"
+	userID := uuid.New().String()
 
 	// Create test articles with different quality scores
 	articles := []models.Article{
@@ -374,7 +376,7 @@ func TestUpvotingFlow(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-2"
+	userID := uuid.New().String()
 
 	// Create test article
 	article := models.Article{
@@ -452,7 +454,7 @@ func TestDownvotingFlow(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-3"
+	userID := uuid.New().String()
 
 	// Create article to downvote
 	badArticle := models.Article{
@@ -527,7 +529,7 @@ func TestDeletedArticlesExcluded(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-4"
+	userID := uuid.New().String()
 
 	// Create active article
 	activeArticle := models.Article{
@@ -581,7 +583,7 @@ func TestEndToEndFlow(t *testing.T) {
 	suite := setupIntegrationTest(t)
 	defer suite.teardown()
 
-	userID := "test-user-e2e"
+	userID := uuid.New().String()
 	feedID := 1
 
 	// 1. Fetcher submits articles
@@ -655,14 +657,16 @@ func TestEndToEndFlow(t *testing.T) {
 	}()
 
 	var recResp struct {
-		UserID          string           `json:"user_id"`
-		Recommendations []models.Article `json:"recommendations"`
-		Count           int              `json:"count"`
+		Data struct {
+			UserID          string           `json:"user_id"`
+			Recommendations []models.Article `json:"recommendations"`
+			Count           int              `json:"count"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&recResp); err != nil {
 		t.Fatalf("Failed to decode recommendations: %v", err)
 	}
-	recommendations := recResp.Recommendations
+	recommendations := recResp.Data.Recommendations
 
 	if len(recommendations) != 5 {
 		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
