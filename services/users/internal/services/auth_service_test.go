@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/google/uuid"
@@ -58,12 +59,12 @@ func setupTestAuthService(t *testing.T) (AuthService, *database.DB, *auth.JWTMan
 // setupTestDB creates a test database connection
 func setupTestDB(t *testing.T) *database.DB {
 	cfg := &database.Config{
-		Host:            getEnvOrDefault("TEST_DB_HOST", "localhost"),
-		Port:            getEnvOrDefault("TEST_DB_PORT", "5432"),
-		User:            getEnvOrDefault("TEST_DB_USER", "postgres"),
-		Password:        getEnvOrDefault("TEST_DB_PASSWORD", "postgres"),
-		Database:        getEnvOrDefault("TEST_DB_NAME", "cairn_test"),
-		SSLMode:         getEnvOrDefault("TEST_DB_SSLMODE", "disable"),
+		Host:            env.GetString("TEST_DB_HOST", "localhost"),
+		Port:            env.GetString("TEST_DB_PORT", "5432"),
+		User:            env.GetString("TEST_DB_USER", "postgres"),
+		Password:        env.GetString("TEST_DB_PASSWORD", "postgres"),
+		Database:        env.GetString("TEST_DB_NAME", "cairn_test"),
+		SSLMode:         env.GetString("TEST_DB_SSLMODE", "disable"),
 		MaxOpenConns:    10,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,
@@ -75,11 +76,6 @@ func setupTestDB(t *testing.T) *database.DB {
 	}
 
 	return db
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	// In real implementation, use os.Getenv
-	return defaultValue
 }
 
 // generateTestRSAKeys generates test RSA key pairs for JWT

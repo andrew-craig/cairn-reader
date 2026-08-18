@@ -430,15 +430,50 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.users == 'true'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cairn_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DB_HOST: localhost
+      TEST_DB_PORT: 5432
+      TEST_DB_USER: postgres
+      TEST_DB_PASSWORD: postgres
+      TEST_DB_NAME: cairn_test
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache-dependency-path: services/users/go.sum
+      - name: Run migrations
+        working-directory: services/users
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: cairn_test
+          DB_SSLMODE: disable
+        run: go run cmd/migrate/main.go -command=up
       - name: Run tests
         working-directory: services/users
-        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./internal/...
+        # -p 1: these packages all connect to the single shared Postgres
+        # service container above by literal test data (emails, device
+        # IDs) - running package test binaries in parallel (Go's default)
+        # races them against each other and produces spurious unique
+        # constraint / "already exists" failures.
+        run: go test -race -p 1 -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./internal/...
       - name: Coverage summary
         if: always() && !cancelled()
         working-directory: services/users
