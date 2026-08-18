@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
 	"github.com/cairn-app/cairn-reader/pkg/logging"
 	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/config"
@@ -134,6 +135,13 @@ func main() {
 		refreshTokenRepo,
 		cfg.JWT.RefreshTokenExpiry,
 	)
+
+	// jwtValidator backs the router's auth middleware. It is kept alive here
+	// (rather than built inside Router) so the key rotation callback below can
+	// push rotated keys into it via UpdatePublicKey — otherwise the middleware
+	// keeps validating against the public key snapshot taken at startup and
+	// rejects every token signed after the first rotation.
+	jwtValidator := pkgauth.NewValidator(publicKey)
 	slog.Info("authentication components initialized")
 
 	// Initialize services
@@ -168,6 +176,9 @@ func main() {
 		OnRotation: func(keyPair *auth.JWTKeyPair) error {
 			// Update JWT manager with new keys
 			jwtManager.UpdateKeys(keyPair.PrivateKey, keyPair.PublicKey)
+			// Push the new public key into the router's validator so this
+			// service can verify the tokens it just started signing.
+			jwtValidator.UpdatePublicKey(keyPair.PublicKey)
 			slog.Info("JWT keys rotated successfully")
 			return nil
 		},
@@ -194,7 +205,7 @@ func main() {
 		AuthService:              authService,
 		UserService:              userService,
 		EmailVerificationService: emailVerificationService,
-		JWTManager:               jwtManager,
+		Validator:                jwtValidator,
 		AuthRateLimit:            cfg.Security.RateLimitRequests,
 		AuthRateLimitWindow:      cfg.Security.RateLimitWindow,
 		Logger:                   logger,

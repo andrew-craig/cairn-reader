@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
 	userAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	userDB "github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/handlers"
@@ -120,6 +121,10 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 
 	emailVerificationService := services.NewEmailVerificationService(userRepo)
 
+	// Selfhost loads the JWT key from a local file and never rotates it (no
+	// KeyRotationManager here), so the validator is built once and never updated.
+	jwtValidator := pkgauth.NewValidator(cfg.PublicKey)
+
 	// Start token cleanup in background
 	go tokenCleanupLoop(ctx, refreshTokenService)
 
@@ -130,7 +135,7 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 		AuthService:              authService,
 		UserService:              userService,
 		EmailVerificationService: emailVerificationService,
-		JWTManager:               jwtManager,
+		Validator:                jwtValidator,
 		AuthRateLimit:            10,
 		AuthRateLimitWindow:      1 * time.Minute,
 		Logger:                   logger,

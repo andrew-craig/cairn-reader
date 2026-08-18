@@ -24,7 +24,7 @@ type RouterConfig struct {
 	AuthService              services.AuthService              // Service handling authentication operations
 	UserService              services.UserService              // Service handling user management operations
 	EmailVerificationService services.EmailVerificationService // Service handling email verification
-	JWTManager               *localAuth.JWTManager             // JWT manager for token validation middleware
+	Validator                *auth.Validator                   // JWT validator for auth middleware; caller retains it to push key rotations via UpdatePublicKey
 	AuthRateLimit            int                               // Requests per window for auth endpoints (default: 10)
 	AuthRateLimitWindow      time.Duration                     // Time window for auth rate limiting (default: 1 minute)
 	Logger                   *slog.Logger                      // Structured logger for request logging
@@ -54,8 +54,10 @@ func Router(config RouterConfig) http.Handler {
 	authHandler := NewAuthHandler(config.AuthService, config.EmailVerificationService)
 	userHandler := NewUserHandler(config.UserService)
 
-	// Create stdlib middleware from pkg/auth
-	authMiddleware := auth.NewMiddleware(auth.NewValidator(config.JWTManager.GetPublicKey()))
+	// Create stdlib middleware from pkg/auth. The validator is constructed by the
+	// caller (not here) so it can be updated in place via UpdatePublicKey when the
+	// signing key rotates — see services/users/cmd/user-service/main.go.
+	authMiddleware := auth.NewMiddleware(config.Validator)
 
 	// Health endpoints (Kubernetes-compatible)
 	// No security middleware applied to allow HTTP health checks within Docker

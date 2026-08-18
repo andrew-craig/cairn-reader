@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
 	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/services"
 	"github.com/google/uuid"
@@ -45,18 +47,10 @@ func TestForgotPasswordAndResetPasswordRoutesRemoved(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	jwtManager := internalAuth.NewJWTManagerWithConfig(internalAuth.JWTManagerConfig{
-		PrivateKey: privateKey,
-		PublicKey:  &privateKey.PublicKey,
-		Expiry:     time.Hour,
-		Issuer:     "test-issuer",
-		Audience:   "test-audience",
-	})
-
 	router := Router(RouterConfig{
 		AuthService:              &stubAuthService{},
 		EmailVerificationService: &mockEmailVerificationService{},
-		JWTManager:               jwtManager,
+		Validator:                pkgauth.NewValidator(&privateKey.PublicKey),
 		Logger:                   slog.Default(),
 	})
 
@@ -67,4 +61,69 @@ func TestForgotPasswordAndResetPasswordRoutesRemoved(t *testing.T) {
 		router.ServeHTTP(w, req)
 		require.Equal(t, 404, w.Code, "expected %s to be unregistered (404), got %d", path, w.Code)
 	}
+}
+
+// TestKeyRotationReachesRouterValidator is the regression test for task_41e2:
+// the users service signs tokens with a rotated key
+// (KeyRotationManager.OnRotation -> jwtManager.UpdateKeys, see
+// cmd/user-service/main.go) but, before this fix, its own router built the
+// auth middleware's *pkgauth.Validator from a one-time public key snapshot
+// taken at startup (router.go used to call
+// auth.NewValidator(config.JWTManager.GetPublicKey()) inline), so the
+// service could never verify the tokens it had just issued. This test
+// proves the router now shares a live *pkgauth.Validator with the caller,
+// so pushing a rotated key via UpdatePublicKey (exactly what the OnRotation
+// callback does) is enough to recover verification with no restart and no
+// new router.
+func TestKeyRotationReachesRouterValidator(t *testing.T) {
+	privA, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	jwtManager := internalAuth.NewJWTManagerWithConfig(internalAuth.JWTManagerConfig{
+		PrivateKey: privA,
+		PublicKey:  &privA.PublicKey,
+		Expiry:     time.Hour,
+		Issuer:     "cairn-user-service",
+		Audience:   "cairn-api",
+	})
+	validator := pkgauth.NewValidator(&privA.PublicKey)
+
+	router := Router(RouterConfig{
+		AuthService:              &stubAuthService{},
+		EmailVerificationService: &mockEmailVerificationService{},
+		Validator:                validator,
+		Logger:                   slog.Default(),
+	})
+
+	userID := uuid.New()
+	tokenA, err := jwtManager.GenerateToken(userID)
+	require.NoError(t, err)
+	requireLogoutAllStatus(t, router, tokenA, http.StatusOK)
+
+	// Rotate the signing key exactly as KeyRotationManager.rotateKeys does:
+	// the manager fetches a new pair from Vault and the OnRotation callback
+	// hands it to the JWT manager. A token signed with the new key is now
+	// rejected by the router's still-stale validator - this is the bug.
+	privB, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	jwtManager.UpdateKeys(privB, &privB.PublicKey)
+	tokenB, err := jwtManager.GenerateToken(userID)
+	require.NoError(t, err)
+	requireLogoutAllStatus(t, router, tokenB, http.StatusUnauthorized)
+
+	// The rest of the OnRotation callback pushes the new public key into the
+	// same validator instance the router is already using - no restart, no
+	// new router or middleware.
+	validator.UpdatePublicKey(&privB.PublicKey)
+	requireLogoutAllStatus(t, router, tokenB, http.StatusOK)
+}
+
+func requireLogoutAllStatus(t *testing.T, router http.Handler, token string, want int) {
+	t.Helper()
+	req := httptest.NewRequest("POST", "/api/v1/auth/logout-all", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, want, w.Code, "logout-all response body: %s", w.Body.String())
 }
