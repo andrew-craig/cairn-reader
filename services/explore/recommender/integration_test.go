@@ -5,6 +5,7 @@ package recommender_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
@@ -120,56 +121,13 @@ type testJWTHelper struct {
 	publicKey  *rsa.PublicKey
 }
 
-// createTestJWTHelper creates a test JWT helper with test RSA keys
+// createTestJWTHelper creates a test JWT helper with a freshly generated RSA keypair
 func createTestJWTHelper(t *testing.T) (*testJWTHelper, *auth.Validator, error) {
-	// Create test RSA keys (simplified for testing)
-	privateKeyPEM := `-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF6IrhvNSPp4n/5dTKV+QMAtZGOqB
-e7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5RzLd4mxQqHNxJxdNTN2r7TQ6Kt1Wl
-DQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfzxKv9gZGTRCkHjhGNpLFjNXRKQcLT
-MEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQPJmAdwq4V6RxKKdvb1LQKvXWS3fCp
-lQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLSXN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ
-+5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xODwIDAQABAoIBAAqNL7qNKWLmkVQU
-vEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9
-S0pCMPKCbN6LWFQhOBvJxdTxJ5rVSWqaL7DVJqG+xZhLMFIhOTGZU6Zw2qwNfXEJ
-r5TJ4Vl0qOcHmNaY3KMJ+VWdRhKZTvU4yQpvLZ5LGZaKQmxqvLJqO7J2UXoE0bRZ
-nQYxKy+kWmZL9YhH7+qN8KYiV/CqFUm+pQ6FwFJKQYL9nZHC3wF8UZWmYv+j9yQV
-qMn8L2VhQFWpCmJ+TFmV3VQv9LhTJnGV0kK7QnXvqC8s4PJGZsHQnZF7vCpXwLMR
-9qJ7TQECgYEA7Z3xJVEZXQvvJJZoZ3L5fKLq7Oq+ZE3yV5+mQJ5WqYQxLQH6fW7y
-K5Fq7lqJZH2iq2IUhQS9xQG8GQkZQ9L7QwU9vQQ6LZ5bT6aZ6Q+mVbxZFqQWq9BL
-RvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8ZmQxL6aJ7TQECgYEA4YQx
-L6aZ6Q+mVbxZFqQWq9BLRvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8Z
-mQxL6aJ7TQE8s4PJGZsHQnZF7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
-qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
-8CgYEAtZ+QxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf
-0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCb
-N7qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjl
-FEGAoGAQxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
-qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
-qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFE
------END RSA PRIVATE KEY-----`
-
-	publicKeyPEM := `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn/ygWy
-F6IrhvNSPp4n/5dTKV+QMAtZGOqBe7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5R
-zLd4mxQqHNxJxdNTN2r7TQ6Kt1WlDQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfz
-xKv9gZGTRCkHjhGNpLFjNXRKQcLTMEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQP
-JmAdwq4V6RxKKdvb1LQKvXWS3fCplQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLS
-XN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ+5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xO
-DwIDAQAB
------END PUBLIC KEY-----`
-
-	// Parse private key
-	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate RSA key: %w", err)
 	}
-
-	// Parse public key
-	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(publicKeyPEM))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse public key: %w", err)
-	}
+	publicKey := &privateKey.PublicKey
 
 	// Create helper
 	helper := &testJWTHelper{
