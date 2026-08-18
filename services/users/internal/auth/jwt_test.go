@@ -93,6 +93,18 @@ func TestJWTGenerateToken(t *testing.T) {
 	assert.Equal(t, "cairn-user-service", claims.Issuer)
 	assert.Contains(t, claims.Audience, "cairn-api")
 	assert.Equal(t, userID.String(), claims.Subject)
+
+	// jti must be present and unique per token - RS256 signing is
+	// deterministic, so without a jti two tokens minted for the same user
+	// within the same second would be byte-identical.
+	assert.NotEmpty(t, claims.ID)
+
+	token2, err := manager.GenerateToken(userID)
+	require.NoError(t, err)
+	claims2, err := manager.ValidateToken(token2)
+	require.NoError(t, err)
+	assert.NotEmpty(t, claims2.ID)
+	assert.NotEqual(t, claims.ID, claims2.ID)
 }
 
 func TestValidateToken(t *testing.T) {
