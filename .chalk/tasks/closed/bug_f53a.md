@@ -2,14 +2,14 @@
 id: bug_f53a
 title: [users JWT] Access tokens are deterministic within the same second — rotation doesn't rotate
 type: bug
-status: open
+status: closed
 priority: 1
 labels: [quality,security,auth-service]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-18T09:29:26Z
-updated_at: 2026-08-18T09:29:26Z
+updated_at: 2026-08-18T11:40:05Z
 ---
 **Discovered while enabling the users service's DB-backed test suite in CI (task_1958).** Not in the original CODE_QUALITY_REVIEW.md ledger - found by actually running these tests against real Postgres for the first time.
 
@@ -35,3 +35,9 @@ All 5 counts should pass (this is what deterministically failed 5/5 before the f
 
 ## Related
 - Currently a known, tracked-separately red test in CI (`test-users` job) after task_1958 lands - `TestAuthService_RefreshAccessToken/success` fails until this is fixed. `TestAuthService_Login/success` passes/fails depending on second-boundary timing luck, same root cause.
+
+## Review
+
+Fixed in the same PR as task_1958 (PR #335), after a reviewer flagged that shipping the CI-enablement PR with this left red would leave `test-users` perpetually failing on `main` and mask future regressions in that job.
+
+Added `ID: uuid.NewString()` to the `jwt.RegisteredClaims` built in `GenerateToken` (`internal/auth/jwt.go`) - `uuid` was already imported. Verified via the exact repro command above: `TestAuthService_Login` and `TestAuthService_RefreshAccessToken` both pass 5/5 with `-count=5` (previously `TestAuthService_RefreshAccessToken/success` failed 5/5 deterministically). Full `go test -race -p 1 ./internal/...` suite is green. `gofmt`, `go vet`, `golangci-lint run` all clean.

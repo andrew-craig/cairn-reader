@@ -136,6 +136,12 @@ func (j *JWTManager) GenerateToken(userID uuid.UUID) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(j.expiry)),
 			NotBefore: jwt.NewNumericDate(now),
+			// ID (jti) makes every issued token unique. Without it, RS256's
+			// deterministic PKCS#1v1.5 padding means two tokens minted for
+			// the same user within the same wall-clock second (iat/exp/nbf
+			// only have second resolution) are byte-identical, silently
+			// defeating rotation.
+			ID: uuid.NewString(),
 		},
 	}
 
