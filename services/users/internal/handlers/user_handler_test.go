@@ -97,6 +97,18 @@ func withChiURLParams(r *http.Request, params map[string]string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
+// decodeUser unwraps the pkg/api {data,meta} success envelope that every
+// UserHandler endpoint writes via api.WriteSuccess, and returns the inner
+// models.User.
+func decodeUser(t *testing.T, body []byte) models.User {
+	t.Helper()
+	var envelope struct {
+		Data models.User `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(body, &envelope))
+	return envelope.Data
+}
+
 // TestGetUser tests the GET /users/:id endpoint
 func TestGetUser(t *testing.T) {
 	handler, db, jwtManager, cleanup := setupTestUserHandler(t)
@@ -115,7 +127,7 @@ func TestGetUser(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 
 		// Add Chi URL params and user ID to context
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -124,9 +136,7 @@ func TestGetUser(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var user models.User
-		err := json.Unmarshal(w.Body.Bytes(), &user)
-		require.NoError(t, err)
+		user := decodeUser(t, w.Body.Bytes())
 
 		assert.Equal(t, userID, user.ID)
 		assert.Equal(t, "getuser@example.com", *user.Email)
@@ -134,7 +144,7 @@ func TestGetUser(t *testing.T) {
 
 	t.Run("Authentication required returns 401", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		// No Authorization header, no user ID in context
 
 		w := httptest.NewRecorder()
@@ -153,7 +163,7 @@ func TestGetUser(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
 
 		// Add Chi URL params with otherUserID but authenticate as userID
-		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": otherUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -170,7 +180,7 @@ func TestGetUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/users/"+nonExistentID.String(), nil)
 		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": nonExistentID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), nonExistentID)
 		req = req.WithContext(ctx)
 
@@ -184,7 +194,7 @@ func TestGetUser(t *testing.T) {
 	t.Run("Invalid user ID format returns 400", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/invalid-uuid", nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": "invalid-uuid"})
+		req = withChiURLParams(req, map[string]string{"user_id": "invalid-uuid"})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -198,7 +208,7 @@ func TestGetUser(t *testing.T) {
 	t.Run("Response structure validation", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/users/"+userID.String(), nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -207,9 +217,7 @@ func TestGetUser(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var user models.User
-		err := json.Unmarshal(w.Body.Bytes(), &user)
-		require.NoError(t, err)
+		user := decodeUser(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, user.ID)
 		assert.NotNil(t, user.Email)
@@ -240,7 +248,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -249,9 +257,7 @@ func TestUpdateUser(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var user models.User
-		err := json.Unmarshal(w.Body.Bytes(), &user)
-		require.NoError(t, err)
+		user := decodeUser(t, w.Body.Bytes())
 
 		assert.Equal(t, newEmail, *user.Email)
 	})
@@ -260,7 +266,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBufferString("invalid"))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -280,7 +286,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -300,7 +306,7 @@ func TestUpdateUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		// No Authorization header, no user ID in context
 
 		w := httptest.NewRecorder()
@@ -323,7 +329,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+otherUserID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": otherUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -348,7 +354,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+userID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -372,7 +378,7 @@ func TestUpdateUser(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPatch, "/users/"+nonExistentID.String(), bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": nonExistentID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), nonExistentID)
 		req = req.WithContext(ctx)
 
@@ -439,7 +445,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -448,19 +454,23 @@ func TestUpgradeAccount(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var user models.User
-		err := json.Unmarshal(w.Body.Bytes(), &user)
-		require.NoError(t, err)
+		user := decodeUser(t, w.Body.Bytes())
 
 		assert.Equal(t, "upgraded@example.com", *user.Email)
-		assert.NotNil(t, user.PasswordHash)
+
+		// PasswordHash is deliberately excluded from the JSON response
+		// (models.User.PasswordHash has json:"-"), so verify it was
+		// actually stored by reading the row back from the database.
+		storedUser, err := database.NewUserRepository(db).GetUserByID(context.Background(), userID)
+		require.NoError(t, err)
+		assert.NotNil(t, storedUser.PasswordHash)
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBufferString("invalid"))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -479,7 +489,7 @@ func TestUpgradeAccount(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPost, "/users/"+userID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		// No Authorization header, no user ID in context
 
 		w := httptest.NewRecorder()
@@ -503,7 +513,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+otherUserID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": otherUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -530,7 +540,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+newAccessToken)
-		req = withChiURLParams(req, map[string]string{"id": newUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": newUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), newUserID)
 		req = req.WithContext(ctx)
 
@@ -557,7 +567,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+emailUserID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+emailAccessToken)
-		req = withChiURLParams(req, map[string]string{"id": emailUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": emailUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), emailUserID)
 		req = req.WithContext(ctx)
 
@@ -589,7 +599,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+newUserID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+newAccessToken)
-		req = withChiURLParams(req, map[string]string{"id": newUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": newUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), newUserID)
 		req = req.WithContext(ctx)
 
@@ -616,7 +626,7 @@ func TestUpgradeAccount(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/users/"+verifyUserID.String()+"/upgrade", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+verifyAccessToken)
-		req = withChiURLParams(req, map[string]string{"id": verifyUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": verifyUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), verifyUserID)
 		req = req.WithContext(ctx)
 
@@ -625,13 +635,18 @@ func TestUpgradeAccount(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var user models.User
-		err := json.Unmarshal(w.Body.Bytes(), &user)
+		_ = decodeUser(t, w.Body.Bytes())
+
+		// PasswordHash and ExpoDeviceID are deliberately excluded from the
+		// JSON response (json:"-"), so IsHybrid()/IsMobileOnly() can't be
+		// evaluated from the decoded response - read the row back from the
+		// database instead, where both fields are populated.
+		storedUser, err := database.NewUserRepository(db).GetUserByID(context.Background(), verifyUserID)
 		require.NoError(t, err)
 
 		// Should be hybrid account now
-		assert.True(t, user.IsHybrid())
-		assert.False(t, user.IsMobileOnly())
+		assert.True(t, storedUser.IsHybrid())
+		assert.False(t, storedUser.IsMobileOnly())
 	})
 }
 
@@ -713,7 +728,7 @@ func TestDeleteUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -729,7 +744,7 @@ func TestDeleteUser(t *testing.T) {
 		defer cleanupTestUser(t, db, userID)
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/"+userID.String(), nil)
-		req = withChiURLParams(req, map[string]string{"id": userID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": userID.String()})
 		// No Authorization header, no user ID in context
 
 		w := httptest.NewRecorder()
@@ -749,7 +764,7 @@ func TestDeleteUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/"+otherUserID.String(), nil)
 		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req = withChiURLParams(req, map[string]string{"id": otherUserID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": otherUserID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), userID)
 		req = req.WithContext(ctx)
 
@@ -765,7 +780,7 @@ func TestDeleteUser(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodDelete, "/users/"+nonExistentID.String(), nil)
 		req.Header.Set("Authorization", "Bearer "+nonExistentToken)
-		req = withChiURLParams(req, map[string]string{"id": nonExistentID.String()})
+		req = withChiURLParams(req, map[string]string{"user_id": nonExistentID.String()})
 		ctx := auth.SetUserIDInContext(req.Context(), nonExistentID)
 		req = req.WithContext(ctx)
 

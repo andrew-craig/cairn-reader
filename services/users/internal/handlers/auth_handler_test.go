@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/cairn-app/cairn-reader/pkg/env"
 	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
 	"github.com/cairn-app/cairn-reader/services/users/internal/database"
 	"github.com/cairn-app/cairn-reader/services/users/internal/models"
@@ -82,12 +83,12 @@ func setupTestAuthHandler(t *testing.T) (*AuthHandler, *database.DB, *internalAu
 // setupTestDB creates a test database connection
 func setupTestDB(t *testing.T) *database.DB {
 	cfg := &database.Config{
-		Host:            getEnvOrDefault("TEST_DB_HOST", "localhost"),
-		Port:            getEnvOrDefault("TEST_DB_PORT", "5432"),
-		User:            getEnvOrDefault("TEST_DB_USER", "postgres"),
-		Password:        getEnvOrDefault("TEST_DB_PASSWORD", "postgres"),
-		Database:        getEnvOrDefault("TEST_DB_NAME", "cairn_test"),
-		SSLMode:         getEnvOrDefault("TEST_DB_SSLMODE", "disable"),
+		Host:            env.GetString("TEST_DB_HOST", "localhost"),
+		Port:            env.GetString("TEST_DB_PORT", "5432"),
+		User:            env.GetString("TEST_DB_USER", "postgres"),
+		Password:        env.GetString("TEST_DB_PASSWORD", "postgres"),
+		Database:        env.GetString("TEST_DB_NAME", "cairn_test"),
+		SSLMode:         env.GetString("TEST_DB_SSLMODE", "disable"),
 		MaxOpenConns:    10,
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,
@@ -99,11 +100,6 @@ func setupTestDB(t *testing.T) *database.DB {
 	}
 
 	return db
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	// In real implementation, use os.Getenv
-	return defaultValue
 }
 
 // generateTestRSAKeys generates test RSA key pairs for JWT
@@ -126,6 +122,18 @@ func cleanupTestUser(t *testing.T, db *database.DB, userID uuid.UUID) {
 	}
 }
 
+// decodeAuthResponse unwraps the pkg/api {data,meta} success envelope that
+// every AuthHandler endpoint writes via api.WriteSuccess, and returns the
+// inner services.AuthResponse.
+func decodeAuthResponse(t *testing.T, body []byte) services.AuthResponse {
+	t.Helper()
+	var envelope struct {
+		Data services.AuthResponse `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(body, &envelope))
+	return envelope.Data
+}
+
 // TestRegister tests the POST /auth/register endpoint
 func TestRegister(t *testing.T) {
 	handler, db, _, cleanup := setupTestAuthHandler(t)
@@ -146,14 +154,12 @@ func TestRegister(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
 		assert.NotEmpty(t, resp.User.ID)
-		assert.Equal(t, reqBody.Email, resp.User.Email)
+		assert.Equal(t, reqBody.Email, *resp.User.Email)
 
 		// Cleanup
 		cleanupTestUser(t, db, resp.User.ID)
@@ -183,7 +189,7 @@ func TestRegister(t *testing.T) {
 		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid request")
+		assert.Contains(t, w.Body.String(), "email and password are required")
 	})
 
 	t.Run("Missing password returns 400", func(t *testing.T) {
@@ -199,7 +205,7 @@ func TestRegister(t *testing.T) {
 		handler.Register(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid request")
+		assert.Contains(t, w.Body.String(), "email and password are required")
 	})
 
 	t.Run("Weak password returns 400", func(t *testing.T) {
@@ -234,8 +240,7 @@ func TestRegister(t *testing.T) {
 		handler.Register(w, req)
 		require.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 		defer cleanupTestUser(t, db, resp.User.ID)
 
 		// Try to create duplicate
@@ -264,15 +269,13 @@ func TestRegister(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
 		assert.Greater(t, resp.ExpiresIn, int64(0))
 		assert.NotEmpty(t, resp.User.ID)
-		assert.Equal(t, reqBody.Email, resp.User.Email)
+		assert.Equal(t, reqBody.Email, *resp.User.Email)
 		assert.NotZero(t, resp.User.CreatedAt)
 
 		// Cleanup
@@ -322,9 +325,7 @@ func TestRegisterMobile(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
@@ -356,7 +357,7 @@ func TestRegisterMobile(t *testing.T) {
 		handler.RegisterMobile(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid request")
+		assert.Contains(t, w.Body.String(), "expo_device_id is required")
 	})
 
 	t.Run("Duplicate device ID returns 409", func(t *testing.T) {
@@ -373,8 +374,7 @@ func TestRegisterMobile(t *testing.T) {
 		handler.RegisterMobile(w, req)
 		require.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 		defer cleanupTestUser(t, db, resp.User.ID)
 
 		// Try to create duplicate
@@ -404,8 +404,7 @@ func TestRegisterMobile(t *testing.T) {
 
 		assert.Equal(t, http.StatusCreated, w.Code)
 
-		var resp services.AuthResponse
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 		defer cleanupTestUser(t, db, resp.User.ID)
 	})
 }
@@ -449,8 +448,7 @@ func TestLogin(t *testing.T) {
 	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var registerResp services.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &registerResp)
+	registerResp := decodeAuthResponse(t, w.Body.Bytes())
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid email/password login", func(t *testing.T) {
@@ -468,13 +466,11 @@ func TestLogin(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
-		assert.Equal(t, email, resp.User.Email)
+		assert.Equal(t, email, *resp.User.Email)
 	})
 
 	t.Run("Invalid JSON body", func(t *testing.T) {
@@ -552,14 +548,12 @@ func TestLogin(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
 		assert.Greater(t, resp.ExpiresIn, int64(0))
-		assert.Equal(t, email, resp.User.Email)
+		assert.Equal(t, email, *resp.User.Email)
 	})
 }
 
@@ -601,8 +595,7 @@ func TestLoginMobile(t *testing.T) {
 	handler.RegisterMobile(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var registerResp services.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &registerResp)
+	registerResp := decodeAuthResponse(t, w.Body.Bytes())
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid device ID login", func(t *testing.T) {
@@ -619,9 +612,7 @@ func TestLoginMobile(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
@@ -706,8 +697,7 @@ func TestRefresh(t *testing.T) {
 	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var registerResp services.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &registerResp)
+	registerResp := decodeAuthResponse(t, w.Body.Bytes())
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid token refresh", func(t *testing.T) {
@@ -724,9 +714,7 @@ func TestRefresh(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp services.AuthResponse
-		err := json.Unmarshal(w.Body.Bytes(), &resp)
-		require.NoError(t, err)
+		resp := decodeAuthResponse(t, w.Body.Bytes())
 
 		assert.NotEmpty(t, resp.AccessToken)
 		assert.NotEmpty(t, resp.RefreshToken)
@@ -905,8 +893,7 @@ func TestLogout(t *testing.T) {
 	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var registerResp services.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &registerResp)
+	registerResp := decodeAuthResponse(t, w.Body.Bytes())
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid logout", func(t *testing.T) {
@@ -975,8 +962,7 @@ func TestLogoutAll(t *testing.T) {
 	handler.Register(w, req)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var registerResp services.AuthResponse
-	json.Unmarshal(w.Body.Bytes(), &registerResp)
+	registerResp := decodeAuthResponse(t, w.Body.Bytes())
 	defer cleanupTestUser(t, db, registerResp.User.ID)
 
 	t.Run("Valid logout all", func(t *testing.T) {

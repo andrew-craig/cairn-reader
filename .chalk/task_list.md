@@ -4,8 +4,8 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
+- **bug_f53a** · P1 · open · [users JWT] Access tokens are deterministic within the same second — rotation doesn't rotate  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **task_1958** · P1 · open · [Audit X9/Tier 0] users test suite cannot run: no Postgres in CI + getEnvOrDefault ignores os.Getenv  (parent: epic_fefa)
 - **task_41e2** · P1 · open · [Audit/Tier 1] Key rotation never reaches the users service's own validator — it signs tokens its middleware cannot verify  (parent: epic_fefa)
 - **task_4a81** · P1 · open · [Audit/Tier 1] Rate limiter bypass on the auth endpoints: check-then-act insert lets N concurrent first requests through  (parent: epic_fefa)
 - **task_527a** · P1 · open · [Audit X9/Tier 0] explore integration job runs only recommender/internal/db — 1,183 lines of recommender integration tests never run  (parent: epic_fefa)
