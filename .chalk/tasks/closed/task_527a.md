@@ -2,14 +2,14 @@
 id: task_527a
 title: [Audit X9/Tier 0] explore integration job runs only recommender/internal/db — 1,183 lines of recommender integration tests never run
 type: task
-status: open
+status: closed
 priority: 1
 labels: [quality,ci,audit-x9]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T10:12:17Z
-updated_at: 2026-08-17T10:12:17Z
+updated_at: 2026-08-18T21:00:07Z
 ---
 **Source:** Cairn Simplification Audit (read-only pass at HEAD `a6c56a1`, 2026-08-16) — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR. Re-verify before fixing — all file:line references below were confirmed at `a6c56a1`.

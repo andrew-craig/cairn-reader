@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/testutil"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,6 +53,7 @@ func postArticles(t *testing.T, serverURL string, articles []models.Article) *ht
 // Integration test configuration
 type IntegrationTestSuite struct {
 	database    *pgxpool.Pool
+	cleanupDB   func()
 	server      *httptest.Server
 	articleRepo db.ArticleRepositoryInterface
 	userRepo    db.UserRepositoryInterface
@@ -62,29 +63,11 @@ type IntegrationTestSuite struct {
 }
 
 func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
-	// Use test database
-	dbHost := env.GetString("TEST_DB_HOST", "localhost")
-	dbPort := env.GetString("TEST_DB_PORT", "5432")
-	dbUser := env.GetString("TEST_DB_USER", "cairn")
-	dbPassword := env.GetString("TEST_DB_PASSWORD", "cairn_password")
-	dbName := env.GetString("TEST_DB_NAME", "cairn_test_db")
-
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPassword, dbName)
-
-	ctx := context.Background()
-	database, err := pgxpool.New(ctx, connStr)
-	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
 	}
 
-	// Verify connection
-	if err := database.Ping(ctx); err != nil {
-		t.Fatalf("Failed to ping test database: %v", err)
-	}
-
-	// Clean up test data
-	cleanupTestData(t, database)
+	database, cleanupDB := testutil.SetupTestDB(t)
 
 	// Initialize repositories
 	articleRepo := db.NewArticleRepository(database)
@@ -116,6 +99,7 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 
 	return &IntegrationTestSuite{
 		database:    database,
+		cleanupDB:   cleanupDB,
 		server:      server,
 		articleRepo: articleRepo,
 		userRepo:    userRepo,
@@ -126,27 +110,8 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 }
 
 func (suite *IntegrationTestSuite) teardown() {
-	cleanupTestData(nil, suite.database)
 	suite.server.Close()
-	suite.database.Close()
-}
-
-func cleanupTestData(t *testing.T, db *pgxpool.Pool) {
-	queries := []string{
-		"DELETE FROM recommendations",
-		"DELETE FROM votes",
-		"DELETE FROM article_categories",
-		"DELETE FROM user_articles",
-		"DELETE FROM articles",
-		"DELETE FROM users",
-	}
-
-	ctx := context.Background()
-	for _, query := range queries {
-		if _, err := db.Exec(ctx, query); err != nil && t != nil {
-			t.Logf("Warning: cleanup query failed: %v", err)
-		}
-	}
+	suite.cleanupDB()
 }
 
 // testJWTHelper helps generate JWT tokens for integration tests
