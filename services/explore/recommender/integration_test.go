@@ -264,7 +264,7 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	t.Log("✓ Article submission and deduplication working correctly")
 }
 
-// Test 3: Recommendation algorithm (4 high-quality + 1 low-exposure)
+// Test 3: Recommendation algorithm (4 high-quality + 1 low-exposure + 1 low-quality)
 func TestRecommendationAlgorithm(t *testing.T) {
 	suite := setupIntegrationTest(t)
 	defer suite.teardown()
@@ -349,9 +349,9 @@ func TestRecommendationAlgorithm(t *testing.T) {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
 
-	// Should return exactly 5 articles
-	if len(recommendations) != 5 {
-		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
+	// Should return all 6 articles (pool is smaller than the page size)
+	if len(recommendations) != 6 {
+		t.Errorf("Expected 6 recommendations, got %d", len(recommendations))
 	}
 
 	// Verify low-exposure article is included
