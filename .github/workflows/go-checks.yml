@@ -311,17 +311,14 @@ jobs:
         with:
           go-version: '1.25'
           cache-dependency-path: services/explore/go.sum
-      # recommender/internal/db's integration tests provision their own Postgres via
-      # testcontainers-go (internal/testutil.SetupTestDB), so no service container is
-      # needed here. The root recommender package's integration_test.go /
-      # integration_shown_test.go use an older, separate hardcoded-connection setup
-      # (TEST_DB_* against a pre-existing "cairn"/"cairn_test_db" database, no
-      # self-migration) instead of that testutil — excluded here, along with all of
-      # fetcher's integration-tagged tests, as pre-existing rot unrelated to Wave 2 —
-      # tracked separately in chalk task bug_96d7.
+      # All of recommender's integration tests (internal/db and the root package)
+      # provision their own Postgres via testcontainers-go
+      # (internal/testutil.SetupTestDB), so no service container is needed here.
+      # fetcher's integration-tagged tests are excluded as pre-existing rot
+      # unrelated to this job — tracked separately in chalk task bug_96d7.
       - name: Run integration tests
         working-directory: services/explore
-        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/internal/db/...
+        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/...
 
   test-read:
     name: go test (services/read)

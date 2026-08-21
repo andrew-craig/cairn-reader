@@ -5,6 +5,7 @@ package recommender_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
@@ -15,11 +16,11 @@ import (
 	"time"
 
 	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/env"
 	"github.com/cairn-app/cairn-reader/pkg/models"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/testutil"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,6 +44,7 @@ func postArticles(t *testing.T, serverURL string, articles []models.Article) *ht
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Internal-API-Key", testInternalAPIKey)
+	req.Header.Set("X-Forwarded-Proto", "https")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to submit articles: %v", err)
@@ -53,6 +55,7 @@ func postArticles(t *testing.T, serverURL string, articles []models.Article) *ht
 // Integration test configuration
 type IntegrationTestSuite struct {
 	database    *pgxpool.Pool
+	cleanupDB   func()
 	server      *httptest.Server
 	articleRepo db.ArticleRepositoryInterface
 	userRepo    db.UserRepositoryInterface
@@ -62,29 +65,11 @@ type IntegrationTestSuite struct {
 }
 
 func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
-	// Use test database
-	dbHost := env.GetString("TEST_DB_HOST", "localhost")
-	dbPort := env.GetString("TEST_DB_PORT", "5432")
-	dbUser := env.GetString("TEST_DB_USER", "cairn")
-	dbPassword := env.GetString("TEST_DB_PASSWORD", "cairn_password")
-	dbName := env.GetString("TEST_DB_NAME", "cairn_test_db")
-
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPassword, dbName)
-
-	ctx := context.Background()
-	database, err := pgxpool.New(ctx, connStr)
-	if err != nil {
-		t.Fatalf("Failed to connect to test database: %v", err)
+	if testing.Short() {
+		t.Skip("Skipping integration test")
 	}
 
-	// Verify connection
-	if err := database.Ping(ctx); err != nil {
-		t.Fatalf("Failed to ping test database: %v", err)
-	}
-
-	// Clean up test data
-	cleanupTestData(t, database)
+	database, cleanupDB := testutil.SetupTestDB(t)
 
 	// Initialize repositories
 	articleRepo := db.NewArticleRepository(database)
@@ -116,6 +101,7 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 
 	return &IntegrationTestSuite{
 		database:    database,
+		cleanupDB:   cleanupDB,
 		server:      server,
 		articleRepo: articleRepo,
 		userRepo:    userRepo,
@@ -126,27 +112,8 @@ func setupIntegrationTest(t *testing.T) *IntegrationTestSuite {
 }
 
 func (suite *IntegrationTestSuite) teardown() {
-	cleanupTestData(nil, suite.database)
 	suite.server.Close()
-	suite.database.Close()
-}
-
-func cleanupTestData(t *testing.T, db *pgxpool.Pool) {
-	queries := []string{
-		"DELETE FROM recommendations",
-		"DELETE FROM votes",
-		"DELETE FROM article_categories",
-		"DELETE FROM user_articles",
-		"DELETE FROM articles",
-		"DELETE FROM users",
-	}
-
-	ctx := context.Background()
-	for _, query := range queries {
-		if _, err := db.Exec(ctx, query); err != nil && t != nil {
-			t.Logf("Warning: cleanup query failed: %v", err)
-		}
-	}
+	suite.cleanupDB()
 }
 
 // testJWTHelper helps generate JWT tokens for integration tests
@@ -155,56 +122,13 @@ type testJWTHelper struct {
 	publicKey  *rsa.PublicKey
 }
 
-// createTestJWTHelper creates a test JWT helper with test RSA keys
+// createTestJWTHelper creates a test JWT helper with a freshly generated RSA keypair
 func createTestJWTHelper(t *testing.T) (*testJWTHelper, *auth.Validator, error) {
-	// Create test RSA keys (simplified for testing)
-	privateKeyPEM := `-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF6IrhvNSPp4n/5dTKV+QMAtZGOqB
-e7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5RzLd4mxQqHNxJxdNTN2r7TQ6Kt1Wl
-DQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfzxKv9gZGTRCkHjhGNpLFjNXRKQcLT
-MEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQPJmAdwq4V6RxKKdvb1LQKvXWS3fCp
-lQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLSXN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ
-+5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xODwIDAQABAoIBAAqNL7qNKWLmkVQU
-vEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9
-S0pCMPKCbN6LWFQhOBvJxdTxJ5rVSWqaL7DVJqG+xZhLMFIhOTGZU6Zw2qwNfXEJ
-r5TJ4Vl0qOcHmNaY3KMJ+VWdRhKZTvU4yQpvLZ5LGZaKQmxqvLJqO7J2UXoE0bRZ
-nQYxKy+kWmZL9YhH7+qN8KYiV/CqFUm+pQ6FwFJKQYL9nZHC3wF8UZWmYv+j9yQV
-qMn8L2VhQFWpCmJ+TFmV3VQv9LhTJnGV0kK7QnXvqC8s4PJGZsHQnZF7vCpXwLMR
-9qJ7TQECgYEA7Z3xJVEZXQvvJJZoZ3L5fKLq7Oq+ZE3yV5+mQJ5WqYQxLQH6fW7y
-K5Fq7lqJZH2iq2IUhQS9xQG8GQkZQ9L7QwU9vQQ6LZ5bT6aZ6Q+mVbxZFqQWq9BL
-RvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8ZmQxL6aJ7TQECgYEA4YQx
-L6aZ6Q+mVbxZFqQWq9BLRvbQFqYQzQU9PQqYZQq8QxmJ+qGqZL5VqQzQFqJQUq8Z
-mQxL6aJ7TQE8s4PJGZsHQnZF7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
-qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
-8CgYEAtZ+QxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf
-0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCb
-N7qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjl
-FEGAoGAQxF6mQ+5EqQWL9nZH7vCpXwLMR9qJ7TQqNL7qNKWLmkVQUvEQqSWLVf0N
-qKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFEGC7FUYQN+9S0pCMPKCbN7
-qNKWLmkVQUvEQqSWLVf0NqKSN8k8zvBXJ9mJ+TzQ89LUfcZBY4fLHDcmM3kHjlFE
------END RSA PRIVATE KEY-----`
-
-	publicKeyPEM := `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn/ygWy
-F6IrhvNSPp4n/5dTKV+QMAtZGOqBe7Bsp5+oVwmXKmONH6Y6N5h9lNr+QZOiWs5R
-zLd4mxQqHNxJxdNTN2r7TQ6Kt1WlDQxdEKvOmZN9+aTyHNOGWTpvEqbz6zS7jUfz
-xKv9gZGTRCkHjhGNpLFjNXRKQcLTMEHdCz4aWUf0dT9mqQN53xHJqJvzJoqxLcQP
-JmAdwq4V6RxKKdvb1LQKvXWS3fCplQ3gxLj3NfDCxh8CwOLO0GvHoH0YVvFvqKLS
-XN2p+6lQ6CJAZ7FfaU3xQFqwwvOZ+5EswGe7ND+qG2N8K3nKvLDVFNLWrEUPB6xO
-DwIDAQAB
------END PUBLIC KEY-----`
-
-	// Parse private key
-	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(privateKeyPEM))
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, nil, fmt.Errorf("failed to generate RSA key: %w", err)
 	}
-
-	// Parse public key
-	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(publicKeyPEM))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse public key: %w", err)
-	}
+	publicKey := &privateKey.PublicKey
 
 	// Create helper
 	helper := &testJWTHelper{
@@ -271,6 +195,7 @@ func makeAuthenticatedRequest(method, url, userID string, body []byte, jwtHelper
 	// Add auth header
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
 
 	return req, nil
 }
@@ -339,13 +264,13 @@ func TestArticleSubmissionAndDeduplication(t *testing.T) {
 	t.Log("✓ Article submission and deduplication working correctly")
 }
 
-// Test 3: Recommendation algorithm (4 high-quality + 1 low-exposure)
+// Test 3: Recommendation algorithm (4 high-quality + 1 low-exposure + 1 low-quality)
 func TestRecommendationAlgorithm(t *testing.T) {
 	suite := setupIntegrationTest(t)
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-1"
+	userID := uuid.New().String()
 
 	// Create test articles with different quality scores
 	articles := []models.Article{
@@ -424,9 +349,9 @@ func TestRecommendationAlgorithm(t *testing.T) {
 		t.Fatalf("Failed to get recommendations: %v", err)
 	}
 
-	// Should return exactly 5 articles
-	if len(recommendations) != 5 {
-		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
+	// Should return all 6 articles (pool is smaller than the page size)
+	if len(recommendations) != 6 {
+		t.Errorf("Expected 6 recommendations, got %d", len(recommendations))
 	}
 
 	// Verify low-exposure article is included
@@ -451,7 +376,7 @@ func TestUpvotingFlow(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-2"
+	userID := uuid.New().String()
 
 	// Create test article
 	article := models.Article{
@@ -529,7 +454,7 @@ func TestDownvotingFlow(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-3"
+	userID := uuid.New().String()
 
 	// Create article to downvote
 	badArticle := models.Article{
@@ -604,7 +529,7 @@ func TestDeletedArticlesExcluded(t *testing.T) {
 	defer suite.teardown()
 
 	ctx := context.Background()
-	userID := "test-user-4"
+	userID := uuid.New().String()
 
 	// Create active article
 	activeArticle := models.Article{
@@ -658,7 +583,7 @@ func TestEndToEndFlow(t *testing.T) {
 	suite := setupIntegrationTest(t)
 	defer suite.teardown()
 
-	userID := "test-user-e2e"
+	userID := uuid.New().String()
 	feedID := 1
 
 	// 1. Fetcher submits articles
@@ -732,14 +657,16 @@ func TestEndToEndFlow(t *testing.T) {
 	}()
 
 	var recResp struct {
-		UserID          string           `json:"user_id"`
-		Recommendations []models.Article `json:"recommendations"`
-		Count           int              `json:"count"`
+		Data struct {
+			UserID          string           `json:"user_id"`
+			Recommendations []models.Article `json:"recommendations"`
+			Count           int              `json:"count"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&recResp); err != nil {
 		t.Fatalf("Failed to decode recommendations: %v", err)
 	}
-	recommendations := recResp.Recommendations
+	recommendations := recResp.Data.Recommendations
 
 	if len(recommendations) != 5 {
 		t.Errorf("Expected 5 recommendations, got %d", len(recommendations))
