@@ -291,13 +291,16 @@ func (r *feedItemRepository) UpdateContentUpdateInfo(ctx context.Context, id uui
 	return nil
 }
 
-// IncrementRetryCount increments the retry count and updates error info
+// IncrementRetryCount increments the retry count and updates error info. It
+// also resets lease_expires_at so the item is immediately reselectable by
+// GetPendingItems on the next poll instead of waiting out the claim lease.
 func (r *feedItemRepository) IncrementRetryCount(ctx context.Context, id uuid.UUID, lastError string) error {
 	query := `
 		UPDATE feed_items
 		SET
 			retry_count = retry_count + 1,
-			last_error = $2
+			last_error = $2,
+			lease_expires_at = now()
 		WHERE id = $1
 	`
 
@@ -318,20 +321,35 @@ func (r *feedItemRepository) IncrementRetryCount(ctx context.Context, id uuid.UU
 	return nil
 }
 
-// GetPendingItems retrieves feed items with pending status
+// GetPendingItems atomically claims and retrieves feed items with pending
+// status, plus items stranded in 'processing' whose lease has expired (e.g.
+// a worker that claimed the item and then crashed before finishing). The
+// claim is a single statement: SELECT ... FOR UPDATE SKIP LOCKED narrows the
+// batch and holds row locks only for the instant of the following UPDATE, so
+// two concurrent callers never claim the same item, and the lease (not a
+// held transaction) is what lets a crashed worker's item be re-claimed later.
 func (r *feedItemRepository) GetPendingItems(ctx context.Context, limit int) ([]*models.FeedItem, error) {
 	query := `
-		SELECT
-			id, feed_id, item_url, item_guid,
-			processing_status, content_hash, content_service_id,
-			title, author, published_at, description,
-			http_last_modified, http_etag, last_checked_at,
-			retry_count, last_error,
-			discovered_at, processed_at
-		FROM feed_items
-		WHERE processing_status = 'pending'
-		ORDER BY discovered_at ASC
-		LIMIT $1
+		WITH claimed AS (
+			SELECT id FROM feed_items
+			WHERE processing_status = 'pending'
+			   OR (processing_status = 'processing' AND lease_expires_at < now())
+			ORDER BY discovered_at ASC
+			LIMIT $1
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE feed_items
+		SET processing_status = 'processing',
+		    lease_expires_at = now() + interval '10 minutes'
+		FROM claimed
+		WHERE feed_items.id = claimed.id
+		RETURNING
+			feed_items.id, feed_items.feed_id, feed_items.item_url, feed_items.item_guid,
+			feed_items.processing_status, feed_items.content_hash, feed_items.content_service_id,
+			feed_items.title, feed_items.author, feed_items.published_at, feed_items.description,
+			feed_items.http_last_modified, feed_items.http_etag, feed_items.last_checked_at,
+			feed_items.retry_count, feed_items.last_error,
+			feed_items.discovered_at, feed_items.processed_at
 	`
 
 	return r.queryFeedItems(ctx, query, limit)

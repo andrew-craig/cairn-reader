@@ -19,13 +19,16 @@ type OutboxRepository interface {
 	// GetByID retrieves an outbox entry by ID
 	GetByID(ctx context.Context, id uuid.UUID) (*models.ContentOutbox, error)
 
-	// GetPendingEntries retrieves outbox entries ready for delivery
+	// GetPendingEntries atomically claims and retrieves outbox entries ready
+	// for delivery
 	GetPendingEntries(ctx context.Context, limit int) ([]*models.ContentOutbox, error)
 
 	// UpdateDeliveryStatus updates the delivery status
 	UpdateDeliveryStatus(ctx context.Context, id uuid.UUID, status models.DeliveryStatus, contentServiceID *uuid.UUID, deliveredAt *time.Time) error
 
-	// UpdateRetryInfo updates retry information after a failed delivery attempt
+	// UpdateRetryInfo updates retry information after a failed delivery
+	// attempt. On the non-terminal branch it also resets lease_expires_at so
+	// the entry is immediately reselectable on the next poll.
 	UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
 
 	// DeleteDelivered deletes up to batchSize delivered entries older than the given duration
@@ -139,20 +142,36 @@ func (r *outboxRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.C
 	return &outbox, nil
 }
 
-// GetPendingEntries retrieves outbox entries ready for delivery
+// GetPendingEntries atomically claims and retrieves outbox entries ready for
+// delivery, plus entries stranded in 'sending' whose lease has expired (e.g.
+// a worker that claimed the entry and then crashed mid-delivery). The claim
+// is a single statement: SELECT ... FOR UPDATE SKIP LOCKED narrows the batch
+// and holds row locks only for the instant of the following UPDATE, so two
+// concurrent callers never claim the same entry, and the lease (not a held
+// transaction) is what lets a crashed worker's entry be re-claimed later.
 func (r *outboxRepository) GetPendingEntries(ctx context.Context, limit int) ([]*models.ContentOutbox, error) {
 	query := `
-		SELECT id, raw_email_id,
-		       content_payload, user_id,
-		       delivery_status, retry_count, max_retries, next_retry_at, last_error,
-		       content_service_id,
-		       created_at, delivered_at
-		FROM content_outbox
-		WHERE delivery_status IN ($1, $2)
-		  AND next_retry_at <= $3
-		  AND retry_count < max_retries
-		ORDER BY created_at ASC
-		LIMIT $4
+		WITH claimed AS (
+			SELECT id FROM content_outbox
+			WHERE (delivery_status = $1
+			       OR (delivery_status = $2 AND lease_expires_at < now()))
+			  AND next_retry_at <= $3
+			  AND retry_count < max_retries
+			ORDER BY created_at ASC
+			LIMIT $4
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE content_outbox
+		SET delivery_status = $2,
+		    lease_expires_at = now() + interval '10 minutes'
+		FROM claimed
+		WHERE content_outbox.id = claimed.id
+		RETURNING
+			content_outbox.id, content_outbox.raw_email_id,
+			content_outbox.content_payload, content_outbox.user_id,
+			content_outbox.delivery_status, content_outbox.retry_count, content_outbox.max_retries, content_outbox.next_retry_at, content_outbox.last_error,
+			content_outbox.content_service_id,
+			content_outbox.created_at, content_outbox.delivered_at
 	`
 
 	rows, err := r.db.QueryContext(ctx, query,
@@ -233,6 +252,10 @@ func (r *outboxRepository) UpdateRetryInfo(ctx context.Context, id uuid.UUID, re
 		    delivery_status = CASE
 		        WHEN $1 >= max_retries THEN $4::VARCHAR(20)
 		        ELSE delivery_status
+		    END,
+		    lease_expires_at = CASE
+		        WHEN $1 >= max_retries THEN lease_expires_at
+		        ELSE now()
 		    END
 		WHERE id = $5
 	`

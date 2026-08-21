@@ -139,6 +139,7 @@ services/read/email/
 | content_hash      | CHAR(64)    | nullable                               |
 | retry_count       | INTEGER     | auto-fails at 5                        |
 | last_error        | TEXT        | nullable                               |
+| lease_expires_at  | TIMESTAMPTZ | nullable, atomic-claim lease set by GetPendingEmails |
 | created_at        | TIMESTAMPTZ |                                        |
 | processed_at      | TIMESTAMPTZ | nullable                               |
 
@@ -156,6 +157,7 @@ services/read/email/
 | next_retry_at      | TIMESTAMPTZ |                                      |
 | last_error         | TEXT        | nullable                             |
 | content_service_id | UUID        | nullable, set on delivery            |
+| lease_expires_at   | TIMESTAMPTZ | nullable, atomic-claim lease set by GetPendingEntries |
 | created_at         | TIMESTAMPTZ |                                      |
 | delivered_at       | TIMESTAMPTZ | nullable                             |
 
@@ -298,9 +300,20 @@ go test ./internal/service/...
 go test ./internal/api/handlers/...
 go test ./internal/worker/...
 go test ./internal/processor/...
+
+# Integration tests (requires PostgreSQL; set TEST_DB_* env vars, see
+# internal/testutil/database.go — defaults to user cairn_email / db
+# cairn_email_test on localhost:5435)
+go test -tags=integration ./...
 ```
 
-Tests use mocked dependencies (no database required for unit tests).
+Tests use mocked dependencies (no database required for unit tests). `internal/testutil` (added alongside the
+repository-layer atomic-claim tests) mirrors `services/read/fetcher/internal/testutil`'s pattern: `SetupTestDatabase`
+creates a uniquely-named database per test, applies every `migrations/*.up.sql` file directly, and returns a
+`*TestDatabase` whose `Cleanup()` drops it — the same shape used by `services/read/content` and `services/read/fetcher`.
+The `test-integration-read` CI job (`.github/workflows/go-checks.yml`) runs this package's `-tags=integration` suite
+against the same shared Postgres service container the fetcher/content integration tests use, gated on
+`changes.read == 'true' || changes.email == 'true'`.
 
 ## Technology Stack
 

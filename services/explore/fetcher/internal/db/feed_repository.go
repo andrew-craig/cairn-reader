@@ -23,19 +23,35 @@ func NewFeedRepository(db *pgxpool.Pool) FeedRepositoryInterface {
 	return &feedRepository{db: db}
 }
 
-// GetNextFeed returns the next feed to fetch
+// GetNextFeed atomically claims and returns the next feed to fetch.
 // Prioritizes: 1) Never fetched (last_fetched_at IS NULL)
 //
 //  2. Oldest fetched
 //
-// Only returns enabled feeds
+// Only returns enabled feeds not currently claimed by another fetcher. The
+// claim is a single statement: SELECT ... FOR UPDATE SKIP LOCKED holds the
+// row lock only for the instant of the following UPDATE (not for the
+// duration of the fetch itself), so two concurrent fetchers never claim the
+// same feed. feeds has no in-flight status, so a crashed fetch needs no
+// recovery path here -- last_fetched_at stays untouched and the feed is
+// picked first again once fetch_lease_expires_at itself expires.
 func (r *feedRepository) GetNextFeed(ctx context.Context) (*models.Feed, error) {
 	query := `
-		SELECT id, url, title, description, last_fetched_at, consecutive_failures, enabled, etag, last_modified, created_at, updated_at
-		FROM feeds
-		WHERE enabled = true
-		ORDER BY last_fetched_at NULLS FIRST, last_fetched_at ASC
-		LIMIT 1
+		WITH claimed AS (
+			SELECT id FROM feeds
+			WHERE enabled = true
+			  AND (fetch_lease_expires_at IS NULL OR fetch_lease_expires_at < now())
+			ORDER BY last_fetched_at NULLS FIRST, last_fetched_at ASC
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE feeds
+		SET fetch_lease_expires_at = now() + interval '5 minutes'
+		FROM claimed
+		WHERE feeds.id = claimed.id
+		RETURNING feeds.id, feeds.url, feeds.title, feeds.description, feeds.last_fetched_at,
+			feeds.consecutive_failures, feeds.enabled, feeds.etag, feeds.last_modified,
+			feeds.created_at, feeds.updated_at
 	`
 
 	var feed models.Feed
@@ -88,6 +104,7 @@ func (r *feedRepository) UpdateFetchResult(ctx context.Context, feedID int, succ
 				consecutive_failures = 0,
 				etag = NULLIF($2, ''),
 				last_modified = NULLIF($3, ''),
+				fetch_lease_expires_at = NULL,
 				updated_at = NOW()
 			WHERE id = $1
 		`
@@ -105,6 +122,7 @@ func (r *feedRepository) UpdateFetchResult(ctx context.Context, feedID int, succ
 			UPDATE feeds
 			SET consecutive_failures = consecutive_failures + 1,
 				enabled = CASE WHEN consecutive_failures + 1 >= 10 THEN false ELSE enabled END,
+				fetch_lease_expires_at = NULL,
 				updated_at = NOW()
 			WHERE id = $1
 			RETURNING consecutive_failures, enabled

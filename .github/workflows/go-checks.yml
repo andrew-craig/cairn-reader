@@ -354,7 +354,7 @@ jobs:
   test-integration-read:
     name: go test integration (services/read)
     needs: [changes]
-    if: needs.changes.outputs.read == 'true'
+    if: needs.changes.outputs.read == 'true' || needs.changes.outputs.email == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -386,12 +386,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-          cache-dependency-path: services/read/go.sum
+          cache-dependency-path: |
+            services/read/go.sum
+            services/read/email/go.sum
       - name: Run integration tests
         working-directory: services/read
         run: |
           cd content && go test -race -tags=integration -count=1 -timeout 10m ./...
           cd ../fetcher && go test -race -tags=integration -count=1 -timeout 10m ./...
+          cd ../email && go test -race -tags=integration -count=1 -timeout 10m ./...
 
   test-email:
     name: go test (services/read/email)

@@ -111,12 +111,8 @@ func (p *ItemProcessor) ProcessPendingItems(ctx context.Context, batchSize int) 
 func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) error {
 	slog.Info("Processing feed item", "item_id", item.ID, "url", item.ItemURL)
 
-	// Update status to 'processing'
-	if err := p.feedItemRepo.UpdateProcessingStatus(
-		ctx, item.ID, models.ProcessingStatusProcessing, nil, nil, nil,
-	); err != nil {
-		return fmt.Errorf("failed to update status to processing: %w", err)
-	}
+	// item arrives already claimed into 'processing' by GetPendingItems'
+	// atomic claim, so no separate status transition is needed here.
 
 	rawHTML, err := p.fetchArticleContent(ctx, item.ItemURL)
 	if err != nil {

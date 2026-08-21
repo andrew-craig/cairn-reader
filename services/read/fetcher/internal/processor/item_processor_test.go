@@ -244,9 +244,6 @@ func TestItemProcessor_OutboxPayloadCarriesRawHTML(t *testing.T) {
 		ProcessingStatus: models.ProcessingStatusPending,
 	}
 
-	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
-		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
-
 	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
 		{ID: uuid.New(), UserID: userID, FeedID: feedID},
 	}, nil).Once()
@@ -304,8 +301,6 @@ func TestItemProcessor_NoSubscribers_SkipsOutbox(t *testing.T) {
 		ProcessingStatus: models.ProcessingStatusPending,
 	}
 
-	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
-		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
 	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{}, nil).Once()
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
@@ -341,8 +336,6 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 		DiscoveredAt:     time.Now(),
 	}
 
-	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
-		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
 	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
 		{ID: uuid.New(), UserID: uuid.New(), FeedID: feedID},
 	}, nil).Once()
@@ -382,9 +375,6 @@ func TestItemProcessor_FiltersSubscribersBySubscriptionTime(t *testing.T) {
 		ProcessingStatus: models.ProcessingStatusPending,
 		DiscoveredAt:     time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
 	}
-
-	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
-		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
 
 	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
 		{ID: uuid.New(), UserID: earlyUserID, FeedID: feedID,
@@ -426,8 +416,6 @@ func TestItemProcessor_AllSubscribersAfterItem_SkipsOutbox(t *testing.T) {
 		DiscoveredAt:     time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
 	}
 
-	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusProcessing,
-		(*string)(nil), (*uuid.UUID)(nil), (*time.Time)(nil)).Return(nil).Once()
 	subRepo.On("GetByFeedID", mock.Anything, feedID).Return([]*models.FeedSubscription{
 		{ID: uuid.New(), UserID: uuid.New(), FeedID: feedID,
 			SubscribedAt: time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)},

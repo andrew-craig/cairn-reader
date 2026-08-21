@@ -120,9 +120,8 @@ func (w *EmailProcessorWorker) processBatch(ctx context.Context) {
 }
 
 func (w *EmailProcessorWorker) processEmail(ctx context.Context, email *models.RawEmail) error {
-	if err := w.rawEmailRepo.UpdateStatus(ctx, email.ID, models.ProcessingStatusProcessing, nil); err != nil {
-		return fmt.Errorf("mark processing: %w", err)
-	}
+	// email arrives already claimed into 'processing' by GetPendingEmails'
+	// atomic claim, so no separate status transition is needed here.
 
 	senderName := ""
 	if email.SenderName != nil {

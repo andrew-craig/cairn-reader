@@ -178,14 +178,8 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 		"retry_count", entry.RetryCount,
 		"user_count", len(entry.UserIDs))
 
-	// Set status to 'sending'
-	if err := ow.updateStatus(ctx, entry.ID, models.DeliveryStatusSending, nil, nil, nil); err != nil {
-		slog.Error("Failed to update status to sending",
-			"worker_id", workerID,
-			"entry_id", entry.ID,
-			"error", err)
-		return
-	}
+	// entry arrives already claimed into 'sending' by GetPendingEntries'
+	// atomic claim, so no separate status transition is needed here.
 
 	// Extract content data from payload
 	contentItem, err := ow.buildContentItem(entry)

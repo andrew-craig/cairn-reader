@@ -153,10 +153,10 @@ func TestEmailProcessorWorker_ProcessEmail_Success(t *testing.T) {
 	err := w.processEmail(context.Background(), email)
 	require.NoError(t, err)
 
-	// Should mark processing then completed
-	require.Len(t, statusUpdates, 2)
-	assert.Equal(t, models.ProcessingStatusProcessing, statusUpdates[0])
-	assert.Equal(t, models.ProcessingStatusCompleted, statusUpdates[1])
+	// The email arrives already claimed into 'processing' by GetPendingEmails'
+	// atomic claim, so processEmail only marks it completed.
+	require.Len(t, statusUpdates, 1)
+	assert.Equal(t, models.ProcessingStatusCompleted, statusUpdates[0])
 
 	// Outbox entry should be created with expected fields
 	require.NotNil(t, outboxCreated)

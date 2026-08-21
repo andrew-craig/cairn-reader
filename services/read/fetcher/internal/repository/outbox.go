@@ -153,17 +153,34 @@ func (r *outboxRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.C
 	return outbox, nil
 }
 
-// GetPendingEntries retrieves outbox entries ready for delivery
+// GetPendingEntries atomically claims and retrieves outbox entries ready for
+// delivery, plus entries stranded in 'sending' whose lease has expired (e.g.
+// a worker that claimed the entry and then crashed mid-delivery). The claim
+// is a single statement: SELECT ... FOR UPDATE SKIP LOCKED narrows the batch
+// and holds row locks only for the instant of the following UPDATE, so two
+// concurrent callers never claim the same entry, and the lease (not a held
+// transaction) is what lets a crashed worker's entry be re-claimed later.
 func (r *outboxRepository) GetPendingEntries(ctx context.Context, limit int) ([]*models.ContentOutbox, error) {
 	query := `
-		SELECT
-			id, feed_item_id, content_payload, user_ids,
-			delivery_status, retry_count, max_retries, next_retry_at, last_error,
-			content_service_id, created_at, delivered_at
-		FROM content_outbox
-		WHERE delivery_status = 'pending' AND next_retry_at <= $1
-		ORDER BY next_retry_at ASC
-		LIMIT $2
+		WITH claimed AS (
+			SELECT id FROM content_outbox
+			WHERE (delivery_status = 'pending'
+			       OR (delivery_status = 'sending' AND lease_expires_at < now()))
+			  AND next_retry_at <= $1
+			  AND retry_count < max_retries
+			ORDER BY next_retry_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE content_outbox
+		SET delivery_status = 'sending',
+		    lease_expires_at = now() + interval '10 minutes'
+		FROM claimed
+		WHERE content_outbox.id = claimed.id
+		RETURNING
+			content_outbox.id, content_outbox.feed_item_id, content_outbox.content_payload, content_outbox.user_ids,
+			content_outbox.delivery_status, content_outbox.retry_count, content_outbox.max_retries, content_outbox.next_retry_at, content_outbox.last_error,
+			content_outbox.content_service_id, content_outbox.created_at, content_outbox.delivered_at
 	`
 
 	return r.queryOutboxEntries(ctx, query, time.Now(), limit)
@@ -205,7 +222,10 @@ func (r *outboxRepository) UpdateDeliveryStatus(
 	return nil
 }
 
-// IncrementRetryCount increments the retry count and sets next retry time
+// IncrementRetryCount increments the retry count and sets next retry time.
+// On the non-terminal branch it also resets lease_expires_at so the entry is
+// immediately reselectable by GetPendingEntries on the next poll instead of
+// waiting out the claim lease.
 func (r *outboxRepository) IncrementRetryCount(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastError string) error {
 	query := `
 		UPDATE content_outbox
@@ -216,6 +236,10 @@ func (r *outboxRepository) IncrementRetryCount(ctx context.Context, id uuid.UUID
 			delivery_status = CASE
 				WHEN retry_count + 1 >= max_retries THEN 'failed'
 				ELSE 'pending'
+			END,
+			lease_expires_at = CASE
+				WHEN retry_count + 1 >= max_retries THEN lease_expires_at
+				ELSE now()
 			END
 		WHERE id = $1
 	`

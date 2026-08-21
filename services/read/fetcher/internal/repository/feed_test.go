@@ -291,7 +291,7 @@ func TestFeedRepository_GetFeedsDueForPolling_Success(t *testing.T) {
 
 	now := time.Now()
 
-	mock.ExpectQuery(`SELECT (.+) FROM feeds WHERE status = 'active' AND next_poll_at <= \$1 ORDER BY next_poll_at ASC LIMIT \$2`).
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED.*UPDATE feeds`).
 		WithArgs(sqlmock.AnyArg(), 10).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "feed_url", "title", "description", "site_url",
