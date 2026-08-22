@@ -138,7 +138,7 @@ func TestOutboxRepository_GetPendingEntries_Success(t *testing.T) {
 	payloadJSON, _ := json.Marshal(payload)
 	userIDStrings := []string{uuid.New().String()}
 
-	mock.ExpectQuery(`SELECT (.+) FROM content_outbox WHERE delivery_status = 'pending' AND next_retry_at <= \$1 ORDER BY next_retry_at ASC LIMIT \$2`).
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED.*UPDATE content_outbox`).
 		WithArgs(sqlmock.AnyArg(), 10).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "feed_item_id", "content_payload", "user_ids",

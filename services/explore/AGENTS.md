@@ -272,6 +272,7 @@ CREATE TABLE feeds (
     consecutive_failures INT DEFAULT 0,
     etag TEXT,                        -- HTTP ETag from last fetch (conditional GET)
     last_modified TEXT,               -- HTTP Last-Modified from last fetch
+    fetch_lease_expires_at TIMESTAMP WITH TIME ZONE,  -- Atomic-claim lease; set by GetNextFeed, cleared by UpdateFetchResult
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

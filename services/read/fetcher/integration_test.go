@@ -427,6 +427,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 				},
 				DeliveryStatus: models.DeliveryStatusPending,
 				NextRetryAt:    time.Now().Add(-1 * time.Hour),
+				MaxRetries:     6,
 			}
 			err := outboxRepo.Create(ctx, outboxEntry)
 			require.NoError(t, err)

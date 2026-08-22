@@ -131,16 +131,35 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 		slog.Info("Fetched pending outbox entries for delivery", "count", len(entries))
 	}
 
-	for _, entry := range entries {
+	for i, entry := range entries {
 		select {
 		case ow.outboxQueue <- entry:
 			// Entry queued successfully
 		case <-ow.stopCh:
-			// Worker is stopping
+			// Worker is stopping. entries[i:] (including this one) were
+			// already claimed into 'sending' by GetPendingEntries but never
+			// queued -- release them so the next instance picks them up on
+			// its first poll instead of waiting out the claim lease.
+			ow.releaseUnqueued(entries[i:])
 			return
 		default:
-			// Queue is full, log warning
-			slog.Warn("Outbox queue is full, will retry entry on next poll", "entry_id", entry.ID)
+			// Queue is full: this entry is already claimed into 'sending',
+			// so release the claim (not just log) or it would sit stranded
+			// for the full lease duration instead of retrying on next poll.
+			if err := ow.outboxRepo.ReleaseClaim(context.Background(), entry.ID); err != nil {
+				slog.Error("Failed to release outbox claim", "entry_id", entry.ID, "error", err)
+			}
+			slog.Warn("Outbox queue is full, entry released for retry on next poll", "entry_id", entry.ID)
+		}
+	}
+}
+
+// releaseUnqueued releases the atomic claim on entries that were fetched by
+// GetPendingEntries but never handed to a worker (e.g. shutdown mid-poll).
+func (ow *OutboxWorker) releaseUnqueued(entries []*models.ContentOutbox) {
+	for _, entry := range entries {
+		if err := ow.outboxRepo.ReleaseClaim(context.Background(), entry.ID); err != nil {
+			slog.Error("Failed to release outbox claim on shutdown", "entry_id", entry.ID, "error", err)
 		}
 	}
 }
@@ -178,14 +197,8 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 		"retry_count", entry.RetryCount,
 		"user_count", len(entry.UserIDs))
 
-	// Set status to 'sending'
-	if err := ow.updateStatus(ctx, entry.ID, models.DeliveryStatusSending, nil, nil, nil); err != nil {
-		slog.Error("Failed to update status to sending",
-			"worker_id", workerID,
-			"entry_id", entry.ID,
-			"error", err)
-		return
-	}
+	// entry arrives already claimed into 'sending' by GetPendingEntries'
+	// atomic claim, so no separate status transition is needed here.
 
 	// Extract content data from payload
 	contentItem, err := ow.buildContentItem(entry)

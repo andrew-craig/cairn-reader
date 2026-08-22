@@ -83,6 +83,11 @@ func (m *MockFeedItemRepository) IncrementRetryCount(ctx context.Context, id uui
 	return args.Error(0)
 }
 
+func (m *MockFeedItemRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockFeedItemRepository) DeleteOldCompletedItems(ctx context.Context, olderThan time.Time, batchSize int) (int, error) {
 	args := m.Called(ctx, olderThan, batchSize)
 	return args.Get(0).(int), args.Error(1)

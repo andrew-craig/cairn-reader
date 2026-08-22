@@ -163,7 +163,7 @@ func TestOutboxRepository_GetPendingEntries(t *testing.T) {
 			models.DeliveryStatusPending, 0, 6, now, nil,
 			nil, now, nil)
 
-	mock.ExpectQuery("SELECT .+ FROM content_outbox WHERE delivery_status").
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED.*UPDATE content_outbox`).
 		WithArgs(models.DeliveryStatusPending, models.DeliveryStatusSending, sqlmock.AnyArg(), 10).
 		WillReturnRows(rows)
 

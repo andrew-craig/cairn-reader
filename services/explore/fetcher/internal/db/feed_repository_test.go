@@ -141,7 +141,7 @@ func TestUpdateFetchResult_Success(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, true, nil, 5)
 
 	// Update with success
-	err := repo.UpdateFetchResult(ctx, feedID, true)
+	err := repo.UpdateFetchResult(ctx, feedID, true, "", "")
 	if err != nil {
 		t.Fatalf("UpdateFetchResult failed: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestUpdateFetchResult_Failure(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, true, nil, 0)
 
 	// Update with failure
-	err := repo.UpdateFetchResult(ctx, feedID, false)
+	err := repo.UpdateFetchResult(ctx, feedID, false, "", "")
 	if err != nil {
 		t.Fatalf("UpdateFetchResult failed: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestUpdateFetchResult_DisablesAfter10Failures(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, true, nil, 9)
 
 	// Update with failure (should disable)
-	err := repo.UpdateFetchResult(ctx, feedID, false)
+	err := repo.UpdateFetchResult(ctx, feedID, false, "", "")
 	if err != nil {
 		t.Fatalf("UpdateFetchResult failed: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 
 	// Create a feed
 	now := time.Now()
-	testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, false, &now, 5)
+	existingFeedID := testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, false, &now, 5)
 
 	// Import feeds including the duplicate
 	feedURLs := []string{
@@ -276,7 +276,7 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 	}
 
 	// Verify existing feed metadata was preserved
-	_, enabled, failures, lastFetched := testutil.GetFeedByID(t, db, 1)
+	_, enabled, failures, lastFetched := testutil.GetFeedByID(t, db, existingFeedID)
 	if enabled {
 		t.Error("Expected existing feed to remain disabled")
 	}

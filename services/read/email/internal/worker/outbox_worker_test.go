@@ -22,6 +22,7 @@ type mockFullOutboxRepo struct {
 	getPendingFunc      func(ctx context.Context, limit int) ([]*models.ContentOutbox, error)
 	updateDeliveryFunc  func(ctx context.Context, id uuid.UUID, status models.DeliveryStatus, contentServiceID *uuid.UUID, deliveredAt *time.Time) error
 	updateRetryFunc     func(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
+	releaseClaimFunc    func(ctx context.Context, id uuid.UUID) error
 	deleteDeliveredFunc func(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
@@ -46,6 +47,12 @@ func (m *mockFullOutboxRepo) UpdateDeliveryStatus(ctx context.Context, id uuid.U
 func (m *mockFullOutboxRepo) UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error {
 	if m.updateRetryFunc != nil {
 		return m.updateRetryFunc(ctx, id, retryCount, nextRetryAt, lastError)
+	}
+	return nil
+}
+func (m *mockFullOutboxRepo) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	if m.releaseClaimFunc != nil {
+		return m.releaseClaimFunc(ctx, id)
 	}
 	return nil
 }

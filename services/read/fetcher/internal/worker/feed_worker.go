@@ -86,22 +86,28 @@ func (fw *FeedWorker) Stop() {
 	slog.Info("Feed worker pool stopped")
 }
 
-// Submit submits a feed for processing
-func (fw *FeedWorker) Submit(feed *models.Feed) {
+// Submit submits a feed for processing. It returns false if the feed was not
+// queued (pool stopping, or queue full) -- the feed was already atomically
+// claimed by GetFeedsDueForPolling before being submitted, so the caller must
+// release that claim on a false return or the feed sits claimed for the full
+// lease duration instead of being retried on the next poll.
+func (fw *FeedWorker) Submit(feed *models.Feed) bool {
 	fw.mu.Lock()
 	defer fw.mu.Unlock()
 
 	if fw.stopped {
 		slog.Warn("Worker pool is stopping, skipping feed", "feed_id", feed.ID)
-		return
+		return false
 	}
 
 	select {
 	case fw.feedQueue <- feed:
 		// Feed submitted successfully
+		return true
 	default:
 		// Queue is full, log warning
 		slog.Warn("Feed queue is full, skipping feed", "feed_id", feed.ID)
+		return false
 	}
 }
 

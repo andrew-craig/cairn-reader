@@ -79,8 +79,20 @@ func (w *OutboxWorker) deliverBatch(ctx context.Context) {
 
 	slog.Info("delivering outbox batch", slog.Int("count", len(entries)))
 
-	for _, entry := range entries {
+	for i, entry := range entries {
 		if ctx.Err() != nil {
+			// entries[i:] were already claimed into 'sending' by
+			// GetPendingEntries but never delivered -- release them so the
+			// next instance picks them up immediately instead of waiting out
+			// the claim lease.
+			for _, e := range entries[i:] {
+				if err := w.outboxRepo.ReleaseClaim(context.Background(), e.ID); err != nil {
+					slog.Error("failed to release outbox claim on shutdown",
+						slog.String("outbox_id", e.ID.String()),
+						slog.Any("error", err),
+					)
+				}
+			}
 			return
 		}
 		w.deliverEntry(ctx, entry)
