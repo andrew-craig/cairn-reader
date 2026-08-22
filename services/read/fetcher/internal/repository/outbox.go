@@ -29,6 +29,13 @@ type OutboxRepository interface {
 	// IncrementRetryCount increments the retry count and sets next retry time
 	IncrementRetryCount(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastError string) error
 
+	// ReleaseClaim resets lease_expires_at to now() without changing
+	// delivery_status, so an entry that was atomically claimed but then
+	// discarded before delivery started (e.g. the delivery queue was full, or
+	// the worker is shutting down) is immediately reselectable on the next
+	// poll instead of sitting claimed for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// DeleteOldDeliveredEntries deletes delivered entries older than the given date
 	DeleteOldDeliveredEntries(ctx context.Context, olderThan time.Time, batchSize int) (int, error)
 
@@ -165,7 +172,7 @@ func (r *outboxRepository) GetPendingEntries(ctx context.Context, limit int) ([]
 		WITH claimed AS (
 			SELECT id FROM content_outbox
 			WHERE (delivery_status = 'pending'
-			       OR (delivery_status = 'sending' AND lease_expires_at < now()))
+			       OR (delivery_status = 'sending' AND (lease_expires_at IS NULL OR lease_expires_at < now())))
 			  AND next_retry_at <= $1
 			  AND retry_count < max_retries
 			ORDER BY next_retry_at ASC
@@ -208,6 +215,27 @@ func (r *outboxRepository) UpdateDeliveryStatus(
 	result, err := r.db.ExecContext(ctx, query, id, status, contentServiceID, deliveredAt, lastError)
 	if err != nil {
 		return fmt.Errorf("failed to update delivery status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("outbox entry not found")
+	}
+
+	return nil
+}
+
+// ReleaseClaim resets lease_expires_at to now() without changing
+// delivery_status, making a claimed-but-not-yet-delivered entry immediately
+// reselectable on the next poll.
+func (r *outboxRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE content_outbox SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()

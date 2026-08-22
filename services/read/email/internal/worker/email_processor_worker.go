@@ -98,8 +98,20 @@ func (w *EmailProcessorWorker) processBatch(ctx context.Context) {
 	sem := make(chan struct{}, w.workerCount)
 	var wg sync.WaitGroup
 
-	for _, email := range emails {
+	for i, email := range emails {
 		if ctx.Err() != nil {
+			// emails[i:] were already claimed into 'processing' by
+			// GetPendingEmails but never dispatched -- release them so the
+			// next instance picks them up immediately instead of waiting out
+			// the claim lease.
+			for _, e := range emails[i:] {
+				if err := w.rawEmailRepo.ReleaseClaim(context.Background(), e.ID); err != nil {
+					slog.Error("failed to release email claim on shutdown",
+						slog.String("email_id", e.ID.String()),
+						slog.Any("error", err),
+					)
+				}
+			}
 			break
 		}
 		sem <- struct{}{}

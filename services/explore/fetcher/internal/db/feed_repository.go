@@ -246,7 +246,7 @@ func (r *feedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]mod
 func (r *feedRepository) RecordFetchHistory(ctx context.Context, feedID int, success bool, articlesFound, articlesSent int, errorMsg string) error {
 	query := `
 		INSERT INTO fetch_history (feed_id, fetch_started_at, fetch_completed_at, success, articles_found, articles_sent, error_message)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''))
 	`
 
 	now := time.Now()

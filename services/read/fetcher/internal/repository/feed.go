@@ -36,6 +36,12 @@ type FeedRepository interface {
 	// GetFeedsDueForPolling retrieves feeds that are ready to be polled
 	GetFeedsDueForPolling(ctx context.Context, limit int) ([]*models.Feed, error)
 
+	// ReleaseClaim resets lease_expires_at to now(), so a feed that was
+	// atomically claimed but then discarded before it was submitted for
+	// polling (e.g. the worker queue was full) is immediately reselectable on
+	// the next poll instead of sitting claimed for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// GetFeedsForTierUpdate retrieves all active feeds for tier management
 	GetFeedsForTierUpdate(ctx context.Context) ([]*models.Feed, error)
 
@@ -275,6 +281,26 @@ func (r *feedRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status 
 	result, err := r.db.ExecContext(ctx, query, id, status, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("feed not found")
+	}
+
+	return nil
+}
+
+// ReleaseClaim resets lease_expires_at to now(), making a claimed-but-not-yet-
+// submitted feed immediately reselectable on the next poll.
+func (r *feedRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE feeds SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()

@@ -113,9 +113,16 @@ func (s *PollScheduler) pollFeeds() {
 
 	slog.Info("Found feeds due for polling", "count", len(feeds))
 
-	// Process each feed using the worker pool
+	// Process each feed using the worker pool. Each feed was already
+	// atomically claimed by GetFeedsDueForPolling; if Submit couldn't queue
+	// it (pool stopping, or queue full), release the claim so it's retried
+	// on the next poll instead of sitting claimed for the full lease.
 	for _, feed := range feeds {
-		s.feedWorker.Submit(feed)
+		if !s.feedWorker.Submit(feed) {
+			if err := s.feedRepo.ReleaseClaim(ctx, feed.ID); err != nil {
+				slog.Error("Error releasing feed claim", "feed_id", feed.ID, "error", err)
+			}
+		}
 	}
 }
 

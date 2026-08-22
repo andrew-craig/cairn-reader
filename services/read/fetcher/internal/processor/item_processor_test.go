@@ -46,6 +46,9 @@ func (m *mockFeedItemRepo) Update(ctx context.Context, item *models.FeedItem) er
 func (m *mockFeedItemRepo) UpdateProcessingStatus(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, contentHash *string, contentServiceID *uuid.UUID, processedAt *time.Time) error {
 	return m.Called(ctx, id, status, contentHash, contentServiceID, processedAt).Error(0)
 }
+func (m *mockFeedItemRepo) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	return m.Called(ctx, id).Error(0)
+}
 func (m *mockFeedItemRepo) UpdateContentUpdateInfo(ctx context.Context, id uuid.UUID, httpLastModified, httpETag *string, lastCheckedAt *time.Time) error {
 	return m.Called(ctx, id, httpLastModified, httpETag, lastCheckedAt).Error(0)
 }
@@ -167,6 +170,9 @@ func (m *mockOutboxRepo) UpdateDeliveryStatus(ctx context.Context, id uuid.UUID,
 }
 func (m *mockOutboxRepo) IncrementRetryCount(ctx context.Context, id uuid.UUID, nextRetryAt time.Time, lastError string) error {
 	return m.Called(ctx, id, nextRetryAt, lastError).Error(0)
+}
+func (m *mockOutboxRepo) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	return m.Called(ctx, id).Error(0)
 }
 func (m *mockOutboxRepo) DeleteOldDeliveredEntries(ctx context.Context, olderThan time.Time, batchSize int) (int, error) {
 	args := m.Called(ctx, olderThan, batchSize)

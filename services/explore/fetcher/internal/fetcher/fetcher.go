@@ -65,7 +65,10 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 		return fmt.Errorf("get next feed: %w", err)
 	}
 	if feed == nil {
-		return fmt.Errorf("no enabled feeds available")
+		// Also the routine post-crash state for up to the lease duration:
+		// every enabled feed is currently claimed by another fetch in
+		// flight, not necessarily "no feeds configured".
+		return fmt.Errorf("no feed currently claimable (none enabled, or all leased)")
 	}
 
 	slog.Info("fetching feed", slog.Int("feed_id", feed.ID), slog.String("url", feed.URL))

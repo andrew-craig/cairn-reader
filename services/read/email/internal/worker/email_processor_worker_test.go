@@ -43,6 +43,7 @@ type mockRawEmailRepo struct {
 	getPendingFunc   func(ctx context.Context, limit int) ([]*models.RawEmail, error)
 	updateStatusFunc func(ctx context.Context, id uuid.UUID, status models.ProcessingStatus, processedAt *time.Time) error
 	updateErrorFunc  func(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
+	releaseClaimFunc func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *mockRawEmailRepo) Create(ctx context.Context, email *models.RawEmail) error { return nil }
@@ -64,6 +65,12 @@ func (m *mockRawEmailRepo) UpdateStatus(ctx context.Context, id uuid.UUID, statu
 func (m *mockRawEmailRepo) UpdateError(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error {
 	if m.updateErrorFunc != nil {
 		return m.updateErrorFunc(ctx, id, retryCount, errorMsg)
+	}
+	return nil
+}
+func (m *mockRawEmailRepo) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	if m.releaseClaimFunc != nil {
+		return m.releaseClaimFunc(ctx, id)
 	}
 	return nil
 }
@@ -91,6 +98,9 @@ func (m *mockOutboxRepo) UpdateDeliveryStatus(ctx context.Context, id uuid.UUID,
 	return nil
 }
 func (m *mockOutboxRepo) UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error {
+	return nil
+}
+func (m *mockOutboxRepo) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {

@@ -305,20 +305,54 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.explore == 'true'
     runs-on: ubuntu-latest
+    services:
+      # fetcher/internal/testutil.SetupTestDB (unlike recommender's, which
+      # provisions its own Postgres via testcontainers-go) connects to a
+      # fixed host:port:credentials, so that database has to already exist.
+      fetcher-postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fetcher
+          POSTGRES_PASSWORD: fetcher_password
+          POSTGRES_DB: fetcher_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
           cache-dependency-path: services/explore/go.sum
-      # All of recommender's integration tests (internal/db and the root package)
+      - name: Migrate fetcher test database
+        run: |
+          for f in services/explore/fetcher/migrations/*.up.sql; do
+            PGPASSWORD=fetcher_password psql -h localhost -p 5433 -U fetcher -d fetcher_db -v ON_ERROR_STOP=1 -f "$f"
+          done
+      # recommender's integration tests (internal/db and the root package)
       # provision their own Postgres via testcontainers-go
-      # (internal/testutil.SetupTestDB), so no service container is needed here.
-      # fetcher's integration-tagged tests are excluded as pre-existing rot
-      # unrelated to this job — tracked separately in chalk task bug_96d7.
+      # (internal/testutil.SetupTestDB), so they don't need the service
+      # container above -- that's solely for fetcher/internal/db.
+      #
+      # fetcher is scoped to ./internal/db/... only, not ./..., because the
+      # rest of the module doesn't compile/pass under -tags=integration yet:
+      # internal/fetcher has an SSRF-guard/httptest conflict and
+      # internal/sync has a NULL-scan bug (both pre-existing, tracked
+      # separately in chalk task bug_96d7), and the root package's
+      # integration_test.go still has the same UpdateFetchResult arity
+      # mismatch internal/db's test file had until this package was
+      # unblocked. Widening this to ./... would ship a CI job that's red by
+      # construction rather than green -- narrow it to the package that
+      # actually builds and passes.
       - name: Run integration tests
         working-directory: services/explore
-        run: go test -race -tags=integration -count=1 -timeout 10m ./recommender/...
+        run: |
+          go test -race -tags=integration -count=1 -timeout 10m ./recommender/...
+          go test -race -tags=integration -count=1 -timeout 10m ./fetcher/internal/db/...
 
   test-read:
     name: go test (services/read)

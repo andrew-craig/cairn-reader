@@ -96,6 +96,42 @@ func TestOutboxRepository_GetPendingEntries_CrashRecovery_Integration(t *testing
 	require.Equal(t, models.DeliveryStatusSending, reclaimed[0].DeliveryStatus)
 }
 
+// TestOutboxRepository_GetPendingEntries_NULLLease_Reclaimed_Integration
+// reproduces the state every pre-existing 'sending' row is in immediately
+// after the lease_expires_at column is added: NULL. `NULL < now()` evaluates
+// to NULL/false in SQL, so a naive `delivery_status = 'sending' AND
+// lease_expires_at < now()` predicate would never re-select these rows --
+// silently leaving the entire existing X6 backlog stranded even after this
+// fix ships. The selector must treat a NULL lease the same as an expired one.
+func TestOutboxRepository_GetPendingEntries_NULLLease_Reclaimed_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	testDB := testutil.SetupTestDatabase(t)
+	t.Cleanup(testDB.Cleanup)
+
+	outboxRepo := NewOutboxRepository(testDB.DB)
+	itemRepo := NewFeedItemRepository(testDB.DB)
+	fRepo := NewFeedRepository(testDB.DB)
+	ctx := context.Background()
+
+	feedItemID := seedFeedItemForOutbox(t, ctx, fRepo, itemRepo, "nulllease")
+	entry := newTestOutboxEntry(feedItemID)
+	require.NoError(t, outboxRepo.Create(ctx, entry))
+
+	// Simulate an entry already stranded in 'sending' from before this
+	// migration -- lease_expires_at defaults to NULL, never set by anything.
+	_, err := testDB.DB.ExecContext(ctx,
+		`UPDATE content_outbox SET delivery_status = 'sending', lease_expires_at = NULL WHERE id = $1`, entry.ID)
+	require.NoError(t, err)
+
+	reclaimed, err := outboxRepo.GetPendingEntries(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, reclaimed, 1, "a pre-existing NULL-lease 'sending' entry must be reclaimable, not permanently stranded")
+	require.Equal(t, entry.ID, reclaimed[0].ID)
+}
+
 // TestOutboxRepository_IncrementRetryCount_ImmediatelyReselectable_Integration
 // proves the outbox retry ladder is reachable: a failed-but-retryable
 // delivery attempt must be reselectable on the very next poll instead of

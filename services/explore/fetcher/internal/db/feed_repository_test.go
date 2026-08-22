@@ -255,7 +255,7 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 
 	// Create a feed
 	now := time.Now()
-	testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, false, &now, 5)
+	existingFeedID := testutil.CreateTestFeed(t, db, testutil.TestFeedURL1, false, &now, 5)
 
 	// Import feeds including the duplicate
 	feedURLs := []string{
@@ -276,7 +276,7 @@ func TestImportFeeds_DuplicatesIgnored(t *testing.T) {
 	}
 
 	// Verify existing feed metadata was preserved
-	_, enabled, failures, lastFetched := testutil.GetFeedByID(t, db, 1)
+	_, enabled, failures, lastFetched := testutil.GetFeedByID(t, db, existingFeedID)
 	if enabled {
 		t.Error("Expected existing feed to remain disabled")
 	}

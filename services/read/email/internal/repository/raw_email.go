@@ -27,6 +27,13 @@ type RawEmailRepository interface {
 	// UpdateError updates the error information for a failed email
 	UpdateError(ctx context.Context, id uuid.UUID, retryCount int, errorMsg string) error
 
+	// ReleaseClaim resets lease_expires_at to now() without changing
+	// processing_status, so an email that was atomically claimed but then
+	// discarded before processing started (e.g. the worker is shutting down)
+	// is immediately reselectable on the next poll instead of sitting claimed
+	// for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// DeleteProcessed deletes up to batchSize processed emails older than the given duration
 	DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
@@ -141,7 +148,7 @@ func (r *rawEmailRepository) GetPendingEmails(ctx context.Context, limit int) ([
 		WITH claimed AS (
 			SELECT id FROM raw_emails
 			WHERE (processing_status = 'pending'
-			       OR (processing_status = 'processing' AND lease_expires_at < now()))
+			       OR (processing_status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at < now())))
 			  AND retry_count < 5
 			ORDER BY created_at ASC
 			LIMIT $1
@@ -213,6 +220,17 @@ func (r *rawEmailRepository) UpdateStatus(ctx context.Context, id uuid.UUID, sta
 		return fmt.Errorf("failed to update raw email status: %w", err)
 	}
 
+	return nil
+}
+
+// ReleaseClaim resets lease_expires_at to now() without changing
+// processing_status, making a claimed-but-not-yet-processed email immediately
+// reselectable on the next poll.
+func (r *rawEmailRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE raw_emails SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
+	}
 	return nil
 }
 

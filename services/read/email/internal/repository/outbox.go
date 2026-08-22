@@ -31,6 +31,13 @@ type OutboxRepository interface {
 	// the entry is immediately reselectable on the next poll.
 	UpdateRetryInfo(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time, lastError string) error
 
+	// ReleaseClaim resets lease_expires_at to now() without changing
+	// delivery_status, so an entry that was atomically claimed but then
+	// discarded before delivery started (e.g. the worker is shutting down) is
+	// immediately reselectable on the next poll instead of sitting claimed
+	// for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// DeleteDelivered deletes up to batchSize delivered entries older than the given duration
 	DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
@@ -154,7 +161,7 @@ func (r *outboxRepository) GetPendingEntries(ctx context.Context, limit int) ([]
 		WITH claimed AS (
 			SELECT id FROM content_outbox
 			WHERE (delivery_status = $1
-			       OR (delivery_status = $2 AND lease_expires_at < now()))
+			       OR (delivery_status = $2 AND (lease_expires_at IS NULL OR lease_expires_at < now())))
 			  AND next_retry_at <= $3
 			  AND retry_count < max_retries
 			ORDER BY created_at ASC
@@ -265,6 +272,17 @@ func (r *outboxRepository) UpdateRetryInfo(ctx context.Context, id uuid.UUID, re
 		return fmt.Errorf("failed to update outbox retry info: %w", err)
 	}
 
+	return nil
+}
+
+// ReleaseClaim resets lease_expires_at to now() without changing
+// delivery_status, making a claimed-but-not-yet-delivered entry immediately
+// reselectable on the next poll.
+func (r *outboxRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE content_outbox SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
+	}
 	return nil
 }
 

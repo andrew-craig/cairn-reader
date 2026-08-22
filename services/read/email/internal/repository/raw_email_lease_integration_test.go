@@ -65,6 +65,39 @@ func TestRawEmailRepository_GetPendingEmails_CrashRecovery_Integration(t *testin
 	require.Equal(t, email.ID, reclaimed[0].ID)
 }
 
+// TestRawEmailRepository_GetPendingEmails_NULLLease_Reclaimed_Integration
+// reproduces the state every pre-existing 'processing' row is in immediately
+// after the lease_expires_at column is added: NULL. `NULL < now()` evaluates
+// to NULL/false in SQL, so a naive `processing_status = 'processing' AND
+// lease_expires_at < now()` predicate would never re-select these rows --
+// silently leaving the entire existing X6 backlog stranded even after this
+// fix ships. The selector must treat a NULL lease the same as an expired one.
+func TestRawEmailRepository_GetPendingEmails_NULLLease_Reclaimed_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	testDB := testutil.SetupTestDatabase(t)
+	t.Cleanup(testDB.Cleanup)
+
+	repo := NewRawEmailRepository(testDB.DB)
+	ctx := context.Background()
+
+	email := newTestRawEmail()
+	require.NoError(t, repo.Create(ctx, email))
+
+	// Simulate a row already stranded in 'processing' from before this
+	// migration -- lease_expires_at defaults to NULL, never set by anything.
+	_, err := testDB.DB.ExecContext(ctx,
+		`UPDATE raw_emails SET processing_status = 'processing', lease_expires_at = NULL WHERE id = $1`, email.ID)
+	require.NoError(t, err)
+
+	reclaimed, err := repo.GetPendingEmails(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, reclaimed, 1, "a pre-existing NULL-lease 'processing' row must be reclaimable, not permanently stranded")
+	require.Equal(t, email.ID, reclaimed[0].ID)
+}
+
 // TestRawEmailRepository_UpdateError_ImmediatelyReselectable_Integration
 // proves the raw-email retry ladder is reachable: a failed-but-retryable
 // email must be reselectable on the very next poll instead of waiting out

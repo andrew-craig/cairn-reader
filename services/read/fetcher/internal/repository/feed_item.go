@@ -30,6 +30,13 @@ type FeedItemRepository interface {
 	// UpdateContentUpdateInfo updates content update tracking information
 	UpdateContentUpdateInfo(ctx context.Context, id uuid.UUID, httpLastModified, httpETag *string, lastCheckedAt *time.Time) error
 
+	// ReleaseClaim resets lease_expires_at to now() without changing
+	// processing_status, so an item that was atomically claimed but then
+	// discarded before processing started (e.g. the delivery queue was full,
+	// or the worker is shutting down) is immediately reselectable on the next
+	// poll instead of sitting claimed for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// IncrementRetryCount increments the retry count and updates error info
 	IncrementRetryCount(ctx context.Context, id uuid.UUID, lastError string) error
 
@@ -291,6 +298,27 @@ func (r *feedItemRepository) UpdateContentUpdateInfo(ctx context.Context, id uui
 	return nil
 }
 
+// ReleaseClaim resets lease_expires_at to now() without changing
+// processing_status, making a claimed-but-not-yet-processed item immediately
+// reselectable on the next poll.
+func (r *feedItemRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE feed_items SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("feed item not found")
+	}
+
+	return nil
+}
+
 // IncrementRetryCount increments the retry count and updates error info. It
 // also resets lease_expires_at so the item is immediately reselectable by
 // GetPendingItems on the next poll instead of waiting out the claim lease.
@@ -333,7 +361,7 @@ func (r *feedItemRepository) GetPendingItems(ctx context.Context, limit int) ([]
 		WITH claimed AS (
 			SELECT id FROM feed_items
 			WHERE processing_status = 'pending'
-			   OR (processing_status = 'processing' AND lease_expires_at < now())
+			   OR (processing_status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at < now()))
 			ORDER BY discovered_at ASC
 			LIMIT $1
 			FOR UPDATE SKIP LOCKED
