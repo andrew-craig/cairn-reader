@@ -225,7 +225,10 @@ func (r *rawEmailRepository) UpdateStatus(ctx context.Context, id uuid.UUID, sta
 
 // ReleaseClaim resets lease_expires_at to now() without changing
 // processing_status, making a claimed-but-not-yet-processed email immediately
-// reselectable on the next poll.
+// reselectable on the next poll. Deliberately doesn't check RowsAffected,
+// matching this file's other update methods (UpdateStatus, UpdateError) --
+// a release racing a row that's already gone (e.g. deleted by cleanup) is a
+// harmless no-op on the shutdown path, not an error worth surfacing.
 func (r *rawEmailRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE raw_emails SET lease_expires_at = now() WHERE id = $1`, id)
 	if err != nil {
