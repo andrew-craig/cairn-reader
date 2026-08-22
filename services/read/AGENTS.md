@@ -257,6 +257,7 @@ next_poll_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 consecutive_error_days INTEGER NOT NULL DEFAULT 0
 last_error_at          TIMESTAMP WITH TIME ZONE
 last_error_message     TEXT
+lease_expires_at       TIMESTAMP WITH TIME ZONE      -- Atomic-claim lease; set by GetFeedsDueForPolling, prevents two pollers claiming the same feed concurrently
 created_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 updated_at             TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 
@@ -299,12 +300,14 @@ http_etag           TEXT
 last_checked_at     TIMESTAMP WITH TIME ZONE
 retry_count         INTEGER NOT NULL DEFAULT 0
 last_error          TEXT
+lease_expires_at    TIMESTAMP WITH TIME ZONE      -- Atomic-claim lease; set by GetPendingItems, prevents two workers claiming the same item concurrently
 discovered_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 processed_at        TIMESTAMP WITH TIME ZONE
 
 -- Constraints & Indexes
 UNIQUE(feed_id, item_guid)
 INDEX(processing_status, discovered_at)
+INDEX(lease_expires_at) WHERE processing_status = 'processing'
 INDEX(feed_id, discovered_at DESC)
 INDEX(feed_id, content_hash) WHERE processing_status = 'completed'
 ```
@@ -321,6 +324,7 @@ max_retries       INTEGER NOT NULL DEFAULT 6
 next_retry_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 last_error        TEXT
 content_service_id UUID                          -- ID returned from Content Service on success
+lease_expires_at  TIMESTAMP WITH TIME ZONE        -- Atomic-claim lease; set by GetPendingEntries, prevents two workers claiming the same entry concurrently
 created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 delivered_at      TIMESTAMP WITH TIME ZONE
 

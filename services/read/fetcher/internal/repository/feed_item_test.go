@@ -173,7 +173,7 @@ func TestFeedItemRepository_GetPendingItems_Success(t *testing.T) {
 
 	now := time.Now()
 
-	mock.ExpectQuery(`SELECT (.+) FROM feed_items WHERE processing_status = 'pending' ORDER BY discovered_at ASC LIMIT \$1`).
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED.*UPDATE feed_items`).
 		WithArgs(10).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "feed_id", "item_url", "item_guid",

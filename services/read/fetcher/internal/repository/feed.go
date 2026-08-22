@@ -36,6 +36,12 @@ type FeedRepository interface {
 	// GetFeedsDueForPolling retrieves feeds that are ready to be polled
 	GetFeedsDueForPolling(ctx context.Context, limit int) ([]*models.Feed, error)
 
+	// ReleaseClaim resets lease_expires_at to now(), so a feed that was
+	// atomically claimed but then discarded before it was submitted for
+	// polling (e.g. the worker queue was full) is immediately reselectable on
+	// the next poll instead of sitting claimed for the full lease duration.
+	ReleaseClaim(ctx context.Context, id uuid.UUID) error
+
 	// GetFeedsForTierUpdate retrieves all active feeds for tier management
 	GetFeedsForTierUpdate(ctx context.Context) ([]*models.Feed, error)
 
@@ -289,18 +295,56 @@ func (r *feedRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status 
 	return nil
 }
 
-// GetFeedsDueForPolling retrieves feeds that are ready to be polled
+// ReleaseClaim resets lease_expires_at to now(), making a claimed-but-not-yet-
+// submitted feed immediately reselectable on the next poll.
+func (r *feedRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE feeds SET lease_expires_at = now() WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to release claim: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("feed not found")
+	}
+
+	return nil
+}
+
+// GetFeedsDueForPolling atomically claims and retrieves feeds that are ready
+// to be polled. Unlike feed_items/content_outbox there is no in-flight status
+// on feeds — a crashed poll just leaves next_poll_at in the past and gets
+// picked up next cycle, so lease_expires_at here exists solely to stop two
+// concurrent pollers (or a retry racing a still-in-flight poll) from fetching
+// the same feed at once; it does not participate in crash recovery. The claim
+// is a single statement: SELECT ... FOR UPDATE SKIP LOCKED narrows the batch
+// and holds row locks only for the instant of the following UPDATE, so two
+// concurrent callers never claim the same feed. next_poll_at is left
+// untouched here — that's owned by UpdateFetchResult/tier logic downstream.
 func (r *feedRepository) GetFeedsDueForPolling(ctx context.Context, limit int) ([]*models.Feed, error) {
 	query := `
-		SELECT
-			id, feed_url, title, description, site_url,
-			polling_tier, last_fetched_at, last_published_at, next_poll_at,
-			status, consecutive_error_days, last_error_at, last_error_message,
-			created_at, updated_at
-		FROM feeds
-		WHERE status = 'active' AND next_poll_at <= $1
-		ORDER BY next_poll_at ASC
-		LIMIT $2
+		WITH claimed AS (
+			SELECT id FROM feeds
+			WHERE status = 'active'
+			  AND next_poll_at <= $1
+			  AND (lease_expires_at IS NULL OR lease_expires_at < $1)
+			ORDER BY next_poll_at ASC
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE feeds
+		SET lease_expires_at = $1 + interval '10 minutes'
+		FROM claimed
+		WHERE feeds.id = claimed.id
+		RETURNING
+			feeds.id, feeds.feed_url, feeds.title, feeds.description, feeds.site_url,
+			feeds.polling_tier, feeds.last_fetched_at, feeds.last_published_at, feeds.next_poll_at,
+			feeds.status, feeds.consecutive_error_days, feeds.last_error_at, feeds.last_error_message,
+			feeds.created_at, feeds.updated_at
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, time.Now(), limit)

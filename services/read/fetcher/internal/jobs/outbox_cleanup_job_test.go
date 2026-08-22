@@ -49,6 +49,11 @@ func (m *MockOutboxRepository) IncrementRetryCount(ctx context.Context, id uuid.
 	return args.Error(0)
 }
 
+func (m *MockOutboxRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockOutboxRepository) DeleteOldDeliveredEntries(ctx context.Context, olderThan time.Time, batchSize int) (int, error) {
 	args := m.Called(ctx, olderThan, batchSize)
 	return args.Get(0).(int), args.Error(1)

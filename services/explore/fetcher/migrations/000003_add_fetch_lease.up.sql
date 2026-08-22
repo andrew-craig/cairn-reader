@@ -1,0 +1,11 @@
+-- Add lease-based atomic claim support to feeds.
+--
+-- feeds has no in-flight status of its own -- a crashed fetch just leaves
+-- last_fetched_at untouched and the feed is picked first again next cycle, so
+-- there is no strand risk here. But without a claim, two concurrent fetchers
+-- (or a retry racing a still-in-flight fetch) can select and fetch the same
+-- feed at once. fetch_lease_expires_at supports a short-lived claim (an atomic
+-- SELECT ... FOR UPDATE SKIP LOCKED + UPDATE) that is held only for the instant
+-- of the claim, not for the duration of the fetch itself, and expires on its
+-- own if the fetcher that claimed the feed dies.
+ALTER TABLE feeds ADD COLUMN fetch_lease_expires_at TIMESTAMP WITH TIME ZONE;

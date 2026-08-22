@@ -30,6 +30,9 @@ func (m *mockRawEmailRepo) UpdateStatus(_ context.Context, _ uuid.UUID, _ models
 func (m *mockRawEmailRepo) UpdateError(_ context.Context, _ uuid.UUID, _ int, _ string) error {
 	return nil
 }
+func (m *mockRawEmailRepo) ReleaseClaim(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
 func (m *mockRawEmailRepo) DeleteProcessed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	if m.deleteFunc != nil {
 		return m.deleteFunc(ctx, olderThan, batchSize)
@@ -52,6 +55,9 @@ func (m *mockOutboxRepo) UpdateDeliveryStatus(_ context.Context, _ uuid.UUID, _ 
 	return nil
 }
 func (m *mockOutboxRepo) UpdateRetryInfo(_ context.Context, _ uuid.UUID, _ int, _ time.Time, _ string) error {
+	return nil
+}
+func (m *mockOutboxRepo) ReleaseClaim(_ context.Context, _ uuid.UUID) error {
 	return nil
 }
 func (m *mockOutboxRepo) DeleteDelivered(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {

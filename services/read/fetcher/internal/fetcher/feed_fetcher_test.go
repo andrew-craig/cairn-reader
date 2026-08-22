@@ -109,6 +109,11 @@ func (m *MockFeedRepository) UpdateStatus(ctx context.Context, id uuid.UUID, sta
 	return args.Error(0)
 }
 
+func (m *MockFeedRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 // MockFeedItemRepository is a mock implementation of FeedItemRepository
 type MockFeedItemRepository struct {
 	mock.Mock
@@ -199,6 +204,11 @@ func (m *MockFeedItemRepository) UpdateContentUpdateInfo(ctx context.Context, id
 
 func (m *MockFeedItemRepository) IncrementRetryCount(ctx context.Context, id uuid.UUID, lastError string) error {
 	args := m.Called(ctx, id, lastError)
+	return args.Error(0)
+}
+
+func (m *MockFeedItemRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 

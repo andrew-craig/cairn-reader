@@ -159,8 +159,8 @@ func TestRawEmailRepository_GetPendingEmails(t *testing.T) {
 			models.ProcessingStatusPending, nil, 0, nil,
 			now, nil)
 
-	mock.ExpectQuery("SELECT .+ FROM raw_emails WHERE processing_status").
-		WithArgs(models.ProcessingStatusPending, 10).
+	mock.ExpectQuery(`FOR UPDATE SKIP LOCKED.*UPDATE raw_emails`).
+		WithArgs(10).
 		WillReturnRows(rows)
 
 	emails, err := repo.GetPendingEmails(ctx, 10)

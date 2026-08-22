@@ -56,6 +56,11 @@ func (m *MockFeedRepository) UpdateStatus(ctx context.Context, id uuid.UUID, sta
 	return args.Error(0)
 }
 
+func (m *MockFeedRepository) ReleaseClaim(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func (m *MockFeedRepository) UpdatePollingInfo(ctx context.Context, id uuid.UUID, lastFetched *time.Time, lastPublished *time.Time, nextPoll time.Time, tier models.PollingTier) error {
 	args := m.Called(ctx, id, lastFetched, lastPublished, nextPoll, tier)
 	return args.Error(0)
