@@ -4,7 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
-- **task_7722** · P1 · in_progress · [Audit X9/Tier 0] selfhost-compose-smoke is always skipped: needs: omits changes, so its if: can never be true  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_4a81** · P1 · open · [Audit/Tier 1] Rate limiter bypass on the auth endpoints: check-then-act insert lets N concurrent first requests through  (parent: epic_fefa)
 - **task_b615** · P1 · open · [Audit/Tier 1] URL validation is skipped whenever content_id is also present, on the flow that prefers the URL  (parent: epic_fefa)
