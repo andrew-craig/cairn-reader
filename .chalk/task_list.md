@@ -6,7 +6,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_88aa** · P0 · in_progress · [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_4a81** · P1 · open · [Audit/Tier 1] Rate limiter bypass on the auth endpoints: check-then-act insert lets N concurrent first requests through  (parent: epic_fefa)
-- **task_7722** · P1 · open · [Audit X9/Tier 0] selfhost-compose-smoke is always skipped: needs: omits changes, so its if: can never be true  (parent: epic_fefa)
 - **task_b615** · P1 · open · [Audit/Tier 1] URL validation is skipped whenever content_id is also present, on the flow that prefers the URL  (parent: epic_fefa)
 - **task_f927** · P1 · open · [Audit X9/Tier 0] No CI job reaches 4 standalone pkg/* modules — 85 tests never run, incl. the SSRF guard suite  (parent: epic_fefa)
 - **bug_96d7** · P2 · open · [explore/fetcher] Integration-tagged test suite is broken: compile errors, SSRF-guard/httptest conflict, NULL scan bug  (parent: epic_fefa)
@@ -68,6 +67,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_9688** · P3 · open · [Audit/Tier 3] Replace the 43 errors.Is branches in the users handlers with one ordered sentinel table  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
+- **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
 - **task_de6d** · P3 · open · [Audit/Tier 4] Deduplicate web's transformToArticle / transformDetailToArticle — they differ on one line  (parent: epic_fefa)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs

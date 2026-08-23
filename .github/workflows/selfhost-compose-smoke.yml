@@ -1,0 +1,88 @@
+name: Selfhost Compose Smoke Test
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'cmd/selfhost/**'
+      - 'pkg/**'
+      - 'services/**'
+      - 'apps/web/**'
+      - 'apps/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'infrastructure/docker/selfhost/**'
+      - '.github/workflows/selfhost-compose-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'cmd/selfhost/**'
+      - 'pkg/**'
+      - 'services/**'
+      - 'apps/web/**'
+      - 'apps/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'infrastructure/docker/selfhost/**'
+      - '.github/workflows/selfhost-compose-smoke.yml'
+
+jobs:
+  selfhost-compose-smoke:
+    name: Selfhost docker-compose smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - name: Build selfhost image (local, test only)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: infrastructure/docker/selfhost/Dockerfile
+          push: false
+          load: true
+          tags: ghcr.io/cairn-app/cairn-selfhost:smoke-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Create .env from example
+        working-directory: infrastructure/docker/selfhost
+        run: |
+          cp .env.example .env
+          # Override password with a known test value
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=ci_test_password/' .env
+      - name: Start stack (using the image just built, not a registry pull)
+        working-directory: infrastructure/docker/selfhost
+        env:
+          CAIRN_VERSION: smoke-test
+        run: docker compose up -d
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8099/health/ready >/dev/null 2>&1; then
+              echo "selfhost is ready"
+              curl -s http://localhost:8099/health/ready
+              exit 0
+            fi
+            echo "waiting for selfhost... ($i/60)"
+            sleep 3
+          done
+          echo "selfhost did not become ready in time"
+          docker compose -f infrastructure/docker/selfhost/docker-compose.yml logs --tail=200 cairn
+          docker compose -f infrastructure/docker/selfhost/docker-compose.yml logs --tail=100 cairn-db
+          exit 1
+      - name: Check liveness endpoint
+        run: curl -fsS http://localhost:8099/health/live
+      - name: Dump container logs on failure
+        if: failure()
+        working-directory: infrastructure/docker/selfhost
+        run: |
+          docker compose ps
+          docker compose logs --tail=300 cairn
+          docker compose logs --tail=100 cairn-db
+      - name: Stop stack
+        if: always()
+        working-directory: infrastructure/docker/selfhost
+        run: docker compose down -v

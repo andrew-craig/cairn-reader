@@ -33,3 +33,7 @@ Either the project pivoted to the `selfhost` binary — making `prod/` dead and 
 ## Done when
 - The decision is recorded in this task and the repo matches it — no half-supported deployment path is left in tree.
 
+## Additional evidence (from task_7722, 2026-08-23)
+`.github/workflows/docker-test.yml` (371 lines, predates the per-service `docker-build-*.yml` split) is **disabled at the GitHub Actions platform level** — confirmed via the Actions API: `{"id":222346144,"name":"Docker Build Test","path":".github/workflows/docker-test.yml","state":"disabled_manually","created_at":"2026-01-10T21:31:50+11:00","updated_at":"2026-01-20T10:31:10+11:00"}`. It contains build jobs for 8 of the same services as the `if: false` `docker-build-*.yml` files (user-service, explore-recommender, explore-fetcher, content-service, content-worker, ingest-rss, ingest-rss-worker, web), each with correct `needs:[changes]`/`if:` path-filter gates — the one thing the `docker-build-*.yml` replacements don't have wrong, since they're gated off entirely instead.
+Whichever way this task resolves (fix `docker-build-*.yml`'s `if: false` gates, or fix `prod/` some other way), `docker-test.yml` should be explicitly deleted as part of it — it's dead weight duplicating whatever the real answer turns out to be. Left untouched by task_7722 (PR #342) to keep that PR surgical; not deleted there despite being fully inert, per review feedback that an unrelated 371-line deletion doesn't belong on a one-file smoke-test fix.
+
