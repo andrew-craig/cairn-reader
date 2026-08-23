@@ -32,12 +32,14 @@ type AddContentToUserRequest struct {
 // Validate validates the AddContentToUserRequest
 func (a AddContentToUserRequest) Validate() error {
 	return validation.ValidateStruct(&a,
-		// At least one of URL or ContentID must be provided
+		// At least one of URL or ContentID must be provided; if URL is present
+		// (regardless of ContentID), it must be well-formed — the handler
+		// dispatches on URL whenever it is non-empty.
 		validation.Field(&a.URL,
 			validation.When(a.ContentID == nil,
 				validation.Required.Error("Either 'url' or 'content_id' is required"),
-				is.URL.Error("URL must be a valid URL"),
 			),
+			is.URL.Error("URL must be a valid URL"),
 		),
 		validation.Field(&a.Status,
 			validation.When(a.Status != "",

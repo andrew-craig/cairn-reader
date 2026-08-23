@@ -2,14 +2,14 @@
 id: task_b615
 title: [Audit/Tier 1] URL validation is skipped whenever content_id is also present, on the flow that prefers the URL
 type: task
-status: open
+status: closed
 priority: 1
 labels: [quality,security,audit]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T12:49:39Z
-updated_at: 2026-08-17T12:49:39Z
+updated_at: 2026-08-23T12:34:30Z
 ---
 **Source:** Cairn Simplification Audit — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f · file:line detail supplied by the audit author 2026-08-17 and re-verified at HEAD `a6c56a1`.
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR.
