@@ -496,6 +496,43 @@ func TestAddContentToUser_BodyTooLarge(t *testing.T) {
 	mockUserContentRepo.AssertNotCalled(t, "Create")
 }
 
+// TestAddContentToUser_MalformedURLWithContentID tests that a malformed URL is
+// rejected even when a valid content_id is also present. The handler prefers
+// the URL flow whenever URL is non-empty (regardless of content_id), so
+// validation must reject a bad URL on that path too.
+func TestAddContentToUser_MalformedURLWithContentID(t *testing.T) {
+	handler := NewUserContentHandler(
+		&mockUserContentRepo{},
+		&mockContentRepo{},
+		&mockContentService{},
+		&mockURLDetector{detectionType: service.URLTypePage},
+		nil, // ingestRSSClient not needed for page submissions
+	)
+
+	userID := uuid.New()
+	contentID := uuid.New()
+
+	reqBody := map[string]interface{}{
+		"url":        "not-a-url",
+		"content_id": contentID.String(),
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 // TestAddContentToUser_DuplicatePrevention tests duplicate prevention
 func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
