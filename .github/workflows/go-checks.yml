@@ -659,23 +659,23 @@ jobs:
         include:
           - module: rss
             filter: pkg-rss
-            cache-dependency-path: pkg/rss/go.sum
+            sumfile: pkg/rss/go.sum
           - module: middleware
             filter: pkg-middleware
-            cache-dependency-path: pkg/middleware/go.sum
+            sumfile: pkg/middleware/go.sum
           - module: config
             filter: pkg-config
-            cache-dependency-path: pkg/config/go.mod
+            sumfile: pkg/config/go.mod
           - module: logging
             filter: pkg-logging
-            cache-dependency-path: pkg/logging/go.sum
+            sumfile: pkg/logging/go.sum
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-          cache-dependency-path: ${{ matrix.cache-dependency-path }}
+          cache-dependency-path: ${{ matrix.sumfile }}
       - name: Run go vet
         working-directory: pkg/${{ matrix.module }}
         run: go vet ./...
