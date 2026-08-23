@@ -33,7 +33,8 @@ func NewContentProcessor() *ContentProcessor {
 		sanitizer:     NewHTMLSanitizer(),
 		canonicalizer: NewURLCanonicalizer(),
 		httpClient: &http.Client{
-			Timeout: FetchTimeout,
+			Timeout:   FetchTimeout,
+			Transport: fetch.NewTransport(),
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) >= 10 {
 					return fmt.Errorf("stopped after 10 redirects")

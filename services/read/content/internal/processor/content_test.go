@@ -1,8 +1,11 @@
 package processor
 
 import (
+	"errors"
 	"strings"
 	"testing"
+
+	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
 )
 
 func TestContentProcessor_ProcessHTML(t *testing.T) {
@@ -118,6 +121,20 @@ func TestContentProcessor_GenerateContentHash(t *testing.T) {
 				t.Errorf("generateContentHash() hashes are same but should differ: %v vs %v", hash1, hash2)
 			}
 		})
+	}
+}
+
+func TestContentProcessor_ProcessURL_BlocksInternalAddress(t *testing.T) {
+	processor := NewContentProcessor()
+
+	// Same SSRF guard proven in pkg/rss/fetch's own tests: a loopback address
+	// must be refused before the processor ever fetches the body.
+	_, err := processor.ProcessURL("http://127.0.0.1:1/")
+	if err == nil {
+		t.Fatal("ProcessURL(loopback) expected error, got nil")
+	}
+	if !errors.Is(err, fetch.ErrBlockedAddress) {
+		t.Errorf("ProcessURL(loopback) error = %v, want error wrapping fetch.ErrBlockedAddress", err)
 	}
 }
 

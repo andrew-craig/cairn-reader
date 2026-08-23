@@ -10,7 +10,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7722** · P1 · open · [Audit X9/Tier 0] selfhost-compose-smoke is always skipped: needs: omits changes, so its if: can never be true  (parent: epic_fefa)
 - **task_b615** · P1 · open · [Audit/Tier 1] URL validation is skipped whenever content_id is also present, on the flow that prefers the URL  (parent: epic_fefa)
 - **task_f927** · P1 · open · [Audit X9/Tier 0] No CI job reaches 4 standalone pkg/* modules — 85 tests never run, incl. the SSRF guard suite  (parent: epic_fefa)
-- **task_fe72** · P1 · open · [Audit/Tier 1] SSRF guard wired on url_detector but missing on the content processor that fetches the body  (parent: epic_fefa)
 - **bug_96d7** · P2 · open · [explore/fetcher] Integration-tagged test suite is broken: compile errors, SSRF-guard/httptest conflict, NULL scan bug  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
