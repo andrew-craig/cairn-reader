@@ -670,6 +670,9 @@ jobs:
             sumfile: pkg/logging/go.sum
     runs-on: ubuntu-latest
     steps:
+      # Gated per-step rather than a job-level `if: needs.changes.outputs[matrix.filter]`:
+      # the matrix context isn't available in jobs.<job_id>.if, so that form silently
+      # skips every matrix combo. Don't revert to a job-level `if`.
       - name: Check whether this module changed
         id: gate
         run: echo "run=${{ needs.changes.outputs[matrix.filter] }}" >> "$GITHUB_OUTPUT"
