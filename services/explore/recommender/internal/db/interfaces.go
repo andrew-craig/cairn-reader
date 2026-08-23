@@ -32,15 +32,17 @@ type ArticleRepositoryInterface interface {
 	// Used for exploration/discovery in recommendation algorithm
 	GetLowExposureArticles(ctx context.Context, userID string, limit int) ([]models.Article, error)
 
-	// IncrementRecommendCount increments the recommends counter for an article
-	IncrementRecommendCount(ctx context.Context, articleID string) error
-
-	// RecordRecommendation tracks that an article was shown to a user.
-	// Returns inserted=true when a new row was written, and inserted=false
-	// when the (user, article) pair already existed (ON CONFLICT DO NOTHING).
-	// Callers use this to decide whether downstream side effects — such as
-	// incrementing articles.recommends — should fire for this call.
-	RecordRecommendation(ctx context.Context, userID string, articleID string) (inserted bool, err error)
+	// RecordShown atomically records that an article was shown to a user
+	// and, the first time for that (user, article) pair, increments
+	// articles.recommends. Both writes happen in one transaction, so a
+	// failure can never leave the recommendations row and the recommends
+	// counter permanently disagreeing — either both land or neither does,
+	// and a retry is always safe. Returns recorded=true only when this
+	// call performed both writes; recorded=false when the pair was
+	// already recorded (ON CONFLICT DO NOTHING short-circuits before the
+	// counter is touched). Returns apperrors.ErrArticleNotFound if the
+	// article does not exist.
+	RecordShown(ctx context.Context, userID string, articleID string) (recorded bool, err error)
 
 	// Search returns non-deleted articles whose title, description, or author
 	// contain q (case-insensitive), paginated with limit/offset.

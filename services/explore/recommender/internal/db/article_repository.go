@@ -417,42 +417,55 @@ func (r *articleRepository) GetLowExposureArticles(ctx context.Context, userID s
 	return r.scanArticles(rows)
 }
 
-// IncrementRecommendCount increments the recommends counter for an article
-func (r *articleRepository) IncrementRecommendCount(ctx context.Context, articleID string) error {
-	query := `
-		UPDATE articles
-		SET recommends = recommends + 1
-		WHERE id = $1
-	`
-
-	result, err := r.db.Exec(ctx, query, articleID)
+// RecordShown atomically inserts the recommendations row and increments
+// articles.recommends in one transaction, so the two representations of
+// "this article was shown to this user" can never be left permanently
+// disagreeing (F-S17-1): either both writes commit or neither does, and a
+// caller can always retry safely.
+func (r *articleRepository) RecordShown(ctx context.Context, userID string, articleID string) (bool, error) {
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to increment recommend count: %w", err)
+		return false, fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer func() {
+		if rbErr := tx.Rollback(ctx); rbErr != nil && rbErr != pgx.ErrTxClosed {
+			slog.Error("failed to rollback transaction", slog.Any("error", rbErr))
+		}
+	}()
 
-	if result.RowsAffected() == 0 {
-		return apperrors.ErrArticleNotFound
-	}
-
-	return nil
-}
-
-// RecordRecommendation tracks that an article was shown to a user.
-// Uses ON CONFLICT DO NOTHING so duplicate (user, article) pairs are
-// no-ops. Returns inserted=true only when a new row was written.
-func (r *articleRepository) RecordRecommendation(ctx context.Context, userID string, articleID string) (bool, error) {
-	query := `
+	insertQuery := `
 		INSERT INTO recommendations (user_id, article_id, recommended_at)
 		VALUES ($1, $2, NOW())
 		ON CONFLICT (user_id, article_id) DO NOTHING
 	`
-
-	result, err := r.db.Exec(ctx, query, userID, articleID)
+	insertResult, err := tx.Exec(ctx, insertQuery, userID, articleID)
 	if err != nil {
 		return false, fmt.Errorf("failed to record recommendation: %w", err)
 	}
+	if insertResult.RowsAffected() == 0 {
+		// Already recorded for this user — don't double-count the
+		// articles.recommends counter.
+		return false, nil
+	}
 
-	return result.RowsAffected() == 1, nil
+	incrementQuery := `
+		UPDATE articles
+		SET recommends = recommends + 1
+		WHERE id = $1
+	`
+	incrementResult, err := tx.Exec(ctx, incrementQuery, articleID)
+	if err != nil {
+		return false, fmt.Errorf("failed to increment recommend count: %w", err)
+	}
+	if incrementResult.RowsAffected() == 0 {
+		return false, apperrors.ErrArticleNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return true, nil
 }
 
 // MarkOldArticlesAsDeleted sets deleted=true for articles older than N days

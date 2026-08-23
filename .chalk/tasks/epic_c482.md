@@ -5,11 +5,11 @@ type: epic
 status: open
 priority: 2
 labels: [explore,recommender,mobile]
-blocked_by: [task_6bf9]
+blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-05-26T11:18:14Z
-updated_at: 2026-08-17T21:31:20Z
+updated_at: 2026-08-23T05:27:51Z
 ---
 Phase A (b568a25) added a mobile POST /api/v1/explore/shown endpoint and the client-side detection (scroll-gated, top-half-of-viewport) that calls it. To avoid double-counting during rollout, Phase A kept the eager write in engine.GetRecommendations and the new endpoint only records the dedup row.
 

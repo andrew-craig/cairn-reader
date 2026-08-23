@@ -366,6 +366,88 @@ func TestShown_IncrementsRecommendsIdempotently(t *testing.T) {
 	}
 }
 
+// TestShown_FailedIncrementDoesNotLeavePermanentDrift is the regression test
+// for F-S17-1. The recommendations row and the articles.recommends counter
+// used to be written as two independent statements: if the row insert
+// committed but the counter increment then failed, the row's existence
+// permanently short-circuited every later attempt via
+// "ON CONFLICT DO NOTHING" — the counter could never catch up. This test
+// forces the increment write to block (by holding a conflicting row lock on
+// the article) until the request's context is canceled, then retries and
+// asserts the shown-tracking write actually lands: both writes must commit
+// together, or neither must.
+func TestShown_FailedIncrementDoesNotLeavePermanentDrift(t *testing.T) {
+	suite := setupShownSuite(t)
+	defer suite.cleanup()
+
+	userID := uuid.New()
+	ids := suite.seedArticles(1)
+	articleID := ids[0]
+
+	// Hold a "FOR NO KEY UPDATE" lock on the article row from a separate,
+	// uncommitted transaction. This is the same lock mode an ordinary
+	// UPDATE of a non-key column (like the recommends counter) acquires
+	// implicitly, so it blocks a concurrent increment — but it does not
+	// conflict with the "FOR KEY SHARE" lock the recommendations insert's
+	// foreign-key check takes, so the insert can still proceed.
+	lockCtx := context.Background()
+	lockTx, err := suite.pool.Begin(lockCtx)
+	if err != nil {
+		t.Fatalf("failed to begin locking transaction: %v", err)
+	}
+	if _, err := lockTx.Exec(lockCtx, "SELECT id FROM articles WHERE id = $1 FOR NO KEY UPDATE", articleID); err != nil {
+		t.Fatalf("failed to lock article row: %v", err)
+	}
+	unlocked := false
+	release := func() {
+		if unlocked {
+			return
+		}
+		unlocked = true
+		if err := lockTx.Rollback(lockCtx); err != nil {
+			t.Errorf("failed to release article lock: %v", err)
+		}
+	}
+	defer release()
+
+	// A client with an aggressive timeout stands in for any transient
+	// failure partway through the write (a dropped connection, a slow
+	// node): the server's request context is canceled when the client
+	// gives up, which is exactly what the increment blocks on above.
+	shortClient := &http.Client{Timeout: 500 * time.Millisecond}
+	body, err := json.Marshal(map[string][]string{"article_ids": {articleID}})
+	if err != nil {
+		t.Fatalf("failed to marshal shown payload: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, suite.server.URL+"/api/v1/explore/shown", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to build shown request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+suite.token(userID))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-Proto", "https")
+
+	if _, doErr := shortClient.Do(req); doErr == nil {
+		t.Fatalf("expected the first request to time out while the article row is locked")
+	}
+
+	// The transient condition clears.
+	release()
+
+	// Retry: this must actually land both writes now, not silently no-op
+	// because a first-attempt row already exists.
+	resp := suite.postShown(userID, []string{articleID})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("retry returned %d", resp.StatusCode)
+	}
+	if resp.Recorded != 1 {
+		t.Errorf("expected retry to record the article, got recorded=%d", resp.Recorded)
+	}
+	if got := suite.recommendsCount(articleID); got != 1 {
+		t.Errorf("expected recommends=1 after retry, got %d", got)
+	}
+}
+
 // TestShown_MixedKnownAndUnknownIDs verifies that unknown article IDs are
 // skipped (logged warn, no FK explosion) and the response still returns
 // 200 with the recorded count reflecting only valid IDs.

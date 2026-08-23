@@ -231,30 +231,26 @@ func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
 				slog.Any("error", ctxErr))
 			break
 		}
-		inserted, err := s.articleRepo.RecordRecommendation(r.Context(), userID, articleID)
+		wasRecorded, err := s.articleRepo.RecordShown(r.Context(), userID, articleID)
 		if err != nil {
+			if errors.Is(err, apperrors.ErrArticleNotFound) {
+				slog.Warn("shown article not found, skipping",
+					slog.String("article_id", articleID),
+					slog.String("user_id", userID))
+				continue
+			}
+			// The recommendations row and the recommends counter are
+			// written in one transaction, so a failure here leaves neither
+			// write in place — safe to retry on a later call.
 			slog.Warn("failed to record shown article",
 				slog.String("article_id", articleID),
 				slog.String("user_id", userID),
 				slog.Any("error", err))
 			continue
 		}
-		if !inserted {
+		if !wasRecorded {
 			// Already recorded for this user — don't double-count the
 			// articles.recommends counter.
-			continue
-		}
-		if err := s.articleRepo.IncrementRecommendCount(r.Context(), articleID); err != nil {
-			if errors.Is(err, apperrors.ErrArticleNotFound) {
-				slog.Warn("shown article not found, skipping increment",
-					slog.String("article_id", articleID),
-					slog.String("user_id", userID))
-				continue
-			}
-			slog.Warn("failed to increment recommend count",
-				slog.String("article_id", articleID),
-				slog.String("user_id", userID),
-				slog.Any("error", err))
 			continue
 		}
 		recorded++
