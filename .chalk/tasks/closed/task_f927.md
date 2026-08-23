@@ -2,14 +2,14 @@
 id: task_f927
 title: [Audit X9/Tier 0] No CI job reaches 4 standalone pkg/* modules — 85 tests never run, incl. the SSRF guard suite
 type: task
-status: open
+status: closed
 priority: 1
 labels: [quality,ci,security,audit-x9]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T10:12:17Z
-updated_at: 2026-08-17T10:12:17Z
+updated_at: 2026-08-23T22:43:27Z
 ---
 **Source:** Cairn Simplification Audit (read-only pass at HEAD `a6c56a1`, 2026-08-16) — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR. Re-verify before fixing — all file:line references below were confirmed at `a6c56a1`.
@@ -42,3 +42,11 @@ Note the `changes` filter already computes a `pkg` output and fans it out to the
 
 ## Expect red on first enablement
 **That is the finding, not a regression** — these 85 tests have never run, so their pass state is unknown by construction. Triage per module; do not delete or skip a test to get green.
+
+## Review
+
+Re-verified on current `main`: only `test-pkg-auth` existed; rss/middleware/config/logging had no CI job. Confirmed test counts match exactly (rss 57, middleware 20, config 6, logging 2 = 85).
+
+Added a `test-pkg` matrix job to `.github/workflows/go-checks.yml`, gated per-module via new `pkg-rss`/`pkg-middleware`/`pkg-config`/`pkg-logging` path filters (mirroring `pkg-auth`), with `fail-fast: false`. `pkg/config` has no `go.sum` (zero external deps), so its matrix entry points `cache-dependency-path` at `go.mod` instead.
+
+Triage: ran `go vet ./...` and `go test -race -count=1 ./...` locally in all four modules before wiring CI — all pass cleanly, including the SSRF guard suite in `pkg/rss`. No red to triage; this PR only closes the CI gap.

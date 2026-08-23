@@ -22,6 +22,10 @@ jobs:
       email: ${{ steps.filter.outputs.email == 'true' || steps.filter.outputs.pkg == 'true' }}
       users: ${{ steps.filter.outputs.users == 'true' || steps.filter.outputs.pkg == 'true' }}
       pkg-auth: ${{ steps.filter.outputs.pkg-auth == 'true' }}
+      pkg-rss: ${{ steps.filter.outputs.pkg-rss == 'true' }}
+      pkg-middleware: ${{ steps.filter.outputs.pkg-middleware == 'true' }}
+      pkg-config: ${{ steps.filter.outputs.pkg-config == 'true' }}
+      pkg-logging: ${{ steps.filter.outputs.pkg-logging == 'true' }}
       selfhost: ${{ steps.filter.outputs.selfhost == 'true' || steps.filter.outputs.pkg == 'true' || steps.filter.outputs.anyservice == 'true' }}
     steps:
       - uses: actions/checkout@v5
@@ -42,6 +46,14 @@ jobs:
               - 'pkg/**'
             pkg-auth:
               - 'pkg/auth/**'
+            pkg-rss:
+              - 'pkg/rss/**'
+            pkg-middleware:
+              - 'pkg/middleware/**'
+            pkg-config:
+              - 'pkg/config/**'
+            pkg-logging:
+              - 'pkg/logging/**'
             selfhost:
               - 'cmd/selfhost/**'
             anyservice:
@@ -631,6 +643,50 @@ jobs:
         working-directory: pkg/auth
         run: |
           echo "## Coverage: pkg/auth" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Other standalone pkg/* modules ───────────────────────────────────
+
+  test-pkg:
+    name: go test (pkg/${{ matrix.module }})
+    needs: [changes]
+    if: needs.changes.outputs[matrix.filter] == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: rss
+            filter: pkg-rss
+            cache-dependency-path: pkg/rss/go.sum
+          - module: middleware
+            filter: pkg-middleware
+            cache-dependency-path: pkg/middleware/go.sum
+          - module: config
+            filter: pkg-config
+            cache-dependency-path: pkg/config/go.mod
+          - module: logging
+            filter: pkg-logging
+            cache-dependency-path: pkg/logging/go.sum
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: ${{ matrix.cache-dependency-path }}
+      - name: Run go vet
+        working-directory: pkg/${{ matrix.module }}
+        run: go vet ./...
+      - name: Run tests
+        working-directory: pkg/${{ matrix.module }}
+        run: go test -race -count=1 -timeout 5m -coverprofile=coverage.out -covermode=atomic ./...
+      - name: Coverage summary
+        if: always() && !cancelled()
+        working-directory: pkg/${{ matrix.module }}
+        run: |
+          echo "## Coverage: pkg/${{ matrix.module }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           go tool cover -func=coverage.out | tail -1 >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
