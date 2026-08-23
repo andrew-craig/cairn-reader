@@ -37,11 +37,11 @@ type ArticleRepositoryInterface interface {
 	// articles.recommends. Both writes happen in one transaction, so a
 	// failure can never leave the recommendations row and the recommends
 	// counter permanently disagreeing — either both land or neither does,
-	// and a retry is always safe. Returns recorded=true only when this
-	// call performed both writes; recorded=false when the pair was
-	// already recorded (ON CONFLICT DO NOTHING short-circuits before the
-	// counter is touched) or the article does not exist (the insert's
-	// foreign key check fails).
+	// and a retry is always safe. Returns recorded=false with a nil error
+	// when the pair was already recorded (ON CONFLICT DO NOTHING
+	// short-circuits before the counter is touched). Returns
+	// recorded=false with a non-nil error if the article does not exist
+	// (the insert's foreign key check fails) or any other write fails.
 	RecordShown(ctx context.Context, userID string, articleID string) (recorded bool, err error)
 
 	// Search returns non-deleted articles whose title, description, or author
