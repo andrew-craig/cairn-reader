@@ -39,7 +39,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_a7b6** · P2 · open · [Audit/Tier 3] Collapse the five near-identical fetch-outcome recording blocks in explore/fetcher FetchSingleFeed  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_ca2d** · P2 · open · [Audit/Tier 4] Consolidate mobile's two private fetchWithAuth copies onto mobile's own AuthService  (parent: epic_fefa)
-- **task_d910** · P2 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
@@ -68,6 +67,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_9688** · P3 · open · [Audit/Tier 3] Replace the 43 errors.Is branches in the users handlers with one ordered sentinel table  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
+- **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
 - **task_de6d** · P3 · open · [Audit/Tier 4] Deduplicate web's transformToArticle / transformDetailToArticle — they differ on one line  (parent: epic_fefa)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
