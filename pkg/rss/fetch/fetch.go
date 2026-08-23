@@ -26,6 +26,21 @@ const (
 	DefaultMaxBodySize int64 = 5 * 1024 * 1024 // 5 MB
 )
 
+// NewTransport returns an *http.Transport wired to the SSRF-safe guarded
+// dialer (DialContext), with the same connection-pooling defaults Fetch
+// itself uses. Callers that need an http.Client Fetch doesn't provide for
+// (different redirect handling, no conditional-GET headers, a different
+// timeout) must build that client's Transport from this function instead of
+// constructing their own &http.Transport{} — a hand-rolled transport has no
+// DialContext, so it silently loses the guard.
+func NewTransport() *http.Transport {
+	return &http.Transport{
+		MaxIdleConnsPerHost: maxIdlePerHost,
+		IdleConnTimeout:     idleConnTimeout,
+		DialContext:         DialContext,
+	}
+}
+
 // sharedClient is the single http.Client used by all Fetch calls. The
 // transport is tuned for concurrent multi-feed use.
 var sharedClient = &http.Client{
@@ -36,11 +51,7 @@ var sharedClient = &http.Client{
 		}
 		return nil
 	},
-	Transport: &http.Transport{
-		MaxIdleConnsPerHost: maxIdlePerHost,
-		IdleConnTimeout:     idleConnTimeout,
-		DialContext:         DialContext,
-	},
+	Transport: NewTransport(),
 }
 
 // FetchOpts configures conditional-GET headers and resource limits for a Fetch call.
