@@ -448,17 +448,17 @@ func (r *articleRepository) RecordShown(ctx context.Context, userID string, arti
 		return false, nil
 	}
 
+	// The insert above already proved the article exists: its foreign key
+	// check takes a FOR KEY SHARE lock on the article row for the rest of
+	// this transaction, so this UPDATE is guaranteed to affect exactly
+	// one row.
 	incrementQuery := `
 		UPDATE articles
 		SET recommends = recommends + 1
 		WHERE id = $1
 	`
-	incrementResult, err := tx.Exec(ctx, incrementQuery, articleID)
-	if err != nil {
+	if _, err := tx.Exec(ctx, incrementQuery, articleID); err != nil {
 		return false, fmt.Errorf("failed to increment recommend count: %w", err)
-	}
-	if incrementResult.RowsAffected() == 0 {
-		return false, apperrors.ErrArticleNotFound
 	}
 
 	if err := tx.Commit(ctx); err != nil {

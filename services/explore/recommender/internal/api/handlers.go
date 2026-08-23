@@ -233,15 +233,11 @@ func (s *Server) handleMarkShown(w http.ResponseWriter, r *http.Request) {
 		}
 		wasRecorded, err := s.articleRepo.RecordShown(r.Context(), userID, articleID)
 		if err != nil {
-			if errors.Is(err, apperrors.ErrArticleNotFound) {
-				slog.Warn("shown article not found, skipping",
-					slog.String("article_id", articleID),
-					slog.String("user_id", userID))
-				continue
-			}
-			// The recommendations row and the recommends counter are
-			// written in one transaction, so a failure here leaves neither
-			// write in place — safe to retry on a later call.
+			// Covers both an unknown article ID (the insert's foreign key
+			// check fails) and any other transient failure. The
+			// recommendations row and the recommends counter are written
+			// in one transaction, so a failure here leaves neither write
+			// in place — safe to retry on a later call.
 			slog.Warn("failed to record shown article",
 				slog.String("article_id", articleID),
 				slog.String("user_id", userID),

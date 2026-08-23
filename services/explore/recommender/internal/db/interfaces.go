@@ -40,8 +40,8 @@ type ArticleRepositoryInterface interface {
 	// and a retry is always safe. Returns recorded=true only when this
 	// call performed both writes; recorded=false when the pair was
 	// already recorded (ON CONFLICT DO NOTHING short-circuits before the
-	// counter is touched). Returns apperrors.ErrArticleNotFound if the
-	// article does not exist.
+	// counter is touched) or the article does not exist (the insert's
+	// foreign key check fails).
 	RecordShown(ctx context.Context, userID string, articleID string) (recorded bool, err error)
 
 	// Search returns non-deleted articles whose title, description, or author
