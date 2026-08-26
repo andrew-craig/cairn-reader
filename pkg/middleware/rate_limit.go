@@ -61,20 +61,16 @@ func (rl *RateLimiter) cleanupLoop() {
 
 // allow checks if a request should be allowed.
 func (rl *RateLimiter) allow(key string) bool {
-	rl.mu.RLock()
+	rl.mu.Lock()
 	b, exists := rl.requests[key]
-	rl.mu.RUnlock()
-
 	if !exists {
 		b = &bucket{
-			tokens:     rl.limit - 1,
+			tokens:     rl.limit,
 			lastRefill: time.Now(),
 		}
-		rl.mu.Lock()
 		rl.requests[key] = b
-		rl.mu.Unlock()
-		return true
 	}
+	rl.mu.Unlock()
 
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -2,14 +2,14 @@
 id: task_4a81
 title: [Audit/Tier 1] Rate limiter bypass on the auth endpoints: check-then-act insert lets N concurrent first requests through
 type: task
-status: open
+status: closed
 priority: 1
 labels: [quality,security,audit]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T10:12:41Z
-updated_at: 2026-08-23T22:43:27Z
+updated_at: 2026-08-26T08:05:22Z
 ---
 **Source:** Cairn Simplification Audit (read-only pass at HEAD `a6c56a1`, 2026-08-16) — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR. Re-verify before fixing — all file:line references below were confirmed at `a6c56a1`.
@@ -51,3 +51,12 @@ That is exactly the attack the race reopens: an attacker who fires concurrently 
 ## Notes
 - `RateLimitRedis` (`pkg/middleware/rate_limit_redis.go`) is a separate sliding-window implementation for multi-instance deploys and is **not** what the users router wires. Don't conflate them; don't 'fix' this by swapping the router to Redis.
 - **Blocked by task_f927** — the test lives in `pkg/middleware`, which no CI job currently reaches, so without that job this fix cannot be ratcheted.
+
+## Review
+Re-verified on current `main`: `(*RateLimiter).allow` still split the counter across an `RLock` check and a separate `Lock` insert, exactly as described (lines 63-96). `task_f927` is closed, so the `pkg/middleware` CI job now exists and this fix is ratcheted.
+
+Added `TestRateLimiter/concurrent_first_requests_on_a_cold_key_are_accounted_exactly_once`: 200 goroutines released simultaneously via a start barrier hit `allow` on the same cold key, across 20 trials; asserts exactly `limit` succeed per trial. Reliably failed on main (observed 11-24 allowed per trial instead of 10, across every run) — reproduces the finding, not a setup/compile issue.
+
+Fix: collapsed the two critical sections into one `rl.mu.Lock()` that does the get-or-create; a newly created bucket starts at `tokens: rl.limit` (not `limit - 1`) and falls through to the existing per-bucket accounting/decrement logic under `b.mu`, so the first-request token spend is now serialized through the same path as every subsequent request instead of being an unaccounted side effect of insertion. No consumer or router change needed, per the task's constraint.
+
+Verified: new test passes reliably (10/10 runs, `-race -count=10`); full `pkg/middleware` suite green under `-race`; `gofmt -l .` clean; `go vet ./...` clean; `golangci-lint run ./...` shows the same 6 pre-existing `errcheck` findings as main (none introduced by this change, none in changed lines); `services/users` builds cleanly against the fixed package.
