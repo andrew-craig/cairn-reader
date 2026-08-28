@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -75,6 +76,46 @@ func TestRateLimiter(t *testing.T) {
 		}
 
 		wg.Wait()
+	})
+
+	t.Run("concurrent first requests on a cold key are accounted exactly once", func(t *testing.T) {
+		const limit = 10
+		const goroutines = 200
+		const trials = 20
+
+		for trial := 0; trial < trials; trial++ {
+			rl := NewRateLimiter(limit, 1*time.Minute)
+			key := fmt.Sprintf("cold-key-%d", trial)
+
+			var wg sync.WaitGroup
+			var ready sync.WaitGroup
+			start := make(chan struct{})
+			var mu sync.Mutex
+			allowed := 0
+
+			ready.Add(goroutines)
+			for i := 0; i < goroutines; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					ready.Done()
+					<-start
+					if rl.allow(key) {
+						mu.Lock()
+						allowed++
+						mu.Unlock()
+					}
+				}()
+			}
+
+			ready.Wait()
+			close(start)
+			wg.Wait()
+
+			if allowed != limit {
+				t.Fatalf("trial %d: expected exactly %d requests to be allowed, got %d", trial, limit, allowed)
+			}
+		}
 	})
 }
 

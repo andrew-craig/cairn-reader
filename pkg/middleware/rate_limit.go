@@ -66,14 +66,16 @@ func (rl *RateLimiter) allow(key string) bool {
 	rl.mu.RUnlock()
 
 	if !exists {
-		b = &bucket{
-			tokens:     rl.limit - 1,
-			lastRefill: time.Now(),
-		}
 		rl.mu.Lock()
-		rl.requests[key] = b
+		b, exists = rl.requests[key]
+		if !exists {
+			b = &bucket{
+				tokens:     rl.limit,
+				lastRefill: time.Now(),
+			}
+			rl.requests[key] = b
+		}
 		rl.mu.Unlock()
-		return true
 	}
 
 	b.mu.Lock()
