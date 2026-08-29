@@ -551,10 +551,23 @@ func TestAuthService_RefreshAccessToken(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		// Sentinel bug: RefreshAccessToken compared the returned error against
+		// apperrors.ErrTokenExpired, but ValidateAndRotateToken actually returns
+		// auth.ErrTokenExpired - a different sentinel from a different package.
+		// The branch never matched, so routine expiry fell through to the
+		// "unexpected error" ERROR log, defeating error-rate monitoring.
+		var buf bytes.Buffer
+		logger := slog.New(slog.NewJSONHandler(&buf, nil))
+		prevDefault := slog.Default()
+		slog.SetDefault(logger)
+
 		// Try to refresh with expired token
 		resp, err := service.RefreshAccessToken(ctx, registerResp.RefreshToken, "", "")
+		slog.SetDefault(prevDefault)
 		assert.Error(t, err)
 		assert.Nil(t, resp)
+		assert.NotContains(t, buf.String(), `"level":"ERROR"`,
+			"routine token expiry must not log at ERROR")
 	})
 
 	// Guards against C3: replaying a refresh token *after* it has already

@@ -722,6 +722,39 @@ func TestRefresh(t *testing.T) {
 		assert.NotEqual(t, registerResp.RefreshToken, resp.RefreshToken)
 	})
 
+	t.Run("Expired token returns 401", func(t *testing.T) {
+		expiredEmail := "refresh-expired@example.com"
+		expiredBody, _ := json.Marshal(RegisterRequest{Email: expiredEmail, Password: password})
+
+		expiredRegReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewBuffer(expiredBody))
+		expiredRegReq.Header.Set("Content-Type", "application/json")
+		expiredRegW := httptest.NewRecorder()
+		handler.Register(expiredRegW, expiredRegReq)
+		require.Equal(t, http.StatusCreated, expiredRegW.Code)
+
+		expiredRegisterResp := decodeAuthResponse(t, expiredRegW.Body.Bytes())
+		defer cleanupTestUser(t, db, expiredRegisterResp.User.ID)
+
+		_, err := db.Pool.Exec(context.Background(),
+			"UPDATE refresh_tokens SET expires_at = $1 WHERE user_id = $2",
+			time.Now().UTC().Add(-1*time.Hour),
+			expiredRegisterResp.User.ID,
+		)
+		require.NoError(t, err)
+
+		refreshBody := RefreshRequest{RefreshToken: expiredRegisterResp.RefreshToken}
+		body, _ := json.Marshal(refreshBody)
+
+		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		handler.Refresh(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		assert.Contains(t, w.Body.String(), "refresh token has expired")
+	})
+
 	t.Run("Invalid JSON body", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString("invalid"))
 		req.Header.Set("Content-Type", "application/json")

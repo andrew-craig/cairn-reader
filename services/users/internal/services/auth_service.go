@@ -23,6 +23,9 @@ var (
 	// ErrInvalidCredentials is returned when login credentials are incorrect
 	ErrInvalidCredentials = errors.New("invalid credentials")
 
+	// ErrRefreshTokenExpired is returned when a refresh token has expired
+	ErrRefreshTokenExpired = errors.New("refresh token expired")
+
 	// ErrAccountExists is returned when attempting to register with an existing email or device ID
 	ErrAccountExists = errors.New("account already exists")
 
@@ -414,11 +417,11 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 			slog.Warn("refresh token validation: token not found")
 			return nil, ErrInvalidCredentials
 		}
-		if errors.Is(err, apperrors.ErrTokenExpired) {
+		if errors.Is(err, auth.ErrTokenExpired) {
 			slog.Warn("refresh token validation: token expired",
 				slog.String("error", err.Error()),
 			)
-			return nil, fmt.Errorf("refresh token expired: %w", err)
+			return nil, ErrRefreshTokenExpired
 		}
 		slog.Error("refresh token validation: unexpected error",
 			slog.String("error", err.Error()),
