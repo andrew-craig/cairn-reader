@@ -49,7 +49,8 @@ Read the following documentation as necessary for each task. do not read a docum
 Each service has an OpenAPI spec and endpoint documentation in its CLAUDE.md:
 - [services/explore/api/openapi.yaml](/services/explore/api/openapi.yaml)
 - [services/users/api/openapi.yaml](/services/users/api/openapi.yaml)
-- [services/read/api/openapi.yaml](/services/read/api/openapi.yaml)
+- [services/read/content/api/openapi.yaml](/services/read/content/api/openapi.yaml)
+- [services/read/fetcher/api/openapi.yaml](/services/read/fetcher/api/openapi.yaml)
 - [services/read/email/api/openapi.yaml](/services/read/email/api/openapi.yaml)
 
 All services use `/health/live` (liveness) and `/health/ready` (readiness) for health checks.
