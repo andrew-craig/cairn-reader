@@ -175,7 +175,7 @@ services:
       # precedence; otherwise the service downloads FEED_LIST_URL (the
       # repository's default curated list) at startup.
       - FEED_LIST_PATH=/app/feeds/feeds.txt
-      - FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+      - FEED_LIST_URL=https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     # To override with a local feed list, add a volumes: entry such as:
     #   volumes:

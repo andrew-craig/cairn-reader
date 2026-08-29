@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/models"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/google/uuid"
 )
 

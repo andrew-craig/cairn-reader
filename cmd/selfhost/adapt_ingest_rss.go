@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	rssMigrations "github.com/cairn-app/cairn-reader/services/read/fetcher/migrations"
-	rssSelfhost "github.com/cairn-app/cairn-reader/services/read/fetcher/selfhost"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	rssMigrations "github.com/andrew-craig/cairn-reader/services/read/fetcher/migrations"
+	rssSelfhost "github.com/andrew-craig/cairn-reader/services/read/fetcher/selfhost"
 )
 
 func runRSSMigrations(cfg *Config) error {

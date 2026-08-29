@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	contentMigrations "github.com/cairn-app/cairn-reader/services/read/content/migrations"
-	contentSelfhost "github.com/cairn-app/cairn-reader/services/read/content/selfhost"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	contentMigrations "github.com/andrew-craig/cairn-reader/services/read/content/migrations"
+	contentSelfhost "github.com/andrew-craig/cairn-reader/services/read/content/selfhost"
 )
 
 func runContentMigrations(cfg *Config) error {

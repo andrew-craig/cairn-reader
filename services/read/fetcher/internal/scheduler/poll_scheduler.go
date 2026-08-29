@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/worker"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/worker"
 	"github.com/google/uuid"
 )
 

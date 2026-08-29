@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	recMigrations "github.com/cairn-app/cairn-reader/services/explore/recommender/migrations"
-	recSelfhost "github.com/cairn-app/cairn-reader/services/explore/recommender/selfhost"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	recMigrations "github.com/andrew-craig/cairn-reader/services/explore/recommender/migrations"
+	recSelfhost "github.com/andrew-craig/cairn-reader/services/explore/recommender/selfhost"
 )
 
 func runRecommenderMigrations(cfg *Config) error {

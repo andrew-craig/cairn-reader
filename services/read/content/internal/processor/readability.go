@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/readability"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/readability"
 )
 
 // ReadabilityProcessor provides HTML content extraction and cleaning

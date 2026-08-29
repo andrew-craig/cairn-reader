@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/models"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 )

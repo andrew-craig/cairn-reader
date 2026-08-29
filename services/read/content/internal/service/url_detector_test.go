@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch/fetchtest"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 )
 
 // TestNewURLDetector_UsesGuardedDialer proves the detector's HTTP client is

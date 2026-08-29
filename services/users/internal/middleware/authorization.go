@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

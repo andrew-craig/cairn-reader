@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/parse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

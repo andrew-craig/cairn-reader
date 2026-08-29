@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	recAPI "github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/cleanup"
-	recDB "github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	recAPI "github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/api"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/cleanup"
+	recDB "github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
+	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

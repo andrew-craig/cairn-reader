@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/processor"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/service"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/processor"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/service"
 	"github.com/google/uuid"
 )
 

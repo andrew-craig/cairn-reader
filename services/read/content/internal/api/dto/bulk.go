@@ -9,8 +9,8 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/google/uuid"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/processor"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/processor"
 )
 
 // validContentURL accepts standard HTTP/HTTPS URLs and the email:// scheme used

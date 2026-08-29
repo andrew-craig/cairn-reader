@@ -1,7 +1,7 @@
 package processor
 
 import (
-	"github.com/cairn-app/cairn-reader/pkg/rss/sanitize"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/sanitize"
 )
 
 // HTMLSanitizer provides HTML sanitization functionality

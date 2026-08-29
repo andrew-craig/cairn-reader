@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/cairn-app/cairn-reader/services/users/test/integration/testutil"
+	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
+	"github.com/andrew-craig/cairn-reader/services/users/test/integration/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

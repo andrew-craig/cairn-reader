@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
 )
 
 func main() {

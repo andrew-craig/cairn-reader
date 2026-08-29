@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/dto"
 )
 
 // WriteError writes a JSON error response

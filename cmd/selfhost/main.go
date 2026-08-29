@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )

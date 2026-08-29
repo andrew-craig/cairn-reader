@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/readability"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/readability"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

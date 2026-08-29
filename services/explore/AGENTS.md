@@ -766,7 +766,7 @@ DB_USER=fetcher                    # Database user
 DB_PASSWORD=fetcher_password       # Database password
 DB_NAME=fetcher_db                 # Database name
 FEED_LIST_PATH=/app/feeds/feeds.txt   # Mount your own list here to override the default
-FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+FEED_LIST_URL=https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt
 INTERNAL_API_KEY=...                  # Required; validates X-Internal-API-Key on manual triggers, and sent to the recommender's article-submission endpoint
 ```
 Note: the 30-second per-fetch HTTP timeout and the 10-consecutive-failure auto-disable

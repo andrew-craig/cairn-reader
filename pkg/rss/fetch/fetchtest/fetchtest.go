@@ -10,7 +10,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
 )
 
 // AllowLoopback returns a context that permits the guarded dialer to dial

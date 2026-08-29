@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch/fetchtest"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

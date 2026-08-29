@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	emailMigrations "github.com/cairn-app/cairn-reader/services/read/email/migrations"
-	emailSelfhost "github.com/cairn-app/cairn-reader/services/read/email/selfhost"
+	emailMigrations "github.com/andrew-craig/cairn-reader/services/read/email/migrations"
+	emailSelfhost "github.com/andrew-craig/cairn-reader/services/read/email/selfhost"
 )
 
 func runEmailMigrations(cfg *Config) error {

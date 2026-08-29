@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	fetcherMigrations "github.com/cairn-app/cairn-reader/services/explore/fetcher/migrations"
-	fetcherSelfhost "github.com/cairn-app/cairn-reader/services/explore/fetcher/selfhost"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	fetcherMigrations "github.com/andrew-craig/cairn-reader/services/explore/fetcher/migrations"
+	fetcherSelfhost "github.com/andrew-craig/cairn-reader/services/explore/fetcher/selfhost"
 )
 
 func runFetcherMigrations(cfg *Config) error {

@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"time"
 
-	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
-	userAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	userDB "github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/cairn-app/cairn-reader/services/users/internal/handlers"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
+	userAuth "github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	userDB "github.com/andrew-craig/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/handlers"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 
 	"github.com/go-chi/chi/v5"
 )

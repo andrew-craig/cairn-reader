@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 )
 
 // Recovery creates a production-safe recovery middleware that:

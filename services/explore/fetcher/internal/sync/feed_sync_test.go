@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
 )
 
 func TestSyncFeeds_Success(t *testing.T) {

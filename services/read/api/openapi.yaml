@@ -27,7 +27,7 @@ info:
     4. Users can manage their reading list and metadata
   contact:
     name: Cairn API Support
-    url: https://github.com/cairn-app/cairn-reader
+    url: https://github.com/andrew-craig/cairn-reader
   license:
     name: MIT
 

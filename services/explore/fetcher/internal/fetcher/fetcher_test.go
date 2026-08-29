@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/models"
-	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/parse"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
 )
 
 // Mock recommender client for testing

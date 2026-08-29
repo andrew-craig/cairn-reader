@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

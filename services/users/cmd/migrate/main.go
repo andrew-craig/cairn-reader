@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/cairn-app/cairn-reader/services/users/internal/config"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/config"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 	"github.com/joho/godotenv"
 )
 

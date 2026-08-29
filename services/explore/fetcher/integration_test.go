@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/client"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
 )
 
 // TestEndToEndFlow tests the complete fetcher workflow:

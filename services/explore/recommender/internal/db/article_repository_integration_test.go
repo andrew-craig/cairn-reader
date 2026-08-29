@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/models"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/testutil"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

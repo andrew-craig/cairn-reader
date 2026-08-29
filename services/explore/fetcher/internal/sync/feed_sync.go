@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
 )
 
 // FeedSyncer loads feed URLs from a curated list and imports them into

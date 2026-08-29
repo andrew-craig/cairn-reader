@@ -1,15 +1,15 @@
-module github.com/cairn-app/cairn-reader/services/read
+module github.com/andrew-craig/cairn-reader/services/read
 
 go 1.25.12
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/cairn-app/cairn-reader/pkg/api v0.0.0
-	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0
-	github.com/cairn-app/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0
-	github.com/cairn-app/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/api v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/auth v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/logging v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -63,14 +63,14 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging
+replace github.com/andrew-craig/cairn-reader/pkg/logging => ../../pkg/logging
 
-replace github.com/cairn-app/cairn-reader/pkg/api => ../../pkg/api
+replace github.com/andrew-craig/cairn-reader/pkg/api => ../../pkg/api
 
-replace github.com/cairn-app/cairn-reader/pkg/config => ../../pkg/config
+replace github.com/andrew-craig/cairn-reader/pkg/config => ../../pkg/config
 
-replace github.com/cairn-app/cairn-reader/pkg/auth => ../../pkg/auth
+replace github.com/andrew-craig/cairn-reader/pkg/auth => ../../pkg/auth
 
-replace github.com/cairn-app/cairn-reader/pkg/middleware => ../../pkg/middleware
+replace github.com/andrew-craig/cairn-reader/pkg/middleware => ../../pkg/middleware
 
-replace github.com/cairn-app/cairn-reader/pkg/rss => ../../pkg/rss
+replace github.com/andrew-craig/cairn-reader/pkg/rss => ../../pkg/rss

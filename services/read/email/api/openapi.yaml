@@ -18,7 +18,7 @@ info:
     4. Worker cleans HTML (tracking pixels, footers), sanitises, and delivers to Content Service
   contact:
     name: Cairn API Support
-    url: https://github.com/cairn-app/cairn-reader
+    url: https://github.com/andrew-craig/cairn-reader
   license:
     name: MIT
 

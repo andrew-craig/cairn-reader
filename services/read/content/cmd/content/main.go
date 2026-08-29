@@ -18,11 +18,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/config"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/config"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/database"
 	"github.com/joho/godotenv"
 )
 

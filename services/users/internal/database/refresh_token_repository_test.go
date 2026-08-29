@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
+	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

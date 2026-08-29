@@ -15,7 +15,7 @@ import (
 // UserAgent is the canonical User-Agent for all Cairn RSS-ingestion HTTP
 // traffic. It identifies the bot and provides a contact/info URL.
 // Do not override this per-call; extend Fetch's options if needed.
-const UserAgent = "CairnBot/1.0 (+https://github.com/cairn-app/cairn-reader)"
+const UserAgent = "CairnBot/1.0 (+https://github.com/andrew-craig/cairn-reader)"
 
 const (
 	defaultTimeout  = 30 * time.Second

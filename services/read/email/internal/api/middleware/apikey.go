@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/repository"
 )
 
 const (

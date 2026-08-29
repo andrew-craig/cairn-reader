@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	fetcherAPI "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/api"
-	fetcherClient "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
-	fetcherDB "github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	fetcherAPI "github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/api"
+	fetcherClient "github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/client"
+	fetcherDB "github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
 	"github.com/go-chi/chi/v5"
 )
 

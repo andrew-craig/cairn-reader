@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
 )
 
 // OutboxCleanupJobConfig holds configuration for the outbox cleanup job

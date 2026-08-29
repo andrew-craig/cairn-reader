@@ -27,7 +27,7 @@ services/explore/pkg/models/doc.go                    4
 services/explore/pkg/models/feed.go                  29
                                              total   98 lines
 ```
-**Zero importers** — `grep -rn 'explore/pkg/models' --include=*.go .` returns nothing. Every real consumer imports the root package `github.com/cairn-app/cairn-reader/pkg/models` (services/explore/fetcher/internal/{fetcher,client,db,api}, services/explore/recommender/…).
+**Zero importers** — `grep -rn 'explore/pkg/models' --include=*.go .` returns nothing. Every real consumer imports the root package `github.com/andrew-craig/cairn-reader/pkg/models` (services/explore/fetcher/internal/{fetcher,client,db,api}, services/explore/recommender/…).
 
 ## Why it is a trap, not just clutter
 Its `feed.go` is **stale**: 29 lines against the live `pkg/models/feed.go`'s 31, and the two missing fields are exactly the ones the conditional-GET path depends on:
