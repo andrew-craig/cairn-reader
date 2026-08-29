@@ -37,9 +37,6 @@ type ContentRepository interface {
 	// DeleteOrphaned deletes up to batchSize orphaned content rows older than the specified duration
 	DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 
-	// List retrieves content records with pagination
-	List(ctx context.Context, limit, offset int) ([]*models.Content, error)
-
 	// GetByContentHashesAndFeedID retrieves multiple contents by their hashes and feed ID (for bulk deduplication)
 	GetByContentHashesAndFeedID(ctx context.Context, contentHashes []string, feedID uuid.UUID) (map[string]*models.Content, error)
 
@@ -451,58 +448,6 @@ func (r *contentRepository) DeleteOrphaned(ctx context.Context, olderThan time.D
 	}
 
 	return rowsAffected, nil
-}
-
-// List retrieves content records with pagination
-func (r *contentRepository) List(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	query := `
-		SELECT
-			id, content_hash, cleaned_html, original_url, canonical_url,
-			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
-		FROM contents
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list contents: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var contents []*models.Content
-	for rows.Next() {
-		content := &models.Content{}
-		err := rows.Scan(
-			&content.ID,
-			&content.ContentHash,
-			&content.CleanedHTML,
-			&content.OriginalURL,
-			&content.CanonicalURL,
-			&content.Title,
-			&content.Author,
-			&content.PublishedAt,
-			&content.Description,
-			&content.ImageURLs,
-			&content.SourceType,
-			&content.SourceFeedID,
-			&content.Metadata,
-			&content.CreatedAt,
-			&content.UpdatedAt,
-			&content.OrphanedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan content: %w", err)
-		}
-		contents = append(contents, content)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating content rows: %w", err)
-	}
-
-	return contents, nil
 }
 
 // GetByContentHashesAndFeedID retrieves multiple contents by their hashes and feed ID (for bulk deduplication)

@@ -30,9 +30,6 @@ type ContentService interface {
 	// CheckDuplicate checks if content already exists by content hash and feed ID
 	CheckDuplicate(ctx context.Context, contentHash string, feedID uuid.UUID) (*models.Content, error)
 
-	// ListContents retrieves contents with pagination
-	ListContents(ctx context.Context, limit, offset int) ([]*models.Content, error)
-
 	// BulkCreateFromHTML processes multiple raw HTML contents and stores them
 	BulkCreateFromHTML(ctx context.Context, items []BulkContentItem) ([]*models.Content, []BulkCreateError, error)
 
@@ -269,11 +266,6 @@ func (s *contentService) UpdateContent(ctx context.Context, id uuid.UUID, url st
 // CheckDuplicate checks if content already exists by content hash and feed ID
 func (s *contentService) CheckDuplicate(ctx context.Context, contentHash string, feedID uuid.UUID) (*models.Content, error) {
 	return s.contentRepo.GetByContentHashAndFeedID(ctx, contentHash, feedID)
-}
-
-// ListContents retrieves contents with pagination
-func (s *contentService) ListContents(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	return s.contentRepo.List(ctx, limit, offset)
 }
 
 // BulkCreateFromHTML processes multiple raw HTML contents and stores them

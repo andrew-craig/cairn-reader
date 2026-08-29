@@ -70,14 +70,6 @@ func (m *MockContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, co
 	return args.Error(0)
 }
 
-func (m *MockContentRepository) List(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	args := m.Called(ctx, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.Content), args.Error(1)
-}
-
 func (m *MockContentRepository) BulkCreate(ctx context.Context, contents []*models.Content) error {
 	args := m.Called(ctx, contents)
 	return args.Error(0)
@@ -364,29 +356,6 @@ func TestCheckDuplicate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, content)
 	assert.Equal(t, contentHash, content.ContentHash)
-	mockRepo.AssertExpectations(t)
-}
-
-// TestListContents tests content listing with pagination
-func TestListContents(t *testing.T) {
-	mockRepo := new(MockContentRepository)
-	service := NewContentService(mockRepo, &sql.DB{})
-
-	ctx := context.Background()
-	limit := 20
-	offset := 0
-
-	expectedContents := []*models.Content{
-		{ID: uuid.New(), Title: "Article 1"},
-		{ID: uuid.New(), Title: "Article 2"},
-	}
-
-	mockRepo.On("List", ctx, limit, offset).Return(expectedContents, nil)
-
-	contents, err := service.ListContents(ctx, limit, offset)
-
-	assert.NoError(t, err)
-	assert.Len(t, contents, 2)
 	mockRepo.AssertExpectations(t)
 }
 

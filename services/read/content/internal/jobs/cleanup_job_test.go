@@ -64,14 +64,6 @@ func (m *MockContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, co
 	return args.Error(0)
 }
 
-func (m *MockContentRepository) List(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	args := m.Called(ctx, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.Content), args.Error(1)
-}
-
 func (m *MockContentRepository) GetByContentHashesAndFeedID(ctx context.Context, contentHashes []string, feedID uuid.UUID) (map[string]*models.Content, error) {
 	args := m.Called(ctx, contentHashes, feedID)
 	if args.Get(0) == nil {
