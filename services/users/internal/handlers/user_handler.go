@@ -7,7 +7,6 @@ import (
 
 	"github.com/andrew-craig/cairn-reader/pkg/api"
 	"github.com/andrew-craig/cairn-reader/pkg/auth"
-	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/validation"
 	"github.com/go-chi/chi/v5"
@@ -64,15 +63,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	// Get user (service layer handles authorization)
 	user, err := h.userService.GetUser(r.Context(), requestingUserID, targetUserID)
 	if err != nil {
-		if errors.Is(err, services.ErrUnauthorized) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only access your own user data", nil, "v1")
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to retrieve user", nil, "v1")
+		writeServiceError(w, err, "failed to retrieve user")
 		return
 	}
 
@@ -128,23 +119,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Update user (service layer handles authorization)
 	user, err := h.userService.UpdateUser(r.Context(), requestingUserID, targetUserID, req.Email)
 	if err != nil {
-		if errors.Is(err, services.ErrUnauthorized) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only update your own user data", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrAccountExists) {
-			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to update user", nil, "v1")
+		writeServiceError(w, err, "failed to update user")
 		return
 	}
 
@@ -210,31 +185,7 @@ func (h *UserHandler) UpgradeAccount(w http.ResponseWriter, r *http.Request) {
 		req.Password,
 	)
 	if err != nil {
-		if errors.Is(err, services.ErrUnauthorized) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only upgrade your own account", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrNotMobileAccount) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "account is not a mobile-only account", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrAccountExists) {
-			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrWeakPassword) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to upgrade account", nil, "v1")
+		writeServiceError(w, err, "failed to upgrade account")
 		return
 	}
 
@@ -282,31 +233,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Change password (service layer handles authorization and validation)
 	err = h.userService.ChangePassword(r.Context(), requestingUserID, targetUserID, req.CurrentPassword, req.NewPassword)
 	if err != nil {
-		if errors.Is(err, services.ErrUnauthorized) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only change your own password", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrIncorrectPassword) {
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "current password is incorrect", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrNoPassword) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "account does not have a password", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrWeakPassword) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to change password", nil, "v1")
+		writeServiceError(w, err, "failed to change password")
 		return
 	}
 
@@ -336,15 +263,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Delete user (service layer handles authorization)
 	err = h.userService.DeleteUser(r.Context(), requestingUserID, targetUserID)
 	if err != nil {
-		if errors.Is(err, services.ErrUnauthorized) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "you can only delete your own account", nil, "v1")
-			return
-		}
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to delete user", nil, "v1")
+		writeServiceError(w, err, "failed to delete user")
 		return
 	}
 

@@ -26,6 +26,10 @@ var (
 	// ErrRefreshTokenExpired is returned when a refresh token has expired
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 
+	// ErrTokenReused is returned when a rotated (already-revoked) refresh token
+	// is replayed. The whole token family is revoked as a side effect.
+	ErrTokenReused = errors.New("token reuse detected")
+
 	// ErrAccountExists is returned when attempting to register with an existing email or device ID
 	ErrAccountExists = errors.New("account already exists")
 
@@ -411,7 +415,7 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 				slog.String("ip", ipAddress),
 				slog.String("user_agent", deviceInfo),
 			)
-			return nil, fmt.Errorf("token reuse detected: %w", err)
+			return nil, fmt.Errorf("%w: %w", ErrTokenReused, err)
 		}
 		if errors.Is(err, auth.ErrRefreshTokenNotFound) {
 			slog.Warn("refresh token validation: token not found")

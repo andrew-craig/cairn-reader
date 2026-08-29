@@ -392,7 +392,7 @@ paths:
                     error: "token reuse detected - all tokens have been revoked"
                 invalid:
                   value:
-                    error: "invalid or expired refresh token"
+                    error: "invalid credentials"
         '413':
           description: Request body too large (max 16KB)
           content:
