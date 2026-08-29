@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/env"
+	"github.com/andrew-craig/cairn-reader/pkg/env"
 )
 
 // Config holds all configuration for the user service

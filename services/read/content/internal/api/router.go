@@ -5,14 +5,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/handlers"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/database"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/handlers"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

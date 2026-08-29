@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
 )
 
 // RecommendationService handles article recommendations

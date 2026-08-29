@@ -9,13 +9,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/models"
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
-	"github.com/cairn-app/cairn-reader/pkg/rss/hash"
-	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
-	"github.com/cairn-app/cairn-reader/pkg/rss/sanitize"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/hash"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/parse"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/sanitize"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/client"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
 )
 
 // Fetcher handles RSS feed fetching and article submission.

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
+	sharedconfig "github.com/andrew-craig/cairn-reader/pkg/config"
 )
 
 // VaultConfig contains HashiCorp Vault configuration

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
 )
 
 // FeedWorkerConfig holds configuration for the feed worker pool

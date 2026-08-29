@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
 )
 
 func TestGetNextFeed_PrioritizesNeverFetched(t *testing.T) {

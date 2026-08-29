@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cairn-app/cairn-reader/pkg/api"
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/cairn-app/cairn-reader/services/users/internal/validation"
+	"github.com/andrew-craig/cairn-reader/pkg/api"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/validation"
 )
 
 // AuthHandler handles authentication-related HTTP requests

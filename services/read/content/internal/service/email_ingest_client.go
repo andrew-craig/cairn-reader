@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 )
 
 // EmailSenderInfo represents a single sender from the email ingest service.

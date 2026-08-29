@@ -7,8 +7,8 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/service"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/service"
 	"github.com/google/uuid"
 )
 

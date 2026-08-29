@@ -3,7 +3,7 @@ package dto
 import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 
-	"github.com/cairn-app/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/pkg/models"
 )
 
 // ArticlesRequest represents a batch of articles to be stored

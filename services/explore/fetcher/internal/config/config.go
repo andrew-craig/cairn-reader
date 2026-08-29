@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	sharedconfig "github.com/cairn-app/cairn-reader/pkg/config"
+	sharedconfig "github.com/andrew-craig/cairn-reader/pkg/config"
 )
 
 // DefaultFeedListURL is the canonical location of the feed list maintained
 // in this repository. It's used when no local feed list file is mounted
 // into the container.
-const DefaultFeedListURL = "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"
+const DefaultFeedListURL = "https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt"
 
 // DefaultFeedListPath is the in-container path the service checks for a
 // user-provided feed list. Mount a file here to override the default list.

@@ -1,6 +1,6 @@
 # Cairn Explore - RSS Fetcher and Recommendation Engine
 
-A system for fetching RSS feeds and recommending content to users. These services provide the Explore functionality of the [Cairn App](https://github.com/cairn-app/cairn-reader).
+A system for fetching RSS feeds and recommending content to users. These services provide the Explore functionality of the [Cairn App](https://github.com/andrew-craig/cairn-reader).
 
 ## Architecture
 

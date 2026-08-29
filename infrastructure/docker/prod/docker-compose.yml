@@ -295,7 +295,7 @@ services:
       # service downloads FEED_LIST_URL (the repository's default list)
       # at startup. Mount your own curated list as a volume to override.
       - FEED_LIST_PATH=/app/feeds/feeds.txt
-      - FEED_LIST_URL=https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt
+      - FEED_LIST_URL=https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:

@@ -1,15 +1,15 @@
-module github.com/cairn-app/cairn-reader/services/explore
+module github.com/andrew-craig/cairn-reader/services/explore
 
 go 1.25.12
 
 require (
-	github.com/cairn-app/cairn-reader/pkg/api v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/models v0.0.0-00010101000000-000000000000
-	github.com/cairn-app/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/api v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/config v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/logging v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/models v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/uuid v1.6.0
@@ -33,7 +33,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.1 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/cairn-app/cairn-reader v0.0.0-20260114203311-1fb2f559a019
+	github.com/andrew-craig/cairn-reader v0.0.0-20260114203311-1fb2f559a019
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
@@ -116,19 +116,19 @@ require (
 )
 
 // Use local version of shared cairn packages
-replace github.com/cairn-app/cairn-reader => ../..
+replace github.com/andrew-craig/cairn-reader => ../..
 
 // Use local versions of pkg packages
-replace github.com/cairn-app/cairn-reader/pkg/api => ../../pkg/api
+replace github.com/andrew-craig/cairn-reader/pkg/api => ../../pkg/api
 
-replace github.com/cairn-app/cairn-reader/pkg/auth => ../../pkg/auth
+replace github.com/andrew-craig/cairn-reader/pkg/auth => ../../pkg/auth
 
-replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging
+replace github.com/andrew-craig/cairn-reader/pkg/logging => ../../pkg/logging
 
-replace github.com/cairn-app/cairn-reader/pkg/models => ../../pkg/models
+replace github.com/andrew-craig/cairn-reader/pkg/models => ../../pkg/models
 
-replace github.com/cairn-app/cairn-reader/pkg/config => ../../pkg/config
+replace github.com/andrew-craig/cairn-reader/pkg/config => ../../pkg/config
 
-replace github.com/cairn-app/cairn-reader/pkg/middleware => ../../pkg/middleware
+replace github.com/andrew-craig/cairn-reader/pkg/middleware => ../../pkg/middleware
 
-replace github.com/cairn-app/cairn-reader/pkg/rss => ../../pkg/rss
+replace github.com/andrew-craig/cairn-reader/pkg/rss => ../../pkg/rss

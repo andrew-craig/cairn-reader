@@ -4,7 +4,7 @@ package middleware
 import (
 	"crypto/rsa"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
 )
 
 // JWTAuth provides JWT authentication middleware for user-facing endpoints.

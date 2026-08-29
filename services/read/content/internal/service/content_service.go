@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/processor"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/processor"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )

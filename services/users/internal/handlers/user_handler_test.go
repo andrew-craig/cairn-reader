@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/cairn-app/cairn-reader/services/users/internal/models"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	internalAuth "github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 )
 
 // setupTestUserHandler creates a test user handler with all dependencies

@@ -16,14 +16,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/api"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/client"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/config"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/api"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/client"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/config"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
 )
 
 func main() {

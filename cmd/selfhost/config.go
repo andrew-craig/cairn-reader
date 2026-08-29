@@ -111,7 +111,7 @@ func loadConfig() *Config {
 		BcryptCost:        getEnvInt("BCRYPT_COST", 12),
 
 		FeedListPath:  getEnv("FEED_LIST_PATH", "/data/feeds/feeds.txt"),
-		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
+		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
 		FetchInterval: getEnvDuration("FETCH_INTERVAL", 60*time.Second),
 
 		ArticleRetentionDays: getEnvInt("ARTICLE_RETENTION_DAYS", 90),

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
-	"github.com/cairn-app/cairn-reader/pkg/rss/parse"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/parse"
 	"golang.org/x/net/html"
 )
 

@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/google/uuid"
 )
 

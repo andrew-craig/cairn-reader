@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"time"
 
-	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/fetcher"
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/sync"
+	pkgapi "github.com/andrew-craig/cairn-reader/pkg/api"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
 	"github.com/go-chi/chi/v5"
 )
 

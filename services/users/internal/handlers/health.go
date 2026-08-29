@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 )
 
 // HealthHandler handles health check endpoints

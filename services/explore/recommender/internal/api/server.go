@@ -6,11 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/recommend"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

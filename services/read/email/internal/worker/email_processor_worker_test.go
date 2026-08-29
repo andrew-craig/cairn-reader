@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/processor"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/service"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/processor"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/service"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

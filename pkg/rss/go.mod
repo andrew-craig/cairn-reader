@@ -1,4 +1,4 @@
-module github.com/cairn-app/cairn-reader/pkg/rss
+module github.com/andrew-craig/cairn-reader/pkg/rss
 
 go 1.25.12
 

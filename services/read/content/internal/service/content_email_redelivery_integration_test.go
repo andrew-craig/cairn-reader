@@ -7,8 +7,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	pkgapi "github.com/cairn-app/cairn-reader/pkg/api"
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/api/dto"
+	pkgapi "github.com/andrew-craig/cairn-reader/pkg/api"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/api/dto"
 	"github.com/go-chi/chi/v5"
 )
 

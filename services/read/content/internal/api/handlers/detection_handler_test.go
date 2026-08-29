@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

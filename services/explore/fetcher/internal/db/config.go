@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/env"
+	"github.com/andrew-craig/cairn-reader/pkg/env"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

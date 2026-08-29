@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	contentAPI "github.com/cairn-app/cairn-reader/services/read/content/internal/api"
-	contentDB "github.com/cairn-app/cairn-reader/services/read/content/internal/database"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/jobs"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	contentAPI "github.com/andrew-craig/cairn-reader/services/read/content/internal/api"
+	contentDB "github.com/andrew-craig/cairn-reader/services/read/content/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/jobs"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/robfig/cron/v3"
 )

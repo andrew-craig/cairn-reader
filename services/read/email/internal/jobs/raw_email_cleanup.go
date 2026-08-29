@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/repository"
 )
 
 // defaultRawEmailCleanupBatchSize bounds each DELETE transaction so cleanup

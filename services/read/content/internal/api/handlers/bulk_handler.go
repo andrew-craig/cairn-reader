@@ -5,13 +5,13 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/api"
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/dto"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/api/middleware"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/repository"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/service"
+	"github.com/andrew-craig/cairn-reader/pkg/api"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/service"
 	"github.com/google/uuid"
 )
 

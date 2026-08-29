@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/database"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/database"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 )

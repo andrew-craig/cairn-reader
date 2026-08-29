@@ -1,15 +1,15 @@
-module github.com/cairn-app/cairn-reader/cmd/selfhost
+module github.com/andrew-craig/cairn-reader/cmd/selfhost
 
 go 1.25.12
 
 require (
-	github.com/cairn-app/cairn-reader/pkg/auth v0.0.0
-	github.com/cairn-app/cairn-reader/pkg/logging v0.0.0
-	github.com/cairn-app/cairn-reader/pkg/middleware v0.0.0
-	github.com/cairn-app/cairn-reader/services/explore v0.0.0
-	github.com/cairn-app/cairn-reader/services/read v0.0.0
-	github.com/cairn-app/cairn-reader/services/read/email v0.0.0
-	github.com/cairn-app/cairn-reader/services/users v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/auth v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/logging v0.0.0
+	github.com/andrew-craig/cairn-reader/pkg/middleware v0.0.0
+	github.com/andrew-craig/cairn-reader/services/explore v0.0.0
+	github.com/andrew-craig/cairn-reader/services/read v0.0.0
+	github.com/andrew-craig/cairn-reader/services/read/email v0.0.0
+	github.com/andrew-craig/cairn-reader/services/users v0.0.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/joho/godotenv v1.5.1
 )
@@ -20,10 +20,10 @@ require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/cairn-app/cairn-reader v0.0.0 // indirect
-	github.com/cairn-app/cairn-reader/pkg/api v0.0.0 // indirect
-	github.com/cairn-app/cairn-reader/pkg/models v0.0.0 // indirect
-	github.com/cairn-app/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000 // indirect
+	github.com/andrew-craig/cairn-reader v0.0.0 // indirect
+	github.com/andrew-craig/cairn-reader/pkg/api v0.0.0 // indirect
+	github.com/andrew-craig/cairn-reader/pkg/models v0.0.0 // indirect
+	github.com/andrew-craig/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0 // indirect
@@ -68,26 +68,26 @@ require (
 )
 
 // Local replacements for all modules in the monorepo
-replace github.com/cairn-app/cairn-reader => ../..
+replace github.com/andrew-craig/cairn-reader => ../..
 
-replace github.com/cairn-app/cairn-reader/pkg/api => ../../pkg/api
+replace github.com/andrew-craig/cairn-reader/pkg/api => ../../pkg/api
 
-replace github.com/cairn-app/cairn-reader/pkg/auth => ../../pkg/auth
+replace github.com/andrew-craig/cairn-reader/pkg/auth => ../../pkg/auth
 
-replace github.com/cairn-app/cairn-reader/pkg/config => ../../pkg/config
+replace github.com/andrew-craig/cairn-reader/pkg/config => ../../pkg/config
 
-replace github.com/cairn-app/cairn-reader/pkg/logging => ../../pkg/logging
+replace github.com/andrew-craig/cairn-reader/pkg/logging => ../../pkg/logging
 
-replace github.com/cairn-app/cairn-reader/pkg/middleware => ../../pkg/middleware
+replace github.com/andrew-craig/cairn-reader/pkg/middleware => ../../pkg/middleware
 
-replace github.com/cairn-app/cairn-reader/pkg/models => ../../pkg/models
+replace github.com/andrew-craig/cairn-reader/pkg/models => ../../pkg/models
 
-replace github.com/cairn-app/cairn-reader/services/users => ../../services/users
+replace github.com/andrew-craig/cairn-reader/services/users => ../../services/users
 
-replace github.com/cairn-app/cairn-reader/services/explore => ../../services/explore
+replace github.com/andrew-craig/cairn-reader/services/explore => ../../services/explore
 
-replace github.com/cairn-app/cairn-reader/services/read => ../../services/read
+replace github.com/andrew-craig/cairn-reader/services/read => ../../services/read
 
-replace github.com/cairn-app/cairn-reader/services/read/email => ../../services/read/email
+replace github.com/andrew-craig/cairn-reader/services/read/email => ../../services/read/email
 
-replace github.com/cairn-app/cairn-reader/pkg/rss => ../../pkg/rss
+replace github.com/andrew-craig/cairn-reader/pkg/rss => ../../pkg/rss

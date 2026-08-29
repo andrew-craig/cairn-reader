@@ -7,7 +7,7 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/google/uuid"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
 )
 
 // AddContentToUserRequest represents the request body for adding content to a user's list

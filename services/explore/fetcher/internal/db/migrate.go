@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"github.com/cairn-app/cairn-reader/pkg/env"
+	"github.com/andrew-craig/cairn-reader/pkg/env"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"

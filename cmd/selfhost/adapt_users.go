@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	userMigrations "github.com/cairn-app/cairn-reader/services/users/migrations"
-	usersSelfhost "github.com/cairn-app/cairn-reader/services/users/selfhost"
+	userMigrations "github.com/andrew-craig/cairn-reader/services/users/migrations"
+	usersSelfhost "github.com/andrew-craig/cairn-reader/services/users/selfhost"
 )
 
 func runUsersMigrations(cfg *Config) error {

@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
-	localAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
+	localAuth "github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/api"
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	apperrors "github.com/cairn-app/cairn-reader/pkg/errors"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
-	"github.com/cairn-app/cairn-reader/services/users/internal/validation"
+	"github.com/andrew-craig/cairn-reader/pkg/api"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/validation"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

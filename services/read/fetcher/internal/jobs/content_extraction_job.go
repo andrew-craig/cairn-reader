@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/fetcher/internal/processor"
+	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/processor"
 )
 
 // ContentExtractionJobConfig holds configuration for the content extraction job

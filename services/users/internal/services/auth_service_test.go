@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/env"
-	"github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/pkg/env"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/explore/fetcher/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
 )
 
 // TestGetNextFeed_CrashRecovery_Integration proves the Theme 4 claim on

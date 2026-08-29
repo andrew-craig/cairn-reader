@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	userDB "github.com/cairn-app/cairn-reader/services/users/internal/database"
-	userMigrations "github.com/cairn-app/cairn-reader/services/users/migrations"
+	userDB "github.com/andrew-craig/cairn-reader/services/users/internal/database"
+	userMigrations "github.com/andrew-craig/cairn-reader/services/users/migrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 )

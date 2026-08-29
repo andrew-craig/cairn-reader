@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/repository"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/repository"
 )
 
 // defaultOutboxCleanupBatchSize bounds each DELETE transaction so cleanup

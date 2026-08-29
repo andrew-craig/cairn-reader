@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch"
-	"github.com/cairn-app/cairn-reader/pkg/rss/fetch/fetchtest"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ func TestUserAgentConstant(t *testing.T) {
 	// The constant must be non-empty and contain the bot name.
 	assert.NotEmpty(t, fetch.UserAgent)
 	assert.Contains(t, fetch.UserAgent, "CairnBot")
-	assert.Contains(t, fetch.UserAgent, "https://github.com/cairn-app/cairn-reader")
+	assert.Contains(t, fetch.UserAgent, "https://github.com/andrew-craig/cairn-reader")
 }
 
 func TestFetch_SetsUserAgent(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 )
 
 // ErrSubscriptionNotFound is returned when an unsubscribe targets a subscription

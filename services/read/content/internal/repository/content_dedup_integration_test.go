@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/models"
-	"github.com/cairn-app/cairn-reader/services/read/content/internal/testutil"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/testutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

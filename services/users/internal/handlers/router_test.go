@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	pkgauth "github.com/cairn-app/cairn-reader/pkg/auth"
-	internalAuth "github.com/cairn-app/cairn-reader/services/users/internal/auth"
-	"github.com/cairn-app/cairn-reader/services/users/internal/services"
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
+	internalAuth "github.com/andrew-craig/cairn-reader/services/users/internal/auth"
+	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

@@ -4,11 +4,11 @@ package api
 import (
 	"net/http"
 
-	"github.com/cairn-app/cairn-reader/pkg/auth"
-	sharedmw "github.com/cairn-app/cairn-reader/pkg/middleware"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/handlers"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/api/middleware"
-	"github.com/cairn-app/cairn-reader/services/read/email/internal/database"
+	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/api/handlers"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/api/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/email/internal/database"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 )

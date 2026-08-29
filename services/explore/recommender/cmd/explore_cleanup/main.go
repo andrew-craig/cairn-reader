@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cairn-app/cairn-reader/pkg/logging"
-	"github.com/cairn-app/cairn-reader/services/explore/recommender/internal/db"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
+	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
