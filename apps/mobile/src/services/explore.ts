@@ -1,7 +1,6 @@
 import { AuthService } from './auth';
 import { Article } from '../types';
 import { getServerUrl } from '@cairn/shared';
-import { withRetry } from '../utils/retry';
 
 interface RecommendationsResponse {
   user_id: string;
@@ -58,77 +57,9 @@ export interface VotedArticleWithType extends Article {
 }
 
 export class ExploreService {
-  private static async fetchWithAuth(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    // Proactively check and refresh token if expired before making request
-    const isValid = await AuthService.ensureValidToken();
-    if (!isValid) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const accessToken = await AuthService.getAccessToken();
-
-    if (!accessToken) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-        ...options.headers,
-      },
-    });
-
-    // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
-    if (response.status === 401) {
-      try {
-        await AuthService.refreshAccessToken();
-        const newAccessToken = await AuthService.getAccessToken();
-
-        // Retry the request with new token
-        const retryResponse = await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${newAccessToken}`,
-            ...options.headers,
-          },
-        });
-
-        return retryResponse;
-      } catch (refreshError) {
-        // If refresh fails, clear tokens and throw
-        await AuthService.clearTokens();
-        throw new Error('Session expired. Please log in again.');
-      }
-    }
-
-    return response;
-  }
-
-  /**
-   * Like fetchWithAuth but also retries on 5xx / network errors.
-   */
-  private static async fetchWithAuthAndRetry(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    return withRetry(async (signal) => {
-      const response = await this.fetchWithAuth(url, { ...options, signal });
-      if (response.status >= 500) {
-        throw new Error(`Server error ${response.status}`);
-      }
-      return response;
-    });
-  }
-
   static async getRecommendations(offset = 0): Promise<Article[]> {
     try {
-      const response = await this.fetchWithAuthAndRetry(
+      const response = await AuthService.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/recommendation?offset=${offset}`
       );
 
@@ -154,7 +85,7 @@ export class ExploreService {
   static async markShown(articleIds: string[]): Promise<void> {
     if (articleIds.length === 0) return;
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/shown`,
         {
           method: 'POST',
@@ -173,7 +104,7 @@ export class ExploreService {
 
   static async markAsRead(articleId: string): Promise<void> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/article/${articleId}/read`,
         {
           method: 'POST',
@@ -195,7 +126,7 @@ export class ExploreService {
     voteType: 'upvote' | 'downvote'
   ): Promise<void> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'POST',
@@ -223,7 +154,7 @@ export class ExploreService {
 
   static async removeVote(articleId: string): Promise<void> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`,
         {
           method: 'DELETE',
@@ -244,7 +175,7 @@ export class ExploreService {
     articleId: string
   ): Promise<{ upvotes: number; downvotes: number; user_vote?: string }> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/article/${articleId}/vote`
       );
 
@@ -266,7 +197,7 @@ export class ExploreService {
     offset: number = 0
   ): Promise<VotedArticleWithType[]> {
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/explore/user/votes?limit=${limit}&offset=${offset}`
       );
 
@@ -291,7 +222,7 @@ export class ExploreService {
 
   static async getUserVoteStats(): Promise<{ upvotes: number; downvotes: number }> {
     try {
-      const response = await this.fetchWithAuthAndRetry(
+      const response = await AuthService.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/user/vote-stats`
       );
 
@@ -312,7 +243,7 @@ export class ExploreService {
   static async searchArticles(q: string, limit = 20, offset = 0): Promise<Article[]> {
     try {
       const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
-      const response = await this.fetchWithAuthAndRetry(
+      const response = await AuthService.fetchWithAuthAndRetry(
         `${getServerUrl()}/api/v1/explore/search?${params.toString()}`
       );
 

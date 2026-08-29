@@ -10,6 +10,7 @@ import {
   User,
 } from '../types';
 import { getServerUrl } from '@cairn/shared';
+import { withRetry } from '../utils/retry';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
@@ -447,6 +448,86 @@ export class AuthService {
   static async getUserId(): Promise<string | null> {
     const user = await this.getUser();
     return user?.id || null;
+  }
+
+  /**
+   * Authenticated fetch with proactive token refresh and a single reactive 401
+   * retry. Feature services (read, explore) build on this — one implementation,
+   * not a private copy per service.
+   *
+   * The 'Session expired. Please log in again.' and 'Not authenticated' error
+   * messages are load-bearing: utils/retry.ts classifies retryability by
+   * substring-matching the message, so rephrasing either makes an unrecoverable
+   * auth failure retryable.
+   */
+  static async fetchWithAuth(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    // Proactively check and refresh token if expired before making request
+    const isValid = await this.ensureValidToken();
+    if (!isValid) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const accessToken = await this.getAccessToken();
+
+    if (!accessToken) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        ...options.headers,
+      },
+    });
+
+    // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
+    if (response.status === 401) {
+      try {
+        await this.refreshAccessToken();
+        const newAccessToken = await this.getAccessToken();
+
+        // Retry the request with new token
+        const retryResponse = await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${newAccessToken}`,
+            ...options.headers,
+          },
+        });
+
+        return retryResponse;
+      } catch {
+        // If refresh fails, clear tokens and throw
+        await this.clearTokens();
+        throw new Error('Session expired. Please log in again.');
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Like fetchWithAuth but also retries on 5xx / network errors.
+   * 4xx responses are returned as-is (callers handle error status).
+   */
+  static async fetchWithAuthAndRetry(
+    url: string,
+    options: RequestInit = {}
+  ): Promise<Response> {
+    return withRetry(async (signal) => {
+      const response = await this.fetchWithAuth(url, { ...options, signal });
+      // Throw on 5xx so withRetry can retry; let 4xx pass through to caller
+      if (response.status >= 500) {
+        throw new Error(`Server error ${response.status}`);
+      }
+      return response;
+    });
   }
 
   static async upgradeAccount(email: string, password: string): Promise<User> {
