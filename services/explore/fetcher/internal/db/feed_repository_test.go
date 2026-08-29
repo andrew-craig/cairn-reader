@@ -437,3 +437,38 @@ func TestListFeeds_EnabledOnly(t *testing.T) {
 		}
 	}
 }
+
+// TestListFeeds_NullTitle verifies feeds created without a title (the ImportFeeds
+// path only sets url + enabled) can be read back. feeds.title / feeds.description
+// are nullable in the schema but models.Feed types them as plain strings.
+func TestListFeeds_NullTitle(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	defer db.Close()
+	defer testutil.CleanupTestDB(t, db)
+
+	repo := NewFeedRepository(db)
+	ctx := context.Background()
+
+	if err := repo.ImportFeeds(ctx, []string{testutil.TestFeedURL1}); err != nil {
+		t.Fatalf("ImportFeeds failed: %v", err)
+	}
+
+	feeds, err := repo.ListFeeds(ctx, false)
+	if err != nil {
+		t.Fatalf("ListFeeds failed: %v", err)
+	}
+	if len(feeds) != 1 {
+		t.Fatalf("Expected 1 feed, got %d", len(feeds))
+	}
+	if feeds[0].Title != "" || feeds[0].Description != "" {
+		t.Errorf("Expected empty title/description, got %q / %q", feeds[0].Title, feeds[0].Description)
+	}
+
+	feed, err := repo.GetFeedByID(ctx, feeds[0].ID)
+	if err != nil {
+		t.Fatalf("GetFeedByID failed: %v", err)
+	}
+	if feed.Title != "" || feed.Description != "" {
+		t.Errorf("Expected empty title/description, got %q / %q", feed.Title, feed.Description)
+	}
+}
