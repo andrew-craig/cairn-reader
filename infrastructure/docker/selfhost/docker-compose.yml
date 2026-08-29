@@ -2,7 +2,7 @@ name: cairn-selfhost
 
 services:
   cairn:
-    image: ghcr.io/cairn-app/cairn-selfhost:${CAIRN_VERSION:-latest}
+    image: ghcr.io/andrew-craig/cairn-selfhost:${CAIRN_VERSION:-latest}
     environment:
       - PORT=8099
       - DB_HOST=cairn-db
@@ -25,7 +25,7 @@ services:
       # cairn_data volume). Drop your own feeds.txt there to override; if
       # missing the service downloads FEED_LIST_URL at startup.
       - FEED_LIST_PATH=${FEED_LIST_PATH:-/data/feeds/feeds.txt}
-      - FEED_LIST_URL=${FEED_LIST_URL:-https://raw.githubusercontent.com/cairn-app/cairn-reader/main/services/explore/feeds/default-feeds.txt}
+      - FEED_LIST_URL=${FEED_LIST_URL:-https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt}
       # Per-service connection pool caps. Defaults chosen so the sum across all
       # services stays under POSTGRES_MAX_CONNECTIONS (default 20).
       - DB_MAX_CONNS=${DB_MAX_CONNS:-3}

@@ -44,7 +44,7 @@ jobs:
           file: infrastructure/docker/selfhost/Dockerfile
           push: false
           load: true
-          tags: ghcr.io/cairn-app/cairn-selfhost:smoke-test
+          tags: ghcr.io/${{ github.repository_owner }}/cairn-selfhost:smoke-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Create .env from example
