@@ -29,7 +29,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7c06** · P2 · open · [Audit/Tier 4] AddLinkModal cannot be dismissed while a debounced URL detection is in flight  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
-- **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
 - **task_997e** · P2 · open · [Audit/Tier 2] Delete the dead duplicate models package services/explore/pkg/models (98 lines, zero importers)  (parent: epic_fefa)
 - **task_a370** · P2 · open · [Audit/Tier 4] Triplicated cursor-list machine — and both mobile copies blank the list on pull-to-refresh  (parent: epic_fefa)
 - **task_a7b6** · P2 · open · [Audit/Tier 3] Collapse the five near-identical fetch-outcome recording blocks in explore/fetcher FetchSingleFeed  (parent: epic_fefa)
