@@ -86,6 +86,8 @@ services/users/migrate
 services/explore/recommender/explore_recommender
 services/read/email/email_ingest
 services/read/email/email_ingest_worker
+cmd/selfhost/selfhost
+cmd/selfhost/cairn-selfhost
 
 # Dolt database runtime files
 .beads/
