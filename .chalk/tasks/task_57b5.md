@@ -2,14 +2,14 @@
 id: task_57b5
 title: [H11] Delete the ~250-line dead JWT-validation duplicate in services/users/internal/auth/jwt.go
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [quality,wave4,consolidation]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-18T13:41:14Z
+updated_at: 2026-08-29T23:25:46Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 

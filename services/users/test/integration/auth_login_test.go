@@ -55,8 +55,7 @@ func TestAuthService_EmailLogin_Integration(t *testing.T) {
 		assert.Greater(t, response.ExpiresIn, int64(0))
 
 		// Verify access token
-		claims, err := env.JWTManager.ValidateToken(response.AccessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, response.AccessToken)
 		assert.Equal(t, userID.String(), claims.Subject)
 
 		// Verify last login was updated
@@ -182,8 +181,7 @@ func TestAuthService_MobileLogin_Integration(t *testing.T) {
 		assert.NotEmpty(t, response.RefreshToken)
 
 		// Verify access token
-		claims, err := env.JWTManager.ValidateToken(response.AccessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, response.AccessToken)
 		assert.Equal(t, userID.String(), claims.Subject)
 
 		// Verify last login was updated
@@ -296,11 +294,8 @@ func TestAuthService_LoginEndToEnd_Integration(t *testing.T) {
 		assert.NotEqual(t, firstAccessToken, loginResponse.AccessToken)
 
 		// Step 4: Verify both tokens are valid
-		claims1, err := env.JWTManager.ValidateToken(firstAccessToken)
-		require.NoError(t, err)
-
-		claims2, err := env.JWTManager.ValidateToken(loginResponse.AccessToken)
-		require.NoError(t, err)
+		claims1 := env.ValidateAccessToken(t, firstAccessToken)
+		claims2 := env.ValidateAccessToken(t, loginResponse.AccessToken)
 
 		// Both should be for same user
 		assert.Equal(t, claims1.Subject, claims2.Subject)

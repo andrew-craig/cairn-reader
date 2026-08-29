@@ -104,7 +104,7 @@ Do this *after* Waves 1–2: consolidation is safest when the behavior being con
 
 | Done | Finding | Summary | P | Recipe |
 |---|---|---|---|---|
-| [ ] | H11 | Delete the ~250-line dead JWT-validation duplicate in `services/users/internal/auth/jwt.go`; everything uses `pkg/auth` | 2 | [R11](#r11--consolidating-duplicates) |
+| [x] #354 | H11 | Delete the ~250-line dead JWT-validation duplicate in `services/users/internal/auth/jwt.go`; everything uses `pkg/auth` | 2 | [R11](#r11--consolidating-duplicates) |
 | [ ] | Fetch dedup | Collapse the 4+ HTTP fetch+size-cap copies onto `pkg/rss/fetch` (which by now carries the SSRF guard from Wave 1) | 2 | [R11](#r11--consolidating-duplicates) |
 | [ ] | Env parsing | Collapse `pkg/env` vs `pkg/config` vs two service-local copies into one, with one duration-parsing behavior | 3 | [R11](#r11--consolidating-duplicates) |
 | [ ] | Email sanitizer | Replace email's hand-maintained bluemonday policy with `pkg/rss/sanitize` | 2 | [R11](#r11--consolidating-duplicates) |
