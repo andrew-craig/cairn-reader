@@ -28,7 +28,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_7829** · P2 · open · [Audit/Tier 2] Delete the dead offset-pagination twins on content — they order without a tiebreaker  (parent: epic_fefa)
 - **task_7c06** · P2 · open · [Audit/Tier 4] AddLinkModal cannot be dismissed while a debounced URL detection is in flight  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
-- **task_8b77** · P2 · open · [users build tag] services/users/test/integration lacks //go:build integration → bare go test hangs  (parent: epic_fefa)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
 - **task_9680** · P2 · open · [Sentinel bug] Routine token expiry logs at ERROR (auth.ErrTokenExpired vs apperrors.ErrTokenExpired)  (parent: epic_fefa)
 - **task_997e** · P2 · open · [Audit/Tier 2] Delete the dead duplicate models package services/explore/pkg/models (98 lines, zero importers)  (parent: epic_fefa)
