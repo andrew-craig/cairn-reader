@@ -348,7 +348,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
 			return
 		}
-		if strings.Contains(err.Error(), "expired") {
+		if errors.Is(err, services.ErrRefreshTokenExpired) {
 			logger.Info("refresh token expired",
 				slog.String("request_id", requestID),
 				slog.String("client_ip", ipAddress),
