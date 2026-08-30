@@ -187,8 +187,6 @@ services/users/
 │   │   ├── user_handler.go  # User management endpoints
 │   │   ├── health.go        # Health checks
 │   │   └── router.go        # Route setup
-│   ├── middleware/          # HTTP middleware
-│   │   └── authorization.go # JWT validation and user authorization
 │   ├── models/              # Data models
 │   │   ├── user.go
 │   │   └── refresh_token.go
@@ -560,7 +558,7 @@ JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 1. `pkg/auth`'s `RequireAuth` middleware (wired onto the `/api/v1/user` route group in `router.go`) extracts the JWT from `Authorization: Bearer <token>`, validates its RS256 signature against the public key, and stores `user_id` from the claims on the request context.
 2. Each `UserHandler` method (`internal/handlers/user_handler.go`) reads that authenticated `user_id` and the `{user_id}` path parameter, then calls into `UserService`, passing both. The service layer compares them and returns `services.ErrUnauthorized`, which the handler maps to `403 Forbidden`, on mismatch.
 
-Note: `internal/middleware/authorization.go` defines `RequireSameUser`/`RequireOwnership` helper middleware for this same purpose, but it is not wired into `router.go` anywhere — the actual ownership check happens in the service layer as described above, and this file is currently dead code.
+There is no `services/users` middleware package — same-user enforcement lives entirely in the service layer as described above.
 
 **Example**:
 ```go
@@ -1045,9 +1043,13 @@ type User struct {
 
 ### Adding Middleware
 
+Cross-cutting middleware (CORS, rate limiting, recovery, auth) lives in the repo-root
+`pkg/middleware` and `pkg/auth` modules and is wired in `internal/handlers/router.go`.
+Add service-specific middleware there or in a new `internal/middleware` package.
+
 **1. Create middleware function**:
 ```go
-// internal/middleware/my_middleware.go
+// internal/middleware/my_middleware.go (new package)
 func MyMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         // Pre-processing
