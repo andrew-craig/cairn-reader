@@ -18,7 +18,11 @@ import (
 )
 
 // stubAuthService is a no-op AuthService used to build a router without a live DB.
-type stubAuthService struct{}
+// refreshErr, when set, is returned by RefreshAccessToken so handler error paths
+// can be driven without a DB (see TestRefresh_LogLevelFollowsErrorMapping).
+type stubAuthService struct {
+	refreshErr error
+}
 
 func (s *stubAuthService) Register(context.Context, string, string) (*services.AuthResponse, error) {
 	return nil, nil
@@ -33,7 +37,7 @@ func (s *stubAuthService) LoginMobile(context.Context, string, string, string) (
 	return nil, nil
 }
 func (s *stubAuthService) RefreshAccessToken(context.Context, string, string, string) (*services.AuthResponse, error) {
-	return nil, nil
+	return nil, s.refreshErr
 }
 func (s *stubAuthService) Logout(context.Context, string) error { return nil }
 func (s *stubAuthService) LogoutAll(context.Context, uuid.UUID) error {

@@ -513,7 +513,7 @@ func TestLogin(t *testing.T) {
 		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid email or password")
+		assert.Contains(t, w.Body.String(), "invalid credentials")
 	})
 
 	t.Run("Incorrect password returns 401", func(t *testing.T) {
@@ -530,7 +530,7 @@ func TestLogin(t *testing.T) {
 		handler.Login(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid email or password")
+		assert.Contains(t, w.Body.String(), "invalid credentials")
 	})
 
 	t.Run("Response structure validation", func(t *testing.T) {
@@ -654,7 +654,7 @@ func TestLoginMobile(t *testing.T) {
 		handler.LoginMobile(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid device ID")
+		assert.Contains(t, w.Body.String(), "invalid credentials")
 	})
 }
 
@@ -791,7 +791,7 @@ func TestRefresh(t *testing.T) {
 		handler.Refresh(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-		assert.Contains(t, w.Body.String(), "invalid or expired")
+		assert.Contains(t, w.Body.String(), "invalid credentials")
 	})
 }
 

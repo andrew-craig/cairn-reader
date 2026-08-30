@@ -102,19 +102,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Register user
 	authResp, err := h.authService.Register(r.Context(), req.Email, req.Password)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountExists) {
-			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this email already exists", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrWeakPassword) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register user", nil, "v1")
+		writeServiceError(w, err, "failed to register user")
 		return
 	}
 
@@ -155,15 +143,7 @@ func (h *AuthHandler) RegisterMobile(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountExists) {
-			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "an account with this device ID already exists", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to register mobile user", nil, "v1")
+		writeServiceError(w, err, "failed to register mobile user")
 		return
 	}
 
@@ -205,19 +185,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountLocked) {
-			api.WriteError(w, http.StatusTooManyRequests, api.ErrCodeTooManyRequests, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidCredentials) {
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid email or password", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
+		writeServiceError(w, err, "failed to authenticate user")
 		return
 	}
 
@@ -258,23 +226,7 @@ func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountLocked) {
-			api.WriteError(w, http.StatusTooManyRequests, api.ErrCodeTooManyRequests, err.Error(), nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidCredentials) {
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid device ID", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrHybridAccountDeviceLogin) {
-			api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "device login not allowed for accounts with email/password", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to authenticate user", nil, "v1")
+		writeServiceError(w, err, "failed to authenticate user")
 		return
 	}
 
@@ -330,47 +282,21 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidCredentials) {
-			logger.Warn("refresh token invalid or not found",
-				slog.String("request_id", requestID),
-				slog.String("client_ip", ipAddress),
-				slog.String("error", err.Error()),
-			)
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid or expired refresh token", nil, "v1")
-			return
+		// Level follows the mapping: a sentinel in serviceErrorTable is a routine
+		// client-side cause — expired or replayed refresh tokens — and logs at
+		// Warn so it doesn't inflate the error rate. An unmapped error is the one
+		// that becomes a 500 (DB/JWT failure), so it stays at Error.
+		// writeServiceError owns the status/message mapping.
+		level := slog.LevelError
+		if _, mapped := lookupServiceError(err); mapped {
+			level = slog.LevelWarn
 		}
-		if strings.Contains(err.Error(), "token reuse detected") {
-			logger.Warn("refresh token reuse detected - potential security issue",
-				slog.String("request_id", requestID),
-				slog.String("client_ip", ipAddress),
-				slog.String("error", err.Error()),
-			)
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "token reuse detected - all tokens have been revoked", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrRefreshTokenExpired) {
-			logger.Info("refresh token expired",
-				slog.String("request_id", requestID),
-				slog.String("client_ip", ipAddress),
-			)
-			api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "refresh token has expired", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			logger.Warn("refresh request: invalid input",
-				slog.String("request_id", requestID),
-				slog.String("client_ip", ipAddress),
-				slog.String("error", err.Error()),
-			)
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		logger.Error("failed to refresh access token",
+		logger.Log(r.Context(), level, "refresh request failed",
 			slog.String("request_id", requestID),
 			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),
 		)
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to refresh access token", nil, "v1")
+		writeServiceError(w, err, "failed to refresh access token")
 		return
 	}
 
@@ -408,11 +334,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	// Revoke the token
 	err := h.authService.Logout(r.Context(), req.RefreshToken)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout", nil, "v1")
+		writeServiceError(w, err, "failed to logout")
 		return
 	}
 
@@ -434,7 +356,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Revoke all user tokens
 	err = h.authService.LogoutAll(r.Context(), userID)
 	if err != nil {
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to logout from all devices", nil, "v1")
+		writeServiceError(w, err, "failed to logout from all devices")
 		return
 	}
 
@@ -483,15 +405,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.emailVerificationService.VerifyEmail(r.Context(), token)
 	if err != nil {
-		if errors.Is(err, services.ErrInvalidVerificationToken) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid or expired verification token", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to verify email", nil, "v1")
+		writeServiceError(w, err, "failed to verify email")
 		return
 	}
 
@@ -509,15 +423,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.emailVerificationService.SendVerificationEmail(r.Context(), userID); err != nil {
-		if errors.Is(err, services.ErrEmailAlreadyVerified) {
-			api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "email is already verified", nil, "v1")
-			return
-		}
-		if errors.Is(err, services.ErrInvalidInput) {
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "account does not have an email address", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "failed to resend verification email", nil, "v1")
+		writeServiceError(w, err, "failed to resend verification email")
 		return
 	}
 
