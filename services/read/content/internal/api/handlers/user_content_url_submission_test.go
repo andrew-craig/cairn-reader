@@ -46,10 +46,6 @@ func (m *mockContentService) CheckDuplicate(ctx context.Context, contentHash str
 	return nil, nil
 }
 
-func (m *mockContentService) ListContents(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	return nil, nil
-}
-
 func (m *mockContentService) BulkCreateFromHTML(ctx context.Context, items []service.BulkContentItem) ([]*models.Content, []service.BulkCreateError, error) {
 	return nil, nil, nil
 }
@@ -94,18 +90,6 @@ func (m *mockUserContentRepo) GetByUserAndContent(ctx context.Context, userID, c
 	return nil, nil
 }
 
-func (m *mockUserContentRepo) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*models.UserContent, error) {
-	return nil, nil
-}
-
-func (m *mockUserContentRepo) ListByUserWithFilter(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit, offset int) ([]*models.UserContent, error) {
-	return nil, nil
-}
-
-func (m *mockUserContentRepo) CountByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
-	return 0, nil
-}
-
 func (m *mockUserContentRepo) Update(ctx context.Context, uc *models.UserContent) error {
 	return nil
 }
@@ -124,10 +108,6 @@ func (m *mockUserContentRepo) Delete(ctx context.Context, userID, contentID uuid
 
 func (m *mockUserContentRepo) DeleteWithTx(ctx context.Context, tx *sql.Tx, userID, contentID uuid.UUID) error {
 	return nil
-}
-
-func (m *mockUserContentRepo) Search(ctx context.Context, userID uuid.UUID, query string, limit, offset int) ([]*models.UserContent, error) {
-	return nil, nil
 }
 
 func (m *mockUserContentRepo) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
@@ -183,10 +163,6 @@ func (m *mockContentRepo) UpdateWithTx(ctx context.Context, tx *sql.Tx, content 
 
 func (m *mockContentRepo) DeleteOrphaned(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
 	return 0, nil
-}
-
-func (m *mockContentRepo) List(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	return nil, nil
 }
 
 func (m *mockContentRepo) GetByContentHashesAndFeedID(ctx context.Context, contentHashes []string, feedID uuid.UUID) (map[string]*models.Content, error) {

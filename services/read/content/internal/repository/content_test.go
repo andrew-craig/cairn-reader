@@ -308,34 +308,6 @@ func TestContentRepository_DeleteOrphaned_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestContentRepository_List_Success(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	require.NoError(t, err)
-	defer db.Close()
-
-	repo := NewContentRepository(db)
-	ctx := context.Background()
-
-	now := time.Now()
-
-	mock.ExpectQuery(`SELECT (.+) FROM contents ORDER BY created_at DESC LIMIT \$1 OFFSET \$2`).
-		WithArgs(10, 0).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "content_hash", "cleaned_html", "original_url", "canonical_url",
-			"title", "author", "published_at", "description", "image_urls",
-			"source_type", "source_feed_id", "metadata", "created_at", "updated_at", "orphaned_at",
-		}).
-			AddRow(uuid.New(), "hash1", "<p>1</p>", "https://example.com/1", nil, "Title 1", nil, nil, nil, pq.StringArray{}, "web", nil, nil, now, now, nil).
-			AddRow(uuid.New(), "hash2", "<p>2</p>", "https://example.com/2", nil, "Title 2", nil, nil, nil, pq.StringArray{}, "web", nil, nil, now, now, nil))
-
-	results, err := repo.List(ctx, 10, 0)
-	assert.NoError(t, err)
-	assert.Len(t, results, 2)
-	assert.Equal(t, "Title 1", results[0].Title)
-	assert.Equal(t, "Title 2", results[1].Title)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 // TestContentRepository_GetByContentHashesAndFeedID_Success tests the bulk hash lookup
 // NOTE: This test is skipped because it requires PostgreSQL-specific array functionality
 // that doesn't work with sqlmock. Use integration tests with testcontainers for this.

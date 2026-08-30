@@ -89,14 +89,6 @@ func (m *MockContentService) CheckDuplicate(ctx context.Context, contentHash str
 	return args.Get(0).(*models.Content), args.Error(1)
 }
 
-func (m *MockContentService) ListContents(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	args := m.Called(ctx, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.Content), args.Error(1)
-}
-
 // TestCreateContent_Success tests successful content creation
 func TestCreateContent_Success(t *testing.T) {
 	mockService := new(MockContentService)

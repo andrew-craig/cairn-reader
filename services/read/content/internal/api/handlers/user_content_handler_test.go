@@ -59,22 +59,6 @@ func (m *MockUserContentRepository) GetByUserAndContent(ctx context.Context, use
 	return args.Get(0).(*models.UserContent), args.Error(1)
 }
 
-func (m *MockUserContentRepository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*models.UserContent, error) {
-	args := m.Called(ctx, userID, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.UserContent), args.Error(1)
-}
-
-func (m *MockUserContentRepository) ListByUserWithFilter(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit, offset int) ([]*models.UserContent, error) {
-	args := m.Called(ctx, userID, status, isFavorite, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.UserContent), args.Error(1)
-}
-
 func (m *MockUserContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
 	args := m.Called(ctx, id, status, scrollPosition, isFavorite)
 	return args.Error(0)
@@ -98,19 +82,6 @@ func (m *MockUserContentRepository) Update(ctx context.Context, userContent *mod
 func (m *MockUserContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, userContent *models.UserContent) error {
 	args := m.Called(ctx, tx, userContent)
 	return args.Error(0)
-}
-
-func (m *MockUserContentRepository) CountByUser(ctx context.Context, userID uuid.UUID) (int64, error) {
-	args := m.Called(ctx, userID)
-	return args.Get(0).(int64), args.Error(1)
-}
-
-func (m *MockUserContentRepository) Search(ctx context.Context, userID uuid.UUID, query string, limit, offset int) ([]*models.UserContent, error) {
-	args := m.Called(ctx, userID, query, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.UserContent), args.Error(1)
 }
 
 func (m *MockUserContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
@@ -192,14 +163,6 @@ func (m *MockContentRepository) Update(ctx context.Context, content *models.Cont
 func (m *MockContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, content *models.Content) error {
 	args := m.Called(ctx, tx, content)
 	return args.Error(0)
-}
-
-func (m *MockContentRepository) List(ctx context.Context, limit, offset int) ([]*models.Content, error) {
-	args := m.Called(ctx, limit, offset)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]*models.Content), args.Error(1)
 }
 
 func (m *MockContentRepository) BulkCreate(ctx context.Context, contents []*models.Content) error {
@@ -1093,7 +1056,7 @@ func TestListUserContents_UnauthorizedUserAccess(t *testing.T) {
 	assert.Equal(t, "forbidden", response["error"])
 	assert.Contains(t, response["message"], "own content")
 	// Repository should not be called for unauthorized request
-	mockUserContentRepo.AssertNotCalled(t, "ListByUserWithFilter")
+	mockUserContentRepo.AssertNotCalled(t, "ListByUserWithCursor")
 }
 
 // TestListUserContents_AuthorizedUserAccess tests that authenticated user can access their own content
