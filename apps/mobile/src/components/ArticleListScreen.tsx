@@ -137,7 +137,11 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     return null;
   };
 
-  if (loading) {
+  // Only take over the whole screen with a spinner on the first load. Once
+  // articles are on screen, a reload (pull-to-refresh, search) keeps the list
+  // visible and shows progress via the RefreshControl instead of replacing the
+  // populated list with a spinner.
+  if (loading && articles.length === 0) {
     return (
       <View
         style={[
