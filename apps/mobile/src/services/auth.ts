@@ -7,7 +7,7 @@ import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import { AuthService as SharedAuthService, getServerUrl } from '@cairn/shared';
 import { MobileAuthRequest, User } from '../types';
-import { withRetry } from '../utils/retry';
+import { withRetry, HttpResponseError } from '../utils/retry';
 
 export class AuthService extends SharedAuthService {
   static async getDeviceId(): Promise<string> {
@@ -73,9 +73,10 @@ export class AuthService extends SharedAuthService {
   ): Promise<Response> {
     return withRetry(async (signal) => {
       const response = await this.fetchWithAuth(url, { ...options, signal });
-      // Throw on 5xx so withRetry can retry; let 4xx pass through to caller
+      // Surface 5xx as a status-carrying error so withRetry retries it; let 4xx
+      // pass through to the caller untouched.
       if (response.status >= 500) {
-        throw new Error(`Server error ${response.status}`);
+        throw new HttpResponseError(response.status);
       }
       return response;
     });

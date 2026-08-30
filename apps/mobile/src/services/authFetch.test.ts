@@ -134,7 +134,7 @@ describe('AuthService.fetchWithAuthAndRetry', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('throws "Server error <status>" on a 5xx so withRetry retries and eventually rejects', async () => {
+  it('surfaces a 5xx as HttpResponseError so withRetry retries and eventually rejects', async () => {
     jest.useFakeTimers();
     try {
       global.fetch = jest
@@ -142,7 +142,10 @@ describe('AuthService.fetchWithAuthAndRetry', () => {
         .mockResolvedValue({ status: 503, ok: false }) as unknown as typeof fetch;
 
       const pending = AuthService.fetchWithAuthAndRetry('https://api.test/x');
-      const assertion = expect(pending).rejects.toThrow('Server error 503');
+      const assertion = expect(pending).rejects.toMatchObject({
+        name: 'HttpResponseError',
+        status: 503,
+      });
       await jest.runAllTimersAsync();
       await assertion;
       // 1 initial + 3 retries

@@ -2,10 +2,11 @@
  * Retry utility with exponential backoff for transient failures.
  *
  * Retries on:
- *   - Network errors (TypeError: network request failed, AbortError, etc.)
- *   - HTTP 5xx responses (when the caller throws on those)
+ *   - Network / abort errors (TypeError: network request failed, AbortError, …)
+ *   - HTTP 5xx responses (surfaced as an HttpResponseError by the caller)
  *
- * Does NOT retry on 4xx client errors.
+ * Never retries 4xx responses, and never retries the client-side auth failures
+ * thrown before any response exists ("Session expired…", "Not authenticated").
  */
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -13,24 +14,52 @@ const BASE_DELAY_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 15000;
 
 /**
- * Returns true for errors that are safe to retry (network / server transients).
- * 4xx errors are NOT retried — they indicate a client-side problem.
+ * Carries the HTTP status of a failed response so the retry decision can key off
+ * the status rather than the response's prose. Callers that want a 5xx retried
+ * should throw this from inside the withRetry callback.
+ */
+export class HttpResponseError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message?: string) {
+    super(message ?? `HTTP ${status}`);
+    this.name = 'HttpResponseError';
+    this.status = status;
+  }
+}
+
+// Auth failures raised before a response exists (no status to branch on). These
+// are unrecoverable by a retry — the caller must re-authenticate. The exact
+// strings are produced by the shared AuthService.fetchWithAuth.
+const NON_RETRYABLE_CLIENT_MESSAGES = ['session expired', 'not authenticated'];
+
+function statusOf(error: unknown): number | undefined {
+  if (error instanceof Error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === 'number') return status;
+  }
+  return undefined;
+}
+
+/**
+ * Returns true for errors that are safe to retry (network / abort / 5xx).
+ *
+ * Decision order:
+ *   1. An error carrying an HTTP status → retry iff it is 5xx. 4xx never retries.
+ *   2. A client-side auth failure thrown before any response → never retry.
+ *   3. Anything else (network failure, abort, unknown) → retry.
  */
 function isRetryable(error: unknown): boolean {
-  if (!(error instanceof Error)) return true;
+  const status = statusOf(error);
+  if (status !== undefined) {
+    return status >= 500 && status <= 599;
+  }
 
-  const msg = error.message.toLowerCase();
-
-  // 4xx client errors — do not retry
-  if (
-    msg.includes('not authenticated') ||
-    msg.includes('session expired') ||
-    msg.includes('unauthorized') ||
-    msg.includes('forbidden') ||
-    msg.includes('not found') ||
-    msg.includes('bad request')
-  ) {
-    return false;
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (NON_RETRYABLE_CLIENT_MESSAGES.some((m) => msg.includes(m))) {
+      return false;
+    }
   }
 
   return true;

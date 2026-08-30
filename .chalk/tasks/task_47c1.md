@@ -53,3 +53,7 @@ if (msg.includes('not authenticated') || msg.includes('session expired') || ...)
 ```
 The substrings `Session expired. Please log in again.` and `Not authenticated` must survive the move into `apps/shared` intact. Rephrase either message and those auth errors silently become **retryable** — the client retries a request that can never succeed instead of prompting re-login. Pin the message-to-retryability contract with a test before refactoring.
 
+
+## Added 2026-08-30 — `isRetryable` must branch on HTTP status, not prose
+`apps/mobile/src/utils/retry.ts:19-37` decides retryability by lowercased substring match on `error.message` (`'not authenticated'`, `'session expired'`, `'unauthorized'`, `'forbidden'`, `'not found'`, `'bad request'`) and **defaults to retryable**. It is safe today only by accident: `read.ts`/`explore.ts` throw the server's message *outside* the `withRetry` callback, so server text never reaches `isRetryable` — an invariant nothing tests or enforces. Any future refactor that throws a server-derived message inside the retry callback silently turns a 401 into 3 retries with 1s/2s/4s backoff against the auth endpoint.
+Now that the shared auth layer surfaces `response.status`, replace the prose matching with a status-based decision: retry only on network/abort errors and 5xx; never retry 4xx. Keep the existing client-side literals working (`'Session expired. Please log in again.'`, `'Not authenticated'`) for errors thrown before any response exists.
