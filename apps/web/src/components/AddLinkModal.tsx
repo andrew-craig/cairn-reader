@@ -73,6 +73,12 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
   // Capture the element that had focus when the modal opened so we can restore
   // it on close — required by ARIA modal best practices.
   const triggerRef = useRef<HTMLElement | null>(null);
+  // Handle to the in-flight detection (debounce timer + cancel flag) so a
+  // dismiss can abandon it. Detection is not user-initiated — it fires on every
+  // URL change — so it must never block closing the modal.
+  const detectRunRef = useRef<{ cancelled: boolean; timer: ReturnType<typeof setTimeout> } | null>(
+    null,
+  );
 
   useFocusTrap(modalRef);
 
@@ -94,25 +100,25 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
       return;
     }
     const normalizedUrl = normalizeUrl(url);
-    let cancelled = false;
 
     const runDetect = async () => {
       setDetecting(true);
       try {
         const result = await ReadService.detectURL(normalizedUrl);
-        if (!cancelled) setDetectionResult(result);
+        if (!run.cancelled) setDetectionResult(result);
       } catch {
-        if (!cancelled) setDetectionResult({ url: normalizedUrl, type: 'unknown', title: null });
+        if (!run.cancelled) setDetectionResult({ url: normalizedUrl, type: 'unknown', title: null });
       } finally {
-        if (!cancelled) setDetecting(false);
+        if (!run.cancelled) setDetecting(false);
       }
     };
 
     // Small debounce so rapid keystrokes don't fire many requests
-    const timer = setTimeout(runDetect, 400);
+    const run = { cancelled: false, timer: setTimeout(runDetect, 400) };
+    detectRunRef.current = run;
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      run.cancelled = true;
+      clearTimeout(run.timer);
     };
   }, [url]);
 
@@ -196,13 +202,23 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
   };
 
   const handleClose = () => {
-    if (!loading && !detecting && !discovering) {
-      setUrl('');
-      setError(null);
-      setDetectionResult(null);
-      setFeedChoices([]);
-      onClose();
+    // Only a real submit in flight blocks dismissal. `detecting` / `discovering`
+    // are advisory background work and must not trap the user.
+    if (loading) return;
+
+    // Abandon any pending / in-flight detection so a late response can't call
+    // setState after the modal unmounts.
+    if (detectRunRef.current) {
+      detectRunRef.current.cancelled = true;
+      clearTimeout(detectRunRef.current.timer);
     }
+    setDetecting(false);
+    setDiscovering(false);
+    setUrl('');
+    setError(null);
+    setDetectionResult(null);
+    setFeedChoices([]);
+    onClose();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -280,7 +296,7 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
               type="button"
               className="add-link-modal__btn add-link-modal__btn--cancel"
               onClick={handleClose}
-              disabled={isBusy}
+              disabled={loading}
             >
               Cancel
             </button>
