@@ -75,45 +75,15 @@ export class ReadService {
 
   /**
    * Transform a full UserContentDetailResponse (with cleaned_html) into an
-   * Article. Mirrors apps/mobile/src/services/read.ts.
+   * Article. Identical to the summary mapping above, plus the cleaned HTML body
+   * that only detail responses carry. Mirrors apps/mobile/src/services/read.ts.
    */
   static transformDetailToArticle(userContent: UserContentDetailResponse): Article {
-    const content = userContent.content;
-
-    if (!content) {
-      return {
-        id: userContent.content_id,
-        url: '',
-        title: 'Unknown Article',
-        description: '',
-        tags: [],
-        isRead: userContent.status === 'completed',
-        isFavorite: userContent.is_favorite,
-        addedAt: new Date(userContent.added_at).getTime(),
-        scrollPosition: userContent.scroll_position || undefined,
-      };
+    const article = this.transformToArticle(userContent);
+    if (userContent.content) {
+      article.content = userContent.content.cleaned_html;
     }
-
-    return {
-      id: content.id,
-      url: content.original_url,
-      title: content.title,
-      description: content.description,
-      content: content.cleaned_html,
-      imageUrl: content.image_urls?.[0],
-      author: content.author,
-      publishedDate: content.published_at,
-      readingTime: content.word_count ? Math.ceil(content.word_count / 200) : undefined,
-      tags: [],
-      isRead: userContent.status === 'completed',
-      isFavorite: userContent.is_favorite,
-      addedAt: new Date(userContent.added_at).getTime(),
-      readAt:
-        userContent.status === 'completed'
-          ? new Date(userContent.updated_at).getTime()
-          : undefined,
-      scrollPosition: userContent.scroll_position || undefined,
-    };
+    return article;
   }
 
   /** List the current user's saved content (cursor-paginated). */
