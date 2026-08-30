@@ -13,12 +13,23 @@ type BookmarksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Bo
 export const BookmarksScreen: React.FC = () => {
   const navigation = useNavigation<BookmarksScreenNavigationProp>();
   const [searchVisible, setSearchVisible] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchPage = useCallback(
     (cursor: string | undefined) =>
       ReadService.listUserContents({ is_favorite: true, limit: PAGE_SIZE, cursor }),
     [],
   );
+
+  const onResetLoaded = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const onLoadError = useCallback((reset: boolean) => {
+    if (reset) {
+      setError("Couldn't load your bookmarks. Check your connection and try again.");
+    }
+  }, []);
 
   const {
     articles,
@@ -31,7 +42,7 @@ export const BookmarksScreen: React.FC = () => {
     clearSearch,
     handleRefresh,
     handleLoadMore,
-  } = useCursorArticleList({ fetchPage });
+  } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError });
 
   useFocusEffect(
     useCallback(() => {
@@ -65,6 +76,8 @@ export const BookmarksScreen: React.FC = () => {
         loadingMore={loadingMore}
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
+        error={error}
+        onRetry={() => load(true)}
       />
       <SearchModal
         visible={searchVisible}

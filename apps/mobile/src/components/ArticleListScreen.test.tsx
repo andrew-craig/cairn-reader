@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ArticleListScreen } from './ArticleListScreen';
 import { Article } from '../types';
 
@@ -30,5 +30,55 @@ describe('ArticleListScreen loading behavior', () => {
     );
 
     expect(screen.getByText('Already on screen')).toBeTruthy();
+  });
+});
+
+describe('ArticleListScreen error state', () => {
+  it('shows the error message and a Retry control when a load fails with nothing to show', () => {
+    const onRetry = jest.fn();
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByText("Couldn't load your reading list.")).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Retry loading'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+
+    // It must NOT look like an empty account.
+    expect(screen.queryByText('No saved articles yet')).toBeNull();
+  });
+
+  it('keeps showing the list (not the error state) when articles are present', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        error="stale/network error"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Already on screen')).toBeTruthy();
+    expect(screen.queryByLabelText('Retry loading')).toBeNull();
+  });
+
+  it('shows the first-load spinner (not the error) while a retry is in flight', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading
+        error="previous failure"
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.queryByText('previous failure')).toBeNull();
   });
 });

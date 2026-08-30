@@ -50,6 +50,7 @@ export const ExploreScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [isStale, setIsStale] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<Article[]>([]);
@@ -142,6 +143,7 @@ export const ExploreScreen: React.FC = () => {
     // run concurrently and corrupt the shared offsetRef during initial load.
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
+    setError(null);
     try {
       offsetRef.current = 0;
       const recommendations = await ExploreService.getRecommendations(offsetRef.current);
@@ -206,8 +208,10 @@ export const ExploreScreen: React.FC = () => {
         console.log('Authentication failed, logging out user');
         await logout();
       } else {
-        // Network/server error — mark as stale if we already have articles
+        // With cached articles on screen: keep them, flag stale. With nothing
+        // to show, ArticleListScreen surfaces `error` + a Retry button.
         setIsStale(true);
+        setError("Couldn't load recommendations. Check your connection and try again.");
       }
     } finally {
       isFetchingRef.current = false;
@@ -460,6 +464,8 @@ export const ExploreScreen: React.FC = () => {
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
         staleMessage={isStale && !searchQuery ? 'Showing cached data — pull to refresh' : undefined}
+        error={searchQuery ? null : error}
+        onRetry={handleRefresh}
       />
       <SearchModal
         visible={searchVisible}

@@ -23,6 +23,7 @@ export const VotesScreen: React.FC = () => {
   const [offset, setOffset] = useState(0);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadVotes = useCallback(async (reset = false) => {
     try {
@@ -30,6 +31,7 @@ export const VotesScreen: React.FC = () => {
 
       if (reset) {
         setLoading(true);
+        setError(null);
         setOffset(0);
         setHasMore(true);
       }
@@ -44,8 +46,11 @@ export const VotesScreen: React.FC = () => {
 
       setHasMore(voted.length === PAGE_SIZE);
       setOffset(currentOffset + voted.length);
-    } catch (error) {
-      console.error('Error loading votes:', error);
+    } catch (err) {
+      console.error('Error loading votes:', err);
+      if (reset) {
+        setError("Couldn't load your votes. Check your connection and try again.");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,6 +124,8 @@ export const VotesScreen: React.FC = () => {
         loadingMore={loadingMore}
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
+        error={error}
+        onRetry={() => loadVotes(true)}
       />
       <SearchModal
         visible={searchVisible}
