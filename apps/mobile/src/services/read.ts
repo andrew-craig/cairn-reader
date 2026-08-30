@@ -17,81 +17,10 @@ import {
   UnifiedSubscriptionsResponse,
   getServerUrl,
 } from '@cairn/shared';
-import { withRetry } from '../utils/retry';
 
 const PAGE_SIZE_DEFAULT = 20;
 
 export class ReadService {
-  private static async fetchWithAuth(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    // Proactively check and refresh token if expired before making request
-    const isValid = await AuthService.ensureValidToken();
-    if (!isValid) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const accessToken = await AuthService.getAccessToken();
-
-    if (!accessToken) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-        ...options.headers,
-      },
-    });
-
-    // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
-    if (response.status === 401) {
-      try {
-        await AuthService.refreshAccessToken();
-        const newAccessToken = await AuthService.getAccessToken();
-
-        // Retry the request with new token
-        const retryResponse = await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${newAccessToken}`,
-            ...options.headers,
-          },
-        });
-
-        return retryResponse;
-      } catch (refreshError) {
-        // If refresh fails, clear tokens and throw
-        await AuthService.clearTokens();
-        throw new Error('Session expired. Please log in again.');
-      }
-    }
-
-    return response;
-  }
-
-  /**
-   * Like fetchWithAuth but also retries on 5xx / network errors.
-   * 4xx responses are returned as-is (callers handle error status).
-   */
-  private static async fetchWithAuthAndRetry(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    return withRetry(async (signal) => {
-      const response = await this.fetchWithAuth(url, { ...options, signal });
-      // Throw on 5xx so withRetry can retry; let 4xx pass through to caller
-      if (response.status >= 500) {
-        throw new Error(`Server error ${response.status}`);
-      }
-      return response;
-    });
-  }
-
   /**
    * List user's saved content
    */
@@ -118,7 +47,7 @@ export class ReadService {
         queryParams.toString() ? `?${queryParams.toString()}` : ''
       }`;
 
-      const response = await this.fetchWithAuthAndRetry(url);
+      const response = await AuthService.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -164,7 +93,7 @@ export class ReadService {
 
       const url = `${getServerUrl()}/api/v1/content/user/${userId}/search?${queryParams.toString()}`;
 
-      const response = await this.fetchWithAuthAndRetry(url);
+      const response = await AuthService.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -200,7 +129,7 @@ export class ReadService {
         throw new Error('Not authenticated');
       }
 
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/user/${userId}`,
         {
           method: 'POST',
@@ -235,7 +164,7 @@ export class ReadService {
         throw new Error('Not authenticated');
       }
 
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`,
         {
           method: 'PATCH',
@@ -267,7 +196,7 @@ export class ReadService {
         throw new Error('Not authenticated');
       }
 
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`,
         {
           method: 'DELETE',
@@ -293,7 +222,7 @@ export class ReadService {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/detect`,
         {
           method: 'POST',
@@ -337,7 +266,7 @@ export class ReadService {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
     try {
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/discover-feed`,
         {
           method: 'POST',
@@ -374,7 +303,7 @@ export class ReadService {
         throw new Error('Not authenticated');
       }
 
-      const response = await this.fetchWithAuth(
+      const response = await AuthService.fetchWithAuth(
         `${getServerUrl()}/api/v1/content/user/${userId}`,
         {
           method: 'POST',
@@ -411,7 +340,7 @@ export class ReadService {
       const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions`;
       console.log('Fetching subscriptions from:', url);
 
-      const response = await this.fetchWithAuthAndRetry(url);
+      const response = await AuthService.fetchWithAuthAndRetry(url);
 
       const result = await response.json();
 
@@ -440,7 +369,7 @@ export class ReadService {
 
     const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions/rss/${feedId}`;
 
-    const response = await this.fetchWithAuth(url, { method: 'DELETE' });
+    const response = await AuthService.fetchWithAuth(url, { method: 'DELETE' });
 
     if (!response.ok) {
       const text = await response.text();
@@ -463,7 +392,7 @@ export class ReadService {
       const url = `${getServerUrl()}/api/v1/source/rss/user/${userId}/subscription`;
       console.log('Fetching feed subscriptions from:', url);
 
-      const response = await this.fetchWithAuth(url);
+      const response = await AuthService.fetchWithAuth(url);
 
       console.log('Feed subscriptions response status:', response.status);
       const responseText = await response.text();
@@ -500,7 +429,7 @@ export class ReadService {
 
     const url = `${getServerUrl()}/api/v1/source/email/user/${userId}/address`;
 
-    const response = await this.fetchWithAuth(url, { method: 'POST' });
+    const response = await AuthService.fetchWithAuth(url, { method: 'POST' });
 
     if (!response.ok) {
       let message = 'Failed to get email address';
@@ -528,7 +457,7 @@ export class ReadService {
     }
 
     const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`;
-    const response = await this.fetchWithAuth(url);
+    const response = await AuthService.fetchWithAuth(url);
 
     const result = await response.json();
 
