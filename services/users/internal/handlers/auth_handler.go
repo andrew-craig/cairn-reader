@@ -282,10 +282,16 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		// Logged at Warn (not Error) so routine causes — expired or replayed
-		// refresh tokens — don't inflate the error rate. writeServiceError owns
-		// the status/message mapping.
-		logger.Warn("refresh request failed",
+		// Level follows the mapping: a sentinel in serviceErrorTable is a routine
+		// client-side cause — expired or replayed refresh tokens — and logs at
+		// Warn so it doesn't inflate the error rate. An unmapped error is the one
+		// that becomes a 500 (DB/JWT failure), so it stays at Error.
+		// writeServiceError owns the status/message mapping.
+		level := slog.LevelError
+		if _, mapped := lookupServiceError(err); mapped {
+			level = slog.LevelWarn
+		}
+		logger.Log(r.Context(), level, "refresh request failed",
 			slog.String("request_id", requestID),
 			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),

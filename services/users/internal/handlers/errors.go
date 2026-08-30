@@ -51,6 +51,19 @@ var serviceErrorTable = []serviceErrorMapping{
 	{services.ErrInvalidInput, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid input provided", false},
 }
 
+// lookupServiceError returns the first serviceErrorTable row matching err, and
+// whether one was found. A match means writeServiceError will translate err
+// into a 4xx client error; no match means it falls through to a 500. Handlers
+// that log the failure use this to pick the log level — see Refresh.
+func lookupServiceError(err error) (serviceErrorMapping, bool) {
+	for _, m := range serviceErrorTable {
+		if errors.Is(err, m.sentinel) {
+			return m, true
+		}
+	}
+	return serviceErrorMapping{}, false
+}
+
 // writeServiceError maps err through serviceErrorTable and writes the matching
 // HTTP error response. If no sentinel matches, it writes a 500 with
 // fallbackMessage — that is the only path to a 500, so a newly added service
@@ -58,15 +71,13 @@ var serviceErrorTable = []serviceErrorMapping{
 // caught by TestServiceErrorTable_CoversAllSentinels) rather than being silently
 // mishandled by a forgotten per-handler branch.
 func writeServiceError(w http.ResponseWriter, err error, fallbackMessage string) {
-	for _, m := range serviceErrorTable {
-		if errors.Is(err, m.sentinel) {
-			message := m.message
-			if m.useErrText {
-				message = err.Error()
-			}
-			api.WriteError(w, m.status, m.code, message, nil, "v1")
-			return
+	if m, ok := lookupServiceError(err); ok {
+		message := m.message
+		if m.useErrText {
+			message = err.Error()
 		}
+		api.WriteError(w, m.status, m.code, message, nil, "v1")
+		return
 	}
 	api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, fallbackMessage, nil, "v1")
 }
