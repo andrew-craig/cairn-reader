@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/andrew-craig/cairn-reader/pkg/models"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/andrew-craig/cairn-reader/pkg/rss/parse"
 	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/db"
 	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/testutil"
@@ -153,7 +154,7 @@ func TestFetchSingleFeed_Success(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	err := fetcher.FetchSingleFeed(ctx)
 	if err != nil {
@@ -194,7 +195,7 @@ func TestFetchSingleFeed_HTTPError(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	err := fetcher.FetchSingleFeed(ctx)
 	if err == nil {
@@ -234,7 +235,7 @@ func TestFetchSingleFeed_RecommenderError(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	err := fetcher.FetchSingleFeed(ctx)
 	if err == nil {
@@ -258,7 +259,7 @@ func TestFetchSingleFeed_NoEnabledFeeds(t *testing.T) {
 	testutil.CreateTestFeed(t, database, testutil.TestFeedURL1, false, nil, 10)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	err := fetcher.FetchSingleFeed(ctx)
 	if err == nil {
@@ -289,7 +290,7 @@ func TestFetchSingleFeed_ForwardsAllItems(t *testing.T) {
 	feedID := testutil.CreateTestFeed(t, database, server.URL, true, &lastFetch, 0)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	if err := fetcher.FetchSingleFeed(ctx); err != nil {
 		t.Fatalf("FetchSingleFeed failed: %v", err)
@@ -339,7 +340,7 @@ func TestFetchSingleFeed_ETagSentOnSubsequentFetch(t *testing.T) {
 	testutil.CreateTestFeed(t, database, server.URL, true, nil, 0)
 
 	fetcher := NewFetcher(repo, mockClient, 60*time.Second)
-	ctx := context.Background()
+	ctx := fetchtest.AllowLoopback(context.Background())
 
 	// First fetch — no conditional headers sent.
 	if err := fetcher.FetchSingleFeed(ctx); err != nil {
