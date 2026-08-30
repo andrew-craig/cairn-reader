@@ -5,4 +5,5 @@
 // + localStorage; mobile: fixed backend + AsyncStorage).
 export * from './types';
 export * from './config/api';
+export * from './services/auth';
 export * from './utils/throttle';

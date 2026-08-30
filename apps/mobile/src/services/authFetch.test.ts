@@ -61,7 +61,7 @@ describe('AuthService.fetchWithAuth', () => {
 
     expect(res).toBe(ok);
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer access-1');
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer access-1');
   });
 
   it('refreshes once on 401 and retries the request with the new token', async () => {
@@ -74,9 +74,10 @@ describe('AuthService.fetchWithAuth', () => {
         // refresh call
         ok: true,
         status: 200,
-        json: async () => ({
-          data: { access_token: 'access-2', refresh_token: 'refresh-2', expires_in: 3600 },
-        }),
+        text: async () =>
+          JSON.stringify({
+            data: { access_token: 'access-2', refresh_token: 'refresh-2', expires_in: 3600 },
+          }),
       })
       .mockResolvedValueOnce(retried); // retried request
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -85,7 +86,7 @@ describe('AuthService.fetchWithAuth', () => {
 
     expect(res).toBe(retried);
     const retryInit = fetchMock.mock.calls[2][1];
-    expect((retryInit.headers as Record<string, string>).Authorization).toBe('Bearer access-2');
+    expect((retryInit.headers as Headers).get('Authorization')).toBe('Bearer access-2');
   });
 
   it('clears tokens and throws the session-expired message when the 401 refresh fails', async () => {
@@ -93,7 +94,11 @@ describe('AuthService.fetchWithAuth', () => {
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce(unauthorized)
-      .mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ message: 'bad refresh' }) });
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        text: async () => JSON.stringify({ message: 'bad refresh' }),
+      });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(AuthService.fetchWithAuth('https://api.test/x')).rejects.toThrow(
@@ -129,7 +134,7 @@ describe('AuthService.fetchWithAuthAndRetry', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('throws "Server error <status>" on a 5xx so withRetry retries and eventually rejects', async () => {
+  it('surfaces a 5xx as HttpResponseError so withRetry retries and eventually rejects', async () => {
     jest.useFakeTimers();
     try {
       global.fetch = jest
@@ -137,7 +142,10 @@ describe('AuthService.fetchWithAuthAndRetry', () => {
         .mockResolvedValue({ status: 503, ok: false }) as unknown as typeof fetch;
 
       const pending = AuthService.fetchWithAuthAndRetry('https://api.test/x');
-      const assertion = expect(pending).rejects.toThrow('Server error 503');
+      const assertion = expect(pending).rejects.toMatchObject({
+        name: 'HttpResponseError',
+        status: 503,
+      });
       await jest.runAllTimersAsync();
       await assertion;
       // 1 initial + 3 retries

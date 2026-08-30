@@ -16,7 +16,7 @@ module.exports = {
     '^@expo/vector-icons$': '<rootDir>/__mocks__/@expo/vector-icons.js',
     '^@expo/vector-icons/(.*)$': '<rootDir>/__mocks__/@expo/vector-icons.js',
   },
-  setupFiles: [],
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   testMatch: [
     '**/*.test.ts',
     '**/*.test.tsx',

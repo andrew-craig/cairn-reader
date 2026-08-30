@@ -1,78 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Mobile authentication service. The token-refresh state machine, email login,
+// changePassword and fetchWithAuth all live in @cairn/shared (parameterized over
+// an injected StorageAdapter — mobile wires AsyncStorage in config/init.ts via
+// configureStorage). This file adds only the mobile-specific pieces: device-ID
+// login/registration, account upgrade, and the 5xx-retrying fetch wrapper.
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
-import {
-  LoginResponse,
-  LoginRequest,
-  RegisterRequest,
-  MobileAuthRequest,
-  AuthTokens,
-  User,
-} from '../types';
-import { getServerUrl } from '@cairn/shared';
-import { withRetry } from '../utils/retry';
+import { AuthService as SharedAuthService, getServerUrl } from '@cairn/shared';
+import { MobileAuthRequest, User } from '../types';
+import { withRetry, HttpResponseError } from '../utils/retry';
 
-const ACCESS_TOKEN_KEY = '@cairn:access_token';
-const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
-const USER_KEY = '@cairn:user';
-const TOKEN_EXPIRES_AT_KEY = '@cairn:token_expires_at';
-
-// Buffer time before expiration to trigger proactive refresh (5 minutes)
-const TOKEN_EXPIRATION_BUFFER_MS = 5 * 60 * 1000;
-
-// Listener type for auth state changes
-type AuthStateListener = (isAuthenticated: boolean) => void;
-
-export class AuthService {
-  private static accessToken: string | null = null;
-  private static refreshToken: string | null = null;
-  private static user: User | null = null;
-  private static expiresAt: number | null = null;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private static async parseJsonResponse(response: Response): Promise<any> {
-    const text = await response.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error('Unable to reach the server. Please try again later.');
-    }
-  }
-
-  private static isRefreshing: boolean = false;
-  private static refreshPromise: Promise<void> | null = null;
-  private static listeners: Set<AuthStateListener> = new Set();
-
-  /**
-   * Register a listener for auth state changes.
-   * Returns an unsubscribe function.
-   */
-  static onAuthStateChange(listener: AuthStateListener): () => void {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  }
-
-  private static notifyListeners(isAuthenticated: boolean): void {
-    this.listeners.forEach((listener) => {
-      try {
-        listener(isAuthenticated);
-      } catch (error) {
-        console.error('Error in auth state listener:', error);
-      }
-    });
-  }
-
-  static async initialize(): Promise<void> {
-    this.accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    const userJson = await AsyncStorage.getItem(USER_KEY);
-    this.user = userJson ? JSON.parse(userJson) : null;
-    const expiresAtStr = await AsyncStorage.getItem(TOKEN_EXPIRES_AT_KEY);
-    this.expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
-  }
-
+export class AuthService extends SharedAuthService {
   static async getDeviceId(): Promise<string> {
     let deviceId: string | null = null;
 
@@ -88,428 +25,42 @@ export class AuthService {
     return deviceId;
   }
 
-  static async loginWithDevice(): Promise<LoginResponse> {
-    const deviceId = await this.getDeviceId();
+  static async loginWithDevice() {
+    const expo_device_id = await this.getDeviceId();
+    return this.authenticate('/api/v1/auth/login/mobile', { expo_device_id } as MobileAuthRequest);
+  }
 
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/login/mobile`, {
+  static async registerWithDevice() {
+    const expo_device_id = await this.getDeviceId();
+    return this.authenticate('/api/v1/auth/register/mobile', {
+      expo_device_id,
+    } as MobileAuthRequest);
+  }
+
+  static async upgradeAccount(email: string, password: string): Promise<User> {
+    const userId = await this.getUserId();
+    if (!userId) {
+      throw new Error('No user found');
+    }
+
+    const response = await this.fetchWithAuth(`${getServerUrl()}/api/v1/user/${userId}/upgrade`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
+      body: JSON.stringify({ email, password }),
     });
 
-    const result = await this.parseJsonResponse(response);
+    const result = (await this.parseJsonResponse(response)) as {
+      data?: User;
+      message?: string;
+      error?: string;
+    };
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Device login failed');
+      throw new Error(result.message || result.error || 'Failed to upgrade account');
     }
 
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
-    await this.saveUser(data.user);
-    return data;
-  }
-
-  static async registerWithDevice(): Promise<LoginResponse> {
-    const deviceId = await this.getDeviceId();
-
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/register/mobile`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ expo_device_id: deviceId } as MobileAuthRequest),
-    });
-
-    const result = await this.parseJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Device registration failed');
-    }
-
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
-    await this.saveUser(data.user);
-    return data;
-  }
-
-  static async loginWithEmail(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    const result = await this.parseJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Email login failed');
-    }
-
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
-    await this.saveUser(data.user);
-    return data;
-  }
-
-  static async registerWithEmail(credentials: RegisterRequest): Promise<LoginResponse> {
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
-
-    const result = await this.parseJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Email registration failed');
-    }
-
-    const data: LoginResponse = result.data;
-    const expiresAt = Date.now() + (data.expires_in * 1000);
-    await this.saveTokens({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt,
-    });
-    await this.saveUser(data.user);
-    return data;
-  }
-
-  static async logout(): Promise<void> {
-    if (this.refreshToken) {
-      try {
-        await fetch(`${getServerUrl()}/api/v1/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.accessToken}`,
-          },
-          body: JSON.stringify({ refresh_token: this.refreshToken }),
-        });
-      } catch (error) {
-        console.error('Error during logout:', error);
-      }
-    }
-
-    await this.clearTokens();
-  }
-
-  static async saveTokens(tokens: AuthTokens): Promise<void> {
-    this.accessToken = tokens.accessToken;
-    this.refreshToken = tokens.refreshToken;
-    this.expiresAt = tokens.expiresAt || null;
-
-    await AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    if (tokens.expiresAt) {
-      await AsyncStorage.setItem(TOKEN_EXPIRES_AT_KEY, tokens.expiresAt.toString());
-    }
-  }
-
-  static async clearTokens(): Promise<void> {
-    this.accessToken = null;
-    this.refreshToken = null;
-    this.user = null;
-    this.expiresAt = null;
-
-    await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
-    await AsyncStorage.removeItem(REFRESH_TOKEN_KEY);
-    await AsyncStorage.removeItem(USER_KEY);
-    await AsyncStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
-
-    // Notify listeners that user is no longer authenticated
-    this.notifyListeners(false);
-  }
-
-  static async getAccessToken(): Promise<string | null> {
-    if (!this.accessToken) {
-      this.accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    }
-    return this.accessToken;
-  }
-
-  static async isAuthenticated(): Promise<boolean> {
-    const token = await this.getAccessToken();
-    return token !== null;
-  }
-
-  /**
-   * Check if the access token is expired or will expire soon.
-   * Returns true if token should be refreshed.
-   */
-  static async isTokenExpired(): Promise<boolean> {
-    if (!this.expiresAt) {
-      const expiresAtStr = await AsyncStorage.getItem(TOKEN_EXPIRES_AT_KEY);
-      this.expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
-    }
-
-    // If no expiration stored, assume expired to trigger refresh
-    if (!this.expiresAt) {
-      return true;
-    }
-
-    // Consider expired if within buffer time of expiration
-    return Date.now() >= (this.expiresAt - TOKEN_EXPIRATION_BUFFER_MS);
-  }
-
-  /**
-   * Check if we have a refresh token available.
-   */
-  static async hasRefreshToken(): Promise<boolean> {
-    if (!this.refreshToken) {
-      this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    }
-    return this.refreshToken !== null;
-  }
-
-  /**
-   * Ensure we have a valid access token, refreshing if necessary.
-   * This method handles concurrent refresh requests by reusing the same promise.
-   * Returns true if a valid token is available, false if user needs to re-login.
-   */
-  static async ensureValidToken(): Promise<boolean> {
-    const hasToken = await this.isAuthenticated();
-    if (!hasToken) {
-      if (__DEV__) {
-        console.log('[Auth] No access token found, authentication required');
-      }
-      return false;
-    }
-
-    const isExpired = await this.isTokenExpired();
-    if (!isExpired) {
-      if (__DEV__) {
-        const timeLeft = this.expiresAt ? Math.floor((this.expiresAt - Date.now()) / 1000) : 'unknown';
-        console.log(`[Auth] Access token still valid (${timeLeft}s remaining)`);
-      }
-      return true;
-    }
-
-    if (__DEV__) {
-      console.log('[Auth] Access token expired or expiring soon, attempting refresh');
-    }
-
-    // Token is expired, need to refresh
-    const hasRefresh = await this.hasRefreshToken();
-    if (!hasRefresh) {
-      if (__DEV__) {
-        console.log('[Auth] No refresh token available, clearing tokens');
-      }
-      await this.clearTokens();
-      return false;
-    }
-
-    try {
-      await this.refreshAccessToken();
-      if (__DEV__) {
-        console.log('[Auth] Token refresh successful');
-      }
-      return true;
-    } catch (error) {
-      console.error('[Auth] Failed to refresh token:', error instanceof Error ? error.message : String(error));
-      return false;
-    }
-  }
-
-  static async refreshAccessToken(): Promise<void> {
-    // If already refreshing, wait for the existing refresh to complete
-    if (this.isRefreshing && this.refreshPromise) {
-      if (__DEV__) {
-        console.log('[Auth] Refresh already in progress, waiting for existing refresh');
-      }
-      return this.refreshPromise;
-    }
-
-    if (__DEV__) {
-      console.log('[Auth] Starting token refresh');
-    }
-    this.isRefreshing = true;
-    this.refreshPromise = this.doRefreshAccessToken();
-
-    try {
-      await this.refreshPromise;
-    } finally {
-      this.isRefreshing = false;
-      this.refreshPromise = null;
-    }
-  }
-
-  private static async doRefreshAccessToken(): Promise<void> {
-    if (!this.refreshToken) {
-      this.refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
-    }
-
-    if (!this.refreshToken) {
-      console.error('[Auth] No refresh token available in doRefreshAccessToken');
-      throw new Error('No refresh token available');
-    }
-
-    if (__DEV__) {
-      console.log('[Auth] Attempting token refresh');
-    }
-
-    try {
-      const requestBody = { refresh_token: this.refreshToken };
-
-      const response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      let result;
-      try {
-        result = await response.json();
-      } catch (parseError) {
-        console.error('[Auth] Failed to parse refresh response as JSON:', parseError);
-        throw new Error('Invalid JSON response from refresh endpoint');
-      }
-
-      if (!response.ok) {
-        if (__DEV__) {
-          console.error('[Auth] Refresh failed with error response:', {
-            status: response.status,
-            message: result.message || result.error,
-          });
-        } else {
-          console.error('[Auth] Refresh failed with error response, status:', response.status);
-        }
-        throw new Error(result.message || result.error || 'Failed to refresh token');
-      }
-
-      const data: LoginResponse = result.data;
-
-      if (!data || !data.access_token || !data.refresh_token || !data.expires_in) {
-        console.error('[Auth] Refresh response missing required fields:', {
-          hasData: !!data,
-          hasAccessToken: !!data?.access_token,
-          hasRefreshToken: !!data?.refresh_token,
-          hasExpiresIn: !!data?.expires_in,
-        });
-        throw new Error('Invalid refresh response: missing required fields');
-      }
-
-      const expiresAt = Date.now() + (data.expires_in * 1000);
-
-      await this.saveTokens({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresAt,
-      });
-
-      if (__DEV__) {
-        console.log('[Auth] Token refresh successful');
-      }
-    } catch (error) {
-      // Clear tokens on ANY error (network issues, parsing errors, HTTP errors, etc.)
-      console.error('[Auth] Refresh failed, clearing all tokens:', error instanceof Error ? error.message : String(error));
-
-      await this.clearTokens();
-      throw error;
-    }
-  }
-
-  static async saveUser(user: User): Promise<void> {
-    this.user = user;
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
-  }
-
-  static async getUser(): Promise<User | null> {
-    if (!this.user) {
-      const userJson = await AsyncStorage.getItem(USER_KEY);
-      this.user = userJson ? JSON.parse(userJson) : null;
-    }
-    return this.user;
-  }
-
-  static async getUserId(): Promise<string | null> {
-    const user = await this.getUser();
-    return user?.id || null;
-  }
-
-  /**
-   * Authenticated fetch with proactive token refresh and a single reactive 401
-   * retry. Feature services (read, explore) build on this — one implementation,
-   * not a private copy per service.
-   *
-   * The 'Session expired. Please log in again.' and 'Not authenticated' error
-   * messages are load-bearing: utils/retry.ts classifies retryability by
-   * substring-matching the message, so rephrasing either makes an unrecoverable
-   * auth failure retryable.
-   */
-  static async fetchWithAuth(
-    url: string,
-    options: RequestInit = {}
-  ): Promise<Response> {
-    // Proactively check and refresh token if expired before making request
-    const isValid = await this.ensureValidToken();
-    if (!isValid) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const accessToken = await this.getAccessToken();
-
-    if (!accessToken) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-        ...options.headers,
-      },
-    });
-
-    // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
-    if (response.status === 401) {
-      try {
-        await this.refreshAccessToken();
-        const newAccessToken = await this.getAccessToken();
-
-        // Retry the request with new token
-        const retryResponse = await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${newAccessToken}`,
-            ...options.headers,
-          },
-        });
-
-        return retryResponse;
-      } catch {
-        // If refresh fails, clear tokens and throw
-        await this.clearTokens();
-        throw new Error('Session expired. Please log in again.');
-      }
-    }
-
-    return response;
+    const user = (result.data ?? (result as unknown as User)) as User;
+    await this.saveUser(user);
+    return user;
   }
 
   /**
@@ -522,69 +73,12 @@ export class AuthService {
   ): Promise<Response> {
     return withRetry(async (signal) => {
       const response = await this.fetchWithAuth(url, { ...options, signal });
-      // Throw on 5xx so withRetry can retry; let 4xx pass through to caller
+      // Surface 5xx as a status-carrying error so withRetry retries it; let 4xx
+      // pass through to the caller untouched.
       if (response.status >= 500) {
-        throw new Error(`Server error ${response.status}`);
+        throw new HttpResponseError(response.status);
       }
       return response;
     });
-  }
-
-  static async upgradeAccount(email: string, password: string): Promise<User> {
-    const isValid = await this.ensureValidToken();
-    if (!isValid) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const userId = await this.getUserId();
-    if (!userId) {
-      throw new Error('No user found');
-    }
-
-    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/upgrade`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.accessToken}`,
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Failed to upgrade account');
-    }
-
-    const user: User = result.data || result;
-    await this.saveUser(user);
-    return user;
-  }
-
-  static async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    const isValid = await this.ensureValidToken();
-    if (!isValid) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const userId = await this.getUserId();
-    if (!userId) {
-      throw new Error('No user found');
-    }
-
-    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/password`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.accessToken}`,
-      },
-      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || result.error || 'Failed to change password');
-    }
   }
 }
