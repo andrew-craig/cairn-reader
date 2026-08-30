@@ -252,7 +252,7 @@ func TestFeedPrioritization(t *testing.T) {
 	}
 
 	// Mark never-fetched feed as fetched
-	err = repo.UpdateFetchResult(ctx, neverFetchedID, true)
+	err = repo.UpdateFetchResult(ctx, neverFetchedID, true, "", "")
 	if err != nil {
 		t.Fatalf("UpdateFetchResult failed: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestFeedPrioritization(t *testing.T) {
 	}
 
 	// Mark old feed as fetched
-	err = repo.UpdateFetchResult(ctx, oldFeedID, true)
+	err = repo.UpdateFetchResult(ctx, oldFeedID, true, "", "")
 	if err != nil {
 		t.Fatalf("UpdateFetchResult failed: %v", err)
 	}
