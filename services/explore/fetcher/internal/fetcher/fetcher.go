@@ -78,35 +78,20 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 		LastModified: feed.LastModified,
 	})
 	if err != nil {
-		if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false, "", ""); updateErr != nil {
-			slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
-		}
-		if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, 0, 0, err.Error()); histErr != nil {
-			slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
-		}
+		f.recordOutcome(ctx, feed.ID, fetchOutcome{errMsg: err.Error()})
 		return fmt.Errorf("fetch RSS: %w", err)
 	}
 
 	// 304 Not Modified — feed unchanged, record success and move on.
 	if resp.NotModified {
 		slog.Info("feed not modified (304)", slog.Int("feed_id", feed.ID))
-		if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, true, feed.ETag, feed.LastModified); updateErr != nil {
-			slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
-		}
-		if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, true, 0, 0, ""); histErr != nil {
-			slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
-		}
+		f.recordOutcome(ctx, feed.ID, fetchOutcome{success: true, etag: feed.ETag, lastModified: feed.LastModified})
 		return nil
 	}
 
 	feedData, err := parse.ParseBytes(resp.Body)
 	if err != nil {
-		if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false, "", ""); updateErr != nil {
-			slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
-		}
-		if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, 0, 0, err.Error()); histErr != nil {
-			slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
-		}
+		f.recordOutcome(ctx, feed.ID, fetchOutcome{errMsg: err.Error()})
 		return fmt.Errorf("parse RSS: %w", err)
 	}
 
@@ -125,26 +110,46 @@ func (f *Fetcher) FetchSingleFeed(ctx context.Context) error {
 	if len(newArticles) > 0 {
 		if err := f.recommenderClient.SubmitArticles(ctx, newArticles); err != nil {
 			slog.Error("failed to submit articles", slog.Any("error", err))
-			if updateErr := f.feedRepo.UpdateFetchResult(ctx, feed.ID, false, "", ""); updateErr != nil {
-				slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", updateErr))
-			}
-			if histErr := f.feedRepo.RecordFetchHistory(ctx, feed.ID, false, len(feedData.Items), 0, err.Error()); histErr != nil {
-				slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", histErr))
-			}
+			f.recordOutcome(ctx, feed.ID, fetchOutcome{articlesFound: len(feedData.Items), errMsg: err.Error()})
 			return fmt.Errorf("submit articles: %w", err)
 		}
 		articlesSent = len(newArticles)
 		slog.Info("successfully submitted articles", slog.Int("count", articlesSent))
 	}
 
-	if err := f.feedRepo.UpdateFetchResult(ctx, feed.ID, true, resp.ETag, resp.LastModified); err != nil {
-		slog.Error("failed to update fetch result", slog.Int("feed_id", feed.ID), slog.Any("error", err))
-	}
-	if err := f.feedRepo.RecordFetchHistory(ctx, feed.ID, true, len(feedData.Items), articlesSent, ""); err != nil {
-		slog.Error("failed to record fetch history", slog.Int("feed_id", feed.ID), slog.Any("error", err))
-	}
+	f.recordOutcome(ctx, feed.ID, fetchOutcome{
+		success:       true,
+		etag:          resp.ETag,
+		lastModified:  resp.LastModified,
+		articlesFound: len(feedData.Items),
+		articlesSent:  articlesSent,
+	})
 
 	return nil
+}
+
+// fetchOutcome is the result of one fetch attempt, recorded once via
+// recordOutcome. The zero value is a plain failure with no articles seen and
+// no conditional-GET values (which UpdateFetchResult ignores on failure).
+type fetchOutcome struct {
+	success       bool
+	etag          string
+	lastModified  string
+	articlesFound int
+	articlesSent  int
+	errMsg        string
+}
+
+// recordOutcome persists a fetch attempt's result. It is the single place
+// UpdateFetchResult and RecordFetchHistory are called, so no exit path can
+// record one without the other or let their arguments drift apart.
+func (f *Fetcher) recordOutcome(ctx context.Context, feedID int, o fetchOutcome) {
+	if err := f.feedRepo.UpdateFetchResult(ctx, feedID, o.success, o.etag, o.lastModified); err != nil {
+		slog.Error("failed to update fetch result", slog.Int("feed_id", feedID), slog.Any("error", err))
+	}
+	if err := f.feedRepo.RecordFetchHistory(ctx, feedID, o.success, o.articlesFound, o.articlesSent, o.errMsg); err != nil {
+		slog.Error("failed to record fetch history", slog.Int("feed_id", feedID), slog.Any("error", err))
+	}
 }
 
 // convertItems converts parse.Items to Article models.
