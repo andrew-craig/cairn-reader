@@ -59,7 +59,7 @@ export function getDefaultServerUrl(): string {
   return resolveDefaultServerUrl();
 }
 
-function getStorage(): StorageAdapter {
+export function getStorage(): StorageAdapter {
   if (!storage) {
     throw new Error('Storage adapter not configured. Call configureStorage() first.');
   }

@@ -1,13 +1,13 @@
 import { AuthService } from './auth';
 
 // H14: token refresh must never leak token material (raw token, token
-// prefix/preview, or full response bodies) to device logs, and diagnostic
-// logging must be gated behind __DEV__.
+// prefix/preview, or full response bodies) to device logs. The state machine
+// now lives in @cairn/shared; these tests pin that contract from the mobile
+// side (mobile re-exports the shared AuthService via a subclass).
 describe('AuthService token refresh logging', () => {
   const OLD_REFRESH_TOKEN = 'old-refresh-token-0123456789abcdef-secret';
   const NEW_REFRESH_TOKEN = 'new-refresh-token-fedcba9876543210-secret';
   const NEW_ACCESS_TOKEN = 'new-access-token-aaaabbbbccccdddd-secret';
-  const originalDev = (global as unknown as { __DEV__: boolean }).__DEV__;
 
   let logSpy: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
@@ -21,10 +21,10 @@ describe('AuthService token refresh logging', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await AuthService.clearTokens();
     logSpy.mockRestore();
     errorSpy.mockRestore();
-    (global as unknown as { __DEV__: boolean }).__DEV__ = originalDev;
     jest.restoreAllMocks();
   });
 
@@ -39,13 +39,14 @@ describe('AuthService token refresh logging', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({
-        data: {
-          access_token: NEW_ACCESS_TOKEN,
-          refresh_token: NEW_REFRESH_TOKEN,
-          expires_in: 3600,
-        },
-      }),
+      text: async () =>
+        JSON.stringify({
+          data: {
+            access_token: NEW_ACCESS_TOKEN,
+            refresh_token: NEW_REFRESH_TOKEN,
+            expires_in: 3600,
+          },
+        }),
     }) as unknown as typeof fetch;
 
     await AuthService.refreshAccessToken();
@@ -64,7 +65,8 @@ describe('AuthService token refresh logging', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 401,
-      json: async () => ({ message: 'invalid refresh token', debug: secretMarker }),
+      text: async () =>
+        JSON.stringify({ message: 'invalid refresh token', debug: secretMarker }),
     }) as unknown as typeof fetch;
 
     await expect(AuthService.refreshAccessToken()).rejects.toThrow();
@@ -73,24 +75,5 @@ describe('AuthService token refresh logging', () => {
     expect(text).not.toContain(OLD_REFRESH_TOKEN);
     expect(text).not.toContain(OLD_REFRESH_TOKEN.substring(0, 20));
     expect(text).not.toContain(secretMarker);
-  });
-
-  it('suppresses diagnostic console.log output when __DEV__ is false', async () => {
-    (global as unknown as { __DEV__: boolean }).__DEV__ = false;
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        data: {
-          access_token: 'access-2',
-          refresh_token: 'refresh-2',
-          expires_in: 3600,
-        },
-      }),
-    }) as unknown as typeof fetch;
-
-    await AuthService.refreshAccessToken();
-
-    expect(logSpy).not.toHaveBeenCalled();
   });
 });

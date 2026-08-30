@@ -65,3 +65,22 @@ jobs:
         working-directory: .
         run: npm ci
       - run: npx vitest run
+
+  shared:
+    name: Shared package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/shared
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install workspace dependencies
+        working-directory: .
+        run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
