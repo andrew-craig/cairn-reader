@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -86,8 +87,10 @@ func TestJWTGenerateToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, token)
 
-	// Verify token can be parsed
-	claims, err := manager.ValidateToken(token)
+	// Verify the minted token validates through the canonical pkg/auth validator
+	// (the real request-path validator; JWTManager no longer validates).
+	validator := pkgauth.NewValidator(publicKey)
+	claims, err := validator.ValidateToken(token)
 	require.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, "cairn-user-service", claims.Issuer)
@@ -101,210 +104,10 @@ func TestJWTGenerateToken(t *testing.T) {
 
 	token2, err := manager.GenerateToken(userID)
 	require.NoError(t, err)
-	claims2, err := manager.ValidateToken(token2)
+	claims2, err := validator.ValidateToken(token2)
 	require.NoError(t, err)
 	assert.NotEmpty(t, claims2.ID)
 	assert.NotEqual(t, claims.ID, claims2.ID)
-}
-
-func TestValidateToken(t *testing.T) {
-	privateKey, publicKey := generateTestKeyPair(t)
-	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
-	userID := uuid.New()
-
-	tests := []struct {
-		name      string
-		setupFunc func() string
-		wantErr   error
-	}{
-		{
-			name: "valid token",
-			setupFunc: func() string {
-				token, _ := manager.GenerateToken(userID)
-				return token
-			},
-			wantErr: nil,
-		},
-		{
-			name: "empty token",
-			setupFunc: func() string {
-				return ""
-			},
-			wantErr: ErrMissingToken,
-		},
-		{
-			name: "expired token",
-			setupFunc: func() string {
-				// Create a manager with very short expiry
-				shortManager := NewJWTManager(privateKey, publicKey, 1*time.Millisecond)
-				token, _ := shortManager.GenerateToken(userID)
-				time.Sleep(2 * time.Millisecond)
-				return token
-			},
-			wantErr: ErrTokenExpired,
-		},
-		{
-			name: "invalid signature",
-			setupFunc: func() string {
-				// Generate token with different key
-				otherPrivateKey, _ := generateTestKeyPair(t)
-				otherManager := NewJWTManager(otherPrivateKey, publicKey, 60*time.Minute)
-				token, _ := otherManager.GenerateToken(userID)
-				return token
-			},
-			wantErr: ErrInvalidSignature,
-		},
-		{
-			name: "malformed token",
-			setupFunc: func() string {
-				return "not.a.valid.jwt.token"
-			},
-			wantErr: nil, // Will be wrapped in "failed to parse token"
-		},
-		{
-			name: "invalid issuer",
-			setupFunc: func() string {
-				// Create token with different issuer
-				config := JWTManagerConfig{
-					PrivateKey: privateKey,
-					PublicKey:  publicKey,
-					Expiry:     60 * time.Minute,
-					Issuer:     "wrong-issuer",
-					Audience:   "cairn-api",
-				}
-				wrongManager := NewJWTManagerWithConfig(config)
-				token, _ := wrongManager.GenerateToken(userID)
-				return token
-			},
-			wantErr: ErrInvalidIssuer,
-		},
-		{
-			name: "invalid audience",
-			setupFunc: func() string {
-				// Create token with different audience
-				config := JWTManagerConfig{
-					PrivateKey: privateKey,
-					PublicKey:  publicKey,
-					Expiry:     60 * time.Minute,
-					Issuer:     "cairn-user-service",
-					Audience:   "wrong-audience",
-				}
-				wrongManager := NewJWTManagerWithConfig(config)
-				token, _ := wrongManager.GenerateToken(userID)
-				return token
-			},
-			wantErr: ErrInvalidAudience,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			token := tt.setupFunc()
-			claims, err := manager.ValidateToken(token)
-
-			if tt.wantErr != nil {
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, tt.wantErr)
-				assert.Nil(t, claims)
-			} else if tt.name == "valid token" {
-				assert.NoError(t, err)
-				assert.NotNil(t, claims)
-				assert.Equal(t, userID, claims.UserID)
-			} else {
-				assert.Error(t, err)
-			}
-		})
-	}
-}
-
-func TestParseTokenWithoutValidation(t *testing.T) {
-	privateKey, publicKey := generateTestKeyPair(t)
-	manager := NewJWTManager(privateKey, publicKey, 1*time.Millisecond)
-	userID := uuid.New()
-
-	// Generate an expired token
-	token, err := manager.GenerateToken(userID)
-	require.NoError(t, err)
-
-	// Wait for token to expire
-	time.Sleep(2 * time.Millisecond)
-
-	// Validation should fail
-	_, err = manager.ValidateToken(token)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrTokenExpired)
-
-	// Parse without validation should succeed
-	claims, err := manager.ParseTokenWithoutValidation(token)
-	require.NoError(t, err)
-	assert.Equal(t, userID, claims.UserID)
-}
-
-func TestExtractTokenFromHeader(t *testing.T) {
-	tests := []struct {
-		name      string
-		header    string
-		wantToken string
-		wantErr   error
-	}{
-		{
-			name:      "valid bearer token",
-			header:    "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantErr:   nil,
-		},
-		{
-			name:      "valid bearer token with lowercase",
-			header:    "bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantErr:   nil,
-		},
-		{
-			name:      "empty header",
-			header:    "",
-			wantToken: "",
-			wantErr:   ErrMissingToken,
-		},
-		{
-			name:      "missing bearer scheme",
-			header:    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantToken: "",
-			wantErr:   ErrInvalidAuthHeader,
-		},
-		{
-			name:      "wrong scheme",
-			header:    "Basic eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9",
-			wantToken: "",
-			wantErr:   ErrInvalidAuthHeader,
-		},
-		{
-			name:      "bearer without token",
-			header:    "Bearer ",
-			wantToken: "",
-			wantErr:   ErrMissingToken,
-		},
-		{
-			name:      "bearer with empty token",
-			header:    "Bearer",
-			wantToken: "",
-			wantErr:   ErrInvalidAuthHeader,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			token, err := ExtractTokenFromHeader(tt.header)
-
-			if tt.wantErr != nil {
-				assert.Error(t, err)
-				assert.ErrorIs(t, err, tt.wantErr)
-				assert.Empty(t, token)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantToken, token)
-			}
-		})
-	}
 }
 
 func TestGetTokenExpiry(t *testing.T) {
@@ -326,25 +129,24 @@ func TestUpdateKeys(t *testing.T) {
 	oldToken, err := manager.GenerateToken(userID)
 	require.NoError(t, err)
 
-	// Validate with old keys
-	claims, err := manager.ValidateToken(oldToken)
+	// Validate with old keys (via the canonical pkg/auth validator)
+	claims, err := pkgauth.NewValidator(oldPublicKey).ValidateToken(oldToken)
 	require.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 
 	// Update to new keys
 	manager.UpdateKeys(newPrivateKey, newPublicKey)
 
-	// Old token should fail validation with new keys
-	_, err = manager.ValidateToken(oldToken)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrInvalidSignature)
+	// Old token should fail validation against the new key
+	_, err = pkgauth.NewValidator(newPublicKey).ValidateToken(oldToken)
+	assert.ErrorIs(t, err, pkgauth.ErrInvalidSignature)
 
 	// Generate new token with new keys
 	newToken, err := manager.GenerateToken(userID)
 	require.NoError(t, err)
 
 	// New token should validate with new keys
-	claims, err = manager.ValidateToken(newToken)
+	claims, err = pkgauth.NewValidator(newPublicKey).ValidateToken(newToken)
 	require.NoError(t, err)
 	assert.Equal(t, userID, claims.UserID)
 }
@@ -355,46 +157,6 @@ func TestGetPublicKey(t *testing.T) {
 
 	retrievedKey := manager.GetPublicKey()
 	assert.Equal(t, publicKey, retrievedKey)
-}
-
-func TestGetTokenInfo(t *testing.T) {
-	privateKey, publicKey := generateTestKeyPair(t)
-	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
-	userID := uuid.New()
-
-	token, err := manager.GenerateToken(userID)
-	require.NoError(t, err)
-
-	info, err := manager.GetTokenInfo(token)
-	require.NoError(t, err)
-
-	assert.Equal(t, userID, info.UserID)
-	assert.Equal(t, "cairn-user-service", info.Issuer)
-	assert.Contains(t, info.Audience, "cairn-api")
-	assert.Equal(t, userID.String(), info.Subject)
-	assert.False(t, info.IsExpired)
-	assert.Greater(t, info.TimeLeft, time.Duration(0))
-	assert.LessOrEqual(t, info.TimeLeft, 60*time.Minute)
-	assert.WithinDuration(t, time.Now(), info.IssuedAt, 5*time.Second)
-	assert.WithinDuration(t, time.Now().Add(60*time.Minute), info.ExpiresAt, 5*time.Second)
-}
-
-func TestGetTokenInfo_ExpiredToken(t *testing.T) {
-	privateKey, publicKey := generateTestKeyPair(t)
-	manager := NewJWTManager(privateKey, publicKey, 1*time.Millisecond)
-	userID := uuid.New()
-
-	token, err := manager.GenerateToken(userID)
-	require.NoError(t, err)
-
-	// Wait for expiration
-	time.Sleep(2 * time.Millisecond)
-
-	info, err := manager.GetTokenInfo(token)
-	require.NoError(t, err)
-
-	assert.True(t, info.IsExpired)
-	assert.Equal(t, time.Duration(0), info.TimeLeft)
 }
 
 func TestTokenClaims(t *testing.T) {
@@ -447,34 +209,6 @@ func TestRS256SigningMethod(t *testing.T) {
 	assert.Equal(t, "RS256", parsedToken.Method.Alg())
 }
 
-func TestValidateToken_NotBeforeCheck(t *testing.T) {
-	privateKey, publicKey := generateTestKeyPair(t)
-	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
-	userID := uuid.New()
-
-	// Create token with nbf in the future
-	now := time.Now()
-	claims := &Claims{
-		UserID: userID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "cairn-user-service",
-			Audience:  jwt.ClaimStrings{"cairn-api"},
-			Subject:   userID.String(),
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(60 * time.Minute)),
-			NotBefore: jwt.NewNumericDate(now.Add(10 * time.Second)),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	tokenString, err := token.SignedString(privateKey)
-	require.NoError(t, err)
-
-	// Validation should fail because token is not yet valid
-	_, err = manager.ValidateToken(tokenString)
-	assert.Error(t, err)
-}
-
 // Benchmark tests
 func BenchmarkGenerateToken(b *testing.B) {
 	privateKey, publicKey := generateTestKeyPair(&testing.T{})
@@ -484,18 +218,6 @@ func BenchmarkGenerateToken(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = manager.GenerateToken(userID)
-	}
-}
-
-func BenchmarkValidateToken(b *testing.B) {
-	privateKey, publicKey := generateTestKeyPair(&testing.T{})
-	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
-	userID := uuid.New()
-	token, _ := manager.GenerateToken(userID)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = manager.ValidateToken(token)
 	}
 }
 
@@ -713,6 +435,8 @@ func TestConcurrentGenerateAndValidate(t *testing.T) {
 	privateKey, publicKey := generateTestKeyPair(t)
 	manager := NewJWTManager(privateKey, publicKey, 60*time.Minute)
 
+	validator := pkgauth.NewValidator(publicKey)
+
 	const numGoroutines = 50
 	tokens := make(chan string, numGoroutines)
 	done := make(chan bool, numGoroutines*2)
@@ -737,7 +461,7 @@ func TestConcurrentGenerateAndValidate(t *testing.T) {
 			defer func() { done <- true }()
 			select {
 			case token := <-tokens:
-				claims, err := manager.ValidateToken(token)
+				claims, err := validator.ValidateToken(token)
 				if err != nil {
 					t.Errorf("ValidateToken failed: %v", err)
 					return

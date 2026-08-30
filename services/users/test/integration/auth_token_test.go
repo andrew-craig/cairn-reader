@@ -62,8 +62,7 @@ func TestAuthService_TokenRefresh_Integration(t *testing.T) {
 		assert.NotEqual(t, oldRefreshToken, refreshResponse.RefreshToken)
 
 		// Verify new access token is valid
-		claims, err := env.JWTManager.ValidateToken(refreshResponse.AccessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, refreshResponse.AccessToken)
 		assert.Equal(t, userID.String(), claims.Subject)
 
 		// Verify old refresh token cannot be reused (token rotation)

@@ -9,10 +9,16 @@ import (
 	"testing"
 	"time"
 
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	testJWTIssuer   = "cairn-test"
+	testJWTAudience = "cairn-api-test"
 )
 
 // TestEnv holds the test environment dependencies
@@ -20,10 +26,21 @@ type TestEnv struct {
 	DB           *database.DB
 	VaultClient  *auth.VaultClient
 	JWTManager   *auth.JWTManager
+	Validator    *pkgauth.Validator
 	UserRepo     database.UserRepository
 	TokenRepo    database.RefreshTokenRepository
 	PasswordHash *auth.PasswordHasher
 	TokenService *auth.RefreshTokenService
+}
+
+// ValidateAccessToken validates an access token minted by env.JWTManager using
+// the canonical pkg/auth validator (the same code the service's request-path
+// middleware runs) and returns the decoded claims.
+func (env *TestEnv) ValidateAccessToken(t *testing.T, token string) *pkgauth.Claims {
+	t.Helper()
+	claims, err := env.Validator.ValidateToken(token)
+	require.NoError(t, err, "access token should validate")
+	return claims
 }
 
 // SetupTestEnvironment initializes all dependencies for integration tests
@@ -79,8 +96,15 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 		Expiry:     15 * time.Minute,
-		Issuer:     "cairn-test",
-		Audience:   "cairn-api-test",
+		Issuer:     testJWTIssuer,
+		Audience:   testJWTAudience,
+	})
+
+	// Canonical validator, matching the manager's issuer/audience
+	validator := pkgauth.NewValidatorWithConfig(pkgauth.ValidatorConfig{
+		PublicKey: publicKey,
+		Issuer:    testJWTIssuer,
+		Audience:  testJWTAudience,
 	})
 
 	// Initialize repositories
@@ -95,6 +119,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		DB:           db,
 		VaultClient:  vaultClient,
 		JWTManager:   jwtManager,
+		Validator:    validator,
 		UserRepo:     userRepo,
 		TokenRepo:    tokenRepo,
 		PasswordHash: passwordHash,

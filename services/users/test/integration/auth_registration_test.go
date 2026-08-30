@@ -64,8 +64,7 @@ func TestAuthService_Registration_Integration(t *testing.T) {
 		assert.NotNil(t, user.PasswordHash)
 
 		// Verify access token is valid
-		claims, err := env.JWTManager.ValidateToken(response.AccessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, response.AccessToken)
 		assert.Equal(t, response.User.ID.String(), claims.Subject)
 
 		// Verify refresh token was stored
@@ -166,8 +165,7 @@ func TestAuthService_MobileRegistration_Integration(t *testing.T) {
 		assert.True(t, user.IsMobileOnly())
 
 		// Verify access token is valid
-		claims, err := env.JWTManager.ValidateToken(response.AccessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, response.AccessToken)
 		assert.Equal(t, response.User.ID.String(), claims.Subject)
 	})
 
@@ -242,8 +240,7 @@ func TestAuthService_RegistrationEndToEnd_Integration(t *testing.T) {
 		accessToken := response.AccessToken
 
 		// Step 2: Verify access token can be used for authorization
-		claims, err := env.JWTManager.ValidateToken(accessToken)
-		require.NoError(t, err)
+		claims := env.ValidateAccessToken(t, accessToken)
 		assert.Equal(t, userID.String(), claims.Subject)
 
 		// Step 3: Verify user can be retrieved

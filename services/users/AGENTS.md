@@ -171,7 +171,7 @@ services/users/
 │       └── main.go
 ├── internal/                  # Private application code
 │   ├── auth/                 # JWT and token management
-│   │   ├── jwt.go           # JWT creation and validation
+│   │   ├── jwt.go           # JWT signing and signing-key management (validation lives in pkg/auth)
 │   │   ├── password.go      # Password hashing (bcrypt)
 │   │   ├── refresh_token.go # Refresh token generation
 │   │   └── vault.go         # Vault integration for keys
@@ -442,13 +442,18 @@ curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
 
 ### JWT Authentication (`internal/auth/jwt.go`)
 
+`internal/auth/jwt.go` (`JWTManager`) only **signs** access tokens and manages the
+signing key pair (rotation via `UpdateKeys`). It does **not** validate tokens —
+the users service validates through the shared `pkg/auth` `Validator` (wired onto
+the `/api/v1/user` route group in `router.go`), exactly like every other service.
+
 **Token Generation**:
 - Algorithm: RS256 (2048-bit RSA keys), with a `kid` header identifying the signing key for rotation
 - Lifetime: 15 minutes (configurable via `JWT_ACCESS_TOKEN_EXPIRY`; code default is 60 minutes if unset)
 - Claims: `user_id` (custom) plus standard registered claims - `iss`, `aud`, `sub`, `iat`, `exp`, `nbf`
 - Keys stored in HashiCorp Vault
 
-**Token Validation**:
+**Token Validation** (`pkg/auth`):
 - Stateless validation using public key
 - No database lookups required
 - Issuer (`cairn-user-service`) and audience (`cairn-api`) are validated, not just the signature

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/andrew-craig/cairn-reader/pkg/env"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
@@ -54,6 +55,22 @@ func setupTestAuthService(t *testing.T) (AuthService, *database.DB, *auth.JWTMan
 	})
 
 	return service, db, jwtManager
+}
+
+// validateAccessToken checks that token was minted by jwtManager and validates
+// through the canonical pkg/auth validator (JWTManager no longer validates),
+// returning the decoded claims.
+func validateAccessToken(t *testing.T, jwtManager *auth.JWTManager, token string) *pkgauth.Claims {
+	t.Helper()
+	validator := pkgauth.NewValidatorWithConfig(pkgauth.ValidatorConfig{
+		PublicKey: jwtManager.GetPublicKey(),
+		Issuer:    "test-issuer",
+		Audience:  "test-audience",
+	})
+	claims, err := validator.ValidateToken(token)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+	return claims
 }
 
 // setupTestDB creates a test database connection
@@ -190,9 +207,7 @@ func TestAuthService_Register(t *testing.T) {
 		assert.Greater(t, resp.ExpiresIn, int64(0))
 
 		// Verify access token is valid
-		token, err := jwtManager.ValidateToken(resp.AccessToken)
-		require.NoError(t, err)
-		assert.NotNil(t, token)
+		validateAccessToken(t, jwtManager, resp.AccessToken)
 
 		// Verify password was hashed (not stored in plain text)
 		assert.NotNil(t, resp.User.PasswordHash)
@@ -276,9 +291,7 @@ func TestAuthService_RegisterMobile(t *testing.T) {
 		assert.Greater(t, resp.ExpiresIn, int64(0))
 
 		// Verify access token is valid
-		token, err := jwtManager.ValidateToken(resp.AccessToken)
-		require.NoError(t, err)
-		assert.NotNil(t, token)
+		validateAccessToken(t, jwtManager, resp.AccessToken)
 	})
 
 	t.Run("success - without device info", func(t *testing.T) {
@@ -348,9 +361,7 @@ func TestAuthService_Login(t *testing.T) {
 		assert.NotEqual(t, registerResp.AccessToken, loginResp.AccessToken)
 
 		// Verify access token is valid
-		token, err := jwtManager.ValidateToken(loginResp.AccessToken)
-		require.NoError(t, err)
-		assert.NotNil(t, token)
+		validateAccessToken(t, jwtManager, loginResp.AccessToken)
 	})
 
 	t.Run("empty email", func(t *testing.T) {
@@ -435,9 +446,7 @@ func TestAuthService_LoginMobile(t *testing.T) {
 		assert.NotEmpty(t, loginResp.RefreshToken)
 
 		// Verify access token is valid
-		token, err := jwtManager.ValidateToken(loginResp.AccessToken)
-		require.NoError(t, err)
-		assert.NotNil(t, token)
+		validateAccessToken(t, jwtManager, loginResp.AccessToken)
 	})
 
 	t.Run("empty device ID", func(t *testing.T) {
@@ -509,9 +518,7 @@ func TestAuthService_RefreshAccessToken(t *testing.T) {
 		assert.NotEqual(t, registerResp.RefreshToken, refreshResp.RefreshToken)
 
 		// Verify new access token is valid
-		token, err := jwtManager.ValidateToken(refreshResp.AccessToken)
-		require.NoError(t, err)
-		assert.NotNil(t, token)
+		validateAccessToken(t, jwtManager, refreshResp.AccessToken)
 
 		// Verify user data
 		assert.NotNil(t, refreshResp.User)

@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,16 +14,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Common JWT errors
-var (
-	ErrInvalidToken      = errors.New("invalid token")
-	ErrTokenExpired      = errors.New("token has expired")
-	ErrInvalidSignature  = errors.New("invalid token signature")
-	ErrInvalidIssuer     = errors.New("invalid token issuer")
-	ErrInvalidAudience   = errors.New("invalid token audience")
-	ErrMissingToken      = errors.New("missing authorization token")
-	ErrInvalidAuthHeader = errors.New("invalid authorization header format")
-)
+// ErrTokenExpired indicates that a token (access or refresh) has expired.
+// Token validation for the request path lives in pkg/auth; this sentinel is
+// retained because the refresh-token service returns it for expired refresh
+// tokens.
+var ErrTokenExpired = errors.New("token has expired")
 
 // JWTManager handles JWT token operations
 type JWTManager struct {
@@ -168,111 +162,6 @@ func (j *JWTManager) GenerateToken(userID uuid.UUID) (string, error) {
 	return signedToken, nil
 }
 
-// ValidateToken validates a JWT token and returns the claims
-func (j *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
-	if tokenString == "" {
-		return nil, ErrMissingToken
-	}
-
-	// Capture public key under read lock for use in the key function
-	j.mu.RLock()
-	publicKey := j.publicKey
-	j.mu.RUnlock()
-
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		// Verify signing method
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return publicKey, nil
-	})
-
-	if err != nil {
-		// Check for specific error types
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrTokenExpired
-		}
-		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
-			return nil, ErrInvalidSignature
-		}
-		return nil, fmt.Errorf("failed to parse token: %w", err)
-	}
-
-	claims, ok := token.Claims.(*Claims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	if !token.Valid {
-		return nil, ErrInvalidToken
-	}
-
-	// Validate issuer if configured
-	if j.issuer != "" && claims.Issuer != j.issuer {
-		return nil, ErrInvalidIssuer
-	}
-
-	// Validate audience if configured
-	if j.audience != "" {
-		validAudience := false
-		for _, aud := range claims.Audience {
-			if aud == j.audience {
-				validAudience = true
-				break
-			}
-		}
-		if !validAudience {
-			return nil, ErrInvalidAudience
-		}
-	}
-
-	return claims, nil
-}
-
-// ParseTokenWithoutValidation parses a token without validating the signature
-// WARNING: This should only be used for debugging or extracting claims from expired tokens
-// NEVER use this for authorization decisions
-func (j *JWTManager) ParseTokenWithoutValidation(tokenString string) (*Claims, error) {
-	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	token, _, err := parser.ParseUnverified(tokenString, &Claims{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse token: %w", err)
-	}
-
-	claims, ok := token.Claims.(*Claims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	return claims, nil
-}
-
-// ExtractTokenFromHeader extracts the JWT token from an Authorization header
-// Expected format: "Bearer <token>"
-func ExtractTokenFromHeader(authHeader string) (string, error) {
-	if authHeader == "" {
-		return "", ErrMissingToken
-	}
-
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 {
-		return "", ErrInvalidAuthHeader
-	}
-
-	scheme := parts[0]
-	token := parts[1]
-
-	if !strings.EqualFold(scheme, "Bearer") {
-		return "", ErrInvalidAuthHeader
-	}
-
-	if token == "" {
-		return "", ErrMissingToken
-	}
-
-	return token, nil
-}
-
 // GetTokenExpiry returns the expiration time for tokens
 func (j *JWTManager) GetTokenExpiry() time.Duration {
 	return j.expiry
@@ -306,46 +195,4 @@ func (j *JWTManager) GetKeyID() string {
 	j.mu.RLock()
 	defer j.mu.RUnlock()
 	return j.keyID
-}
-
-// TokenInfo holds information about a token
-type TokenInfo struct {
-	UserID    uuid.UUID
-	IssuedAt  time.Time
-	ExpiresAt time.Time
-	NotBefore time.Time
-	Issuer    string
-	Audience  []string
-	Subject   string
-	IsExpired bool
-	TimeLeft  time.Duration
-}
-
-// GetTokenInfo extracts and returns information about a token without full validation
-// Useful for debugging and logging purposes
-func (j *JWTManager) GetTokenInfo(tokenString string) (*TokenInfo, error) {
-	claims, err := j.ParseTokenWithoutValidation(tokenString)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	expiresAt := claims.ExpiresAt.Time
-	isExpired := now.After(expiresAt)
-	timeLeft := time.Duration(0)
-	if !isExpired {
-		timeLeft = time.Until(expiresAt)
-	}
-
-	return &TokenInfo{
-		UserID:    claims.UserID,
-		IssuedAt:  claims.IssuedAt.Time,
-		ExpiresAt: expiresAt,
-		NotBefore: claims.NotBefore.Time,
-		Issuer:    claims.Issuer,
-		Audience:  claims.Audience,
-		Subject:   claims.Subject,
-		IsExpired: isExpired,
-		TimeLeft:  timeLeft,
-	}, nil
 }
