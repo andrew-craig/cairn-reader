@@ -218,11 +218,12 @@ func (r *feedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]mod
 	var feeds []models.Feed
 	for rows.Next() {
 		var feed models.Feed
+		var title, description sql.NullString
 		err := rows.Scan(
 			&feed.ID,
 			&feed.URL,
-			&feed.Title,
-			&feed.Description,
+			&title,
+			&description,
 			&feed.LastFetchedAt,
 			&feed.ConsecutiveFailures,
 			&feed.Enabled,
@@ -231,6 +232,12 @@ func (r *feedRepository) ListFeeds(ctx context.Context, enabledOnly bool) ([]mod
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan feed: %w", err)
+		}
+		if title.Valid {
+			feed.Title = title.String
+		}
+		if description.Valid {
+			feed.Description = description.String
 		}
 		feeds = append(feeds, feed)
 	}
@@ -267,17 +274,25 @@ func (r *feedRepository) GetFeedByID(ctx context.Context, feedID int) (*models.F
 	`
 
 	var feed models.Feed
+	var title, description sql.NullString
 	err := r.db.QueryRow(ctx, query, feedID).Scan(
 		&feed.ID,
 		&feed.URL,
-		&feed.Title,
-		&feed.Description,
+		&title,
+		&description,
 		&feed.LastFetchedAt,
 		&feed.ConsecutiveFailures,
 		&feed.Enabled,
 		&feed.CreatedAt,
 		&feed.UpdatedAt,
 	)
+
+	if title.Valid {
+		feed.Title = title.String
+	}
+	if description.Valid {
+		feed.Description = description.String
+	}
 
 	if err == pgx.ErrNoRows {
 		return nil, apperrors.ErrFeedNotFound
