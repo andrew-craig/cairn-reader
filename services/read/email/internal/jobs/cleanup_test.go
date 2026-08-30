@@ -127,6 +127,30 @@ func TestNewRawEmailCleanupJob_InvalidCron(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestNewCleanupJob_NonPositiveRetentionFallsBackToDefault proves both
+// constructors share the retention-fallback rule: a non-positive retentionDays
+// is clamped to defaultRetentionDays rather than producing a zero-retention
+// job that would delete everything.
+func TestNewCleanupJob_NonPositiveRetentionFallsBackToDefault(t *testing.T) {
+	for _, retention := range []int{0, -3} {
+		var captured time.Duration
+		deleteFunc := func(_ context.Context, olderThan time.Duration, _ int) (int64, error) {
+			captured = olderThan
+			return 0, nil
+		}
+
+		outbox, err := NewOutboxCleanupJob(&mockOutboxRepo{deleteFunc: deleteFunc}, "0 6 * * *", retention)
+		require.NoError(t, err)
+		outbox.run(context.Background())
+		assert.Equal(t, defaultRetentionDays*24*time.Hour, captured, "outbox retention=%d", retention)
+
+		rawEmail, err := NewRawEmailCleanupJob(&mockRawEmailRepo{deleteFunc: deleteFunc}, "0 5 * * *", retention)
+		require.NoError(t, err)
+		rawEmail.run(context.Background())
+		assert.Equal(t, defaultRetentionDays*24*time.Hour, captured, "raw email retention=%d", retention)
+	}
+}
+
 func TestRawEmailCleanupJob_Run_UsesRetentionDuration(t *testing.T) {
 	var capturedDuration time.Duration
 	repo := &mockRawEmailRepo{
@@ -166,7 +190,7 @@ func TestRawEmailCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 
 	assert.Equal(t, 3, calls, "must keep batching until a call returns zero")
 	for _, bs := range capturedBatchSizes {
-		assert.Equal(t, defaultRawEmailCleanupBatchSize, bs, "every call must be bounded by the batch size")
+		assert.Equal(t, defaultCleanupBatchSize, bs, "every call must be bounded by the batch size")
 	}
 }
 
@@ -252,7 +276,7 @@ func TestOutboxCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 
 	assert.Equal(t, 3, calls, "must keep batching until a call returns zero")
 	for _, bs := range capturedBatchSizes {
-		assert.Equal(t, defaultOutboxCleanupBatchSize, bs, "every call must be bounded by the batch size")
+		assert.Equal(t, defaultCleanupBatchSize, bs, "every call must be bounded by the batch size")
 	}
 }
 
