@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/andrew-craig/cairn-reader/pkg/rss/sanitize"
 	"golang.org/x/net/html"
 )
 
@@ -24,44 +24,19 @@ const maxHTMLWalkDepth = 100
 
 // ContentExtractor sanitizes email HTML and generates a content hash.
 // No readability extraction — sanitize only.
-type ContentExtractor struct {
-	policy *bluemonday.Policy
-}
+type ContentExtractor struct{}
 
-// NewContentExtractor creates a ContentExtractor with a safe bluemonday policy.
+// NewContentExtractor creates a ContentExtractor.
 func NewContentExtractor() *ContentExtractor {
-	policy := bluemonday.NewPolicy()
-
-	// Text content
-	policy.AllowElements("p", "br", "hr")
-	policy.AllowElements("h1", "h2", "h3", "h4", "h5", "h6")
-	policy.AllowElements("strong", "em", "code", "blockquote", "pre")
-
-	// Lists
-	policy.AllowElements("ul", "ol", "li", "dl", "dt", "dd")
-
-	// Tables
-	policy.AllowElements("table", "thead", "tbody", "tr", "th", "td")
-	policy.AllowAttrs("colspan", "rowspan").OnElements("th", "td")
-
-	// Links — require nofollow + noreferrer
-	policy.AllowURLSchemes("http", "https", "mailto")
-	policy.AllowElements("a")
-	policy.AllowAttrs("href", "title").OnElements("a")
-	policy.RequireNoReferrerOnLinks(true)
-	policy.AddSpaceWhenStrippingTag(true)
-
-	// Images
-	policy.AllowElements("img", "figure", "picture", "source")
-	policy.AllowAttrs("src", "alt").OnElements("img")
-	policy.AllowAttrs("width", "height").Matching(bluemonday.Integer).OnElements("img")
-
-	return &ContentExtractor{policy: policy}
+	return &ContentExtractor{}
 }
 
 // Extract sanitizes cleanedHTML, generates a content hash, and extracts plain text.
+// Sanitization uses the canonical pkg/rss/sanitize policy, the same policy the
+// content service applies to RSS-sourced HTML — email is an untrusted inbound
+// path and must not diverge from it.
 func (e *ContentExtractor) Extract(cleanedHTML string) (ProcessedEmailContent, error) {
-	sanitized := e.policy.Sanitize(cleanedHTML)
+	sanitized := sanitize.Sanitize(cleanedHTML)
 
 	hash := sha256.Sum256([]byte(sanitized))
 	contentHash := fmt.Sprintf("%x", hash)

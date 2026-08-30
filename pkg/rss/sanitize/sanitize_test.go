@@ -237,3 +237,35 @@ func TestSanitize_Snapshots(t *testing.T) {
 		})
 	}
 }
+
+// --- cases the email ingest path relies on (consolidated onto this policy) ---
+
+func TestSanitize_HorizontalRuleKept(t *testing.T) {
+	out := sanitize.Sanitize(`<p>above</p><hr><p>below</p>`)
+	assert.Contains(t, out, "<hr>", "section-divider <hr> must survive (newsletters/articles use it)")
+}
+
+func TestSanitize_SpaceInsertedWhenStrippingTag(t *testing.T) {
+	// A disallowed tag wrapping text must not fuse that text to its neighbours
+	// once the tag is removed (matters for plain-text / preview extraction).
+	out := sanitize.Sanitize(`foo<font>bar</font>baz`)
+	assert.Contains(t, out, "foo bar baz")
+	assert.NotContains(t, out, "<font")
+}
+
+func TestSanitize_EmailUntrustedInputStripped(t *testing.T) {
+	// Email is an untrusted inbound path; the canonical policy must strip the
+	// same active content the email service's former hand-rolled policy did.
+	cases := []string{
+		`<p onclick="steal()">x</p>`,
+		`<iframe src="https://evil.example/x"></iframe>`,
+		`<img src="javascript:alert(1)">`,
+		`<a href="javascript:alert(1)">x</a>`,
+	}
+	for _, in := range cases {
+		out := sanitize.Sanitize(in)
+		assert.NotContains(t, out, "javascript:")
+		assert.NotContains(t, out, "onclick")
+		assert.NotContains(t, out, "<iframe")
+	}
+}

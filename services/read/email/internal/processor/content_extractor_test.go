@@ -109,8 +109,8 @@ func TestContentExtractor_PlainText(t *testing.T) {
 }
 
 // TestHTMLToPlainText_DeepNestingIsBounded exercises htmlToPlainText's walk
-// directly (bypassing bluemonday, which would otherwise strip the <span>
-// nesting) with HTML nested past maxHTMLWalkDepth. It proves the walk
+// directly (not through Extract's sanitization) with HTML nested past
+// maxHTMLWalkDepth. It proves the walk
 // doesn't keep recursing past the bound: content past it is dropped rather
 // than processed. The nesting depth (300) is deliberately kept under
 // golang.org/x/net/html's own hard cap of 512 open elements (Parse returns

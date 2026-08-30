@@ -60,7 +60,7 @@ Cloudflare Email Worker
 
 ### Key Principles
 
-1. **Sanitise only** — no readability extraction; emails are cleaned and sanitised with bluemonday
+1. **Sanitise only** — no readability extraction; emails are cleaned and then sanitised with the canonical `pkg/rss/sanitize` policy (the same policy the content service applies to RSS HTML)
 2. **One address per user** — 8-char alphanumeric local part, no regeneration
 3. **Open by default** — all senders accepted, no allowlist/blocklist
 4. **Outbox pattern** — reliable delivery to Content Service with exponential backoff
@@ -232,7 +232,7 @@ GET /health/ready   → 200 OK or 503 if DB unreachable
 1. Fetch pending `raw_emails` (batch of 20, semaphore-limited to 3 concurrent)
 2. Upsert sender record
 3. **EmailCleaner**: Remove tracking pixels, unsubscribe footers, preheader text
-4. **ContentExtractor**: Sanitise HTML with bluemonday, generate SHA-256 content hash
+4. **ContentExtractor**: Sanitise HTML with the canonical `pkg/rss/sanitize` policy, generate SHA-256 content hash
 5. Create `content_outbox` entry with payload `{url: "email://<uuid>", html, title, author, source_type: "email"}`
 6. Mark raw email as completed
 
@@ -319,7 +319,7 @@ against the same shared Postgres service container the fetcher/content integrati
 
 - **Routing**: go-chi/chi v5
 - **Database**: lib/pq (PostgreSQL), golang-migrate
-- **Sanitisation**: bluemonday
+- **Sanitisation**: `pkg/rss/sanitize` (canonical bluemonday policy, shared with the content service)
 - **Circuit breaker**: sony/gobreaker
 - **JWT**: golang-jwt/jwt v5
-- **Shared packages**: pkg/logging, pkg/auth, pkg/middleware, pkg/api
+- **Shared packages**: pkg/logging, pkg/auth, pkg/middleware, pkg/api, pkg/rss/sanitize

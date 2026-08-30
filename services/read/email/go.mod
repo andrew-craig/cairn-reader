@@ -7,13 +7,13 @@ require (
 	github.com/andrew-craig/cairn-reader/pkg/auth v0.0.0-00010101000000-000000000000
 	github.com/andrew-craig/cairn-reader/pkg/logging v0.0.0
 	github.com/andrew-craig/cairn-reader/pkg/middleware v0.0.0-00010101000000-000000000000
+	github.com/andrew-craig/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
-	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/sony/gobreaker v0.5.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.57.0
@@ -34,6 +34,7 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
 	github.com/hashicorp/vault/api v1.22.0 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
@@ -58,3 +59,5 @@ replace github.com/andrew-craig/cairn-reader/pkg/config => ../../../pkg/config
 replace github.com/andrew-craig/cairn-reader/pkg/auth => ../../../pkg/auth
 
 replace github.com/andrew-craig/cairn-reader/pkg/middleware => ../../../pkg/middleware
+
+replace github.com/andrew-craig/cairn-reader/pkg/rss => ../../../pkg/rss
