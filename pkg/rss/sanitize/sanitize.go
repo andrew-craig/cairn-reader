@@ -21,14 +21,20 @@ var canonicalPolicy = buildPolicy()
 var strictPolicy = bluemonday.StrictPolicy()
 
 // buildPolicy constructs the canonical Cairn sanitizer policy.
-// Source: services/read/content/internal/processor/sanitizer.go with two corrections:
+// Source: services/read/content/internal/processor/sanitizer.go with these corrections:
 //  1. <source src=…> is allowed (podcast/media enclosures)
 //  2. id= is restricted to a single whitespace-free token (HTML5 §2.7.1)
+//  3. <hr> is allowed (section dividers, common in newsletters and articles)
+//  4. AddSpaceWhenStrippingTag inserts a space where a disallowed tag is
+//     removed, so adjacent text doesn't fuse (matters for plain-text/preview
+//     extraction). Both from the email service's former policy.
 func buildPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 
+	p.AddSpaceWhenStrippingTag(true)
+
 	// Text formatting
-	p.AllowElements("p", "br", "span", "div", "article", "section")
+	p.AllowElements("p", "br", "hr", "span", "div", "article", "section")
 	p.AllowElements("h1", "h2", "h3", "h4", "h5", "h6")
 	p.AllowElements("strong", "b", "em", "i", "u", "s", "del", "ins")
 	p.AllowElements("blockquote", "q", "cite", "code", "pre", "kbd", "samp", "var")
