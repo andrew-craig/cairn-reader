@@ -224,8 +224,10 @@ GET /health/ready   → 200 OK or 503 if DB unreachable
 |------------------------|---------------------------------------------|------------------|
 | EmailProcessorWorker   | Clean, sanitise, and create outbox entries   | Poll every 5s    |
 | OutboxWorker           | Deliver to Content Service with retries      | Poll every 10s   |
-| RawEmailCleanupJob     | Delete completed raw_emails > 7 days old     | Daily at 5 AM    |
-| OutboxCleanupJob       | Delete delivered outbox entries > 7 days old  | Daily at 6 AM    |
+| CleanupJob (raw email) | Delete completed raw_emails > 7 days old     | Daily at 5 AM    |
+| CleanupJob (outbox)    | Delete delivered outbox entries > 7 days old  | Daily at 6 AM    |
+
+Both cleanup jobs are one type, `jobs.CleanupJob` (`internal/jobs/cleanup.go`), built by `NewRawEmailCleanupJob` / `NewOutboxCleanupJob` — same batched daily-retention loop, differing only in the table they target.
 
 ### Email Processing Pipeline
 
