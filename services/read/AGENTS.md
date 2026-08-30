@@ -1043,7 +1043,7 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 3. **Add service method** in `internal/service/`
 4. **Add repository method** if database access needed
 5. **Write tests** for handler and service
-6. **Update OpenAPI spec** in `api/openapi.yaml`
+6. **Update OpenAPI spec** in the relevant sub-service spec (`content/api/openapi.yaml` or `fetcher/api/openapi.yaml`)
 
 ### Adding a New Database Table
 
@@ -1167,7 +1167,7 @@ Note: `IMPLEMENTATION_PLAN.md` and `INTEGRATION_TESTS.md` do not exist in this d
 - ✅ **JWT Authentication** (Phase 6) - User-content access control with RS256 token validation
 
 **Remaining Work**:
-- 🔲 API documentation (OpenAPI/Swagger UI) — specs exist (`api/openapi.yaml`) but no served UI
+- 🔲 API documentation (OpenAPI/Swagger UI) — specs exist (`content/api/openapi.yaml`, `fetcher/api/openapi.yaml`) but no served UI
 - 🔲 Production observability (metrics, structured logging)
 - 🔲 Performance optimization
 - 🔲 Rate limiting (CORS is already applied via `pkg/middleware` in both routers)
