@@ -61,6 +61,11 @@ export const ReadScreen: React.FC = () => {
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError });
 
+  // Mirror the current list so the archive mutation can compute the next list
+  // (and persist it) without a side effect inside a state updater.
+  const articlesRef = useRef<Article[]>(articles);
+  articlesRef.current = articles;
+
   // On focus: show cached stale data immediately, then refetch in the
   // background if the TTL has expired. Skip while a search is active.
   useFocusEffect(
@@ -87,11 +92,9 @@ export const ReadScreen: React.FC = () => {
 
   const handleArticleArchived = useCallback(
     (articleId: string) => {
-      setArticles((prev) => {
-        const next = prev.filter((a) => a.id !== articleId);
-        void StorageService.saveReadListCache(next);
-        return next;
-      });
+      const next = articlesRef.current.filter((a) => a.id !== articleId);
+      setArticles(next);
+      void StorageService.saveReadListCache(next);
     },
     [setArticles],
   );

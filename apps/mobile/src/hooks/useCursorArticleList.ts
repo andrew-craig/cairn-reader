@@ -93,6 +93,7 @@ export function useCursorArticleList({
       Alert.alert('Error', 'Failed to search articles. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 

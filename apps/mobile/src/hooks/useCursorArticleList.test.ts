@@ -111,4 +111,21 @@ describe('useCursorArticleList', () => {
     expect(result.current.searchQuery).toBe('term');
     expect(result.current.articles.map((a) => a.id)).toEqual(['s1', 's2']);
   });
+
+  it('clears the refreshing indicator after a pull-to-refresh during search', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page([], '', false));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+
+    await act(async () => {
+      await result.current.search('term');
+    });
+
+    await act(async () => {
+      result.current.handleRefresh();
+    });
+
+    await waitFor(() => expect(result.current.refreshing).toBe(false));
+  });
 });
