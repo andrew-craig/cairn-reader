@@ -84,7 +84,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   const renderHeader = (showStaleMessage = true) => (
     <View>
       <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
-      {showStaleMessage && staleMessage && (
+      {showStaleMessage && staleMessage && !searchQuery && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
             {staleMessage}

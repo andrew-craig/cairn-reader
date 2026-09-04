@@ -111,6 +111,22 @@ describe('ArticleListScreen error state', () => {
     expect(screen.getByText('Showing cached data — pull to refresh')).toBeTruthy();
   });
 
+  it('suppresses the stale banner while a search is active', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        staleMessage="Showing cached data — pull to refresh"
+        searchQuery="whatever"
+        onClearSearch={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('Showing cached data — pull to refresh')).toBeNull();
+    expect(screen.getByText('Results for "whatever"')).toBeTruthy();
+  });
+
   it('shows empty search results (not the error state) when a search is active', () => {
     render(
       <ArticleListScreen

@@ -292,6 +292,13 @@ export const ExploreScreen: React.FC = () => {
     flushShownRef.current();
     setRefreshing(true);
     setIsStale(false);
+    if (articlesRef.current.length === 0) {
+      // Retrying from an empty/error state: show the full-screen spinner
+      // instead of a flash of "No articles available". With articles already
+      // on screen (pull-to-refresh), leave `loading` alone so the populated
+      // list stays visible during reload.
+      setLoading(true);
+    }
     setArticles([]);
     lastVisibleIndexRef.current = 0;
     offsetRef.current = 0;
