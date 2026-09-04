@@ -40,6 +40,11 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   // closing the modal).
   const detectRunRef = useRef<{ cancelled: boolean } | null>(null);
 
+  // Handle to the in-flight Find-feed request so a dismiss can abandon it —
+  // same rationale as detectRunRef: a hung network request must never trap
+  // the user, and a late response must not setState or pop an Alert.
+  const discoverRunRef = useRef<{ cancelled: boolean } | null>(null);
+
   // Trigger URL detection when URL changes
   useEffect(() => {
     if (!url.trim()) {
@@ -178,10 +183,14 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
     setError(null);
     setDiscovering(true);
+    const run = { cancelled: false };
+    discoverRunRef.current = run;
 
     try {
       const normalizedUrl = normalizeUrl(url);
       const { feeds } = await ReadService.discoverFeed(normalizedUrl);
+
+      if (run.cancelled) return;
 
       if (feeds.length === 0) {
         setError('No RSS feed found for this site');
@@ -210,9 +219,9 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
+      if (!run.cancelled) setError(errorMessage);
     } finally {
-      setDiscovering(false);
+      if (!run.cancelled) setDiscovering(false);
     }
   };
 
@@ -223,6 +232,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
     // Abandon any in-flight detection so a late response can't touch state.
     if (detectRunRef.current) detectRunRef.current.cancelled = true;
+    // Same for an in-flight Find-feed request.
+    if (discoverRunRef.current) discoverRunRef.current.cancelled = true;
     setDetecting(false);
     setDiscovering(false);
     setUrl('');

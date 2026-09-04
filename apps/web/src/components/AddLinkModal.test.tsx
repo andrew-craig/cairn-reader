@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AddLinkModal from './AddLinkModal';
 import { ReadService } from '../services/read';
@@ -55,5 +55,60 @@ describe('AddLinkModal dismissal during URL detection', () => {
     await screen.findByText('Adding…');
     await userEvent.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+// task_7c06 follow-up: dismissal must not be gated on `discovering` either, and
+// a late discoverFeed resolution after close must not setState (single-feed
+// success calls setUrl, which would re-trigger the detection effect on a
+// closing modal).
+
+describe('AddLinkModal dismissal during Find-feed', () => {
+  let resolveDiscover: (value: { feeds: { url: string; title: string }[] }) => void;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(ReadService, 'detectURL').mockResolvedValue({
+      url: 'https://example.com',
+      type: 'page',
+      title: null,
+    });
+    vi.spyOn(ReadService, 'discoverFeed').mockReturnValue(
+      new Promise((resolve) => {
+        resolveDiscover = resolve;
+      }),
+    );
+  });
+
+  async function openAndStartDiscovering() {
+    const onClose = vi.fn();
+    render(<AddLinkModal onClose={onClose} />);
+    await userEvent.type(screen.getByLabelText('URL to add'), 'https://example.com');
+    await userEvent.click(screen.getByRole('button', { name: 'Find feed' }));
+    await screen.findByText('Finding…');
+    return onClose;
+  }
+
+  it('the Cancel button dismisses while a feed discovery is pending', async () => {
+    const onClose = await openAndStartDiscovering();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a late discoverFeed resolution after close does not mutate state or warn', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onClose = await openAndStartDiscovering();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await act(async () => {
+      resolveDiscover({ feeds: [{ url: 'https://example.com/feed', title: 'Feed' }] });
+      await Promise.resolve();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    // handleClose already cleared the input; a late single-feed success
+    // calling setUrl would refill it and re-trigger the detection effect.
+    expect((screen.getByLabelText('URL to add') as HTMLInputElement).value).toBe('');
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

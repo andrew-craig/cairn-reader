@@ -79,6 +79,10 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
   const detectRunRef = useRef<{ cancelled: boolean; timer: ReturnType<typeof setTimeout> } | null>(
     null,
   );
+  // Handle to the in-flight Find-feed request so a dismiss can abandon it —
+  // same rationale as detectRunRef: a hung network request must never trap
+  // the user, and a late response must not setState (or, on mobile, alert).
+  const discoverRunRef = useRef<{ cancelled: boolean } | null>(null);
 
   useFocusTrap(modalRef);
 
@@ -175,9 +179,12 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
     setError(null);
     setFeedChoices([]);
     setDiscovering(true);
+    const run = { cancelled: false };
+    discoverRunRef.current = run;
     try {
       const normalizedUrl = normalizeUrl(url);
       const { feeds } = await ReadService.discoverFeed(normalizedUrl);
+      if (run.cancelled) return;
       if (feeds.length === 0) {
         setError('No RSS feed found for this site');
         return;
@@ -190,9 +197,9 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
       // Multiple feeds: show inline picker
       setFeedChoices(feeds);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      if (!run.cancelled) setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setDiscovering(false);
+      if (!run.cancelled) setDiscovering(false);
     }
   };
 
@@ -212,6 +219,8 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
       detectRunRef.current.cancelled = true;
       clearTimeout(detectRunRef.current.timer);
     }
+    // Same for an in-flight Find-feed request.
+    if (discoverRunRef.current) discoverRunRef.current.cancelled = true;
     setDetecting(false);
     setDiscovering(false);
     setUrl('');
