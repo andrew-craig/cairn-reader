@@ -18,7 +18,7 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByText('Something went wrong')).toBeTruthy();
-    expect(screen.getByLabelText('Try again')).toBeTruthy();
+    expect(screen.getByLabelText('Restart app')).toBeTruthy();
 
     jest.restoreAllMocks();
   });
@@ -33,7 +33,7 @@ describe('ErrorBoundary', () => {
     expect(screen.queryByText('Something went wrong')).toBeNull();
   });
 
-  it('re-renders the subtree when "Try again" is pressed', () => {
+  it('re-renders the subtree when "Restart app" is pressed', () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
     let shouldThrow = true;
     const Maybe = () => {
@@ -49,7 +49,7 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeTruthy();
 
     shouldThrow = false;
-    fireEvent.press(screen.getByLabelText('Try again'));
+    fireEvent.press(screen.getByLabelText('Restart app'));
     expect(screen.getByText('recovered')).toBeTruthy();
 
     jest.restoreAllMocks();
