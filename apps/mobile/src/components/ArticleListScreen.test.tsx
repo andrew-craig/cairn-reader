@@ -110,4 +110,23 @@ describe('ArticleListScreen error state', () => {
 
     expect(screen.getByText('Showing cached data — pull to refresh')).toBeTruthy();
   });
+
+  it('shows empty search results (not the error state) when a search is active', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={() => {}}
+        searchQuery="whatever"
+        onClearSearch={() => {}}
+        emptyMessage="No matching articles"
+      />,
+    );
+
+    expect(screen.queryByText("Couldn't load your reading list.")).toBeNull();
+    expect(screen.queryByLabelText('Retry loading')).toBeNull();
+    expect(screen.getByText('No matching articles')).toBeTruthy();
+  });
 });

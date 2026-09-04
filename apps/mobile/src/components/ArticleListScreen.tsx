@@ -166,7 +166,9 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 
   // A load failure with nothing to show: distinguish it from an empty account
   // and give an explicit retry (pull-to-refresh alone is an accessibility gap).
-  if (error && articles.length === 0) {
+  // Suppressed during an active search — a failed reset load shouldn't hide
+  // empty search results behind a stale Retry that would abandon the search.
+  if (error && articles.length === 0 && !searchQuery) {
     return (
       <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
         {renderHeader(false)}
