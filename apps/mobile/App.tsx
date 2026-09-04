@@ -19,6 +19,7 @@ import {
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { TopBlurGradient } from './src/components/common';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 // The shared API config layer (storage + default server URL) is wired up in
 // src/config/init.ts, imported first from index.js so it runs before any module
@@ -43,17 +44,19 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <RootNavigator />
-          <TopBlurGradient />
-          <StatusBar
-            style={colorScheme === 'dark' ? 'light' : 'dark'}
-            translucent={Platform.OS === 'android'}
-            backgroundColor="transparent"
-          />
-        </NavigationContainer>
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <NavigationContainer>
+            <RootNavigator />
+            <TopBlurGradient />
+            <StatusBar
+              style={colorScheme === 'dark' ? 'light' : 'dark'}
+              translucent={Platform.OS === 'android'}
+              backgroundColor="transparent"
+            />
+          </NavigationContainer>
+        </AuthProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
