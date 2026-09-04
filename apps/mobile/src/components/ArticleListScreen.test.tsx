@@ -81,4 +81,33 @@ describe('ArticleListScreen error state', () => {
     );
     expect(screen.queryByText('previous failure')).toBeNull();
   });
+
+  it('does not show the stale banner alongside the error state when there is nothing cached', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={() => {}}
+        staleMessage="Showing cached data — pull to refresh"
+      />,
+    );
+
+    expect(screen.getByText("Couldn't load your reading list.")).toBeTruthy();
+    expect(screen.queryByText('Showing cached data — pull to refresh')).toBeNull();
+  });
+
+  it('still shows the stale banner when there are cached articles to show', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        staleMessage="Showing cached data — pull to refresh"
+      />,
+    );
+
+    expect(screen.getByText('Showing cached data — pull to refresh')).toBeTruthy();
+  });
 });

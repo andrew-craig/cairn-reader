@@ -81,10 +81,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     itemVisiblePercentThreshold: 50,
   });
 
-  const renderHeader = () => (
+  const renderHeader = (showStaleMessage = true) => (
     <View>
       <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
-      {staleMessage && (
+      {showStaleMessage && staleMessage && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
             {staleMessage}
@@ -169,7 +169,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   if (error && articles.length === 0) {
     return (
       <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
-        {renderHeader()}
+        {renderHeader(false)}
         <View style={GlobalStyles.emptyContainer}>
           <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>{error}</Text>
           {onRetry && (
