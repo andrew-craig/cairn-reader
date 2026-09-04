@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,16 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
 
+  // Handle to the in-flight detection so a dismiss can abandon it (detection is
+  // not user-initiated — it fires on every URL change — so it must never block
+  // closing the modal).
+  const detectRunRef = useRef<{ cancelled: boolean } | null>(null);
+
+  // Handle to the in-flight Find-feed request so a dismiss can abandon it —
+  // same rationale as detectRunRef: a hung network request must never trap
+  // the user, and a late response must not setState or pop an Alert.
+  const discoverRunRef = useRef<{ cancelled: boolean } | null>(null);
+
   // Trigger URL detection when URL changes
   useEffect(() => {
     if (!url.trim()) {
@@ -49,19 +59,20 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     }
 
     const normalizedUrl = normalizeUrl(url);
-    let cancelled = false;
+    const run = { cancelled: false };
+    detectRunRef.current = run;
 
     const detectURL = async () => {
       setDetecting(true);
       try {
         const result = await ReadService.detectURL(normalizedUrl);
-        if (!cancelled) {
+        if (!run.cancelled) {
           setDetectionResult(result);
         }
       } catch (err) {
         console.error('URL detection error:', err);
         // Silently fail - user can still submit
-        if (!cancelled) {
+        if (!run.cancelled) {
           setDetectionResult({
             url: normalizedUrl,
             type: 'unknown',
@@ -69,7 +80,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
           });
         }
       } finally {
-        if (!cancelled) {
+        if (!run.cancelled) {
           setDetecting(false);
         }
       }
@@ -78,7 +89,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     detectURL();
 
     return () => {
-      cancelled = true;
+      run.cancelled = true;
     };
   }, [url]);
 
@@ -172,10 +183,14 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
     setError(null);
     setDiscovering(true);
+    const run = { cancelled: false };
+    discoverRunRef.current = run;
 
     try {
       const normalizedUrl = normalizeUrl(url);
       const { feeds } = await ReadService.discoverFeed(normalizedUrl);
+
+      if (run.cancelled) return;
 
       if (feeds.length === 0) {
         setError('No RSS feed found for this site');
@@ -204,19 +219,27 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
+      if (!run.cancelled) setError(errorMessage);
     } finally {
-      setDiscovering(false);
+      if (!run.cancelled) setDiscovering(false);
     }
   };
 
   const handleClose = () => {
-    if (!loading && !detecting && !discovering) {
-      setUrl('');
-      setError(null);
-      setDetectionResult(null);
-      onClose();
-    }
+    // Only a real submit in flight blocks dismissal. `detecting` / `discovering`
+    // are advisory background work and must not trap the user.
+    if (loading) return;
+
+    // Abandon any in-flight detection so a late response can't touch state.
+    if (detectRunRef.current) detectRunRef.current.cancelled = true;
+    // Same for an in-flight Find-feed request.
+    if (discoverRunRef.current) discoverRunRef.current.cancelled = true;
+    setDetecting(false);
+    setDiscovering(false);
+    setUrl('');
+    setError(null);
+    setDetectionResult(null);
+    onClose();
   };
 
   // Button text changes based on detection
