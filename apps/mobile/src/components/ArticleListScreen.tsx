@@ -38,6 +38,13 @@ interface ArticleListScreenProps {
   onClearSearch?: () => void;
   /** When set, renders a small banner below the header to indicate stale data. */
   staleMessage?: string;
+  /**
+   * When set and there are no articles to show, renders a full-screen error
+   * state with an explicit retry affordance instead of the empty message — so a
+   * network failure is not mistaken for an empty account.
+   */
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
@@ -59,6 +66,8 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   searchQuery,
   onClearSearch,
   staleMessage,
+  error,
+  onRetry,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -72,10 +81,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     itemVisiblePercentThreshold: 50,
   });
 
-  const renderHeader = () => (
+  const renderHeader = (showStaleMessage = true) => (
     <View>
       <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
-      {staleMessage && (
+      {showStaleMessage && staleMessage && !searchQuery && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
             {staleMessage}
@@ -155,6 +164,31 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
     );
   }
 
+  // A load failure with nothing to show: distinguish it from an empty account
+  // and give an explicit retry (pull-to-refresh alone is an accessibility gap).
+  // Suppressed during an active search — a failed reset load shouldn't hide
+  // empty search results behind a stale Retry that would abandon the search.
+  if (error && articles.length === 0 && !searchQuery) {
+    return (
+      <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
+        {renderHeader(false)}
+        <View style={GlobalStyles.emptyContainer}>
+          <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>{error}</Text>
+          {onRetry && (
+            <TouchableOpacity
+              onPress={onRetry}
+              style={[errorStateStyles.retryButton, { borderColor: colors.textSecondary }]}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading"
+            >
+              <Text style={[errorStateStyles.retryText, { color: colors.text }]}>Retry</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
       <FlatList
@@ -176,6 +210,20 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
       />
     </View>
   );
+};
+
+const errorStateStyles = {
+  retryButton: {
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  retryText: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.defaultSemiBold,
+  },
 };
 
 const searchBannerStyles = {

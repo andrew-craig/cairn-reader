@@ -21,6 +21,7 @@ export const ReadScreen: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [isStale, setIsStale] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Timestamp of the last successful network fetch (null = never fetched)
   const lastFetchedAtRef = useRef<number | null>(null);
@@ -34,13 +35,17 @@ export const ReadScreen: React.FC = () => {
     void StorageService.saveReadListCache(next);
     lastFetchedAtRef.current = Date.now();
     setIsStale(false);
+    setError(null);
   }, []);
 
   const onLoadError = useCallback((reset: boolean) => {
     if (reset) {
       // Network failure after showing stale data — mark stale rather than
-      // blocking with an alert; the user can still read cached content.
+      // blocking with an alert; the user can still read cached content. With
+      // nothing to show, ArticleListScreen surfaces `error` + a Retry button
+      // instead (and hides the stale banner in that case).
       setIsStale(true);
+      setError("Couldn't load your reading list. Check your connection and try again.");
     } else {
       Alert.alert('Error', 'Failed to load articles. Please try again.', [{ text: 'OK' }]);
     }
@@ -132,6 +137,8 @@ export const ReadScreen: React.FC = () => {
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
         staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
+        error={error}
+        onRetry={() => load(true)}
       />
       <AddLinkModal
         visible={modalVisible}

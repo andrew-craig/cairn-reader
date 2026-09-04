@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ArticleListScreen } from './ArticleListScreen';
 import { Article } from '../types';
 
@@ -30,5 +30,119 @@ describe('ArticleListScreen loading behavior', () => {
     );
 
     expect(screen.getByText('Already on screen')).toBeTruthy();
+  });
+});
+
+describe('ArticleListScreen error state', () => {
+  it('shows the error message and a Retry control when a load fails with nothing to show', () => {
+    const onRetry = jest.fn();
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByText("Couldn't load your reading list.")).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Retry loading'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+
+    // It must NOT look like an empty account.
+    expect(screen.queryByText('No saved articles yet')).toBeNull();
+  });
+
+  it('keeps showing the list (not the error state) when articles are present', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        error="stale/network error"
+        onRetry={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Already on screen')).toBeTruthy();
+    expect(screen.queryByLabelText('Retry loading')).toBeNull();
+  });
+
+  it('shows the first-load spinner (not the error) while a retry is in flight', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading
+        error="previous failure"
+        onRetry={() => {}}
+      />,
+    );
+    expect(screen.queryByText('previous failure')).toBeNull();
+  });
+
+  it('does not show the stale banner alongside the error state when there is nothing cached', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={() => {}}
+        staleMessage="Showing cached data — pull to refresh"
+      />,
+    );
+
+    expect(screen.getByText("Couldn't load your reading list.")).toBeTruthy();
+    expect(screen.queryByText('Showing cached data — pull to refresh')).toBeNull();
+  });
+
+  it('still shows the stale banner when there are cached articles to show', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        staleMessage="Showing cached data — pull to refresh"
+      />,
+    );
+
+    expect(screen.getByText('Showing cached data — pull to refresh')).toBeTruthy();
+  });
+
+  it('suppresses the stale banner while a search is active', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[article]}
+        loading={false}
+        staleMessage="Showing cached data — pull to refresh"
+        searchQuery="whatever"
+        onClearSearch={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('Showing cached data — pull to refresh')).toBeNull();
+    expect(screen.getByText('Results for "whatever"')).toBeTruthy();
+  });
+
+  it('shows empty search results (not the error state) when a search is active', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading={false}
+        error="Couldn't load your reading list."
+        onRetry={() => {}}
+        searchQuery="whatever"
+        onClearSearch={() => {}}
+        emptyMessage="No matching articles"
+      />,
+    );
+
+    expect(screen.queryByText("Couldn't load your reading list.")).toBeNull();
+    expect(screen.queryByLabelText('Retry loading')).toBeNull();
+    expect(screen.getByText('No matching articles')).toBeTruthy();
   });
 });
