@@ -24,8 +24,12 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
+- **task_a8a4** · P2 · open · Mobile: single SQLite-backed local article store (replaces AsyncStorage article caches)  (parent: feature_90a5)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
+- **task_c55c** · P2 · open · Mobile: prefetch article bodies and read from the local store when offline  (parent: feature_90a5)
+- **task_c87c** · P2 · open · Mobile: connectivity awareness and offline banner  (parent: feature_90a5)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_ebf1** · P2 · open · Mobile: offline mutation outbox and reconnect sync  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **decision_4052** · P3 · open · Decide to offer hosted service
@@ -45,6 +49,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
+- **task_43fc** · P3 · open · Docs: offline reading architecture, requirements and mobile CLAUDE.md  (parent: feature_90a5)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
