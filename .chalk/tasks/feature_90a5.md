@@ -49,7 +49,7 @@ connection is restored").
 1. **Mobile only.** Web/PWA stays a non-goal per its requirements doc.
 2. **Automatic, not manual.** Bodies of every `unread`/`reading` article in the Read list
    are downloaded in the background after each list sync, newest first, capped
-   (proposed: 200 articles). No per-article "download" button in v1.
+   (the 100 most recent Read-list articles). No per-article "download" button in v1.
 3. **Images stay remote.** Consistent with the product doc's out-of-scope note
    ("images loaded from source"). Offline articles show text; images fail silently.
    Image caching is a follow-up.
@@ -60,7 +60,7 @@ connection is restored").
 6. **Last-write-wins on sync.** No backend change for conflict resolution in v1; replayed
    PATCHes may clobber a newer value from another device. Acceptable for a
    single-device-dominant read-it-later app; noted as a known limitation.
-7. **Explore content and add-URL stay online-only.**
+7. **Explore article content is never synced.** Explore and add-URL stay online-only.
 
 ## Plan
 
@@ -79,7 +79,8 @@ Each phase ships end to end on its own and is tracked as a sub-task.
       → verify: unit tests for error classification; banner toggles with mocked
       network state.
 - [ ] **Phase 3 — task_c55c** Body prefetch and offline reading. Background download of
-      `cleaned_html` into the store (bounded concurrency, newest first, cap), detail
+      `cleaned_html` into the store (bounded concurrency, newest first, cap of 100,
+      Read list only, never Explore content), detail
       screen renders stored body immediately, refreshes when `content.updated_at`
       changes, evicts on archive/delete and beyond cap.
       → verify: airplane-mode manual test reads a previously synced article; unit
