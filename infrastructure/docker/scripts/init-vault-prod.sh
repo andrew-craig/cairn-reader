@@ -231,6 +231,25 @@ path "auth/token/lookup-self" {
 EOF
 echo "  - explore-recommender policy created"
 
+# Content Service Policy (only needs public key)
+vault policy write content-service - <<EOF
+# Content Service Policy
+# Read-only access to JWT public key for verification
+
+path "secret/data/jwt/public-key" {
+  capabilities = ["read"]
+}
+
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+EOF
+echo "  - content-service policy created"
+
 # Create AppRoles for each service
 echo "Creating AppRoles..."
 
@@ -260,6 +279,19 @@ EXPLORE_RECOMMENDER_SECRET_ID=$(vault write -format=json -f auth/approle/role/ex
 
 echo "  - explore-recommender AppRole created"
 
+# Content Service AppRole
+vault write auth/approle/role/content-service \
+    token_policies="content-service" \
+    token_ttl=1h \
+    token_max_ttl=4h \
+    secret_id_ttl=0 \
+    secret_id_num_uses=0
+
+CONTENT_SERVICE_ROLE_ID=$(vault read -format=json auth/approle/role/content-service/role-id | grep -o '"role_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+CONTENT_SERVICE_SECRET_ID=$(vault write -format=json -f auth/approle/role/content-service/secret-id | grep -o '"secret_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+
+echo "  - content-service AppRole created"
+
 # Write AppRole credentials to file for services to use
 # In production, consider using Docker secrets or another secure method
 cat > /vault-keys/approle-credentials.env << EOF
@@ -274,6 +306,10 @@ USER_SERVICE_SECRET_ID=$USER_SERVICE_SECRET_ID
 # Explore Recommender
 EXPLORE_RECOMMENDER_ROLE_ID=$EXPLORE_RECOMMENDER_ROLE_ID
 EXPLORE_RECOMMENDER_SECRET_ID=$EXPLORE_RECOMMENDER_SECRET_ID
+
+# Content Service
+CONTENT_SERVICE_ROLE_ID=$CONTENT_SERVICE_ROLE_ID
+CONTENT_SERVICE_SECRET_ID=$CONTENT_SERVICE_SECRET_ID
 EOF
 
 chmod 600 /vault-keys/approle-credentials.env
@@ -291,6 +327,10 @@ echo ""
 echo "  Explore Recommender:"
 echo "    VAULT_ROLE_ID=$EXPLORE_RECOMMENDER_ROLE_ID"
 echo "    VAULT_SECRET_ID=$EXPLORE_RECOMMENDER_SECRET_ID"
+echo ""
+echo "  Content Service:"
+echo "    VAULT_ROLE_ID=$CONTENT_SERVICE_ROLE_ID"
+echo "    VAULT_SECRET_ID=$CONTENT_SERVICE_SECRET_ID"
 echo ""
 echo "SECURITY REMINDERS:"
 echo "  1. Retrieve and securely store the unseal keys from /vault-keys/UNSEAL_KEYS.txt"
