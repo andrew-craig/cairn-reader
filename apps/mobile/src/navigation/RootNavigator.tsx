@@ -46,6 +46,8 @@ export default function RootNavigator() {
             <TouchableOpacity
               onPress={() => navigation.navigate('AddArticle')}
               style={{ marginRight: 16 }}
+              accessibilityRole="button"
+              accessibilityLabel="Add link"
             >
               <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
             </TouchableOpacity>

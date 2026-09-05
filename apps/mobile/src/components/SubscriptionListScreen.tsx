@@ -47,7 +47,13 @@ const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle, onDeletePress })
 
   return (
     <View style={[styles.row, { borderColor: colors.border }]}>
-      <TouchableOpacity style={styles.trashButton} onPress={onDeletePress} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={styles.trashButton}
+        onPress={onDeletePress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`Unsubscribe from ${title}`}
+      >
         <Ionicons name="trash-outline" size={24} color={colors.error} />
       </TouchableOpacity>
       <Animated.View

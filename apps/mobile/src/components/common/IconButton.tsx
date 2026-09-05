@@ -10,6 +10,7 @@ import { Colors } from '../../constants';
 interface IconButtonProps {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  accessibilityLabel: string;
   size?: number;
   color?: string;
 }
@@ -17,6 +18,7 @@ interface IconButtonProps {
 export const IconButton: React.FC<IconButtonProps> = ({
   icon,
   onPress,
+  accessibilityLabel,
   size = 24,
   color,
 }) => {
@@ -30,6 +32,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
     >
       <Ionicons name={icon} size={size} color={iconColor} />
     </TouchableOpacity>

@@ -105,7 +105,7 @@ export const VotesScreen: React.FC = () => {
   const clearSearch = useCallback(() => setSearchQuery(null), []);
 
   const headerActions = (
-    <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} />
+    <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
   );
 
   return (

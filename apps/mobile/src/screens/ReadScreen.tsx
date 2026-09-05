@@ -116,8 +116,8 @@ export const ReadScreen: React.FC = () => {
 
   const headerActions = (
     <>
-      <IconButton icon="add-outline" onPress={() => setModalVisible(true)} />
-      <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} />
+      <IconButton icon="add-outline" onPress={() => setModalVisible(true)} accessibilityLabel="Add link" />
+      <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
     </>
   );
 

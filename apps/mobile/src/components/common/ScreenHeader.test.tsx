@@ -21,6 +21,11 @@ describe('ScreenHeader', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it('labels the back button for screen readers', () => {
+    render(<ScreenHeader title="Settings" onBack={() => {}} />);
+    expect(screen.getByLabelText('Back')).toBeTruthy();
+  });
+
   it('renders right actions when provided', () => {
     render(
       <ScreenHeader

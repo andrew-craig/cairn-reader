@@ -126,25 +126,30 @@ export const ExploreArticleDetailScreen: React.FC = () => {
         actions={[
           {
             icon: 'return',
+            label: 'Back',
             onPress: handleBack,
           },
           {
             icon: 'next-article',
+            label: 'Next',
             onPress: handleNextArticle,
             disabled: !hasNextArticle,
           },
           {
             icon: 'bookmark',
+            label: 'Save',
             onPress: handleSave,
             active: isSaved,
           },
           {
             icon: 'thumbs-up',
+            label: 'Upvote',
             onPress: handleUpvote,
             active: hasUpvoted,
           },
           {
             icon: 'thumbs-down',
+            label: 'Downvote',
             onPress: handleDownvote,
             active: hasDownvoted,
           },
