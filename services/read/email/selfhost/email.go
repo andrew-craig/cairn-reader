@@ -147,6 +147,11 @@ func MountEmail(ctx context.Context, cfg EmailConfig, r chi.Router, publicKey *r
 	})
 	r.Handle("/api/v1/source/email", emailRouter)
 	r.Handle("/api/v1/source/email/*", emailRouter)
+	// Internal service-to-service routes live under /api/v1/internal/source/email.
+	// They must be mounted explicitly here; otherwise the content service's
+	// /api/v1/internal/* catch-all mount swallows them and returns 404.
+	r.Handle("/api/v1/internal/source/email", emailRouter)
+	r.Handle("/api/v1/internal/source/email/*", emailRouter)
 
 	// Initialize email worker components
 	emailCleaner := emailProcessor.NewEmailCleaner()

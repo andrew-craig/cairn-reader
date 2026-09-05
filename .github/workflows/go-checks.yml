@@ -619,6 +619,41 @@ jobs:
           done
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+  test-integration-selfhost:
+    name: go test integration (cmd/selfhost)
+    needs: [changes]
+    if: needs.changes.outputs.selfhost == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DB_HOST: localhost
+      TEST_DB_PORT: 5432
+      TEST_DB_USER: postgres
+      TEST_DB_PASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: cmd/selfhost/go.sum
+      # These tests mount several services onto the master router at once, which is
+      # the only place the single-binary routing collisions between them show up.
+      - name: Run integration tests
+        working-directory: cmd/selfhost
+        run: go test -race -tags=integration -count=1 -timeout 10m ./...
+
   # ── Shared pkg/auth (standalone module) ──────────────────────────────
 
   test-pkg-auth:
