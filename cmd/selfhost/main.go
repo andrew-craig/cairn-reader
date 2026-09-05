@@ -61,29 +61,7 @@ func main() {
 	internalAuthMiddleware := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
 
 	// Build master router
-	r := chi.NewRouter()
-	r.Use(sharedmw.Recovery)
-	r.Use(logging.ChiRequestLogger(logger))
-	r.Use(sharedmw.SecureHeadersRelaxed)
-	// Each individual service enforces HTTPS by checking the X-Forwarded-Proto
-	// header, which is what any TLS-terminating reverse proxy sets. The selfhost
-	// binary acts as the integration layer between the host network and those
-	// services, so it is responsible for asserting that header — exactly as
-	// Caddy does in the multi-container prod deployment. The binary itself does
-	// not terminate TLS; operators must place a TLS-terminating reverse proxy
-	// (nginx, Caddy, Traefik, etc.) in front of port 8099. See README.md.
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("X-Forwarded-Proto") == "" {
-				req.Header.Set("X-Forwarded-Proto", "https")
-			}
-			next.ServeHTTP(w, req)
-		})
-	})
-	// CORS at the master-router level covers the aggregated /health/* endpoints and
-	// every mounted service in single-binary mode, and reliably answers browser
-	// preflight OPTIONS before route/method resolution.
-	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
+	r := newMasterRouter(logger)
 
 	// Health checker for aggregated health endpoints
 	health := newHealthChecker()
@@ -197,6 +175,40 @@ func main() {
 	}
 
 	slog.Info("shutdown complete")
+}
+
+// newMasterRouter builds the top-level router every service is mounted on,
+// with the middleware stack those services sit behind.
+func newMasterRouter(logger *slog.Logger) *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(sharedmw.Recovery)
+	r.Use(logging.ChiRequestLogger(logger))
+	r.Use(sharedmw.SecureHeadersRelaxed)
+	// Each individual service enforces HTTPS by checking the X-Forwarded-Proto
+	// header, which is what any TLS-terminating reverse proxy sets. The selfhost
+	// binary acts as the integration layer between the host network and those
+	// services, so it is responsible for asserting that header — exactly as
+	// Caddy does in the multi-container prod deployment. The binary itself does
+	// not terminate TLS; operators must place a TLS-terminating reverse proxy
+	// (nginx, Caddy, Traefik, etc.) in front of port 8099. See README.md.
+	//
+	// This is also what lets the in-binary loopback calls between services
+	// (content -> email, content -> ingest RSS, all over http://localhost:PORT)
+	// satisfy their RequireHTTPS middleware without the clients having to know
+	// they are talking to a loopback address.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Forwarded-Proto") == "" {
+				req.Header.Set("X-Forwarded-Proto", "https")
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+	// CORS at the master-router level covers the aggregated /health/* endpoints and
+	// every mounted service in single-binary mode, and reliably answers browser
+	// preflight OPTIONS before route/method resolution.
+	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
+	return r
 }
 
 // runAllMigrations runs embedded migrations for all 6 databases.

@@ -26,7 +26,7 @@ r.Handle("/api/v1/internal/source/email/*", emailRouter)
 ```
 alongside the existing public mount in `MountEmail`. Verified `cmd/selfhost` still builds (`go build ./...`) and that `go test ./...` passes in `cmd/selfhost`, `services/read`, and `services/read/email`. PR #375 opened against `main`.
 
-## Follow-up review findings (2026-09-05) — THIS BRANCH IS INCOMPLETE, DO NOT MERGE AS-IS
+## Follow-up review findings (2026-09-05) — findings 1 and 3 stand, finding 2 was wrong (see "Resolution" below)
 
 Raised after review pushback that selfhost email is working in practice. Re-verified by
 reproducing the composed `cmd/selfhost` mount structure in a throwaway chi test:
@@ -46,7 +46,7 @@ That is why selfhost email appears to work. The wording under "Problem" above
 ("breaking the internal sender-listing endpoint") overstates the user-visible impact:
 the symptom is a silent omission plus a log line, not a failed request.
 
-### 2. The mount fix alone does NOT fix the endpoint — it turns 404 into 403
+### 2. The mount fix alone does NOT fix the endpoint — it turns 404 into 403 — **SUPERSEDED, this was a reproduction artefact**
 The internal route is wrapped in `sharedmw.RequireHTTPS`
 (`services/read/email/internal/api/router.go:67`), which 403s unless `r.TLS != nil` or
 `X-Forwarded-Proto: https` is set (`pkg/middleware/security.go:12-30`). In selfhost the
@@ -69,14 +69,52 @@ modes; diverging them to fix this bug would trade a working shared code path for
 convenience. Any fix must keep the loopback HTTP call intact and address the
 `RequireHTTPS` check instead.
 
+## Resolution of the review findings (2026-09-05)
+
+### Finding 2 was wrong: there is no 403, and no `RequireHTTPS` change is needed
+The throwaway chi test that produced the `403 {"error":"HTTPS required"}` result rebuilt the
+mount structure but omitted the master router's middleware stack. `cmd/selfhost/main.go`
+already injects `X-Forwarded-Proto: https` on every request that arrives without one — it
+sits on the master router, above every mounted service, precisely so each service's
+`RequireHTTPS` is satisfied the same way Caddy satisfies it in the hosted stack. Loopback
+calls from content → email go over the socket into that same master router, so they get the
+header injected on the way in. The client stays unchanged and the loopback HTTP call stays
+intact (finding 3 respected). That injection is now covered by the regression test and is
+explained in the comment on `newMasterRouter`.
+
+Measured on the composed router, with and without the mount fix:
+```
+WITHOUT FIX  => 404 "404 page not found"     (content catch-all swallows it)
+WITH FIX     => 200 {"data":[],"meta":{...}} (email service response)
+```
+
+Finding 1 (blast radius: a silent omission of newsletter senders from the unified
+subscriptions response plus a `slog.Error` line, not a failed user request) stands — the
+"Problem" wording above overstates the user-visible impact.
+
+### What was added
+- `cmd/selfhost/router_internal_routes_test.go` (`integration` tag): mounts the real content
+  and email services on the real master router, in main()'s order, against scratch databases,
+  and asserts `GET /api/v1/internal/source/email/user/{id}/senders` with a valid
+  `X-Internal-API-Key` returns 200 with the email service's payload — plain HTTP, no
+  `X-Forwarded-Proto`, exactly as the content service's loopback client sends it. Confirmed
+  to fail with 404 when the mount fix is reverted.
+- `cmd/selfhost/main.go`: master-router construction extracted into `newMasterRouter` so the
+  test exercises the binary's real middleware stack rather than a copy of it.
+- `.github/workflows/go-checks.yml`: new `test-integration-selfhost` job with a Postgres
+  service, so the regression test actually runs in CI.
+
 ## Done when
 - [x] Fix implemented and committed on a branch
-- [x] PR opened (#375) — **not to be merged as-is; see findings above**
-- [ ] Decide how selfhost satisfies `RequireHTTPS` on internal loopback calls, keeping the
-      loopback intact (e.g. internal client sets `X-Forwarded-Proto`, or the middleware
-      recognises a trusted-loopback condition) — needs a decision, not yet made
-- [ ] Add a regression test over the composed `cmd/selfhost` router asserting
+- [x] PR opened (#375)
+- [x] Decide how selfhost satisfies `RequireHTTPS` on internal loopback calls, keeping the
+      loopback intact — no change needed; already satisfied by the master router's
+      `X-Forwarded-Proto` injection (`cmd/selfhost/main.go`, `newMasterRouter`)
+- [x] Add a regression test over the composed `cmd/selfhost` router asserting
       `GET /api/v1/internal/source/email/user/{id}/senders` returns 200, not 404/403
-- [ ] Manually verified against a running selfhost stack (docker compose) that
+- [x] Manually verified against a running selfhost binary that
       `GET /api/v1/internal/source/email/user/{id}/senders` with a valid
-      `X-Internal-API-Key` returns 200
+      `X-Internal-API-Key` returns 200 — and that the real consumer path works end to end:
+      registered a user, called `GET /api/v1/content/user/{id}/subscriptions`, and the
+      binary logged the internal loopback call at `status=200` with no
+      "Failed to fetch email subscriptions" error
