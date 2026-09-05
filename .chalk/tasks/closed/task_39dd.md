@@ -2,14 +2,14 @@
 id: task_39dd
 title: [Email sanitizer] Replace email's hand-maintained bluemonday policy with pkg/rss/sanitize
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,wave4,consolidation]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-14T10:17:09Z
+updated_at: 2026-08-30T04:03:06Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 

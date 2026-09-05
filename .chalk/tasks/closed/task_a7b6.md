@@ -2,14 +2,14 @@
 id: task_a7b6
 title: [Audit/Tier 3] Collapse the five near-identical fetch-outcome recording blocks in explore/fetcher FetchSingleFeed
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,consolidation,audit,explore]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T12:51:30Z
-updated_at: 2026-08-17T12:51:30Z
+updated_at: 2026-08-29T23:46:39Z
 ---
 **Source:** Cairn Simplification Audit — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f · file:line detail supplied by the audit author 2026-08-17 and re-verified at HEAD `a6c56a1`.
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR.

@@ -2,14 +2,14 @@
 id: bug_96d7
 title: [explore/fetcher] Integration-tagged test suite is broken: compile errors, SSRF-guard/httptest conflict, NULL scan bug
 type: bug
-status: open
+status: closed
 priority: 2
 labels: [quality,tests,explore]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-15T23:28:41Z
-updated_at: 2026-08-15T23:28:41Z
+updated_at: 2026-08-29T23:43:03Z
 ---
 Discovered while wiring the new integration-test CI job (task_ac75). services/explore/fetcher
 tags essentially its entire test suite with //go:build integration, so none of it has ever
