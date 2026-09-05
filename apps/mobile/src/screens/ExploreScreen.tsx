@@ -295,11 +295,11 @@ export const ExploreScreen: React.FC = () => {
     if (articlesRef.current.length === 0) {
       // Retrying from an empty/error state: show the full-screen spinner
       // instead of a flash of "No articles available". With articles already
-      // on screen (pull-to-refresh), leave `loading` alone so the populated
-      // list stays visible during reload.
+      // on screen (pull-to-refresh), leave `loading` alone and the existing
+      // articles in place so the populated list stays visible during reload
+      // instead of blanking to "No articles available" mid-fetch.
       setLoading(true);
     }
-    setArticles([]);
     lastVisibleIndexRef.current = 0;
     offsetRef.current = 0;
     hasMoreRef.current = true;
@@ -470,8 +470,8 @@ export const ExploreScreen: React.FC = () => {
         }
         searchQuery={searchQuery ?? undefined}
         onClearSearch={clearSearch}
-        staleMessage={isStale && !searchQuery ? 'Showing cached data — pull to refresh' : undefined}
-        error={searchQuery ? null : error}
+        staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
+        error={error}
         onRetry={handleRefresh}
       />
       <SearchModal
