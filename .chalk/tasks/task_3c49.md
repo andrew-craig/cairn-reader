@@ -42,8 +42,8 @@ Note: the mobile "Archive = hard delete" bug (P2-C5) was already fixed in PR #29
 ## Progress
 - Piece 1 (error boundaries): merged, PR #370.
 - Piece 2 (mobile list error states): merged, PR #371.
-- Piece 5 (ExploreScreen follow-ups): merged, PR #372.
-- Piece 3 (mobile accessibilityLabel): PR #376, open. Made `accessibilityLabel` a required prop on `IconButton` and `QuickAccessButton` (via a new `label` field on `BottomActionMenu` actions) and wired labels through every icon-only control found across the app (reader action bars, `ScreenHeader` back button, header search/add buttons, subscription unsubscribe button, search-clear button).
-- Piece 4 (web destructive-action confirmations): PR #377, open. `ReadArticle.tsx` archive/delete now gate on `window.confirm` (matching the existing pattern in `Feeds.tsx`) and surface failures via `window.alert` in addition to `console.error`.
-- Task stays open until #376 and #377 merge.
+- Piece 3 (mobile accessibilityLabel): merged, PR #376.
+- Piece 4 (web destructive-action confirmations): merged, PR #377.
+- Piece 5 (ExploreScreen follow-ups): PR #372 only recorded the two follow-up bugs in this tracker file — it never touched `ExploreScreen.tsx`. The actual fix (drop the unconditional `setArticles([])` in `handleRefresh`; drop the now-redundant `!searchQuery` guards on `staleMessage`/`error`) is PR #378, open.
+- Task stays open until #378 merges.
 
