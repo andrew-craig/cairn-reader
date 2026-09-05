@@ -44,16 +44,23 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
+- **task_1f23** · P3 · open · Offline mobile: connectivity detection + expo-sqlite OfflineStore foundation (piece 2/7)  (parent: feature_90a5)
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
+- **task_3d59** · P3 · open · Offline mobile: keep auth tokens when server is unreachable (piece 1/7)  (parent: feature_90a5)
+- **task_44ca** · P3 · open · Offline mobile: offline banner, Settings section, docs (piece 6/7)  (parent: feature_90a5)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
+- **task_c73b** · P3 · open · Offline mobile: OfflineSyncService — bounded Read + Explore sync (piece 3/7)  (parent: feature_90a5)
+- **task_ccf3** · P3 · open · Offline mobile: read cached article bodies in the reader screens (piece 4/7)  (parent: feature_90a5)
+- **task_d091** · P3 · open · Offline mobile: end-to-end airplane-mode QA pass (piece 7/7)  (parent: feature_90a5)
 - **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
+- **task_ec80** · P3 · open · Offline mobile: write outbox — queue offline edits, replay on reconnect (piece 5/7)  (parent: feature_90a5)
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support
