@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: []
-blocked_by: []
+blocked_by: [task_a8a4]
 parent: null
 remote_task_url: null
 created_at: 2026-07-05T06:45:55Z
-updated_at: 2026-07-05T06:45:55Z
+updated_at: 2026-09-05T23:36:10Z
 ---
 
 Found while investigating the "archived article still shows in Read list"
