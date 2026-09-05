@@ -214,21 +214,25 @@ export default function ReadArticle() {
 
   const handleArchive = useCallback(async () => {
     if (!article) return;
+    if (!window.confirm('Archive this article?')) return;
     try {
       await ReadService.updateUserContent(article.id, { status: 'archived' });
       navigate('/read');
     } catch (err) {
       console.error('Failed to archive article:', err);
+      window.alert('Failed to archive article. Please try again.');
     }
   }, [article, navigate]);
 
   const handleDelete = useCallback(async () => {
     if (!article) return;
+    if (!window.confirm('Delete this article? This cannot be undone.')) return;
     try {
       await ReadService.deleteUserContent(article.id);
       navigate('/read');
     } catch (err) {
       console.error('Failed to delete article:', err);
+      window.alert('Failed to delete article. Please try again.');
     }
   }, [article, navigate]);
 
