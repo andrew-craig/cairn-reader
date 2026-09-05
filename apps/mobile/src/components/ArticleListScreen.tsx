@@ -96,7 +96,12 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
             Results for "{searchQuery}"
           </Text>
-          <TouchableOpacity onPress={onClearSearch} hitSlop={8}>
+          <TouchableOpacity
+            onPress={onClearSearch}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
             <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>

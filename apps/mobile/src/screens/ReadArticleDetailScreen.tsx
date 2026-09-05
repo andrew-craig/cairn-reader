@@ -226,20 +226,24 @@ export const ReadArticleDetailScreen: React.FC = () => {
         actions={[
           {
             icon: 'return',
+            label: 'Back',
             onPress: handleBack,
           },
           {
             icon: 'next-article',
+            label: 'Next',
             onPress: handleNextArticle,
             disabled: !hasNextArticle,
           },
           {
             icon: 'bookmark',
+            label: 'Favorite',
             onPress: handleToggleFavorite,
             active: isFavorite,
           },
           {
             icon: 'archive',
+            label: 'Archive',
             onPress: handleArchive,
           },
         ]}

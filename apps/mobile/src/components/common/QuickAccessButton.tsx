@@ -8,6 +8,7 @@ export type QuickAccessButtonIcon = 'bookmark' | 'archive' | 'return' | 'next-ar
 interface QuickAccessButtonProps {
   icon: QuickAccessButtonIcon;
   onPress: () => void;
+  accessibilityLabel: string;
   active?: boolean;
   disabled?: boolean;
 }
@@ -15,6 +16,7 @@ interface QuickAccessButtonProps {
 export const QuickAccessButton: React.FC<QuickAccessButtonProps> = ({
   icon,
   onPress,
+  accessibilityLabel,
   active = false,
   disabled = false,
 }) => {
@@ -46,6 +48,9 @@ export const QuickAccessButton: React.FC<QuickAccessButtonProps> = ({
       style={styles.button}
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.7}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled, selected: active }}
     >
       {renderIcon()}
     </TouchableOpacity>

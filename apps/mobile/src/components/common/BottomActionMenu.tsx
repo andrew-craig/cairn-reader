@@ -8,6 +8,7 @@ import { Colors, Spacing } from '../../constants';
 interface BottomActionMenuAction {
   icon: QuickAccessButtonIcon;
   onPress: () => void;
+  label: string;
   active?: boolean;
   disabled?: boolean;
 }
@@ -48,6 +49,7 @@ export const BottomActionMenu: React.FC<BottomActionMenuProps> = ({ actions }) =
               key={index}
               icon={action.icon}
               onPress={action.onPress}
+              accessibilityLabel={action.label}
               active={action.active}
               disabled={action.disabled}
             />

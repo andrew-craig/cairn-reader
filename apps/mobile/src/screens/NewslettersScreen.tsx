@@ -60,8 +60,8 @@ export const NewslettersScreen: React.FC = () => {
 
   const headerActions = (
     <>
-      <IconButton icon="add" onPress={() => setModalVisible(true)} size={24} />
-      <IconButton icon="search-outline" onPress={() => {}} size={24} />
+      <IconButton icon="add" onPress={() => setModalVisible(true)} size={24} accessibilityLabel="Add newsletter" />
+      <IconButton icon="search-outline" onPress={() => {}} size={24} accessibilityLabel="Search" />
     </>
   );
 

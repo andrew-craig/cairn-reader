@@ -445,7 +445,7 @@ export const ExploreScreen: React.FC = () => {
   const displayedArticles = searchQuery ? searchResults : articles;
 
   const headerActions = (
-    <IconButton icon="search-outline" onPress={handleSearchPress} />
+    <IconButton icon="search-outline" onPress={handleSearchPress} accessibilityLabel="Search" />
   );
 
   return (
