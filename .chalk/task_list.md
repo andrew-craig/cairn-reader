@@ -28,6 +28,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_c55c** · P2 · open · Mobile: prefetch article bodies and read from the local store when offline  (parent: feature_90a5)
 - **task_c87c** · P2 · open · Mobile: connectivity awareness and offline banner  (parent: feature_90a5)
+- **task_cab7** · P2 · open · Mobile: keep auth tokens when the server is unreachable  (parent: feature_90a5)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_ebf1** · P2 · open · Mobile: offline mutation outbox and reconnect sync  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
@@ -58,6 +59,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
+- **task_de93** · P3 · open · Mobile: end-to-end airplane-mode QA pass for offline reading  (parent: feature_90a5)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal

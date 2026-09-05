@@ -31,16 +31,19 @@ connection is restored").
   `apps/mobile/src/services/storage.ts` (task_179f). Neither holds article bodies.
 - **No connectivity detection.** No netinfo / expo-network; every failure is inferred
   from a thrown fetch error. `withRetry` retries list calls only; mutations are
-  fire-and-forget with `console.error`.
+  fire-and-forget with `console.error`. `BookmarksScreen` has no cache at all.
+- **Detail screen is route-params only** (`ReadArticleDetailScreen.tsx:35`) and shows a
+  blank body when the lazy detail fetch fails.
 - **Auth clears tokens on any refresh error** (`auth.ts:426-432`), so opening the app
   offline near token expiry logs the user out (task_47c1). Hard blocker.
 - **Content is inline HTML** rendered by `react-native-render-html` from a string, so a
   stored body renders offline with no further work. Images are remote `<img src>` URLs;
   the backend never proxies or stores images.
-- **Backend has no delta-sync, ETag or version.** `updated_at` on `contents` and
-  `user_contents` is the only staleness signal. PATCH is field-level and replay-safe but
-  last-write-wins with no client timestamp. DELETE returns 404 on replay. POST add-URL
-  has no idempotency key.
+- **Backend has no delta-sync, ETag or version endpoint**, but every list item carries
+  `content.content_hash` (`ContentSummaryResponse`, `apps/shared/src/types/read.ts:5-7`),
+  so a client can detect changed bodies from a list page without fetching detail.
+  PATCH is field-level and replay-safe but last-write-wins with no client timestamp.
+  DELETE returns 404 on replay. POST add-URL has no idempotency key.
 - **Web** has no service worker, manifest or IndexedDB, and its requirements doc lists
   offline/PWA as an explicit non-goal (`web_app_requirements.md` lines 18, 447).
 
@@ -66,11 +69,16 @@ connection is restored").
 
 Each phase ships end to end on its own and is tracked as a sub-task.
 
-- [ ] **Prerequisite: task_47c1** (offline part only): `doRefreshAccessToken` must not
-      `clearTokens()` on a network error, only on a server rejection. Blocks phase 3.
+- [ ] **Prerequisite — task_cab7** Keep auth tokens when the server is unreachable.
+      `doRefreshAccessToken` must not `clearTokens()` on a network error, only on a
+      server rejection, and the thrown network error must not carry the auth strings
+      that `retry.ts` and `ExploreScreen` key on. Collapses into task_47c1 if that
+      lands first. Blocks phase 3.
+      → verify: offline refresh keeps tokens and throws a retryable error; 401 still
+      clears tokens.
 - [ ] **Phase 1 — task_a8a4** Single SQLite local article store. Replaces `ARTICLES_KEY`
-      and `READ_LIST_CACHE_KEY`; `ReadScreen` and detail screen read store-first then
-      refresh. Cleared on logout. Supersedes the dual-cache part of task_179f
+      and `READ_LIST_CACHE_KEY`; `ReadScreen`, `BookmarksScreen` (query `is_favorite`)
+      and the detail screen read store-first then refresh. Cleared on logout. Supersedes the dual-cache part of task_179f
       (task_179f now blocked by this and should be re-scoped afterwards).
       → verify: existing `storage.test.ts`, `ReadScreen` behaviour unchanged online;
       new store tests for upsert/list/clear.
@@ -80,36 +88,52 @@ Each phase ships end to end on its own and is tracked as a sub-task.
       network state.
 - [ ] **Phase 3 — task_c55c** Body prefetch and offline reading. Background download of
       `cleaned_html` into the store (bounded concurrency, newest first, cap of 100,
-      Read list only, never Explore content), detail
-      screen renders stored body immediately, refreshes when `content.updated_at`
-      changes, evicts on archive/delete and beyond cap.
+      Read list only, never Explore content). Diff by `content_hash` from the list
+      page so unchanged bodies are never re-downloaded. Detail screen renders the
+      stored body immediately, resolves the article by id from the store (not only
+      route params), and shows a "Not available offline" state when offline with no
+      stored body. Evicts on archive/delete and beyond cap.
       → verify: airplane-mode manual test reads a previously synced article; unit
       tests for prefetch selection, cap eviction and staleness check.
 - [ ] **Phase 4 — task_ebf1** Offline mutation outbox. Store-first writes, outbox
-      table drained on reconnect and app foreground, scroll_position coalesced per
-      article, 404-on-replayed-DELETE treated as success, archive error no longer
-      swallowed.
+      table drained on reconnect, app foreground and pull-to-refresh, in `created_at`
+      order. 2xx deletes the row; 404 on a replayed DELETE counts as success;
+      definitive 4xx (except 401) drops the row and logs; network/5xx/401 keeps the
+      row, bumps `attempts` and halts the batch to preserve order. scroll_position
+      coalesced per article. Archive error no longer swallowed.
       → verify: unit tests for enqueue/drain/coalesce/404 handling; manual test:
       archive and favorite offline, reconnect, server state matches.
-- [ ] **Phase 5 — task_43fc** Docs: `apps/mobile/CLAUDE.md`, `docs/ARCHITECTURE.md`,
+- [ ] **Phase 5 — task_de93** End-to-end airplane-mode QA pass, coverage check, fill in the
+      Review section, capture lessons in `LEARNINGS.md`.
+- [ ] **Phase 6 — task_43fc** Docs: `apps/mobile/CLAUDE.md`, `docs/ARCHITECTURE.md`,
       `docs/product_requirements.md` (move out of Future Enhancements), non-goals.
+
+## Relationship to PR #379
+
+PR #379 was an earlier planning attempt with seven sub-tasks. Its content_hash diffing,
+reader empty state, by-id resolution, Bookmarks caching, outbox replay rules and QA pass
+are folded in here. Its Explore body sync and Settings section are dropped per the
+confirmed decisions. PR #379 should be closed without merging so its sub-tasks are not
+created alongside these.
 
 ## Out of scope for this feature
 
 - Web app offline / PWA.
-- Image download or proxying (client or backend).
+- Image download or proxying (client or backend). Tracked by feature_9d64.
 - Backend delta-sync (`updated_since`) or ETag support. Would cheapen phase 3 syncs at
   scale; raise as a separate backend task if sync cost becomes a problem.
 - Server-side conflict resolution (client timestamps / versions on PATCH).
-- Manual per-article download and storage-usage UI.
+- Manual per-article download and a Settings "Offline reading" section (cached count,
+  clear data). Logout already clears the store.
 
 ## Rough sizing
 
 | Phase | Size |
 |---|---|
-| task_47c1 offline part | S |
+| task_cab7 auth prerequisite | S |
 | task_a8a4 store | M |
 | task_c87c connectivity | S |
 | task_c55c prefetch + offline read | M |
 | task_ebf1 outbox + sync | M |
+| task_de93 QA pass | S |
 | task_43fc docs | S |
