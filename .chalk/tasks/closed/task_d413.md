@@ -2,14 +2,14 @@
 id: task_d413
 title: Fix: selfhost email internal routes 404 (content catch-all swallows them)
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [quality,selfhost,bugfix]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-09-05T09:21:04Z
-updated_at: 2026-09-05T11:47:14Z
+updated_at: 2026-09-05T21:10:21Z
 ---
 **Source:** recovered from a stashed WIP change (`git stash` entry) found during a repo cleanup pass and re-verified against current `main` before implementing.
 
