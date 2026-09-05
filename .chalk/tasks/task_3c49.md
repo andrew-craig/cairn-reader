@@ -9,7 +9,7 @@ blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-09T06:53:56Z
+updated_at: 2026-09-05T07:20:41Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -25,11 +25,14 @@ Web is meaningfully more resilient than mobile (real loading/error/empty triad p
 - **Web reader destructive actions** (archive/delete) fire immediately with no confirmation and only `console.error` on failure.
 
 ## What to do
-Four independent pieces — split into separate PRs if any one grows large:
+Five independent pieces — split into separate PRs if any one grows large:
 1. React error boundaries in both apps.
 2. Mobile list-screen error states with an explicit retry affordance.
 3. `accessibilityLabel` on every icon-only mobile control, starting with the reader action bar.
 4. Confirmation on web destructive actions, plus real user-visible error handling instead of `console.error`.
+5. ExploreScreen follow-ups surfaced while reviewing piece 2 (PR #371) — both left alone there as out of scope:
+   - `handleRefresh` calls `setArticles([])` unconditionally, so pull-to-refresh blanks the list and can briefly show 'No articles available'. This is the same class of flash piece 2 fixed for the retry path; ExploreScreen never got the no-blank-on-refresh treatment main applied to the hook-based screens in #367.
+   - The call-site guards `error={searchQuery ? null : error}` and `staleMessage={isStale && !searchQuery ? ... : undefined}` are now redundant with the component-level guards in `ArticleListScreen`. Remove them so the invariant lives in one place instead of drifting.
 
 Note: the mobile "Archive = hard delete" bug (P2-C5) was already fixed in PR #298 — do not redo it.
 
