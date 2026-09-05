@@ -14,6 +14,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 - **task_19a9** · P2 · open · [explore/fetcher] Integration suite: test isolation + EndToEndFlow hardcoded IDs + EmptyResponse behavior  (parent: epic_fefa)
 - **task_2315** · P2 · open · Fix: prod Vault init never provisions content-service AppRole  (parent: epic_fefa)
+- **task_317b** · P2 · open · Subscription aggregator silently swallows per-source failures (200 with a short list)  (parent: epic_fefa)
 - **task_3c49** · P2 · open · [FE resilience] Error boundaries, mobile list error states, mobile a11y labels, web destructive-action confirmations  (parent: epic_fefa)
 - **task_47c1** · P2 · open · [FE auth layer] Move the duplicated web/mobile auth.ts into apps/shared; fix H12 + offline-clears-tokens  (parent: epic_fefa)
 - **task_499a** · P2 · open · [Audit F-S11-1 + F-S08-1/Tier 3] Type the outbox payloads in both services — producer/consumer drift, sequence together (X2)  (parent: epic_fefa)
