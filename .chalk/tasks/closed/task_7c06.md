@@ -2,14 +2,14 @@
 id: task_7c06
 title: [Audit/Tier 4] AddLinkModal cannot be dismissed while a debounced URL detection is in flight
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,audit,web,ux]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T12:54:16Z
-updated_at: 2026-08-17T12:54:16Z
+updated_at: 2026-09-05T09:20:13Z
 ---
 **Source:** Cairn Simplification Audit — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f · located and verified against HEAD `a6c56a1` (the report names these two items by description; file:line below is my own derivation, so re-verify before relying on it).
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR.

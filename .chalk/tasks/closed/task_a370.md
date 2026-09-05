@@ -2,14 +2,14 @@
 id: task_a370
 title: [Audit/Tier 4] Triplicated cursor-list machine — and both mobile copies blank the list on pull-to-refresh
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,consolidation,audit,mobile,web]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T12:54:15Z
-updated_at: 2026-08-17T12:54:15Z
+updated_at: 2026-09-05T09:20:13Z
 ---
 **Source:** Cairn Simplification Audit — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f · located and verified against HEAD `a6c56a1` (the report names these two items by description; file:line below is my own derivation, so re-verify before relying on it).
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR.
