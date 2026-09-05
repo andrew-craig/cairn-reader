@@ -100,4 +100,28 @@ describe('ExploreScreen retry/refresh spinner', () => {
       refresh.resolve([article('a1')]);
     });
   });
+
+  it('keeps the existing articles on screen while pulling to refresh, instead of flashing empty', async () => {
+    mockedExploreService.getRecommendations.mockResolvedValueOnce([article('a1')]);
+
+    render(<ExploreScreen />);
+
+    await screen.findByText('Article a1');
+
+    const refresh = deferred<Article[]>();
+    mockedExploreService.getRecommendations.mockReturnValueOnce(refresh.promise);
+
+    act(() => {
+      screen.UNSAFE_getByType(FlatList).props.onRefresh();
+    });
+
+    // The list must not blank to the empty state while the refresh is in
+    // flight — the old article should still be visible.
+    expect(screen.queryByText('No articles available')).toBeNull();
+    expect(screen.getByText('Article a1')).toBeTruthy();
+
+    await act(async () => {
+      refresh.resolve([article('a1')]);
+    });
+  });
 });

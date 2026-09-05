@@ -2,14 +2,14 @@
 id: task_3c49
 title: [FE resilience] Error boundaries, mobile list error states, mobile a11y labels, web destructive-action confirmations
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,wave4,frontend]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-09-05T07:20:41Z
+updated_at: 2026-09-05T22:29:04Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -42,8 +42,8 @@ Note: the mobile "Archive = hard delete" bug (P2-C5) was already fixed in PR #29
 ## Progress
 - Piece 1 (error boundaries): merged, PR #370.
 - Piece 2 (mobile list error states): merged, PR #371.
-- Piece 5 (ExploreScreen follow-ups): merged, PR #372.
-- Piece 3 (mobile accessibilityLabel): PR #376, open. Made `accessibilityLabel` a required prop on `IconButton` and `QuickAccessButton` (via a new `label` field on `BottomActionMenu` actions) and wired labels through every icon-only control found across the app (reader action bars, `ScreenHeader` back button, header search/add buttons, subscription unsubscribe button, search-clear button).
-- Piece 4 (web destructive-action confirmations): PR #377, open. `ReadArticle.tsx` archive/delete now gate on `window.confirm` (matching the existing pattern in `Feeds.tsx`) and surface failures via `window.alert` in addition to `console.error`.
-- Task stays open until #376 and #377 merge.
+- Piece 3 (mobile accessibilityLabel): merged, PR #376.
+- Piece 4 (web destructive-action confirmations): merged, PR #377.
+- Piece 5 (ExploreScreen follow-ups): PR #372 only recorded the two follow-up bugs in this tracker file — it never touched `ExploreScreen.tsx`. The actual fix (drop the unconditional `setArticles([])` in `handleRefresh`; drop the now-redundant `!searchQuery` guards on `staleMessage`/`error`) is PR #378.
+- All five pieces merged (#370, #371, #376, #377, #378). Closing.
 
