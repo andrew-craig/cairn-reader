@@ -230,6 +230,43 @@ describe('AuthService.fetchWithAuth', () => {
 
     await expect(AuthService.fetchWithAuth('https://api.test/x')).rejects.toBeInstanceOf(NetworkError);
   });
+
+  // task_c87c review fix: an aborted fetch can reject with a DOMException,
+  // which is not an instanceof Error in this test environment (confirmed
+  // below) — a guard that only checked `instanceof Error` would miss it and
+  // let the raw abort fall through to the 401-retry's session-expired path,
+  // losing valid tokens on a timeout. Covered on the 401-retry call site
+  // specifically, since that's the window where the consequence is token loss.
+  it('rejects with a NetworkError and keeps tokens when the 401 retry request aborts with a non-Error DOMException', async () => {
+    const abortError = new DOMException('Aborted', 'AbortError');
+    expect(abortError).not.toBeInstanceOf(Error);
+
+    const unauthorized = { status: 401, ok: false } as Response;
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(unauthorized) // initial request
+      .mockResolvedValueOnce({
+        // refresh call succeeds
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { access_token: 'access-2', refresh_token: 'refresh-2', expires_in: 3600 },
+        }),
+      })
+      .mockRejectedValueOnce(abortError); // retry request aborts
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await AuthService.fetchWithAuth('https://api.test/x');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect(await AuthService.getAccessToken()).toBe('access-2');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
 });
 
 describe('AuthService.fetchWithAuthAndRetry', () => {

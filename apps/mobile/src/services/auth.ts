@@ -480,7 +480,9 @@ export class AuthService {
     try {
       return await fetch(url, init);
     } catch (error) {
-      if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
+      // An aborted fetch can reject with a DOMException, which does not extend Error
+      // in every runtime, so match on the name rather than the type.
+      if (error instanceof TypeError || (error as { name?: string } | null)?.name === 'AbortError') {
         throw new NetworkError();
       }
       throw error;
