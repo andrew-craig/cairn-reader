@@ -15,7 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../types';
 import { Button } from '../components/common';
-import { StorageService, ReadService, AuthService } from '../services';
+import { ArticleStore, ReadService, AuthService } from '../services';
 import { isValidUrl } from '../utils';
 import { Colors, Spacing, FontSizes, BorderRadius } from '../constants';
 
@@ -76,7 +76,7 @@ export const AddArticleScreen: React.FC = () => {
       }
 
       // Also save locally for offline access
-      await StorageService.addArticle(article);
+      await ArticleStore.upsertMany([article]);
 
       Alert.alert('Success', 'Article added successfully', [
         {

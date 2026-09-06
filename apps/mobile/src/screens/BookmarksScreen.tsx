@@ -6,6 +6,7 @@ import { IconButton } from '../components/common/IconButton';
 import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
+import { ArticleStore } from '../services/articleStore';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 type BookmarksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Bookmarks'>;
@@ -21,7 +22,8 @@ export const BookmarksScreen: React.FC = () => {
     [],
   );
 
-  const onResetLoaded = useCallback(() => {
+  const onResetLoaded = useCallback((next: Article[]) => {
+    void ArticleStore.upsertMany(next);
     setError(null);
   }, []);
 
@@ -33,7 +35,9 @@ export const BookmarksScreen: React.FC = () => {
 
   const {
     articles,
+    setArticles,
     loading,
+    setLoading,
     refreshing,
     loadingMore,
     searchQuery,
@@ -44,12 +48,21 @@ export const BookmarksScreen: React.FC = () => {
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError });
 
+  // Show stored favorites immediately, then refresh from the network — a
+  // network failure at that point no longer blanks the list, since the store
+  // already primed `articles`.
   useFocusEffect(
     useCallback(() => {
-      if (!searchQuery) {
+      if (searchQuery) return;
+
+      ArticleStore.listFavorites().then((stored) => {
+        if (stored.length > 0) {
+          setArticles(stored);
+          setLoading(false);
+        }
         void load(true);
-      }
-    }, [searchQuery, load]),
+      });
+    }, [searchQuery, load, setArticles, setLoading]),
   );
 
   const handleArticlePress = (article: Article) => {

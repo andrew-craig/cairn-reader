@@ -8,11 +8,14 @@ import { AddLinkModal } from '../components/AddLinkModal';
 import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
-import { StorageService } from '../services/storage';
+import { ArticleStore } from '../services/articleStore';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 // Minimum ms between background refetches triggered by tab focus.
 const FOCUS_REFETCH_TTL_MS = 30_000;
+// Cap on stored articles read for the initial/offline render — the store is a
+// read-through cache for the first render, not a paginated query engine.
+const STORED_ARTICLES_LIMIT = 100;
 
 type ReadScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -32,7 +35,7 @@ export const ReadScreen: React.FC = () => {
   );
 
   const onResetLoaded = useCallback((next: Article[]) => {
-    void StorageService.saveReadListCache(next);
+    void ArticleStore.upsertMany(next);
     lastFetchedAtRef.current = Date.now();
     setIsStale(false);
     setError(null);
@@ -84,9 +87,9 @@ export const ReadScreen: React.FC = () => {
 
       if (!ttlExpired) return;
 
-      StorageService.getReadListCache().then((cached) => {
-        if (cached && cached.articles.length > 0) {
-          setArticles(cached.articles);
+      ArticleStore.listRecent(STORED_ARTICLES_LIMIT).then((stored) => {
+        if (stored.length > 0) {
+          setArticles(stored);
           setLoading(false);
           setIsStale(true);
         }
@@ -99,7 +102,7 @@ export const ReadScreen: React.FC = () => {
     (articleId: string) => {
       const next = articlesRef.current.filter((a) => a.id !== articleId);
       setArticles(next);
-      void StorageService.saveReadListCache(next);
+      void ArticleStore.remove(articleId);
     },
     [setArticles],
   );

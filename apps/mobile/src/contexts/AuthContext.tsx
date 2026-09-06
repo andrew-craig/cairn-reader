@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthService } from '../services';
+import { AuthService, ArticleStore } from '../services';
 import { loadServerUrl } from '@cairn/shared';
 import { User } from '../types';
 import { NetworkError } from '../utils';
@@ -82,6 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await AuthService.logout();
+      await ArticleStore.clear().catch((err) =>
+        console.error('Failed to clear local articles on logout:', err),
+      );
       setUser(null);
     } catch (error) {
       console.error('Error during logout:', error);
