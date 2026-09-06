@@ -358,3 +358,60 @@ this feature — see LEARNINGS.md.
 
 **Not committed** — left in the working tree on branch
 `task_a8a4-sqlite-article-store` pending the go-ahead.
+
+## Review follow-up (PR #382, 2026-09-06)
+
+One review comment on the pushed commit (0e079b2), rated Important. It was
+correct, and it caught something the tech lead's own review had mis-assessed.
+
+**The defect.** In `ReadScreen:90` and `BookmarksScreen`, the network refresh
+`load(true)` was called only *inside* the `ArticleStore.listRecent()` /
+`listFavorites()` `.then()` callback, which had no `.catch`. A rejected SQLite
+read therefore skipped `load(true)` entirely and left the screen on its loading
+spinner forever. `ReadArticleDetailScreen`'s `getById` chain had the same missing
+handler, producing an unhandled rejection.
+
+This was a regression introduced by this task. The `StorageService.getReadListCache()`
+it replaced wrapped its body in try/catch and returned `null`, so it could never
+reject and the network load always fired (`git show d2f92e3:apps/mobile/src/services/storage.ts`).
+
+**Why the reviewer's suggested fix was not taken.** The comment suggested adding
+`.catch(() => { void load(true); })` at each call site. That treats the symptom.
+Three call sites had already forgotten the handler, and every future caller would
+have to remember — the same per-call-site fragility that `chore_1089` exists to
+eliminate for `fetch`. The root cause is that `ArticleStore`'s read methods
+silently changed the contract the screens were written against.
+
+**Fix.** `listRecent`, `listFavorites` and `getById` now catch, log via
+`console.error` and resolve to `[]`/`[]`/`null` — a read-through cache degrades to
+"nothing cached" rather than blocking its callers. The contract is documented on
+each method. Write methods (`upsertMany`, `saveBody`, `updateUserState`, `remove`,
+`clear`) still propagate, because their call sites already catch and log, and
+`AuthContext.logout` depends on `clear()` rejecting so its own `.catch` fires. A
+test pins that read/write asymmetry so it cannot be "tidied" away later.
+
+`getDb()` also now resets `dbPromise = null` on a failed open, so a single
+transient failure no longer poisons every subsequent call. That is what makes the
+degradation above recoverable rather than permanent.
+
+**No screen file was edited.** That was the test of whether the fix was at the
+right layer, and it held.
+
+**Reviewer's own error, recorded.** The tech lead's review section above lists the
+cached-rejected-open as a "low severity, noted rather than fixed" gap. That
+assessment was wrong: it was judged in isolation, without tracing what the screens
+do when a read rejects. Chained to the missing `.catch`, a transient DB failure
+became a permanent spinner. See LEARNINGS.md.
+
+**Verification (re-run by the reviewer, not taken on report):** `npx jest` — 23
+suites / 148 tests pass. `npm run type-check` — clean. `npm run lint` — 0 errors,
+12 pre-existing warnings, none in a touched file. Regression proof: reverting
+`articleStore.ts` to 0e079b2 while keeping the new tests fails exactly the 4 new
+store-level tests plus the new screen-level test, with the 12 pre-existing store
+tests unaffected. The write-still-rejects test passes both before and after — a
+regression guard, correctly labelled as such.
+
+The screen-level test (`ReadScreen.storeFailure.test.tsx`) is the strongest piece:
+it does not mock `ArticleStore` at all, but mocks `openDatabaseAsync` to reject and
+drives the real screen against the real store. Against the pre-fix code it times
+out waiting for `listUserContents` — reproducing the reported defect end to end.

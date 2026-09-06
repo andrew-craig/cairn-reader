@@ -149,3 +149,108 @@ describe('ArticleStore', () => {
     });
   });
 });
+
+// PR #382 review fix: a failed SQLite open used to poison `articleStore.ts`'s
+// module-scoped `dbPromise` forever, and every read propagated that failure
+// to its caller. Screens wired their network refresh only inside the read's
+// `.then()` with no `.catch`, so a single failed open could strand a screen
+// on its initial spinner permanently. These tests exercise a *fresh* module
+// instance per case (`jest.resetModules()` + `jest.doMock('expo-sqlite', ...)`
+// + `require`), because `dbPromise` is captured at module scope: reusing the
+// module imported at the top of this file would already have a healthy,
+// resolved `dbPromise` from the tests above, making a fresh open failure
+// impossible to simulate.
+describe('failure handling (root cause: reads degrade, writes still propagate)', () => {
+  type ArticleStoreModule = typeof import('./articleStore');
+
+  // Builds a fresh 'expo-sqlite' mock inline (rather than delegating to
+  // __mocks__/expo-sqlite.js) — requiring that file by path from inside a
+  // jest.doMock factory for the same module name recurses into Jest's own
+  // mock resolution and blows the stack.
+  function freshStoreWithFailingOpen(mode: 'always' | 'once'): ArticleStoreModule['ArticleStore'] {
+    jest.resetModules();
+    jest.doMock('expo-sqlite', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { DatabaseSync } = require('node:sqlite');
+      let shouldFail = true;
+      let nativeDb: InstanceType<typeof DatabaseSync> | null = null;
+      return {
+        openDatabaseAsync: jest.fn(async () => {
+          if (shouldFail) {
+            if (mode === 'once') shouldFail = false;
+            throw new Error('simulated SQLite open failure');
+          }
+          if (!nativeDb) nativeDb = new DatabaseSync(':memory:');
+          return {
+            execAsync: async (sql: string) => nativeDb.exec(sql),
+            runAsync: async (sql: string, params: Record<string, unknown> = {}) => {
+              const result = nativeDb.prepare(sql).run(params);
+              return { changes: result.changes, lastInsertRowId: result.lastInsertRowid };
+            },
+            getAllAsync: async (sql: string, params: Record<string, unknown> = {}) =>
+              nativeDb.prepare(sql).all(params),
+            getFirstAsync: async (sql: string, params: Record<string, unknown> = {}) =>
+              nativeDb.prepare(sql).get(params) ?? null,
+            closeAsync: async () => nativeDb.close(),
+          };
+        }),
+      };
+    });
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('./articleStore') as ArticleStoreModule).ArticleStore;
+  }
+
+  let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
+
+  beforeEach(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  describe('reads never reject', () => {
+    it('listRecent resolves to [] and logs the failure', async () => {
+      const store = freshStoreWithFailingOpen('always');
+      await expect(store.listRecent(10)).resolves.toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it('listFavorites resolves to [] and logs the failure', async () => {
+      const store = freshStoreWithFailingOpen('always');
+      await expect(store.listFavorites()).resolves.toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it('getById resolves to null and logs the failure', async () => {
+      const store = freshStoreWithFailingOpen('always');
+      await expect(store.getById('a1')).resolves.toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+  });
+
+  it('a write method (upsertMany) still rejects on DB failure, unlike reads', async () => {
+    const store = freshStoreWithFailingOpen('always');
+    await expect(store.upsertMany([makeArticle({ id: 'write-fails' })])).rejects.toThrow(
+      'simulated SQLite open failure',
+    );
+  });
+
+  it('getDb retries after a failed open instead of caching the rejection forever', async () => {
+    const store = freshStoreWithFailingOpen('once');
+
+    // First call: the open fails. upsertMany is a write, so it must reject —
+    // this also confirms the failure actually happened.
+    await expect(store.upsertMany([makeArticle({ id: 'retry-1' })])).rejects.toThrow(
+      'simulated SQLite open failure',
+    );
+
+    // Second call: without the fix, `dbPromise` would still be the same
+    // rejected promise from the first call, and this would reject too.
+    await expect(store.upsertMany([makeArticle({ id: 'retry-1' })])).resolves.toBeUndefined();
+
+    const recent = await store.listRecent(10);
+    expect(recent.map((a) => a.id)).toEqual(['retry-1']);
+  });
+});

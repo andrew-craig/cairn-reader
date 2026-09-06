@@ -59,29 +59,37 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync(DB_NAME).then(async (db) => {
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS articles (
-          id TEXT PRIMARY KEY,
-          url TEXT NOT NULL,
-          title TEXT NOT NULL,
-          description TEXT,
-          image_url TEXT,
-          author TEXT,
-          published_date TEXT,
-          reading_time INTEGER,
-          tags TEXT NOT NULL DEFAULT '[]',
-          is_read INTEGER NOT NULL DEFAULT 0,
-          is_favorite INTEGER NOT NULL DEFAULT 0,
-          added_at INTEGER NOT NULL,
-          read_at INTEGER,
-          scroll_position REAL,
-          scroll_fraction REAL,
-          body TEXT
-        );
-      `);
-      return db;
-    });
+    dbPromise = SQLite.openDatabaseAsync(DB_NAME)
+      .then(async (db) => {
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS articles (
+            id TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            image_url TEXT,
+            author TEXT,
+            published_date TEXT,
+            reading_time INTEGER,
+            tags TEXT NOT NULL DEFAULT '[]',
+            is_read INTEGER NOT NULL DEFAULT 0,
+            is_favorite INTEGER NOT NULL DEFAULT 0,
+            added_at INTEGER NOT NULL,
+            read_at INTEGER,
+            scroll_position REAL,
+            scroll_fraction REAL,
+            body TEXT
+          );
+        `);
+        return db;
+      })
+      .catch((error) => {
+        // Don't leave a rejected promise cached forever — a transient failure
+        // (e.g. the OS briefly denying disk access) would otherwise poison
+        // every future call. Reset so the next getDb() retries the open.
+        dbPromise = null;
+        throw error;
+      });
   }
   return dbPromise;
 }
@@ -138,32 +146,56 @@ export const ArticleStore = {
     }
   },
 
-  /** The most recently added stored articles, for the Read screen's initial render. */
+  /**
+   * The most recently added stored articles, for the Read screen's initial
+   * render. Reads never reject: a store failure degrades to "nothing
+   * cached" (logged via console.error) rather than blocking callers that
+   * depend on a subsequent network refresh always firing.
+   */
   async listRecent(limit: number): Promise<Article[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync<ArticleRow>(
-      'SELECT * FROM articles ORDER BY added_at DESC LIMIT $limit',
-      { $limit: limit },
-    );
-    return rows.map(rowToArticle);
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<ArticleRow>(
+        'SELECT * FROM articles ORDER BY added_at DESC LIMIT $limit',
+        { $limit: limit },
+      );
+      return rows.map(rowToArticle);
+    } catch (error) {
+      console.error('Error loading recent articles:', error);
+      return [];
+    }
   },
 
-  /** Stored articles marked as favorites, for the Bookmarks screen's initial render. */
+  /**
+   * Stored articles marked as favorites, for the Bookmarks screen's initial
+   * render. Reads never reject — see `listRecent`.
+   */
   async listFavorites(): Promise<Article[]> {
-    const db = await getDb();
-    const rows = await db.getAllAsync<ArticleRow>(
-      'SELECT * FROM articles WHERE is_favorite = 1 ORDER BY added_at DESC',
-      {},
-    );
-    return rows.map(rowToArticle);
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<ArticleRow>(
+        'SELECT * FROM articles WHERE is_favorite = 1 ORDER BY added_at DESC',
+        {},
+      );
+      return rows.map(rowToArticle);
+    } catch (error) {
+      console.error('Error loading favorite articles:', error);
+      return [];
+    }
   },
 
+  /** Reads never reject — see `listRecent`. Resolves to null on failure. */
   async getById(id: string): Promise<Article | null> {
-    const db = await getDb();
-    const row = await db.getFirstAsync<ArticleRow>('SELECT * FROM articles WHERE id = $id', {
-      $id: id,
-    });
-    return row ? rowToArticle(row) : null;
+    try {
+      const db = await getDb();
+      const row = await db.getFirstAsync<ArticleRow>('SELECT * FROM articles WHERE id = $id', {
+        $id: id,
+      });
+      return row ? rowToArticle(row) : null;
+    } catch (error) {
+      console.error('Error loading article by id:', error);
+      return null;
+    }
   },
 
   /** Cache a freshly fetched article body (cleaned HTML) opportunistically. */
