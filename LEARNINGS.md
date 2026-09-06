@@ -2,6 +2,45 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-07 — `instanceof` in a catch block is a bet about a runtime you don't control (task_c87c)
+
+**Correction:** `fetchOrNetworkError` classified an aborted request with
+`error instanceof Error && error.name === 'AbortError'`. A `DOMException` — what
+the fetch spec says an abort rejects with — **does not extend `Error`**. Where the
+runtime supplies a native one, the guard misses and the raw error reaches the
+401-retry's catch-all, which calls `clearTokens()`. A timeout logs the user out.
+
+The test could not have caught it: it built the abort as a plain `Error` with
+`.name` assigned. That is the *polyfilled* shape, so the test and the code shared
+one assumption and agreed with each other.
+
+**The part worth keeping.** Asked to observe rather than assume, the implementer
+found bare Node 24 says `instanceof Error` is `true` and `jest-expo` says `false`.
+Neither is the device, where it depends on whether Hermes has a native
+`DOMException` or `whatwg-fetch` installs its polyfill — and the polyfill sets
+`prototype = Object.create(Error.prototype)`, so it is `true` there and `false`
+with a native one. Three environments, two answers, and the one that ships is the
+one nobody can run locally.
+
+**How to apply:** when catching an error you did not construct, branch on a
+*property* (`name`, a `code`), not on a constructor. `instanceof` across a host
+boundary asserts a prototype chain the platform is free to change between
+runtimes, and TypeScript will type-check the narrowing happily because it
+describes the same shape either way. `TypeError` and `NetworkError` are fine —
+one is a real `Error` subclass everywhere, the other you built yourself.
+
+And when a test constructs the error it is testing, it is testing your idea of
+the error. Make the test assert the property that makes the case interesting —
+here, `expect(abortError).not.toBeInstanceOf(Error)` — so that if the environment
+shifts, it fails loudly instead of quietly ceasing to test anything.
+
+**Tally, because it is the point:** this is the fourth window in which an
+unconverted fetch rejection could clear valid tokens (refresh fetch in cab7,
+primary fetch and 401-retry fetch in c87c, now the abort *shape* on the retry).
+Each was found by a different reviewer, none by a test written beforehand. The
+fix is not more review — it is chore_1089's lint rule, which makes the next
+unwrapped `fetch` fail CI.
+
 ## 2026-09-06 — Replacing a module inherits its callers' assumptions about how it fails (task_a8a4)
 
 **Correction:** `ArticleStore` replaced `StorageService`'s article caches. The old

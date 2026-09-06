@@ -7,6 +7,7 @@ import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, 
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { OfflineBanner } from '../components/common';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -28,106 +29,109 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.card,
-        },
-        headerTintColor: colors.text,
-        headerBackTitleVisible: false,
-      }}
-    >
-      <Stack.Screen
-        name="MainTabs"
-        component={TabNavigator}
-        options={({ navigation }) => ({
-          headerShown: false,
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('AddArticle')}
-              style={{ marginRight: 16 }}
-              accessibilityRole="button"
-              accessibilityLabel="Add link"
-            >
-              <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
-            </TouchableOpacity>
-          ),
-        })}
-      />
-      <Stack.Screen
-        name="ArticleDetail"
-        component={ReadArticleDetailScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
+    <>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colors.card,
+          },
+          headerTintColor: colors.text,
+          headerBackTitleVisible: false,
         }}
-      />
-      <Stack.Screen
-        name="ExploreArticleDetail"
-        component={ExploreArticleDetailScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-          cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
-        }}
-      />
-      <Stack.Screen
-        name="AddArticle"
-        component={AddArticleScreen}
-        options={{
-          title: 'Add Article',
-          presentation: 'modal',
-        }}
-      />
-      <Stack.Screen
-        name="Bookmarks"
-        component={BookmarksScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-      <Stack.Screen
-        name="Votes"
-        component={VotesScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-      <Stack.Screen
-        name="Account"
-        component={AccountScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-      <Stack.Screen
-        name="About"
-        component={AboutScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-      <Stack.Screen
-        name="Feeds"
-        component={FeedsScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-      <Stack.Screen
-        name="Newsletters"
-        component={NewslettersScreen}
-        options={{
-          headerShown: false,
-          presentation: 'card',
-        }}
-      />
-    </Stack.Navigator>
+      >
+        <Stack.Screen
+          name="MainTabs"
+          component={TabNavigator}
+          options={({ navigation }) => ({
+            headerShown: false,
+            headerRight: () => (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AddArticle')}
+                style={{ marginRight: 16 }}
+                accessibilityRole="button"
+                accessibilityLabel="Add link"
+              >
+                <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+              </TouchableOpacity>
+            ),
+          })}
+        />
+        <Stack.Screen
+          name="ArticleDetail"
+          component={ReadArticleDetailScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+            cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
+          }}
+        />
+        <Stack.Screen
+          name="ExploreArticleDetail"
+          component={ExploreArticleDetailScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+            cardStyleInterpolator: CardStyleInterpolators.forVerticalIOS,
+          }}
+        />
+        <Stack.Screen
+          name="AddArticle"
+          component={AddArticleScreen}
+          options={{
+            title: 'Add Article',
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="Bookmarks"
+          component={BookmarksScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="Votes"
+          component={VotesScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="Account"
+          component={AccountScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="About"
+          component={AboutScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="Feeds"
+          component={FeedsScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="Newsletters"
+          component={NewslettersScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+      </Stack.Navigator>
+      <OfflineBanner />
+    </>
   );
 }
