@@ -1,4 +1,5 @@
 import { AuthService } from './auth';
+import { NetworkError } from '../utils/errors';
 
 // H14: token refresh must never leak token material (raw token, token
 // prefix/preview, or full response bodies) to device logs, and diagnostic
@@ -92,5 +93,115 @@ describe('AuthService token refresh logging', () => {
     await AuthService.refreshAccessToken();
 
     expect(logSpy).not.toHaveBeenCalled();
+  });
+});
+
+// task_cab7: a failed refresh must only clear tokens when the server actually
+// rejected the credential (4xx). Network errors, timeouts, 5xx responses, and
+// malformed bodies must keep the tokens and surface a retryable NetworkError,
+// otherwise a merely-offline device gets logged out.
+describe('AuthService token refresh: offline vs rejected (task_cab7)', () => {
+  beforeEach(async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await AuthService.saveTokens({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('keeps tokens and throws a NetworkError when the refresh request cannot reach the server', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('clears tokens when the refresh is rejected with a 401', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'invalid refresh token' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toThrow('invalid refresh token');
+
+    expect(await AuthService.getAccessToken()).toBeNull();
+    expect(await AuthService.hasRefreshToken()).toBe(false);
+  });
+
+  it('keeps tokens and throws a NetworkError when the refresh endpoint returns a 500', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({ message: 'internal error' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('keeps tokens and throws a NetworkError when the refresh endpoint returns a 429 (rate limited)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ message: 'rate limited' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('keeps tokens and throws a NetworkError when the refresh endpoint returns a 400 (malformed request)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: 'invalid input' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('ensureValidToken propagates a NetworkError when the server is unreachable (expired token)', async () => {
+    await AuthService.saveTokens({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      expiresAt: Date.now() - 1000,
+    });
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
+
+    await expect(AuthService.ensureValidToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+  });
+
+  it('ensureValidToken returns false when the server rejects the refresh (expired token)', async () => {
+    await AuthService.saveTokens({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      expiresAt: Date.now() - 1000,
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ message: 'invalid refresh token' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.ensureValidToken()).resolves.toBe(false);
+
+    expect(await AuthService.getAccessToken()).toBeNull();
   });
 });

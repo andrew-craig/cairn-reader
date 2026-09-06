@@ -7,6 +7,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_e848** · P1 · open · [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)  (parent: epic_fefa)
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
+- **task_cab7** · P2 · in_progress · Mobile: keep auth tokens when the server is unreachable  (parent: feature_90a5)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -28,7 +29,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_c55c** · P2 · open · Mobile: prefetch article bodies and read from the local store when offline  (parent: feature_90a5)
 - **task_c87c** · P2 · open · Mobile: connectivity awareness and offline banner  (parent: feature_90a5)
-- **task_cab7** · P2 · open · Mobile: keep auth tokens when the server is unreachable  (parent: feature_90a5)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_ebf1** · P2 · open · Mobile: offline mutation outbox and reconnect sync  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)

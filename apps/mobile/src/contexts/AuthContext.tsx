@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthService } from '../services';
 import { loadServerUrl } from '@cairn/shared';
 import { User } from '../types';
+import { NetworkError } from '../utils';
 
 interface AuthContextType {
   user: User | null;
@@ -51,9 +52,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
-      // On error, clear auth state to force re-login
-      setUser(null);
+      if (error instanceof NetworkError) {
+        // Server unreachable, not a rejection — stay signed in with the
+        // persisted session instead of forcing the user to log in again.
+        console.error('Error checking auth status (server unreachable), keeping session:', error);
+        try {
+          const user = await AuthService.getUser();
+          setUser(user);
+        } catch (getUserError) {
+          console.error('Error reading persisted user, clearing auth state:', getUserError);
+          setUser(null);
+        }
+      } else {
+        console.error('Error checking auth status:', error);
+        // On error, clear auth state to force re-login
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }

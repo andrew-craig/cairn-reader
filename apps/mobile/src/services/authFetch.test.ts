@@ -1,5 +1,6 @@
 import { AuthService } from './auth';
 import { withRetry } from '../utils/retry';
+import { NetworkError } from '../utils/errors';
 
 // task_ca2d: mobile's read.ts and explore.ts each carried a private copy of the
 // authenticated-fetch policy. These are now one implementation on AuthService.
@@ -23,6 +24,26 @@ describe('withRetry auth-error classification (load-bearing message contract)', 
 
     await expect(withRetry(fn)).rejects.toThrow('Not authenticated');
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  // task_cab7: an offline/unreachable-server failure must be retried, not
+  // treated like a rejected credential.
+  it('DOES retry when the request throws a NetworkError', async () => {
+    jest.useFakeTimers();
+    try {
+      const fn = jest.fn(async () => {
+        throw new NetworkError();
+      });
+
+      const pending = withRetry(fn, { maxRetries: 1 });
+      const assertion = expect(pending).rejects.toBeInstanceOf(NetworkError);
+      await jest.runAllTimersAsync();
+      await assertion;
+
+      expect(fn).toHaveBeenCalledTimes(2); // initial attempt + 1 retry
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -100,6 +121,31 @@ describe('AuthService.fetchWithAuth', () => {
       'Session expired. Please log in again.',
     );
     expect(await AuthService.getAccessToken()).toBeNull();
+  });
+
+  // task_cab7: an expiring/expired access token with the server unreachable must
+  // surface a retryable NetworkError, not 'Session expired', and must not log
+  // the user out.
+  it('rejects with a NetworkError (not "Session expired") and keeps tokens when offline with an expiring token', async () => {
+    await AuthService.saveTokens({
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      expiresAt: Date.now() - 1000,
+    });
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await AuthService.fetchWithAuth('https://api.test/x');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect((caught as Error).message.toLowerCase()).not.toContain('session expired');
+    expect((caught as Error).message.toLowerCase()).not.toContain('not authenticated');
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
   });
 });
 

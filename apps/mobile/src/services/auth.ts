@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { getServerUrl } from '@cairn/shared';
 import { withRetry } from '../utils/retry';
+import { NetworkError } from '../utils/errors';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
@@ -327,6 +328,11 @@ export class AuthService {
       }
       return true;
     } catch (error) {
+      if (error instanceof NetworkError) {
+        // Server unreachable — not a rejection. Let the caller distinguish
+        // this from a genuine "please log in again" by propagating it.
+        throw error;
+      }
       console.error('[Auth] Failed to refresh token:', error instanceof Error ? error.message : String(error));
       return false;
     }
@@ -369,66 +375,79 @@ export class AuthService {
       console.log('[Auth] Attempting token refresh');
     }
 
+    let response: Response;
     try {
       const requestBody = { refresh_token: this.refreshToken };
 
-      const response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
+      response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
       });
-
-      let result;
-      try {
-        result = await response.json();
-      } catch (parseError) {
-        console.error('[Auth] Failed to parse refresh response as JSON:', parseError);
-        throw new Error('Invalid JSON response from refresh endpoint');
-      }
-
-      if (!response.ok) {
-        if (__DEV__) {
-          console.error('[Auth] Refresh failed with error response:', {
-            status: response.status,
-            message: result.message || result.error,
-          });
-        } else {
-          console.error('[Auth] Refresh failed with error response, status:', response.status);
-        }
-        throw new Error(result.message || result.error || 'Failed to refresh token');
-      }
-
-      const data: LoginResponse = result.data;
-
-      if (!data || !data.access_token || !data.refresh_token || !data.expires_in) {
-        console.error('[Auth] Refresh response missing required fields:', {
-          hasData: !!data,
-          hasAccessToken: !!data?.access_token,
-          hasRefreshToken: !!data?.refresh_token,
-          hasExpiresIn: !!data?.expires_in,
-        });
-        throw new Error('Invalid refresh response: missing required fields');
-      }
-
-      const expiresAt = Date.now() + (data.expires_in * 1000);
-
-      await this.saveTokens({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresAt,
-      });
-
-      if (__DEV__) {
-        console.log('[Auth] Token refresh successful');
-      }
     } catch (error) {
-      // Clear tokens on ANY error (network issues, parsing errors, HTTP errors, etc.)
-      console.error('[Auth] Refresh failed, clearing all tokens:', error instanceof Error ? error.message : String(error));
+      // Could not reach the server at all (offline, timeout, DNS, etc.). This is
+      // not a rejection of the credential, so the refresh token must survive.
+      console.error('[Auth] Refresh request failed, server unreachable:', error instanceof Error ? error.message : String(error));
+      throw new NetworkError();
+    }
 
+    let result;
+    try {
+      result = await response.json();
+    } catch (parseError) {
+      console.error('[Auth] Failed to parse refresh response as JSON:', parseError);
+      throw new NetworkError();
+    }
+
+    if (!response.ok) {
+      if (__DEV__) {
+        console.error('[Auth] Refresh failed with error response:', {
+          status: response.status,
+          message: result.message || result.error,
+        });
+      } else {
+        console.error('[Auth] Refresh failed with error response, status:', response.status);
+      }
+
+      // Only 401 (invalid/expired/reused refresh token, per the refresh
+      // endpoint's documented responses) or 403 (a definitive authorization
+      // rejection, e.g. a disabled account) means the server rejected the
+      // credential. Every other status — including 400 (malformed request),
+      // 404, and 429 (rate limited; /auth/* is rate-limited per IP) — is not
+      // a credential rejection and must not log the user out.
+      if (response.status !== 401 && response.status !== 403) {
+        throw new NetworkError();
+      }
+
+      console.error('[Auth] Refresh rejected by server, clearing tokens');
       await this.clearTokens();
-      throw error;
+      throw new Error(result.message || result.error || 'Failed to refresh token');
+    }
+
+    const data: LoginResponse = result.data;
+
+    if (!data || !data.access_token || !data.refresh_token || !data.expires_in) {
+      console.error('[Auth] Refresh response missing required fields:', {
+        hasData: !!data,
+        hasAccessToken: !!data?.access_token,
+        hasRefreshToken: !!data?.refresh_token,
+        hasExpiresIn: !!data?.expires_in,
+      });
+      throw new NetworkError();
+    }
+
+    const expiresAt = Date.now() + (data.expires_in * 1000);
+
+    await this.saveTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt,
+    });
+
+    if (__DEV__) {
+      console.log('[Auth] Token refresh successful');
     }
   }
 
@@ -502,8 +521,14 @@ export class AuthService {
         });
 
         return retryResponse;
-      } catch {
-        // If refresh fails, clear tokens and throw
+      } catch (error) {
+        if (error instanceof NetworkError) {
+          // Server unreachable — not a rejection. Keep tokens and let the
+          // caller retry later instead of forcing a logout.
+          throw error;
+        }
+        // Refresh was rejected (or unavailable) for a real reason; ensure
+        // tokens are cleared before forcing a logout.
         await this.clearTokens();
         throw new Error('Session expired. Please log in again.');
       }
