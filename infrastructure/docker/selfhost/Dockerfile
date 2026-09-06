@@ -1,16 +1,31 @@
+# Lockfile stage — derive a web+shared-only view of the workspace lockfile.
+# apps/mobile is also a workspace member, so the shared root package-lock.json
+# changes on every mobile-only dependency bump. Feeding that straight into the
+# web install makes a mobile change bust the npm ci + vite build cache layers.
+# Dropping apps/mobile from the workspace list and regenerating the lockfile
+# offline (no network, no node_modules) yields output that is byte-identical
+# unless a dependency that web or shared actually uses changes — so the
+# COPY --from below is a BuildKit content-hash cache hit for mobile-only changes.
+# npm 11+ prunes the orphaned workspace entry fully, hence node:24 here.
+FROM node:24-alpine AS lockfile
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY apps/shared/package.json apps/shared/package.json
+RUN node -e "const fs=require('fs');const p=require('./package.json');p.workspaces=p.workspaces.filter(w=>w!=='apps/mobile');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" \
+    && npm install --package-lock-only --offline
+
 # Web build stage — compile the Vite SPA to static assets that the Go binary serves
 FROM node:22-alpine AS web-builder
 
 WORKDIR /app
 
-# Install workspace dependencies. The root manifest + lockfile drive the install;
-# both workspace package.json files must be present for npm to link them. The
-# install is scoped to web + shared so apps/mobile (also a workspace member, but
-# not part of this image) is neither required nor fetched.
-COPY package.json package-lock.json ./
+# Install workspace dependencies from the pruned lockfile. Both workspace
+# package.json files must be present for npm to link them.
+COPY --from=lockfile /app/package.json /app/package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/shared/package.json apps/shared/package.json
-RUN npm ci -w @cairn/web -w @cairn/shared --include-workspace-root
+RUN npm ci
 
 # @cairn/shared is consumed from source via the Vite alias, so no build step for it.
 COPY apps/shared apps/shared
