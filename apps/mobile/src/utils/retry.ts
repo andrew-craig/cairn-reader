@@ -8,6 +8,8 @@
  * Does NOT retry on 4xx client errors.
  */
 
+import { NetworkError } from './errors';
+
 const DEFAULT_MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -18,6 +20,10 @@ const DEFAULT_TIMEOUT_MS = 15000;
  */
 function isRetryable(error: unknown): boolean {
   if (!(error instanceof Error)) return true;
+
+  // A NetworkError means "couldn't reach the server" by construction — always
+  // retryable, regardless of what its message happens to contain.
+  if (error instanceof NetworkError) return true;
 
   const msg = error.message.toLowerCase();
 

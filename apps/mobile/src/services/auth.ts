@@ -470,6 +470,24 @@ export class AuthService {
   }
 
   /**
+   * fetch(), converting "couldn't reach the server" into a NetworkError so
+   * callers can tell it apart from a rejected credential. Anything else is
+   * rethrown untouched. Used by both the primary request and the 401 retry
+   * in fetchWithAuth — a dropped connection in either window must not be
+   * mistaken for the server rejecting the credential.
+   */
+  private static async fetchOrNetworkError(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      if (error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')) {
+        throw new NetworkError();
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Authenticated fetch with proactive token refresh and a single reactive 401
    * retry. Feature services (read, explore) build on this — one implementation,
    * not a private copy per service.
@@ -495,7 +513,7 @@ export class AuthService {
       throw new Error('Not authenticated');
     }
 
-    const response = await fetch(url, {
+    const response = await this.fetchOrNetworkError(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -511,7 +529,7 @@ export class AuthService {
         const newAccessToken = await this.getAccessToken();
 
         // Retry the request with new token
-        const retryResponse = await fetch(url, {
+        const retryResponse = await this.fetchOrNetworkError(url, {
           ...options,
           headers: {
             'Content-Type': 'application/json',

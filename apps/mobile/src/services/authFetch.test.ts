@@ -45,6 +45,29 @@ describe('withRetry auth-error classification (load-bearing message contract)', 
       jest.useRealTimers();
     }
   });
+
+  // task_c87c: isRetryable must recognize a NetworkError by type, not by
+  // falling through to the "unrecognized error" default — otherwise a
+  // NetworkError whose message happens to contain a substring the classifier
+  // treats as a non-retryable 4xx (e.g. "not found") would stop being
+  // retried.
+  it('DOES retry a NetworkError even when its message contains a normally non-retryable substring', async () => {
+    jest.useFakeTimers();
+    try {
+      const fn = jest.fn(async () => {
+        throw new NetworkError('resource not found on network');
+      });
+
+      const pending = withRetry(fn, { maxRetries: 1 });
+      const assertion = expect(pending).rejects.toBeInstanceOf(NetworkError);
+      await jest.runAllTimersAsync();
+      await assertion;
+
+      expect(fn).toHaveBeenCalledTimes(2); // initial attempt + 1 retry
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('AuthService.fetchWithAuth', () => {
@@ -123,6 +146,40 @@ describe('AuthService.fetchWithAuth', () => {
     expect(await AuthService.getAccessToken()).toBeNull();
   });
 
+  // task_c87c: a 401 followed by a successful refresh followed by a dropped
+  // connection on the retry request must surface a NetworkError and keep
+  // tokens — not log the user out. This is the exact window task_cab7 exists
+  // to close, in the one spot the initial fix missed.
+  it('rejects with a NetworkError and keeps tokens when the network drops on the 401 retry request', async () => {
+    const unauthorized = { status: 401, ok: false } as Response;
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(unauthorized) // initial request
+      .mockResolvedValueOnce({
+        // refresh call succeeds
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: { access_token: 'access-2', refresh_token: 'refresh-2', expires_in: 3600 },
+        }),
+      })
+      .mockRejectedValueOnce(new TypeError('Network request failed')); // retry request drops
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await AuthService.fetchWithAuth('https://api.test/x');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect((caught as Error).message.toLowerCase()).not.toContain('session expired');
+    expect((caught as Error).message.toLowerCase()).not.toContain('not authenticated');
+    expect(await AuthService.getAccessToken()).toBe('access-2');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
   // task_cab7: an expiring/expired access token with the server unreachable must
   // surface a retryable NetworkError, not 'Session expired', and must not log
   // the user out.
@@ -146,6 +203,32 @@ describe('AuthService.fetchWithAuth', () => {
     expect((caught as Error).message.toLowerCase()).not.toContain('not authenticated');
     expect(await AuthService.getAccessToken()).toBe('access-1');
     expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  // task_c87c: the gap task_cab7 deliberately left — the request fetch itself
+  // (after the token check passes with a still-valid token) must also surface
+  // a NetworkError when the server is unreachable, not a bare TypeError.
+  it('rejects with a NetworkError (not a bare TypeError) when offline with a valid, unexpired token', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await AuthService.fetchWithAuth('https://api.test/x');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(NetworkError);
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('rejects with a NetworkError when the request is aborted (withRetry timeout)', async () => {
+    const abortError = new Error('Aborted');
+    abortError.name = 'AbortError';
+    global.fetch = jest.fn().mockRejectedValue(abortError) as unknown as typeof fetch;
+
+    await expect(AuthService.fetchWithAuth('https://api.test/x')).rejects.toBeInstanceOf(NetworkError);
   });
 });
 
