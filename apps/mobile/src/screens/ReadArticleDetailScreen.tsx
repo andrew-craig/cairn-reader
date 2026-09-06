@@ -10,7 +10,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
-import { StorageService, ReadService } from '../services';
+import { ArticleStore, ReadService } from '../services';
 import { Colors } from '../constants';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 import type { ScrollProgressInfo } from '../components/common/ArticleContent';
@@ -42,11 +42,24 @@ export const ReadArticleDetailScreen: React.FC = () => {
   useEffect(() => {
     if (initialArticle.content) return; // already have the HTML
     let cancelled = false;
+
+    // Prefer a locally cached body so the article can render before the
+    // network responds; the fetch below still runs to refresh it.
+    ArticleStore.getById(initialArticle.id).then((stored) => {
+      if (cancelled || !stored?.content) return;
+      setArticle((current) => (current.content ? current : { ...current, content: stored.content }));
+      setContentLoading(false);
+    });
+
     ReadService.getContentById(initialArticle.id)
       .then((detail) => {
         if (cancelled) return;
-        setArticle(ReadService.transformDetailToArticle(detail));
+        const updated = ReadService.transformDetailToArticle(detail);
+        setArticle(updated);
         setContentLoading(false);
+        if (updated.content) {
+          void ArticleStore.saveBody(initialArticle.id, updated.content);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -97,7 +110,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
     ReadService.updateUserContent(articleId, { status: 'completed' }).catch(
       (err) => console.error('Failed to mark article completed:', err)
     );
-    StorageService.updateArticle(articleId, { isRead: true, readAt }).catch(
+    ArticleStore.updateUserState(articleId, { isRead: true, readAt }).catch(
       (err) => console.error('Failed to persist completed locally:', err)
     );
   }, []);
@@ -142,7 +155,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
       ReadService.updateUserContent(articleId, { scroll_position: fraction }).catch(
         (err) => console.error('Failed to save scroll position:', err)
       );
-      StorageService.updateArticle(articleId, { scrollFraction: fraction }).catch(
+      ArticleStore.updateUserState(articleId, { scrollFraction: fraction }).catch(
         (err) => console.error('Failed to save scroll position locally:', err)
       );
     };
@@ -170,7 +183,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
     setIsFavorite(newIsFavorite);
     try {
       // Update both local storage and backend
-      await StorageService.updateArticle(targetId, {
+      await ArticleStore.updateUserState(targetId, {
         isFavorite: newIsFavorite,
       });
       try {
@@ -191,7 +204,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
   const handleArchive = async () => {
     try {
-      await StorageService.deleteArticle(article.id);
+      await ArticleStore.remove(article.id);
       onArchived?.(article.id);
       // Backend delete runs in the background so a slow/offline network
       // doesn't block navigation; failures are logged only (see above).

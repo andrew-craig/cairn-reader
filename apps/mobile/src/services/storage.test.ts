@@ -20,133 +20,34 @@ describe('StorageService', () => {
     await AsyncStorage.clear();
   });
 
-  describe('getArticles', () => {
-    it('returns empty array when no articles are stored', async () => {
-      const articles = await StorageService.getArticles();
-      expect(articles).toEqual([]);
+  describe('getExploreCache', () => {
+    it('returns null when nothing is cached', async () => {
+      const cached = await StorageService.getExploreCache();
+      expect(cached).toBeNull();
     });
 
-    it('returns stored articles', async () => {
+    it('returns the cached explore list', async () => {
       const article = makeArticle();
-      await AsyncStorage.setItem(
-        '@cairnreader:articles',
-        JSON.stringify([article])
-      );
+      await StorageService.saveExploreCache([article]);
 
-      const articles = await StorageService.getArticles();
-      expect(articles).toHaveLength(1);
-      expect(articles[0].id).toBe('test-1');
+      const cached = await StorageService.getExploreCache();
+      expect(cached?.articles).toHaveLength(1);
+      expect(cached?.articles[0].id).toBe('test-1');
+      expect(typeof cached?.cachedAt).toBe('number');
     });
   });
 
-  describe('saveArticles', () => {
-    it('persists articles to AsyncStorage', async () => {
+  describe('saveExploreCache', () => {
+    it('persists the explore list under the explore cache key', async () => {
       const articles = [makeArticle({ id: 'a' }), makeArticle({ id: 'b' })];
-      await StorageService.saveArticles(articles);
+      await StorageService.saveExploreCache(articles);
 
-      const raw = await AsyncStorage.getItem('@cairnreader:articles');
+      const raw = await AsyncStorage.getItem('@cairnreader:explore_cache');
       expect(raw).not.toBeNull();
       const parsed = JSON.parse(raw!);
-      expect(parsed).toHaveLength(2);
-      expect(parsed[0].id).toBe('a');
-      expect(parsed[1].id).toBe('b');
-    });
-  });
-
-  describe('addArticle', () => {
-    it('prepends article to existing list', async () => {
-      const existing = makeArticle({ id: 'existing' });
-      await StorageService.saveArticles([existing]);
-
-      const newArticle = makeArticle({ id: 'new' });
-      await StorageService.addArticle(newArticle);
-
-      const articles = await StorageService.getArticles();
-      expect(articles).toHaveLength(2);
-      expect(articles[0].id).toBe('new');
-      expect(articles[1].id).toBe('existing');
-    });
-
-    it('adds to empty list', async () => {
-      const article = makeArticle({ id: 'first' });
-      await StorageService.addArticle(article);
-
-      const articles = await StorageService.getArticles();
-      expect(articles).toHaveLength(1);
-      expect(articles[0].id).toBe('first');
-    });
-  });
-
-  describe('updateArticle', () => {
-    it('updates an existing article by id', async () => {
-      const article = makeArticle({ id: 'update-me', title: 'Old Title' });
-      await StorageService.saveArticles([article]);
-
-      await StorageService.updateArticle('update-me', { title: 'New Title' });
-
-      const articles = await StorageService.getArticles();
-      expect(articles[0].title).toBe('New Title');
-      // Other fields should remain
-      expect(articles[0].id).toBe('update-me');
-    });
-
-    it('does nothing when article id is not found', async () => {
-      const article = makeArticle({ id: 'keep' });
-      await StorageService.saveArticles([article]);
-
-      await StorageService.updateArticle('nonexistent', { title: 'X' });
-
-      const articles = await StorageService.getArticles();
-      expect(articles).toHaveLength(1);
-      expect(articles[0].title).toBe('Test Article');
-    });
-
-    it('can toggle isFavorite and isRead', async () => {
-      const article = makeArticle({ id: 'toggle', isFavorite: false, isRead: false });
-      await StorageService.saveArticles([article]);
-
-      await StorageService.updateArticle('toggle', { isFavorite: true, isRead: true });
-
-      const articles = await StorageService.getArticles();
-      expect(articles[0].isFavorite).toBe(true);
-      expect(articles[0].isRead).toBe(true);
-    });
-  });
-
-  describe('deleteArticle', () => {
-    it('removes an article by id', async () => {
-      const articles = [makeArticle({ id: 'a' }), makeArticle({ id: 'b' })];
-      await StorageService.saveArticles(articles);
-
-      await StorageService.deleteArticle('a');
-
-      const remaining = await StorageService.getArticles();
-      expect(remaining).toHaveLength(1);
-      expect(remaining[0].id).toBe('b');
-    });
-
-    it('does nothing when id is not found', async () => {
-      const articles = [makeArticle({ id: 'a' })];
-      await StorageService.saveArticles(articles);
-
-      await StorageService.deleteArticle('nonexistent');
-
-      const remaining = await StorageService.getArticles();
-      expect(remaining).toHaveLength(1);
-    });
-  });
-
-  describe('clearAllArticles', () => {
-    it('removes all articles', async () => {
-      await StorageService.saveArticles([
-        makeArticle({ id: 'a' }),
-        makeArticle({ id: 'b' }),
-      ]);
-
-      await StorageService.clearAllArticles();
-
-      const articles = await StorageService.getArticles();
-      expect(articles).toEqual([]);
+      expect(parsed.articles).toHaveLength(2);
+      expect(parsed.articles[0].id).toBe('a');
+      expect(parsed.articles[1].id).toBe('b');
     });
   });
 });

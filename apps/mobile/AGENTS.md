@@ -13,7 +13,7 @@ The Cairn mobile app is a React Native application built with Expo that provides
 - 🔍 Personalized content discovery (Explore feed)
 - ⭐ Favorites and archive functionality
 - 🌓 Dark mode support (follows system preference)
-- 💾 Local persistence with AsyncStorage
+- 💾 Local persistence with SQLite (read-list articles) and AsyncStorage (explore cache, auth)
 - 🔄 Backend integration with JWT authentication
 
 ## Project Structure
@@ -76,10 +76,11 @@ apps/mobile/
     │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/Feeds/etc.)
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
+    │   ├── articleStore.ts          # Local read-list article store (SQLite)
     │   ├── auth.ts                  # Authentication service
     │   ├── explore.ts               # Explore/recommendations API
     │   ├── read.ts                  # Read service API
-    │   ├── storage.ts               # Local storage (AsyncStorage)
+    │   ├── storage.ts               # Local storage (AsyncStorage, explore cache)
     │   ├── system.ts                # Backend metadata not tied to a user session
     │   └── index.ts                 # Exports
     ├── types/                       # TypeScript type definitions
@@ -130,9 +131,9 @@ The app uses React hooks and Context API for state management:
    - Component-level state with `useState`
    - Side effects with `useEffect`
 
-3. **AsyncStorage**:
-   - Persistent local storage for articles, tokens, and user data
-   - Accessed via `StorageService` (see Services section)
+3. **Local Persistence**:
+   - Read-list articles: `ArticleStore` (SQLite via `expo-sqlite`)
+   - Explore cache, tokens, and user data: AsyncStorage via `StorageService`/`AuthService`
 
 ### Service Layer Pattern
 All backend communication goes through service classes:
@@ -140,7 +141,8 @@ All backend communication goes through service classes:
 - **AuthService** (`src/services/auth.ts`): Authentication and token management
 - **ExploreService** (`src/services/explore.ts`): Content recommendations and voting
 - **ReadService** (`src/services/read.ts`): Article storage and management
-- **StorageService** (`src/services/storage.ts`): Local data persistence
+- **StorageService** (`src/services/storage.ts`): Explore cache persistence (AsyncStorage)
+- **ArticleStore** (`src/services/articleStore.ts`): Local read-list article store (SQLite)
 
 **Key Patterns:**
 - Services are static classes (no instantiation needed)
@@ -302,20 +304,39 @@ interface LoginResponse {
 ## Services
 
 ### StorageService (`src/services/storage.ts`)
-Local persistence using AsyncStorage.
+AsyncStorage-backed stale-while-revalidate cache for the Explore feed only.
+Read-list articles live in `ArticleStore` (SQLite) instead — see below.
 
 **Methods:**
 ```typescript
-StorageService.getArticles(): Promise<Article[]>
-StorageService.saveArticles(articles: Article[]): Promise<void>
-StorageService.addArticle(article: Article): Promise<void>
-StorageService.updateArticle(id: string, updates: Partial<Article>): Promise<void>
-StorageService.deleteArticle(id: string): Promise<void>
-StorageService.clearAllArticles(): Promise<void>
+StorageService.getExploreCache(): Promise<{ articles: Article[]; cachedAt: number } | null>
+StorageService.saveExploreCache(articles: Article[]): Promise<void>
 ```
 
 **Storage Key:**
-- Articles: `@cairnreader:articles`
+- Explore cache: `@cairnreader:explore_cache`
+
+### ArticleStore (`src/services/articleStore.ts`)
+SQLite-backed (`expo-sqlite`) local store for read-list articles: metadata,
+user state (`isRead`/`isFavorite`/scroll position) and an opportunistically
+cached `body` (cleaned HTML). It is a read-through cache for the initial
+render of `ReadScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`, not a
+paginated query engine — `useCursorArticleList` still drives pagination
+against the network. Sync is upsert-only; rows are only removed via the
+explicit archive path or `clear()` (called on logout). Explore articles are
+never written here.
+
+**Methods:**
+```typescript
+ArticleStore.upsertMany(articles: Article[]): Promise<void>
+ArticleStore.listRecent(limit: number): Promise<Article[]>
+ArticleStore.listFavorites(): Promise<Article[]>
+ArticleStore.getById(id: string): Promise<Article | null>
+ArticleStore.saveBody(id: string, body: string): Promise<void>
+ArticleStore.updateUserState(id: string, updates: Partial<Pick<Article, 'isRead' | 'isFavorite' | 'scrollFraction' | 'readAt'>>): Promise<void>
+ArticleStore.remove(id: string): Promise<void>
+ArticleStore.clear(): Promise<void>
+```
 
 ### AuthService (`src/services/auth.ts`)
 Authentication and token management.

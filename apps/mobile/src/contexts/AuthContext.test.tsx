@@ -1,8 +1,8 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, renderHook, screen, waitFor, act } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from './AuthContext';
-import { AuthService } from '../services';
+import { AuthService, ArticleStore } from '../services';
 import { NetworkError } from '../utils';
 import { User } from '../types';
 
@@ -21,6 +21,9 @@ jest.mock('../services', () => ({
     onAuthStateChange: jest.fn(() => () => {}),
     logout: jest.fn(),
   },
+  ArticleStore: {
+    clear: jest.fn(),
+  },
 }));
 
 jest.mock('@cairn/shared', () => ({
@@ -28,6 +31,7 @@ jest.mock('@cairn/shared', () => ({
 }));
 
 const mockedAuthService = AuthService as jest.Mocked<typeof AuthService>;
+const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
 
 const STORED_USER: User = {
   id: 'user-1',
@@ -94,5 +98,49 @@ describe('AuthProvider.checkAuthStatus offline handling (task_cab7)', () => {
     );
 
     await waitFor(() => expect(screen.getByText('user:none')).toBeTruthy());
+  });
+});
+
+describe('AuthProvider.logout', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockedAuthService.onAuthStateChange.mockReturnValue(() => {});
+    mockedAuthService.isAuthenticated.mockResolvedValue(false);
+    mockedAuthService.logout.mockResolvedValue(undefined);
+    mockedArticleStore.clear.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('clears the local article store alongside the auth session', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(mockedArticleStore.clear).toHaveBeenCalled();
+  });
+
+  it('still logs the user out when ArticleStore.clear rejects', async () => {
+    mockedArticleStore.clear.mockRejectedValue(new Error('database is locked'));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await expect(
+      act(async () => {
+        await result.current.logout();
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(result.current.user).toBeNull();
   });
 });
