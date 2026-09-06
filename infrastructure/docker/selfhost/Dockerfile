@@ -4,8 +4,8 @@
 # web install makes a mobile change bust the npm ci + vite build cache layers.
 # Dropping apps/mobile from the workspace list and regenerating the lockfile
 # offline (no network, no node_modules) yields output that is byte-identical
-# unless a dependency web or shared actually uses moves — so the COPY --from
-# below is a BuildKit content-hash cache hit for mobile-only changes.
+# unless a dependency that web or shared actually uses changes — so the
+# COPY --from below is a BuildKit content-hash cache hit for mobile-only changes.
 # npm 11+ prunes the orphaned workspace entry fully, hence node:24 here.
 FROM node:24-alpine AS lockfile
 WORKDIR /app
