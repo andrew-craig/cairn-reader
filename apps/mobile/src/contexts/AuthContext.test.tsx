@@ -81,4 +81,18 @@ describe('AuthProvider.checkAuthStatus offline handling (task_cab7)', () => {
 
     await waitFor(() => expect(screen.getByText('user:none')).toBeTruthy());
   });
+
+  it('falls back to a null user, without an unhandled rejection, when getUser throws on corrupt storage', async () => {
+    mockedAuthService.isAuthenticated.mockResolvedValue(true);
+    mockedAuthService.ensureValidToken.mockRejectedValue(new NetworkError());
+    mockedAuthService.getUser.mockRejectedValue(new SyntaxError('Unexpected token in JSON'));
+
+    render(
+      <AuthProvider>
+        <Consumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText('user:none')).toBeTruthy());
+  });
 });

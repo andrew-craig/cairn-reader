@@ -149,6 +149,32 @@ describe('AuthService token refresh: offline vs rejected (task_cab7)', () => {
     expect(await AuthService.hasRefreshToken()).toBe(true);
   });
 
+  it('keeps tokens and throws a NetworkError when the refresh endpoint returns a 429 (rate limited)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ message: 'rate limited' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
+  it('keeps tokens and throws a NetworkError when the refresh endpoint returns a 400 (malformed request)', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ message: 'invalid input' }),
+    }) as unknown as typeof fetch;
+
+    await expect(AuthService.refreshAccessToken()).rejects.toBeInstanceOf(NetworkError);
+
+    expect(await AuthService.getAccessToken()).toBe('access-1');
+    expect(await AuthService.hasRefreshToken()).toBe(true);
+  });
+
   it('ensureValidToken propagates a NetworkError when the server is unreachable (expired token)', async () => {
     await AuthService.saveTokens({
       accessToken: 'access-1',

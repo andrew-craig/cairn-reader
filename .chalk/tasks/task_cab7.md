@@ -110,3 +110,41 @@ fake timers rather than sleeping through real backoff.
 
 **Not committed** — left in the working tree on branch
 `task_cab7-offline-auth-tokens` pending the go-ahead.
+
+## Review follow-up (PR #381, 2026-09-06)
+
+Two review comments on the pushed commit (686f9fa):
+
+1. **Important — `doRefreshAccessToken` cleared tokens on *any* 4xx.** That's
+   broader than the invariant and reintroduces the bug for statuses that
+   aren't a credential rejection. Confirmed against the backend: `/auth/*` is
+   rate-limited per IP (10 req/min, `pkg/middleware/rate_limit.go:112`), so a
+   busy device can get a genuine 429 on refresh — previously that logged the
+   user out. The refresh endpoint's OpenAPI spec documents only 200/400/401;
+   401 is the actual "invalid, expired, or reused refresh token" response, and
+   400 means a malformed request (a client bug), not a rejected credential.
+   Fix: clear tokens only on 401 or 403 (403 isn't documented for this
+   endpoint but is included as a deliberate, definitive authorization
+   rejection, e.g. a disabled account). Every other status — 400, 404, 429,
+   5xx — now throws `NetworkError` and keeps the tokens. Added tests for 429
+   and 400 (keep tokens, throw `NetworkError`); confirmed both fail against
+   the pre-fix code. Trade-off accepted, not solved: routing 400/404 through
+   `NetworkError` means `withRetry` retries them 3x with backoff before
+   failing — wasted work for a permanently-failing status, but bounded, and
+   `NetworkError` stays the single canonical type for task_c87c.
+
+2. **Nit — `AuthContext.checkAuthStatus`'s `NetworkError` branch could throw
+   an unhandled rejection.** `AuthService.getUser()` does `JSON.parse` on the
+   persisted user and can throw on corrupt storage; that call sat inside the
+   catch handler unguarded, widening the catch block's error surface beyond
+   what the pre-existing code could do. Fixed with a small try/catch around
+   the `getUser()` call that falls back to `setUser(null)` on failure. Added a
+   test with a throwing `getUser` inside the `NetworkError` branch, asserting
+   a null user and no unhandled rejection.
+
+Verification (apps/mobile): `npx jest` — 18 suites / 132 tests pass (129
+existing + 3 new). `npm run type-check` — clean. `npm run lint` — 0 errors, 12
+pre-existing warnings, none in a touched file.
+
+Not committed to origin — left as a local commit on
+`task_cab7-offline-auth-tokens` pending review.

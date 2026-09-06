@@ -411,9 +411,13 @@ export class AuthService {
         console.error('[Auth] Refresh failed with error response, status:', response.status);
       }
 
-      // Only a 4xx means the server rejected the credential. 5xx (and any other
-      // non-4xx failure) is a server-side problem, not a rejection.
-      if (response.status < 400 || response.status >= 500) {
+      // Only 401 (invalid/expired/reused refresh token, per the refresh
+      // endpoint's documented responses) or 403 (a definitive authorization
+      // rejection, e.g. a disabled account) means the server rejected the
+      // credential. Every other status — including 400 (malformed request),
+      // 404, and 429 (rate limited; /auth/* is rate-limited per IP) — is not
+      // a credential rejection and must not log the user out.
+      if (response.status !== 401 && response.status !== 403) {
         throw new NetworkError();
       }
 
