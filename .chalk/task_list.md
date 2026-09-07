@@ -9,8 +9,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **chore_6449** · P2 · in_progress · Selfhost image: mobile-only root-lockfile changes bust the web build cache
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
 - **task_a8a4** · P2 · in_progress · Mobile: single SQLite-backed local article store (replaces AsyncStorage article caches)  (parent: feature_90a5)
-- **task_c87c** · P2 · in_progress · Mobile: connectivity awareness and offline banner  (parent: feature_90a5)
-- **chore_1089** · P2 · open · Mobile: route every raw fetch through NetworkError conversion, and lint against new ones  (parent: feature_90a5)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps

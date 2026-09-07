@@ -12,6 +12,7 @@ import {
 import { getServerUrl } from '@cairn/shared';
 import { withRetry } from '../utils/retry';
 import { NetworkError } from '../utils/errors';
+import { fetchOrNetworkError } from '../utils/http';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
 const REFRESH_TOKEN_KEY = '@cairn:refresh_token';
@@ -92,7 +93,7 @@ export class AuthService {
   static async loginWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/login/mobile`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/auth/login/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export class AuthService {
   static async registerWithDevice(): Promise<LoginResponse> {
     const deviceId = await this.getDeviceId();
 
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/register/mobile`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/auth/register/mobile`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -146,7 +147,7 @@ export class AuthService {
   }
 
   static async loginWithEmail(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/login`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ export class AuthService {
   }
 
   static async registerWithEmail(credentials: RegisterRequest): Promise<LoginResponse> {
-    const response = await fetch(`${getServerUrl()}/api/v1/auth/register`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -200,7 +201,7 @@ export class AuthService {
   static async logout(): Promise<void> {
     if (this.refreshToken) {
       try {
-        await fetch(`${getServerUrl()}/api/v1/auth/logout`, {
+        await fetchOrNetworkError(`${getServerUrl()}/api/v1/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -379,6 +380,11 @@ export class AuthService {
     try {
       const requestBody = { refresh_token: this.refreshToken };
 
+      // Not routed through fetchOrNetworkError: this catch already converts
+      // *any* thrown error to NetworkError (task_cab7), which is broader than
+      // fetchOrNetworkError's TypeError/AbortError-only guard. That's not
+      // provably identical, so left as-is per chore_1089's scope.
+      // eslint-disable-next-line no-restricted-syntax
       response = await fetch(`${getServerUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
@@ -470,26 +476,6 @@ export class AuthService {
   }
 
   /**
-   * fetch(), converting "couldn't reach the server" into a NetworkError so
-   * callers can tell it apart from a rejected credential. Anything else is
-   * rethrown untouched. Used by both the primary request and the 401 retry
-   * in fetchWithAuth — a dropped connection in either window must not be
-   * mistaken for the server rejecting the credential.
-   */
-  private static async fetchOrNetworkError(url: string, init: RequestInit): Promise<Response> {
-    try {
-      return await fetch(url, init);
-    } catch (error) {
-      // An aborted fetch can reject with a DOMException, which does not extend Error
-      // in every runtime, so match on the name rather than the type.
-      if (error instanceof TypeError || (error as { name?: string } | null)?.name === 'AbortError') {
-        throw new NetworkError();
-      }
-      throw error;
-    }
-  }
-
-  /**
    * Authenticated fetch with proactive token refresh and a single reactive 401
    * retry. Feature services (read, explore) build on this — one implementation,
    * not a private copy per service.
@@ -515,7 +501,7 @@ export class AuthService {
       throw new Error('Not authenticated');
     }
 
-    const response = await this.fetchOrNetworkError(url, {
+    const response = await fetchOrNetworkError(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -531,7 +517,7 @@ export class AuthService {
         const newAccessToken = await this.getAccessToken();
 
         // Retry the request with new token
-        const retryResponse = await this.fetchOrNetworkError(url, {
+        const retryResponse = await fetchOrNetworkError(url, {
           ...options,
           headers: {
             'Content-Type': 'application/json',
@@ -586,7 +572,7 @@ export class AuthService {
       throw new Error('No user found');
     }
 
-    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/upgrade`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/user/${userId}/upgrade`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -617,7 +603,7 @@ export class AuthService {
       throw new Error('No user found');
     }
 
-    const response = await fetch(`${getServerUrl()}/api/v1/user/${userId}/password`, {
+    const response = await fetchOrNetworkError(`${getServerUrl()}/api/v1/user/${userId}/password`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
