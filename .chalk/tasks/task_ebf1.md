@@ -43,3 +43,19 @@ Whichever is chosen, add a test for the interleaving above specifically: pending
 write + list sync arriving first + assert the user's value survives. It will not
 be caught by the enqueue/replay/drop/halt/coalesce tests already listed in the
 description, because those never run a list sync concurrently.
+
+## Inherited from task_c55c (tech lead, 2026-09-08)
+Phase 3 deferred its app-foreground and reconnect prefetch triggers to this task, on the
+grounds that the outbox needs the same `AppState`/network-change listener and building it
+twice is waste. When that listener lands here, wire **both** consumers to it:
+`ArticlePrefetchService.run()` as well as the outbox drain.
+
+Two concrete symptoms that trigger should fix, both live on main today:
+1. A user who regains connectivity does not prefetch until they open or pull-to-refresh
+   the Read tab (30s TTL).
+2. `ReadArticleDetailScreen` shows "Not available offline"; if connectivity returns while
+   that screen is open, the render guard (`!article.content && isOffline`) stops matching
+   and the screen falls through to a **blank** `ArticleContent` — nothing re-triggers the
+   fetch, since the content-loading effect keys off `initialArticle.id` and reads
+   connectivity through a ref. Backing out and re-opening recovers. Fix it via the
+   reconnect trigger, not a screen-local listener.

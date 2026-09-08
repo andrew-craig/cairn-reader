@@ -325,3 +325,72 @@ the full suite/type-check/lint were re-run clean (results in the table above).
   so the "apply steps in order" claim in the `migrate()` doc comment is asserted by
   design/code-reading, not by a test that chains two real migrations — there's only one
   to chain. This will matter once task_ebf1 adds a second step.
+
+## Tech lead review (2026-09-08)
+**Accepted.** Verification re-run independently, not taken on report: `npx jest` — 31
+suites / 199 tests pass; `npm run type-check` — clean; `npm run lint` — 0 errors, 12
+warnings, all pre-existing and none in a touched file. Matches what was reported.
+
+### What I checked beyond the report
+**The UPSERT `CASE` was the one change that could silently destroy user data, so I
+verified its core assumption directly rather than through the suite.** The `body` CASE
+compares `excluded.content_hash` against `articles.content_hash` while the same
+statement also assigns `content_hash`. If SQLite evaluated `SET` clauses sequentially,
+the comparison would read the *already-updated* value, always compare equal, and a
+changed hash would never clear a stale body — the exact failure this phase exists to
+prevent, and one that would look correct in review. Probed against `node:sqlite`
+outside the repo, all four paths behave as intended:
+
+| incoming hash vs stored | body |
+|---|---|
+| equal | survives |
+| changed | cleared |
+| absent (`NULL`) | survives |
+| stored `NULL`, incoming present (a migrated v1 row) | cleared |
+
+SQLite evaluates `DO UPDATE SET` right-hand sides against the pre-update row, so the
+implementation is correct. Recording it here because the next person to touch that
+statement needs to know the ordering is load-bearing.
+
+**Consequence of row 4, not called out in the implementer's review:** every install
+upgrading from v1 has `content_hash = NULL` on rows that may already hold a cached
+body, so the first list sync after upgrade clears those bodies and prefetch
+re-downloads them. That is the correct conservative choice — a body whose hash is
+unknown cannot be proven current — and it is a one-time cost, but it is real and
+should be expected on the first post-upgrade sync.
+
+**Migration test is the right shape.** It seeds the exact v1 `CREATE TABLE`, inserts a
+legacy row, runs the store against it, and asserts `content_hash` exists by querying
+the column directly rather than relying on `rowToArticle`'s `?? undefined` to mask its
+absence. A second open is asserted not to re-run the `ALTER`.
+
+### Answers to the three questions raised
+1. **Eviction after an aborted batch but not after an offline skip** — correct as
+   built. Eviction is storage bookkeeping, not part of the network pass; skipping it
+   when offline just means the cap is enforced on the next run. No change.
+2. **Two `undefined` hashes treated as "not equal"** — correct. Currency cannot be
+   proven without a hash, so falling through to a fetch is the safe direction. No change.
+3. **`isOffline` read through a ref** — accepted, matching the file's existing pattern,
+   but it leaves a narrow gap; see below.
+
+### Gap carried to Phase 4 (task_ebf1), not fixed here
+If connectivity returns *while the user is sitting on* the "Not available offline"
+screen, the render guard (`!article.content && isOffline`) stops matching and the
+screen falls through to `ArticleContent` with no body — a blank page rather than the
+honest message. Nothing re-triggers the fetch, because the content-loading effect keys
+off `initialArticle.id` and reads connectivity through a ref. Backing out and
+re-opening the article recovers.
+
+Not fixed here deliberately: the fix is a reconnect trigger, which is precisely what
+decision 5 defers to Phase 4, where the same listener drains the outbox. Building a
+screen-local version now is the duplication that decision exists to avoid. Noted on
+task_ebf1 so it is not lost.
+
+### Not changed, recorded for later
+`saveBody(id, body)` writes the body without the hash it was fetched against, so a
+detail/prefetch fetch that returns content newer than the row's `content_hash` stores a
+body labelled with the older hash. It is self-correcting (the next list sync sees the
+new hash, clears the body, re-prefetches) and cannot serve *stale* text — `saveBody`
+always stores the newest body, so the mislabel only ever runs in the harmless
+direction. Left alone rather than widening the signature for a case that costs one
+redundant download.
