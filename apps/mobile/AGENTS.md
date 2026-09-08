@@ -77,6 +77,7 @@ apps/mobile/
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
     │   ├── articleStore.ts          # Local read-list article store (SQLite)
+    │   ├── articlePrefetch.ts       # Background body prefetch for the local store
     │   ├── auth.ts                  # Authentication service
     │   ├── explore.ts               # Explore/recommendations API
     │   ├── read.ts                  # Read service API
@@ -143,6 +144,7 @@ All backend communication goes through service classes:
 - **ReadService** (`src/services/read.ts`): Article storage and management
 - **StorageService** (`src/services/storage.ts`): Explore cache persistence (AsyncStorage)
 - **ArticleStore** (`src/services/articleStore.ts`): Local read-list article store (SQLite)
+- **ArticlePrefetchService** (`src/services/articlePrefetch.ts`): Background body prefetch into the local store
 
 **Key Patterns:**
 - Services are static classes (no instantiation needed)
@@ -235,6 +237,7 @@ interface Article {
   title: string;
   description?: string;
   content?: string;        // Cleaned HTML content from readability extraction
+  contentHash?: string;    // content.content_hash, for diffing cached bodies
   imageUrl?: string;
   author?: string;
   publishedDate?: string;  // ISO 8601 date string
@@ -319,12 +322,15 @@ StorageService.saveExploreCache(articles: Article[]): Promise<void>
 ### ArticleStore (`src/services/articleStore.ts`)
 SQLite-backed (`expo-sqlite`) local store for read-list articles: metadata,
 user state (`isRead`/`isFavorite`/scroll position) and an opportunistically
-cached `body` (cleaned HTML). It is a read-through cache for the initial
-render of `ReadScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`, not a
-paginated query engine — `useCursorArticleList` still drives pagination
+cached `body` (cleaned HTML), diffed against the server by `content_hash` so
+an unchanged body is never re-downloaded. It is a read-through cache for the
+initial render of `ReadScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`,
+not a paginated query engine — `useCursorArticleList` still drives pagination
 against the network. Sync is upsert-only; rows are only removed via the
 explicit archive path or `clear()` (called on logout). Explore articles are
-never written here.
+never written here. Schema changes since the original table apply via a
+`PRAGMA user_version`-driven migration inside `getDb()` — see the migration
+comment in the source before widening the table further.
 
 **Methods:**
 ```typescript
@@ -332,10 +338,27 @@ ArticleStore.upsertMany(articles: Article[]): Promise<void>
 ArticleStore.listRecent(limit: number): Promise<Article[]>
 ArticleStore.listFavorites(): Promise<Article[]>
 ArticleStore.getById(id: string): Promise<Article | null>
+ArticleStore.listPrefetchCandidates(limit: number): Promise<Article[]>
 ArticleStore.saveBody(id: string, body: string): Promise<void>
+ArticleStore.evictBodiesOutsideCap(limit: number): Promise<void>
 ArticleStore.updateUserState(id: string, updates: Partial<Pick<Article, 'isRead' | 'isFavorite' | 'scrollFraction' | 'readAt'>>): Promise<void>
 ArticleStore.remove(id: string): Promise<void>
 ArticleStore.clear(): Promise<void>
+```
+
+### ArticlePrefetchService (`src/services/articlePrefetch.ts`)
+Downloads `cleaned_html` for unread/reading Read-list articles that lack a
+cached body: bounded concurrency (3 workers), newest first, capped at the 100
+most recent Read-list articles, then evicts cached bodies outside that cap.
+Never runs while offline; aborts the remaining batch on the first
+`NetworkError` (a non-network error skips just that article). Single-flight —
+a run already in progress is not restarted by a second call. Triggered by
+`ReadScreen`'s sync callback after `ArticleStore.upsertMany`, not by any
+screen directly; no other screen calls it.
+
+**Methods:**
+```typescript
+ArticlePrefetchService.run(): Promise<void>
 ```
 
 ### AuthService (`src/services/auth.ts`)

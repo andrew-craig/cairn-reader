@@ -20,22 +20,30 @@ interface ArticleRow {
   scroll_position: number | null;
   scroll_fraction: number | null;
   body: string | null;
+  content_hash: string | null;
 }
 
 // A list page from the server upserts its rows; existing rows are updated,
-// never bulk-deleted. `body` is the one exception: list responses never carry
-// cleaned HTML, so a plain overwrite would erase a previously cached body on
-// every refresh. COALESCE keeps whatever body is already stored when the
-// incoming row doesn't have one.
+// never bulk-deleted. `body` and `content_hash` need special handling because
+// list responses carry a hash but never the cleaned HTML itself:
+// - content_hash: overwritten when the incoming row has one (COALESCE keeps
+//   the stored value on a summary payload that omits it — none do today, but
+//   nothing should crash if one ever does).
+// - body: kept when the incoming hash is absent, or equal to what's already
+//   stored (a plain refresh) — COALESCE also guards the never-carries-a-body
+//   case, same as before this task. Cleared when the incoming hash differs
+//   from the stored one: a body whose hash no longer matches the server's is
+//   stale and must not be served offline. See task_c55c scope clarification,
+//   "Selection, staleness and eviction".
 const UPSERT_SQL = `
   INSERT INTO articles (
     id, url, title, description, image_url, author, published_date,
     reading_time, tags, is_read, is_favorite, added_at, read_at,
-    scroll_position, scroll_fraction, body
+    scroll_position, scroll_fraction, body, content_hash
   ) VALUES (
     $id, $url, $title, $description, $image_url, $author, $published_date,
     $reading_time, $tags, $is_read, $is_favorite, $added_at, $read_at,
-    $scroll_position, $scroll_fraction, $body
+    $scroll_position, $scroll_fraction, $body, $content_hash
   )
   ON CONFLICT(id) DO UPDATE SET
     url = excluded.url,
@@ -52,7 +60,12 @@ const UPSERT_SQL = `
     read_at = excluded.read_at,
     scroll_position = excluded.scroll_position,
     scroll_fraction = excluded.scroll_fraction,
-    body = COALESCE(excluded.body, articles.body)
+    content_hash = COALESCE(excluded.content_hash, articles.content_hash),
+    body = CASE
+      WHEN excluded.content_hash IS NULL THEN COALESCE(excluded.body, articles.body)
+      WHEN excluded.content_hash = articles.content_hash THEN COALESCE(excluded.body, articles.body)
+      ELSE NULL
+    END
 `;
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -61,6 +74,10 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = SQLite.openDatabaseAsync(DB_NAME)
       .then(async (db) => {
+        // Kept at its original (v1) shape. Installs from before this task
+        // already have this table; widening this statement would be a no-op
+        // against them, so schema changes since v1 are applied by migrate()
+        // instead, tracked via PRAGMA user_version.
         await db.execAsync(`
           CREATE TABLE IF NOT EXISTS articles (
             id TEXT PRIMARY KEY,
@@ -81,6 +98,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
             body TEXT
           );
         `);
+        await migrate(db);
         return db;
       })
       .catch((error) => {
@@ -92,6 +110,30 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
       });
   }
   return dbPromise;
+}
+
+/**
+ * Applies schema migrations in order, tracked via PRAGMA user_version, so a
+ * fresh install (CREATE TABLE above, then every step here) and an upgraded
+ * install (already at some version, then only the remaining steps) converge
+ * on the same schema. A DB already at the latest version runs no statements —
+ * safe to call on every open.
+ */
+async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const startVersion = row?.user_version ?? 0;
+  let version = startVersion;
+
+  // Step 2 (task_c55c): content_hash, for diffing cached bodies against the
+  // server's hash so unchanged bodies are never re-downloaded.
+  if (version < 2) {
+    await db.execAsync('ALTER TABLE articles ADD COLUMN content_hash TEXT');
+    version = 2;
+  }
+
+  if (version !== startVersion) {
+    await db.execAsync(`PRAGMA user_version = ${version}`);
+  }
 }
 
 function articleToParams(article: Article): Record<string, string | number | null> {
@@ -112,6 +154,7 @@ function articleToParams(article: Article): Record<string, string | number | nul
     $scroll_position: article.scrollPosition ?? null,
     $scroll_fraction: article.scrollFraction ?? null,
     $body: article.content ?? null,
+    $content_hash: article.contentHash ?? null,
   };
 }
 
@@ -133,6 +176,7 @@ function rowToArticle(row: ArticleRow): Article {
     readAt: row.read_at ?? undefined,
     scrollPosition: row.scroll_position ?? undefined,
     scrollFraction: row.scroll_fraction ?? undefined,
+    contentHash: row.content_hash ?? undefined,
   };
 }
 
@@ -198,6 +242,27 @@ export const ArticleStore = {
     }
   },
 
+  /**
+   * Unread/reading articles with no cached body, newest first, for the
+   * prefetch service (task_c55c). `upsertMany` already clears `body` when a
+   * list sync's incoming hash differs from what's stored, so this is the
+   * full selection: nothing else needs to compare hashes. Reads never
+   * reject — see `listRecent`.
+   */
+  async listPrefetchCandidates(limit: number): Promise<Article[]> {
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<ArticleRow>(
+        'SELECT * FROM articles WHERE is_read = 0 AND body IS NULL ORDER BY added_at DESC LIMIT $limit',
+        { $limit: limit },
+      );
+      return rows.map(rowToArticle);
+    } catch (error) {
+      console.error('Error loading prefetch candidates:', error);
+      return [];
+    }
+  },
+
   /** Cache a freshly fetched article body (cleaned HTML) opportunistically. */
   async saveBody(id: string, body: string): Promise<void> {
     const db = await getDb();
@@ -205,6 +270,21 @@ export const ArticleStore = {
       $id: id,
       $body: body,
     });
+  },
+
+  /**
+   * Drop cached bodies for rows outside the `limit` most recent by
+   * `added_at`, e.g. after a prefetch run, so the store never keeps more
+   * bodies than the Read screen's own retention window.
+   */
+  async evictBodiesOutsideCap(limit: number): Promise<void> {
+    const db = await getDb();
+    await db.runAsync(
+      `UPDATE articles SET body = NULL WHERE id NOT IN (
+         SELECT id FROM articles ORDER BY added_at DESC LIMIT $limit
+       )`,
+      { $limit: limit },
+    );
   },
 
   async updateUserState(

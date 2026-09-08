@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
+  Text,
   ActivityIndicator,
   StyleSheet,
   useColorScheme,
@@ -11,7 +12,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
 import { ArticleStore, ReadService } from '../services';
-import { Colors } from '../constants';
+import { Colors, GlobalStyles } from '../constants';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 import type { ScrollProgressInfo } from '../components/common/ArticleContent';
 
@@ -38,34 +40,70 @@ export const ReadArticleDetailScreen: React.FC = () => {
   // (list responses are summaries). We lazy-load the full content on mount.
   const [article, setArticle] = useState<Article>(initialArticle);
   const [contentLoading, setContentLoading] = useState(!initialArticle.content);
+  const { isOffline } = useNetworkStatus();
+  // Read inside the effect below without adding `isOffline` to its deps —
+  // this mirrors the file's existing pattern (see articleIdRef etc.) of
+  // reading current values through a ref so connectivity flapping mid-read
+  // can't restart the content-loading effect.
+  const isOfflineRef = useRef(isOffline);
+  isOfflineRef.current = isOffline;
 
   useEffect(() => {
     if (initialArticle.content) return; // already have the HTML
     let cancelled = false;
 
-    // Prefer a locally cached body so the article can render before the
-    // network responds; the fetch below still runs to refresh it.
+    // Resolve the article by id from the store rather than trusting route
+    // params alone: the store carries the body and the hash it was cached
+    // against, while route params carry the fresh list metadata (including
+    // the fresh hash) — merge the two.
     ArticleStore.getById(initialArticle.id).then((stored) => {
-      if (cancelled || !stored?.content) return;
-      setArticle((current) => (current.content ? current : { ...current, content: stored.content }));
-      setContentLoading(false);
+      if (cancelled) return;
+      const hasStoredBody = Boolean(stored?.content);
+
+      if (hasStoredBody && stored) {
+        setArticle((current) =>
+          current.content
+            ? current
+            : { ...current, content: stored.content, contentHash: stored.contentHash },
+        );
+        setContentLoading(false);
+      }
+
+      // A stored body whose hash matches the fresh route-param hash is
+      // already current — skip the network fetch entirely. That's the point
+      // of the hash diff: today's screen (pre-task_c55c) fetched on every
+      // open regardless.
+      const hashMatches =
+        hasStoredBody &&
+        stored?.contentHash !== undefined &&
+        stored.contentHash === initialArticle.contentHash;
+      if (hashMatches) return;
+
+      // Never fetch while offline — it can only fail. With nothing stored,
+      // stop loading so the "Not available offline" state below can render
+      // instead of hanging on the spinner.
+      if (isOfflineRef.current) {
+        if (!hasStoredBody) setContentLoading(false);
+        return;
+      }
+
+      ReadService.getContentById(initialArticle.id)
+        .then((detail) => {
+          if (cancelled) return;
+          const updated = ReadService.transformDetailToArticle(detail);
+          setArticle(updated);
+          setContentLoading(false);
+          if (updated.content) {
+            void ArticleStore.saveBody(initialArticle.id, updated.content);
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error('Failed to load article content:', err);
+          setContentLoading(false);
+        });
     });
 
-    ReadService.getContentById(initialArticle.id)
-      .then((detail) => {
-        if (cancelled) return;
-        const updated = ReadService.transformDetailToArticle(detail);
-        setArticle(updated);
-        setContentLoading(false);
-        if (updated.content) {
-          void ArticleStore.saveBody(initialArticle.id, updated.content);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error('Failed to load article content:', err);
-        setContentLoading(false);
-      });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialArticle.id]);
@@ -222,6 +260,20 @@ export const ReadArticleDetailScreen: React.FC = () => {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Offline with nothing cached: a blank article body is misleading, so say
+  // so explicitly instead.
+  if (!article.content && isOffline) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <View style={GlobalStyles.emptyContainer}>
+          <Text style={[GlobalStyles.emptyText, { color: colors.textSecondary }]}>
+            Not available offline
+          </Text>
+        </View>
       </View>
     );
   }
