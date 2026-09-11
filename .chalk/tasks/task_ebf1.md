@@ -230,3 +230,7 @@ level only.
 The QA pass should specifically exercise a definitive 4xx at write time (not just
 the offline path), since that is the branch both review findings lived on and the
 one with no outbox row to reconcile it.
+
+### PR
+https://github.com/andrew-craig/cairn-reader/pull/388 — opened 2026-09-11, all 5 checks green on e0ae5b5, mergeable_state clean.
+Task stays in_progress until it merges.
