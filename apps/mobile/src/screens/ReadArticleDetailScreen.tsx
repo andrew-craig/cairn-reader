@@ -41,15 +41,27 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const [article, setArticle] = useState<Article>(initialArticle);
   const [contentLoading, setContentLoading] = useState(!initialArticle.content);
   const { isOffline } = useNetworkStatus();
-  // Read inside the effect below without adding `isOffline` to its deps —
-  // this mirrors the file's existing pattern (see articleIdRef etc.) of
-  // reading current values through a ref so connectivity flapping mid-read
-  // can't restart the content-loading effect.
-  const isOfflineRef = useRef(isOffline);
-  isOfflineRef.current = isOffline;
 
   useEffect(() => {
-    if (initialArticle.content) return; // already have the HTML
+    // Gate on the currently displayed article's content, not the initial
+    // route param: on the first run these are the same thing (`article`
+    // state is seeded from `initialArticle`), but this effect also re-runs
+    // when connectivity returns (see the `isOffline` dep below), and by
+    // then `article` may already carry a body a background prefetch wrote
+    // to the store while this screen was open. Gating on "still missing"
+    // rather than the frozen initial value is what stops a completed load
+    // from being restarted by later connectivity flapping.
+    if (article.content) return;
+    // Past this point there is definitely no content to show yet, and we're
+    // about to hit the store and possibly the network for it. Show the
+    // spinner rather than leaving contentLoading at whatever it already was
+    // — on a fresh mount that's already true, but on a reconnect-triggered
+    // re-run (the `isOffline` dep below) it's false, left over from the
+    // earlier "Not available offline" render, which would otherwise fall
+    // through to a blank ArticleContent for the duration of this fetch. The
+    // offline-with-nothing-stored branch further down still wins once the
+    // store lookup resolves, since it explicitly sets this back to false.
+    setContentLoading(true);
     let cancelled = false;
 
     // Resolve the article by id from the store rather than trusting route
@@ -81,8 +93,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
       // Never fetch while offline — it can only fail. With nothing stored,
       // stop loading so the "Not available offline" state below can render
-      // instead of hanging on the spinner.
-      if (isOfflineRef.current) {
+      // instead of hanging on the spinner. Once connectivity returns, the
+      // `isOffline` dep below re-runs this effect and retries.
+      if (isOffline) {
         if (!hasStoredBody) setContentLoading(false);
         return;
       }
@@ -105,8 +118,13 @@ export const ReadArticleDetailScreen: React.FC = () => {
     });
 
     return () => { cancelled = true; };
+  // `article` is deliberately excluded: it's read for the "still missing"
+  // gate above via closure, which is enough since a dep change (id or
+  // isOffline) always re-renders before this effect body runs; adding it
+  // would just make this effect re-run once more (a no-op past the gate)
+  // every time it sets `article` itself.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialArticle.id]);
+  }, [initialArticle.id, isOffline]);
 
   // Mutable UI state tracked separately from the article object so async updates
   // are scoped to the displayed article. Seeded from the article and resynced

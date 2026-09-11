@@ -1,10 +1,11 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, waitFor } from '@testing-library/react-native';
+import { ActivityIndicator } from 'react-native';
 import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
 import { ArticleStore, ReadService } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
-import type { UserContentResponse } from '@cairn/shared';
+import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shared';
 
 // task_a8a4: opening a previously-read article must render its cached body
 // (decision 4: opportunistic body caching) without waiting on the network
@@ -132,5 +133,68 @@ describe('ReadArticleDetailScreen offline body cache', () => {
     expect(await screen.findByText('<p>Cached</p>')).toBeTruthy();
     expect(screen.queryByText('Not available offline')).toBeNull();
     expect(mockedReadService.getContentById).not.toHaveBeenCalled();
+  });
+
+  // task_06e5: regaining connectivity while this screen is open used to
+  // leave it stuck on a blank ArticleContent — the render guard
+  // (`!article.content && isOffline`) stopped matching once isOffline went
+  // false, but nothing re-triggered the fetch that would give it content.
+  it('shows the spinner, never a blank body, while re-fetching after reconnect', async () => {
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: true });
+    mockedArticleStore.getById.mockResolvedValue(null);
+
+    const { rerender } = render(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('Not available offline')).toBeTruthy();
+    expect(mockedReadService.getContentById).not.toHaveBeenCalled();
+
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
+    // Still nothing in the store, and the network call never resolves in
+    // this test — the point is to observe the fetch window itself, not the
+    // state once it settles.
+    mockedArticleStore.getById.mockResolvedValue(null);
+    mockedReadService.getContentById.mockReturnValue(new Promise(() => {}));
+
+    rerender(<ReadArticleDetailScreen />);
+
+    // Immediately after the reconnect render: the effect has synchronously
+    // put the screen back into the loading state, before the store lookup
+    // (a pending promise) has had a chance to resolve.
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+
+    // After the store lookup resolves and the effect has moved on to the
+    // network fetch (still pending): still no blank body.
+    await waitFor(() => expect(mockedReadService.getContentById).toHaveBeenCalled());
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+  });
+
+  it('renders content once connectivity returns and the fetch resolves', async () => {
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: true });
+    mockedArticleStore.getById.mockResolvedValue(null);
+
+    const { rerender } = render(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('Not available offline')).toBeTruthy();
+
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
+    mockedArticleStore.getById.mockResolvedValue(null);
+    mockedReadService.getContentById.mockResolvedValue(
+      { content_id: 'a1' } as unknown as UserContentDetailResponse,
+    );
+    mockedReadService.transformDetailToArticle.mockReturnValue({
+      ...summaryArticle,
+      content: '<p>Fresh</p>',
+    });
+
+    rerender(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('<p>Fresh</p>')).toBeTruthy();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(mockedReadService.getContentById).toHaveBeenCalled();
   });
 });

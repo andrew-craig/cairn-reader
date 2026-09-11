@@ -7,7 +7,7 @@ import { AddArticleScreen, ReadArticleDetailScreen, ExploreArticleDetailScreen, 
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
-import { OfflineBanner } from '../components/common';
+import { OfflineBanner, SyncTriggerEffect } from '../components/common';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -132,6 +132,7 @@ export default function RootNavigator() {
         />
       </Stack.Navigator>
       <OfflineBanner />
+      <SyncTriggerEffect />
     </>
   );
 }
