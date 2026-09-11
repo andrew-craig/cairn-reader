@@ -2,14 +2,14 @@
 id: task_06e5
 title: Mobile: app-foreground and reconnect sync trigger
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [mobile,offline]
 blocked_by: []
 parent: feature_90a5
 remote_task_url: null
 created_at: 2026-09-11T09:36:33Z
-updated_at: 2026-09-11T09:36:33Z
+updated_at: 2026-09-11T09:37:18Z
 ---
 Split out of task_ebf1 (tech lead, 2026-09-11). Phase 4a of feature_90a5.
 

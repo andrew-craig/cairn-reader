@@ -7,12 +7,12 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_e848** · P1 · open · [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)  (parent: epic_fefa)
 - **chore_6449** · P2 · in_progress · Selfhost image: mobile-only root-lockfile changes bust the web build cache
+- **task_06e5** · P2 · in_progress · Mobile: app-foreground and reconnect sync trigger  (parent: feature_90a5)
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_02c8** · P2 · open · [Audit/Tier 3] Vote counters: collapse the transition ladder AND fix the asymmetric RowsAffected handling  (parent: epic_fefa)
-- **task_06e5** · P2 · open · Mobile: app-foreground and reconnect sync trigger  (parent: feature_90a5)
 - **task_0849** · P2 · open · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 - **task_19a9** · P2 · open · [explore/fetcher] Integration suite: test isolation + EndToEndFlow hardcoded IDs + EmptyResponse behavior  (parent: epic_fefa)
