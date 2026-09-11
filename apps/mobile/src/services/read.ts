@@ -1,4 +1,5 @@
 import { AuthService } from './auth';
+import { HttpError } from '../utils/errors';
 import { Article } from '../types';
 import {
   UserContentsListResponse,
@@ -175,7 +176,7 @@ export class ReadService {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || result.error || 'Failed to update content');
+        throw new HttpError(response.status, result.message || result.error || 'Failed to update content');
       }
 
       return result.data;
@@ -205,7 +206,7 @@ export class ReadService {
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Failed to delete content: ${error}`);
+        throw new HttpError(response.status, `Failed to delete content: ${error}`);
       }
     } catch (error) {
       console.error('Error deleting content:', error);

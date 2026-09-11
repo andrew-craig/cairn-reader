@@ -1,9 +1,10 @@
 import { SyncTrigger, runConsumersIsolated } from './syncTrigger';
 import { ArticlePrefetchService } from './articlePrefetch';
+import { Outbox } from './outbox';
 
 // task_06e5: SyncTrigger.run() is the single, fixed-order entry point the
-// app-foreground/reconnect trigger calls into. Today it has one consumer
-// (ArticlePrefetchService); task_ebf1 adds an outbox drain ahead of it.
+// app-foreground/reconnect trigger calls into. task_ebf1 adds the outbox
+// drain as a consumer, ahead of ArticlePrefetchService.
 
 jest.mock('./articlePrefetch', () => ({
   ArticlePrefetchService: {
@@ -11,17 +12,34 @@ jest.mock('./articlePrefetch', () => ({
   },
 }));
 
+jest.mock('./outbox', () => ({
+  Outbox: {
+    drain: jest.fn(),
+  },
+}));
+
 const mockedArticlePrefetchService = ArticlePrefetchService as jest.Mocked<typeof ArticlePrefetchService>;
+const mockedOutbox = Outbox as jest.Mocked<typeof Outbox>;
 
 describe('SyncTrigger.run', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedArticlePrefetchService.run.mockResolvedValue(undefined);
+    mockedOutbox.drain.mockResolvedValue(undefined);
   });
 
   it('runs ArticlePrefetchService.run() as a consumer', async () => {
     await SyncTrigger.run();
     expect(mockedArticlePrefetchService.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('drains the outbox before running prefetch', async () => {
+    await SyncTrigger.run();
+
+    expect(mockedOutbox.drain).toHaveBeenCalledTimes(1);
+    const drainOrder = mockedOutbox.drain.mock.invocationCallOrder[0];
+    const prefetchOrder = mockedArticlePrefetchService.run.mock.invocationCallOrder[0];
+    expect(drainOrder).toBeLessThan(prefetchOrder);
   });
 
   it('does not stack concurrent runs', async () => {

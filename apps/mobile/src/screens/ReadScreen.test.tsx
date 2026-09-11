@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react-native';
 import { ReadScreen } from './ReadScreen';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
-import { ArticlePrefetchService } from '../services/articlePrefetch';
+import { SyncTrigger } from '../services/syncTrigger';
 import { Article } from '../types';
 
 // task_a8a4: ReadScreen must render articles already in the local SQLite
@@ -12,6 +12,9 @@ import { Article } from '../types';
 // task_c55c: prefetch is triggered from this screen's sync callback only —
 // after upsertMany, per decision 4 — and the screen itself knows nothing
 // else about it.
+// task_ebf1 (item G): pull-to-refresh routes through SyncTrigger.run() (outbox
+// drain, then prefetch) instead of calling ArticlePrefetchService directly,
+// so the outbox gets a drain on this path too.
 
 jest.mock('../services/read', () => ({
   ReadService: {
@@ -27,8 +30,8 @@ jest.mock('../services/articleStore', () => ({
   },
 }));
 
-jest.mock('../services/articlePrefetch', () => ({
-  ArticlePrefetchService: {
+jest.mock('../services/syncTrigger', () => ({
+  SyncTrigger: {
     run: jest.fn(),
   },
 }));
@@ -42,7 +45,7 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
-const mockedArticlePrefetchService = ArticlePrefetchService as jest.Mocked<typeof ArticlePrefetchService>;
+const mockedSyncTrigger = SyncTrigger as jest.Mocked<typeof SyncTrigger>;
 
 const article = (id: string): Article => ({
   id,
@@ -59,7 +62,7 @@ describe('ReadScreen offline-first render', () => {
     jest.clearAllMocks();
     mockedArticleStore.upsertMany.mockResolvedValue(undefined);
     mockedArticleStore.remove.mockResolvedValue(undefined);
-    mockedArticlePrefetchService.run.mockResolvedValue(undefined);
+    mockedSyncTrigger.run.mockResolvedValue(undefined);
   });
 
   it('renders stored articles before the network call resolves', async () => {
@@ -73,7 +76,7 @@ describe('ReadScreen offline-first render', () => {
     expect(mockedReadService.listUserContents).toHaveBeenCalled();
   });
 
-  it('triggers prefetch after a successful sync upserts the new page', async () => {
+  it('triggers SyncTrigger.run() (outbox drain, then prefetch) after a successful sync upserts the new page', async () => {
     mockedArticleStore.listRecent.mockResolvedValue([]);
     mockedReadService.listUserContents.mockResolvedValue({
       contents: [],
@@ -86,11 +89,12 @@ describe('ReadScreen offline-first render', () => {
     render(<ReadScreen />);
     await screen.findByText('No saved articles yet');
 
-    // Prefetch must run only after upsertMany's write has resolved, not
-    // alongside it — it depends on the post-sync store state.
-    await waitFor(() => expect(mockedArticlePrefetchService.run).toHaveBeenCalled());
+    // SyncTrigger.run() must run only after upsertMany's write has resolved,
+    // not alongside it — prefetch (one of its consumers) depends on the
+    // post-sync store state.
+    await waitFor(() => expect(mockedSyncTrigger.run).toHaveBeenCalled());
     const upsertOrder = mockedArticleStore.upsertMany.mock.invocationCallOrder[0];
-    const prefetchOrder = mockedArticlePrefetchService.run.mock.invocationCallOrder[0];
-    expect(prefetchOrder).toBeGreaterThan(upsertOrder);
+    const syncTriggerOrder = mockedSyncTrigger.run.mock.invocationCallOrder[0];
+    expect(syncTriggerOrder).toBeGreaterThan(upsertOrder);
   });
 });

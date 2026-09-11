@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { ActivityIndicator } from 'react-native';
 import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
-import { ArticleStore, ReadService } from '../services';
+import { ArticleStore, ReadService, ArticleMutations } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
 import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shared';
@@ -13,6 +13,9 @@ import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shar
 // task_c55c: a stored body whose hash matches the fresh route-param hash
 // skips the network call entirely, and offline with nothing stored shows an
 // explicit "Not available offline" state instead of a blank body.
+// task_ebf1: the "mark as reading" effect fires unconditionally on mount for
+// an unread article, now via the ArticleMutations facade — it must be mocked
+// here even though this file's tests don't assert on it directly.
 
 jest.mock('../services', () => ({
   ArticleStore: {
@@ -25,6 +28,13 @@ jest.mock('../services', () => ({
     getContentById: jest.fn(),
     updateUserContent: jest.fn(),
     transformDetailToArticle: jest.fn(),
+  },
+  ArticleMutations: {
+    markCompleted: jest.fn(),
+    markReading: jest.fn(),
+    saveScrollPosition: jest.fn(),
+    setFavorite: jest.fn(),
+    archive: jest.fn(),
   },
 }));
 
@@ -49,6 +59,7 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
 const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
+const mockedArticleMutations = ArticleMutations as jest.Mocked<typeof ArticleMutations>;
 const mockedUseNetworkStatus = useNetworkStatus as jest.Mock;
 
 const summaryArticle: Article = {
@@ -69,6 +80,11 @@ describe('ReadArticleDetailScreen offline body cache', () => {
     mockedArticleStore.updateUserState.mockResolvedValue(undefined);
     mockedArticleStore.saveBody.mockResolvedValue(undefined);
     mockedReadService.updateUserContent.mockResolvedValue({} as UserContentResponse);
+    mockedArticleMutations.markCompleted.mockResolvedValue(undefined);
+    mockedArticleMutations.markReading.mockResolvedValue(undefined);
+    mockedArticleMutations.saveScrollPosition.mockResolvedValue(undefined);
+    mockedArticleMutations.setFavorite.mockResolvedValue(undefined);
+    mockedArticleMutations.archive.mockResolvedValue(undefined);
     mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
   });
 

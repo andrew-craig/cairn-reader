@@ -11,7 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
-import { ArticleStore, ReadService } from '../services';
+import { ArticleStore, ReadService, ArticleMutations } from '../services';
 import { Colors, GlobalStyles } from '../constants';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { ArticleContent, BottomActionMenu } from '../components/common';
@@ -137,11 +137,12 @@ export const ReadArticleDetailScreen: React.FC = () => {
   // Tracks the currently displayed article id so async callbacks can detect a
   // swap (next article) and avoid mutating UI state for a different article.
   const articleIdRef = useRef(article.id);
-  // Backend-only throttled save; local AsyncStorage persistence stays on the
-  // unmount flush below since it rewrites the whole articles array.
+  // Throttled while actively scrolling; the unmount flush below covers the
+  // final position on the way out. Both go through the same facade call
+  // (store write, then a backend attempt queued on NetworkError).
   const throttledSaveRef = useRef(
     throttle((articleId: string, fraction: number) => {
-      ReadService.updateUserContent(articleId, { scroll_position: fraction }).catch(
+      ArticleMutations.saveScrollPosition(articleId, fraction).catch(
         (err) => console.error('Failed to save scroll position:', err)
       );
     }, SCROLL_SAVE_THROTTLE_MS),
@@ -163,11 +164,8 @@ export const ReadArticleDetailScreen: React.FC = () => {
     if (hasMarkedCompletedRef.current) return;
     hasMarkedCompletedRef.current = true;
     const readAt = Date.now();
-    ReadService.updateUserContent(articleId, { status: 'completed' }).catch(
+    ArticleMutations.markCompleted(articleId, readAt).catch(
       (err) => console.error('Failed to mark article completed:', err)
-    );
-    ArticleStore.updateUserState(articleId, { isRead: true, readAt }).catch(
-      (err) => console.error('Failed to persist completed locally:', err)
     );
   }, []);
 
@@ -196,7 +194,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
   useEffect(() => {
     if (article.isRead) return;
-    ReadService.updateUserContent(article.id, { status: 'reading' }).catch(
+    ArticleMutations.markReading(article.id).catch(
       (err) => console.error('Failed to mark article reading:', err)
     );
   }, [article.id, article.isRead]);
@@ -208,11 +206,8 @@ export const ReadArticleDetailScreen: React.FC = () => {
       throttledSave.cancel();
       if (!hasScrolledRef.current) return;
       const fraction = scrollFractionRef.current;
-      ReadService.updateUserContent(articleId, { scroll_position: fraction }).catch(
+      ArticleMutations.saveScrollPosition(articleId, fraction).catch(
         (err) => console.error('Failed to save scroll position:', err)
-      );
-      ArticleStore.updateUserState(articleId, { scrollFraction: fraction }).catch(
-        (err) => console.error('Failed to save scroll position locally:', err)
       );
     };
   }, [article.id]);
@@ -238,18 +233,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
     // Optimistically reflect the new state in the action menu.
     setIsFavorite(newIsFavorite);
     try {
-      // Update both local storage and backend
-      await ArticleStore.updateUserState(targetId, {
-        isFavorite: newIsFavorite,
-      });
-      try {
-        await ReadService.updateUserContent(targetId, {
-          is_favorite: newIsFavorite,
-        });
-      } catch (backendError) {
-        console.error('Failed to sync favorite status to backend:', backendError);
-        // Continue anyway - local update was successful
-      }
+      await ArticleMutations.setFavorite(targetId, newIsFavorite);
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
       // Roll back the optimistic update on failure, but only if the same
@@ -260,13 +244,8 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
   const handleArchive = async () => {
     try {
-      await ArticleStore.remove(article.id);
+      await ArticleMutations.archive(article.id);
       onArchived?.(article.id);
-      // Backend delete runs in the background so a slow/offline network
-      // doesn't block navigation; failures are logged only (see above).
-      ReadService.deleteUserContent(article.id).catch((backendError) => {
-        console.error('Failed to archive article in backend:', backendError);
-      });
       navigation.goBack();
     } catch (error) {
       console.error('Failed to archive article:', error);

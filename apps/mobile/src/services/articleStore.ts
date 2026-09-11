@@ -1,7 +1,5 @@
-import * as SQLite from 'expo-sqlite';
 import { Article } from '../types';
-
-const DB_NAME = 'cairnreader.db';
+import { getDb } from './db';
 
 interface ArticleRow {
   id: string;
@@ -35,15 +33,34 @@ interface ArticleRow {
 //   from the stored one: a body whose hash no longer matches the server's is
 //   stale and must not be served offline. See task_c55c scope clarification,
 //   "Selection, staleness and eviction".
+//
+// task_ebf1 adds two guards against a queued offline write being clobbered
+// by a list sync that runs before the outbox drains:
+// - A pending `delete` row for this article (an offline archive) skips the
+//   insert/update entirely — the WHERE on the SELECT source makes the insert
+//   produce zero rows, so ON CONFLICT never even fires. Otherwise the server
+//   still listing the article would resurrect it in the store the moment a
+//   sync ran, ahead of the queued DELETE actually reaching the backend.
+// - Any other pending outbox row for this article (status/is_favorite/
+//   scroll_position) freezes the four user-state columns at their current
+//   stored value instead of accepting the server's — those are exactly the
+//   fields a queued write is waiting to change, and the server hasn't seen
+//   the new value yet. Keyed on article_id alone, not per field: simpler SQL,
+//   and the over-freezing is transient (cleared the moment the drain
+//   succeeds). `scroll_position` (the legacy column, distinct from
+//   `scroll_fraction`) is not one of the four and is never guarded.
 const UPSERT_SQL = `
   INSERT INTO articles (
     id, url, title, description, image_url, author, published_date,
     reading_time, tags, is_read, is_favorite, added_at, read_at,
     scroll_position, scroll_fraction, body, content_hash
-  ) VALUES (
+  )
+  SELECT
     $id, $url, $title, $description, $image_url, $author, $published_date,
     $reading_time, $tags, $is_read, $is_favorite, $added_at, $read_at,
     $scroll_position, $scroll_fraction, $body, $content_hash
+  WHERE NOT EXISTS (
+    SELECT 1 FROM outbox WHERE article_id = $id AND field = 'delete'
   )
   ON CONFLICT(id) DO UPDATE SET
     url = excluded.url,
@@ -54,12 +71,24 @@ const UPSERT_SQL = `
     published_date = excluded.published_date,
     reading_time = excluded.reading_time,
     tags = excluded.tags,
-    is_read = excluded.is_read,
-    is_favorite = excluded.is_favorite,
+    is_read = CASE
+      WHEN EXISTS (SELECT 1 FROM outbox WHERE article_id = articles.id) THEN articles.is_read
+      ELSE excluded.is_read
+    END,
+    is_favorite = CASE
+      WHEN EXISTS (SELECT 1 FROM outbox WHERE article_id = articles.id) THEN articles.is_favorite
+      ELSE excluded.is_favorite
+    END,
     added_at = excluded.added_at,
-    read_at = excluded.read_at,
+    read_at = CASE
+      WHEN EXISTS (SELECT 1 FROM outbox WHERE article_id = articles.id) THEN articles.read_at
+      ELSE excluded.read_at
+    END,
     scroll_position = excluded.scroll_position,
-    scroll_fraction = excluded.scroll_fraction,
+    scroll_fraction = CASE
+      WHEN EXISTS (SELECT 1 FROM outbox WHERE article_id = articles.id) THEN articles.scroll_fraction
+      ELSE excluded.scroll_fraction
+    END,
     content_hash = COALESCE(excluded.content_hash, articles.content_hash),
     body = CASE
       WHEN excluded.content_hash IS NULL THEN COALESCE(excluded.body, articles.body)
@@ -67,74 +96,6 @@ const UPSERT_SQL = `
       ELSE NULL
     END
 `;
-
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
-
-async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync(DB_NAME)
-      .then(async (db) => {
-        // Kept at its original (v1) shape. Installs from before this task
-        // already have this table; widening this statement would be a no-op
-        // against them, so schema changes since v1 are applied by migrate()
-        // instead, tracked via PRAGMA user_version.
-        await db.execAsync(`
-          CREATE TABLE IF NOT EXISTS articles (
-            id TEXT PRIMARY KEY,
-            url TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            image_url TEXT,
-            author TEXT,
-            published_date TEXT,
-            reading_time INTEGER,
-            tags TEXT NOT NULL DEFAULT '[]',
-            is_read INTEGER NOT NULL DEFAULT 0,
-            is_favorite INTEGER NOT NULL DEFAULT 0,
-            added_at INTEGER NOT NULL,
-            read_at INTEGER,
-            scroll_position REAL,
-            scroll_fraction REAL,
-            body TEXT
-          );
-        `);
-        await migrate(db);
-        return db;
-      })
-      .catch((error) => {
-        // Don't leave a rejected promise cached forever — a transient failure
-        // (e.g. the OS briefly denying disk access) would otherwise poison
-        // every future call. Reset so the next getDb() retries the open.
-        dbPromise = null;
-        throw error;
-      });
-  }
-  return dbPromise;
-}
-
-/**
- * Applies schema migrations in order, tracked via PRAGMA user_version, so a
- * fresh install (CREATE TABLE above, then every step here) and an upgraded
- * install (already at some version, then only the remaining steps) converge
- * on the same schema. A DB already at the latest version runs no statements —
- * safe to call on every open.
- */
-async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
-  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
-  const startVersion = row?.user_version ?? 0;
-  let version = startVersion;
-
-  // Step 2 (task_c55c): content_hash, for diffing cached bodies against the
-  // server's hash so unchanged bodies are never re-downloaded.
-  if (version < 2) {
-    await db.execAsync('ALTER TABLE articles ADD COLUMN content_hash TEXT');
-    version = 2;
-  }
-
-  if (version !== startVersion) {
-    await db.execAsync(`PRAGMA user_version = ${version}`);
-  }
-}
 
 function articleToParams(article: Article): Record<string, string | number | null> {
   return {
@@ -322,9 +283,14 @@ export const ArticleStore = {
     await db.runAsync('DELETE FROM articles WHERE id = $id', { $id: id });
   },
 
-  /** Drop all stored articles, e.g. on logout. */
+  /**
+   * Drop all stored articles, e.g. on logout. Also clears the outbox
+   * (task_ebf1) — a queued write must never replay against a different
+   * account.
+   */
   async clear(): Promise<void> {
     const db = await getDb();
     await db.execAsync('DELETE FROM articles');
+    await db.execAsync('DELETE FROM outbox');
   },
 };
