@@ -185,3 +185,48 @@ write must never replay against a different account).
 Route it through `SyncTrigger.run()` instead, so the drain gets the pull-to-refresh trigger
 the description requires and the fixed consumer order (drain, then prefetch) is honoured in
 every path rather than only on reconnect/foreground.
+
+## Review (tech lead, 2026-09-11)
+Implemented by a subagent over two rounds; verified independently each round
+(`npx tsc --noEmit`, full `npm test`, `npm run lint` re-run by the reviewer, not
+taken on report). Final: 36 suites / 250 tests green, 0 lint errors, 12 warnings
+all pre-existing.
+
+### Delivered
+Items A-G and the earlier scope clarification, as specified. `outbox` table in
+`cairnreader.db` (migration step 3), keyed on `(article_id, field)` so writes
+coalesce without losing queue position; `getDb()`/migration ladder extracted to
+`services/db.ts` and shared; `ArticleMutations` facade behind the six call sites;
+`HttpError` carrying the status out of `ReadService`; drain ordered by
+`created_at, rowid` with the specified 2xx / 404-on-delete / 4xx-drop /
+401-5xx-halt classification; drain wired as SyncTrigger's first consumer and
+`ReadScreen` pull-to-refresh routed through it.
+
+Both `UPSERT_SQL` guards are in: a pending `delete` skips the row entirely (item B,
+via `INSERT ... SELECT ... WHERE NOT EXISTS`, so ON CONFLICT never fires), and any
+other pending row freezes the four user-state columns. Store and outbox tests run
+against real in-memory SQLite, including a negative control proving the guard
+releases once the row clears — without that, "guard freezes everything forever"
+would have passed silently.
+
+### Found in review, fixed in de0929c
+1. `handleToggleFavorite` rolled back the UI but not the store on a definitive
+   rejection, so the action menu and BookmarksScreen disagreed until the next sync.
+   The rollback was dead code before this task; making the error propagate armed it
+   for the first time.
+2. `handleArchive` began awaiting the backend DELETE, reverting the deliberate
+   non-blocking-navigation decision its own comment had recorded. Navigating first
+   and alerting from the `.catch` satisfies "error no longer swallowed" without
+   blocking — the two goals were not actually in conflict.
+
+Both captured in `LEARNINGS.md` (2026-09-11 entry).
+
+### Not verified here
+The on-device airplane-mode pass (archive and favorite offline, reconnect, confirm
+server state matches) — that is task_de93. Unit and integration-against-real-SQLite
+level only.
+
+### Note for task_de93
+The QA pass should specifically exercise a definitive 4xx at write time (not just
+the offline path), since that is the branch both review findings lived on and the
+one with no outbox row to reconcile it.

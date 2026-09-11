@@ -2,6 +2,39 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-11 — A swallowed error and a surfaced error are not interchangeable (task_ebf1)
+
+Scope item 4 said to remove the `.catch(console.error)` swallowing at the six
+`ReadArticleDetailScreen` mutation call sites. The implementation did exactly that,
+routing them through one facade that writes the store, attempts the network, and
+queues only on `NetworkError`. Two of the six broke in review, both for the same
+underlying reason: the call sites had been *built around* the swallow, and removing
+it changed control flow they depended on.
+
+`handleToggleFavorite` already had a rollback in its outer catch that, before this
+change, was unreachable for backend failures — the inner catch ate them. Making the
+error propagate armed that rollback for the first time, and it rolled back only the
+UI. The store write had already happened inside the facade, so the action menu and
+BookmarksScreen (`listFavorites()`) disagreed until the next list sync.
+
+`handleArchive` had a comment explaining that the backend DELETE ran unawaited so a
+slow network could not block navigation. Awaiting the facade to let the error reach
+the existing `Alert` quietly reverted that decision, freezing the archive button with
+no spinner on a slow-but-online connection.
+
+**Why it happened:** "stop swallowing the error" reads like a local change to one
+line. It isn't — it hands a live exception to a handler that has never run. Both
+handlers were written when that path was dead, so neither was correct for it.
+
+**How to apply:** When you make a previously-swallowed error propagate, read the
+handler that will now receive it and ask what it does to state the failing call
+already mutated — an optimistic-UI rollback that doesn't also roll back the store is
+half a rollback. And when a call site carries a comment justifying *not* awaiting
+something, satisfying a new requirement by awaiting it is reverting a decision, not
+implementing one: find the shape that does both. Here, navigating first and alerting
+from the `.catch` surfaced the error without blocking — the two goals were never
+actually in conflict.
+
 ## 2026-09-07 — `instanceof` in a catch block is a bet about a runtime you don't control (task_c87c)
 
 **Correction:** `fetchOrNetworkError` classified an aborted request with
