@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [mobile,offline]
-blocked_by: []
+blocked_by: [task_06e5]
 parent: feature_90a5
 remote_task_url: null
 created_at: 2026-09-05T23:36:10Z
-updated_at: 2026-09-08T23:28:38Z
+updated_at: 2026-09-11T09:36:38Z
 ---
 Phase 4 of feature_90a5. Status, favorite, scroll_position and archive (DELETE) writes go store-first and enqueue an outbox row when the request fails with a NetworkError. A sync worker drains the outbox on reconnect, app foreground and pull-to-refresh, in created_at order, before the body prefetch runs. 2xx deletes the row; 404 on a replayed DELETE counts as success; definitive 4xx (except 401) drops the row and logs; network/5xx/401 keeps the row, bumps attempts and halts the batch to preserve order. Coalesce scroll_position (and repeated PATCHes) per article so the queue stays bounded. Verify with unit tests for enqueue, ordered replay, 4xx drop, 5xx halt and coalescing. Fixes the swallowed archive error from task_179f. Add-URL stays online-only.
 
@@ -59,3 +59,73 @@ Two concrete symptoms that trigger should fix, both live on main today:
    fetch, since the content-loading effect keys off `initialArticle.id` and reads
    connectivity through a ref. Backing out and re-opening recovers. Fix it via the
    reconnect trigger, not a screen-local listener.
+
+## Scope clarification (tech lead, 2026-09-11)
+Reviewed the phase 1-3 code on main before assigning. Decisions below are made, not
+open — push back with a reason if one is wrong, don't silently pick differently.
+
+### Split
+The inherited app-foreground/reconnect trigger is now **task_06e5**, which blocks this
+task. Do not build a listener here: consume the one task_06e5 lands, adding the outbox
+drain as the first consumer ahead of `ArticlePrefetchService.run()`.
+
+### 1. The `upsertMany` clobber — decision: guard in SQL, not ordering
+Of the three options in the note above, take the second: `upsertMany` skips the
+user-state columns (`is_read`, `is_favorite`, `scroll_fraction`, `read_at`) for any row
+with a pending outbox entry. Ordering the drain before the list sync is *not* sufficient
+on its own — a list request already in flight can resolve mid-drain, and a drain that
+halts on a 5xx leaves rows queued while syncs keep running. The guard is correct under
+every interleaving; the ordering is a freshness nicety on top.
+
+The coupling concern in the note is answered by putting the outbox table in the **same**
+`cairnreader.db`, so the guard is an `EXISTS (SELECT 1 FROM outbox WHERE ...)` inside the
+existing upsert statement — one table, one module, no cross-layer dependency. Do not
+introduce a second database or have the store call into a service.
+
+Note `body`/`content_hash` handling in `UPSERT_SQL` must keep working exactly as it does
+today; the guard applies only to the four user-state columns.
+
+### 2. Schema
+New `outbox` table in `cairnreader.db` as migration step 3 via `PRAGMA user_version`
+(step 2 is task_c55c's `content_hash` — follow that pattern exactly). Cleared alongside
+articles in `ArticleStore.clear()`, which `AuthContext` already calls on logout — a
+queued write must never replay against a different account.
+
+### 3. Coalescing — one row per (article_id, field)
+Key the table on `(article_id, field)` where field is one of `status`, `is_favorite`,
+`scroll_position`, `delete`. Enqueue is `ON CONFLICT(article_id, field) DO UPDATE SET
+payload = excluded.payload`, **leaving `created_at` untouched** so a coalesced write keeps
+its place in the queue instead of jumping to the back. Enqueuing a `delete` for an article
+removes that article's other rows — the DELETE supersedes them and replaying a PATCH
+against a deleted row is a guaranteed 404.
+
+### 4. Call sites — add a facade, don't repeat the pattern six times
+Six call sites need the same three steps (write the store, try the network, enqueue on
+`NetworkError`): `markCompleted`, the `status: 'reading'` effect, the throttled scroll
+save, the unmount scroll flush, `handleToggleFavorite` and `handleArchive`, all in
+`ReadArticleDetailScreen.tsx`. Route them through one module rather than inlining the
+logic six times. This also removes the `.catch(console.error)` swallowing that
+task_179f left behind, including the archive error.
+
+Only `NetworkError` enqueues. A definitive 4xx at write time is a real rejection and must
+surface as it does today — do not queue it.
+
+### 5. Drain semantics (restating the description's rules as the acceptance list)
+Ordered by `created_at` ascending. 2xx deletes the row. 404 on a replayed `delete`
+counts as success and deletes the row. Definitive 4xx other than 401 drops the row and
+logs. `NetworkError`/5xx/401 keeps the row, bumps `attempts` and **halts the whole batch**
+(global halt, not per-article) so ordering is preserved. `fetchWithAuth` already refreshes
+on 401, so a 401 reaching the drain means refresh genuinely failed — halting is correct.
+
+`attempts` is bookkeeping for diagnosis in v1: bump it, do not add backoff or a
+drop-after-N rule unless you can point at a concrete need.
+
+### 6. Out of scope
+Add-URL stays online-only (`AddArticleScreen`). No backend change. No conflict resolution
+beyond last-write-wins — decision 6 on feature_90a5 stands.
+
+### Tests
+Beyond enqueue / ordered replay / 4xx drop / 5xx halt / coalesce, the interleaving test
+the note above calls for is mandatory: pending outbox write + a list sync arriving first
++ assert the user's value survives in the store. Also cover 404-on-replayed-delete and
+delete-supersedes-pending-patches.
