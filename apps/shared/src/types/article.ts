@@ -4,6 +4,7 @@ export interface Article {
   title: string;
   description?: string;
   content?: string; // Cleaned HTML content from readability extraction
+  contentHash?: string; // content.content_hash from the Read service, used to diff cached bodies
   imageUrl?: string;
   author?: string;
   publishedDate?: string;

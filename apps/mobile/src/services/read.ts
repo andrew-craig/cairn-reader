@@ -498,6 +498,7 @@ export class ReadService {
       description: content.description,
       // cleaned_html is not present in summary responses — will be loaded on demand
       content: undefined,
+      contentHash: content.content_hash,
       imageUrl: content.image_urls?.[0],
       author: content.author,
       publishedDate: content.published_at,
@@ -537,6 +538,7 @@ export class ReadService {
       title: content.title,
       description: content.description,
       content: content.cleaned_html,
+      contentHash: content.content_hash,
       imageUrl: content.image_urls?.[0],
       author: content.author,
       publishedDate: content.published_at,
