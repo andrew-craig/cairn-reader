@@ -238,19 +238,32 @@ export const ReadArticleDetailScreen: React.FC = () => {
       console.error('Failed to toggle favorite:', error);
       // Roll back the optimistic update on failure, but only if the same
       // article is still displayed — otherwise we'd flip the wrong article.
-      if (articleIdRef.current === targetId) setIsFavorite(!newIsFavorite);
+      // ArticleMutations.setFavorite already wrote the store before it
+      // rethrew (only NetworkError is absorbed there), so the store needs
+      // the same rollback as the UI or BookmarksScreen (listFavorites())
+      // would disagree with what this screen now shows.
+      if (articleIdRef.current === targetId) {
+        setIsFavorite(!newIsFavorite);
+        ArticleStore.updateUserState(targetId, { isFavorite: !newIsFavorite }).catch(
+          (storeError) => console.error('Failed to roll back favorite locally:', storeError)
+        );
+      }
     }
   };
 
-  const handleArchive = async () => {
-    try {
-      await ArticleMutations.archive(article.id);
-      onArchived?.(article.id);
-      navigation.goBack();
-    } catch (error) {
+  const handleArchive = () => {
+    const targetId = article.id;
+    onArchived?.(targetId);
+    navigation.goBack();
+    // Deliberately not awaited: offline is fast (ArticleMutations.archive
+    // queues it on NetworkError), but waiting on a slow-but-online DELETE
+    // would freeze the archive button with no spinner. A real failure still
+    // surfaces via the alert below — it just does so after navigation
+    // instead of blocking it.
+    ArticleMutations.archive(targetId).catch((error) => {
       console.error('Failed to archive article:', error);
       Alert.alert('Error', 'Failed to archive article');
-    }
+    });
   };
 
   if (contentLoading) {
