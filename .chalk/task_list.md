@@ -7,7 +7,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_e848** · P1 · open · [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)  (parent: epic_fefa)
 - **chore_6449** · P2 · in_progress · Selfhost image: mobile-only root-lockfile changes bust the web build cache
-- **task_06e5** · P2 · in_progress · Mobile: app-foreground and reconnect sync trigger  (parent: feature_90a5)
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven

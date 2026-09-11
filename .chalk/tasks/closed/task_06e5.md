@@ -2,14 +2,14 @@
 id: task_06e5
 title: Mobile: app-foreground and reconnect sync trigger
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [mobile,offline]
 blocked_by: []
 parent: feature_90a5
 remote_task_url: null
 created_at: 2026-09-11T09:36:33Z
-updated_at: 2026-09-11T09:37:18Z
+updated_at: 2026-09-11T09:56:20Z
 ---
 Split out of task_ebf1 (tech lead, 2026-09-11). Phase 4a of feature_90a5.
 
@@ -199,3 +199,37 @@ commit (kept separate from the reviewed/pushed one per instruction, not amended)
 
 `npm test` (214 tests), `npm run type-check`, and `npm run lint` (0 errors, same 12
 pre-existing warnings as before) all still pass from `apps/mobile` after both fixes.
+
+## Tech lead review (2026-09-11) — accepted
+Reviewed the diff directly rather than on report. Two findings from the first pass
+(26f8446) were sent back and are fixed in 259037c:
+
+1. **Blank body still rendered on reconnect.** The first pass narrowed it from permanent
+   to transient but did not remove it: `contentLoading` stayed false (left over from the
+   "Not available offline" render), so between the reconnect re-render and the fetch
+   resolving, all three render branches fell through to a contentless `ArticleContent`.
+   Reproduced with a never-resolving `getContentById` before asking for the fix.
+   The first pass's test could not observe this — `findByText` waited for the fetch to
+   resolve, so its `NO CONTENT` assertion ran after the content had already arrived.
+2. **`SyncTrigger.run()` did not isolate a failing consumer.** A rejection aborted the
+   remaining consumers and escaped as an unhandled rejection through
+   `void SyncTrigger.run()`. Harmless with one consumer; once task_ebf1 inserts the
+   outbox drain *ahead* of prefetch, a rejecting drain would have silently stopped
+   prefetch from running at all.
+
+Verified after the fix, independently of the agent's own run:
+- The rewritten test genuinely fails without the one-line fix (deleted
+  `setContentLoading(true)`, watched it fail on the exact assertion, restored it).
+- Own probes pass: no blank body during the post-reconnect fetch window; offline with
+  nothing stored still lands on "Not available offline" rather than a stuck spinner;
+  an offline→online→offline flap lands back on the offline state.
+- Full gate from `apps/mobile`: 33 suites / 214 tests pass, `type-check` clean,
+  `lint` 0 errors (12 pre-existing warnings in untouched files).
+
+Accepted as-is: `SyncTriggerEffect` as its own component mirrors the existing
+`OfflineBanner` pattern, and hardcoding the `'active'` AppState baseline is sound for a
+hook that only mounts inside the foregrounded authenticated tree.
+`runConsumersIsolated` being exported solely for tests is a mild smell, but isolation
+genuinely cannot be exercised against the single real consumer that exists today.
+
+task_ebf1 is now unblocked and consumes the seam left in `syncTrigger.ts`.
