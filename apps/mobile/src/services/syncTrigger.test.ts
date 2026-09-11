@@ -1,4 +1,4 @@
-import { SyncTrigger } from './syncTrigger';
+import { SyncTrigger, runConsumersIsolated } from './syncTrigger';
 import { ArticlePrefetchService } from './articlePrefetch';
 
 // task_06e5: SyncTrigger.run() is the single, fixed-order entry point the
@@ -50,5 +50,30 @@ describe('SyncTrigger.run', () => {
     await SyncTrigger.run();
 
     expect(mockedArticlePrefetchService.run).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reject when its consumer rejects', async () => {
+    mockedArticlePrefetchService.run.mockRejectedValue(new Error('boom'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(SyncTrigger.run()).resolves.toBeUndefined();
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('runConsumersIsolated', () => {
+  it('runs every consumer even when an earlier one rejects, and does not reject itself', async () => {
+    const first = jest.fn().mockRejectedValue(new Error('boom'));
+    const second = jest.fn().mockResolvedValue(undefined);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(runConsumersIsolated([first, second])).resolves.toBeUndefined();
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 });

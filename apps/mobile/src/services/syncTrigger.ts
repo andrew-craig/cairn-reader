@@ -16,14 +16,29 @@ const consumers: (() => Promise<void>)[] = [
 // consumer against being entered concurrently from any other caller.
 let inFlight = false;
 
+// Runs each consumer in order, isolating one from the next: a rejection
+// (e.g. the outbox drain task_ebf1 adds ahead of prefetch) must not stop the
+// rest of the fixed order from running, and must not escape as an unhandled
+// rejection into useSyncTrigger's `void SyncTrigger.run()`. Exported
+// separately from SyncTrigger.run() only so this isolation behavior can be
+// exercised directly in tests against more than the one real consumer that
+// exists today — callers still only ever see SyncTrigger.run().
+export async function runConsumersIsolated(fns: (() => Promise<void>)[]): Promise<void> {
+  for (const fn of fns) {
+    try {
+      await fn();
+    } catch (error) {
+      console.error('SyncTrigger consumer failed:', error);
+    }
+  }
+}
+
 export const SyncTrigger = {
   async run(): Promise<void> {
     if (inFlight) return;
     inFlight = true;
     try {
-      for (const consumer of consumers) {
-        await consumer();
-      }
+      await runConsumersIsolated(consumers);
     } finally {
       inFlight = false;
     }

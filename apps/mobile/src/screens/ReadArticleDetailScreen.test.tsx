@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, waitFor } from '@testing-library/react-native';
+import { ActivityIndicator } from 'react-native';
 import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
 import { ArticleStore, ReadService } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -138,7 +139,7 @@ describe('ReadArticleDetailScreen offline body cache', () => {
   // leave it stuck on a blank ArticleContent — the render guard
   // (`!article.content && isOffline`) stopped matching once isOffline went
   // false, but nothing re-triggered the fetch that would give it content.
-  it('fetches and renders content once connectivity returns, never falling through to a blank body', async () => {
+  it('shows the spinner, never a blank body, while re-fetching after reconnect', async () => {
     mockedUseNetworkStatus.mockReturnValue({ isOffline: true });
     mockedArticleStore.getById.mockResolvedValue(null);
 
@@ -148,6 +149,39 @@ describe('ReadArticleDetailScreen offline body cache', () => {
     expect(mockedReadService.getContentById).not.toHaveBeenCalled();
 
     mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
+    // Still nothing in the store, and the network call never resolves in
+    // this test — the point is to observe the fetch window itself, not the
+    // state once it settles.
+    mockedArticleStore.getById.mockResolvedValue(null);
+    mockedReadService.getContentById.mockReturnValue(new Promise(() => {}));
+
+    rerender(<ReadArticleDetailScreen />);
+
+    // Immediately after the reconnect render: the effect has synchronously
+    // put the screen back into the loading state, before the store lookup
+    // (a pending promise) has had a chance to resolve.
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+
+    // After the store lookup resolves and the effect has moved on to the
+    // network fetch (still pending): still no blank body.
+    await waitFor(() => expect(mockedReadService.getContentById).toHaveBeenCalled());
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+  });
+
+  it('renders content once connectivity returns and the fetch resolves', async () => {
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: true });
+    mockedArticleStore.getById.mockResolvedValue(null);
+
+    const { rerender } = render(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('Not available offline')).toBeTruthy();
+
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
+    mockedArticleStore.getById.mockResolvedValue(null);
     mockedReadService.getContentById.mockResolvedValue(
       { content_id: 'a1' } as unknown as UserContentDetailResponse,
     );

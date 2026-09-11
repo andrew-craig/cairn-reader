@@ -52,6 +52,16 @@ export const ReadArticleDetailScreen: React.FC = () => {
     // rather than the frozen initial value is what stops a completed load
     // from being restarted by later connectivity flapping.
     if (article.content) return;
+    // Past this point there is definitely no content to show yet, and we're
+    // about to hit the store and possibly the network for it. Show the
+    // spinner rather than leaving contentLoading at whatever it already was
+    // — on a fresh mount that's already true, but on a reconnect-triggered
+    // re-run (the `isOffline` dep below) it's false, left over from the
+    // earlier "Not available offline" render, which would otherwise fall
+    // through to a blank ArticleContent for the duration of this fetch. The
+    // offline-with-nothing-stored branch further down still wins once the
+    // store lookup resolves, since it explicitly sets this back to false.
+    setContentLoading(true);
     let cancelled = false;
 
     // Resolve the article by id from the store rather than trusting route

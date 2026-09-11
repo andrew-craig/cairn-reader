@@ -138,12 +138,64 @@ cases in `src/navigation/RootNavigator.test.tsx` (sync trigger mounts only when
 authenticated), one case in `src/screens/ReadArticleDetailScreen.test.tsx` (reconnect
 fetches and renders content, never a blank body).
 
-Tradeoff: `useSyncTrigger`'s AppState baseline assumes the tree is already in the
-foreground at mount (see above) rather than reading `AppState.currentState`. That value
-is a plain function in this project's RN jest mock (not a string), which would have
-made the very first genuine `active` event look like a transition in tests; hardcoding
-the assumption sidesteps that without weakening the real-world behavior, since the
-mount location already guarantees the app is foregrounded when this hook attaches.
+Tradeoff: `useSyncTrigger` assumes 'active' as the AppState baseline at mount rather
+than reading `AppState.currentState` — the tree this hook mounts in only renders while
+the app is already foregrounded, so it only needs to catch *later* transitions, not
+classify the state at mount time (see the code comment above the effect).
 
 `npm test`, `npm run type-check`, and `npm run lint` all pass from `apps/mobile` (lint:
 0 errors, only pre-existing warnings on files this task didn't touch).
+
+## Review addendum (follow-up commit, post-review)
+Tech-lead review caught two real gaps in the first pass; both are fixed in a follow-up
+commit (kept separate from the reviewed/pushed one per instruction, not amended).
+
+1. **The blank-body window was still there, just shorter.** The first pass re-ran the
+   content-loading effect on reconnect but left `contentLoading` at whatever it already
+   was (`false`, left over from the "Not available offline" render). Between the
+   reconnect render (isOffline flips false) and the effect's async store/network work
+   resolving, `contentLoading` was false, `article.content` was still undefined, and
+   `isOffline` was false — all three render branches fall through to `ArticleContent`
+   with no content, i.e. exactly the blank body the task asked to eliminate, just for
+   the duration of one fetch instead of forever. My original test only asserted
+   `queryByText('NO CONTENT')` *after* `findByText('<p>Fresh</p>')` had already resolved
+   the fetch, so it could not see that window and passed anyway.
+
+   Fixed by calling `setContentLoading(true)` the moment the effect passes the
+   `if (article.content) return;` gate — i.e. the moment it's definitely about to hit
+   the store and possibly the network for a body that's missing. The
+   offline-with-nothing-stored branch further down still explicitly sets this back to
+   `false`, so "Not available offline" still wins once that's confirmed; nothing else
+   about that path changed.
+
+   Test rewritten as two cases in `ReadArticleDetailScreen.test.tsx`: one drives
+   `getContentById` with a promise that never resolves and asserts, immediately after
+   the reconnect `rerender()` *and* again after `waitFor` confirms the store lookup has
+   handed off to the network call, that neither `NO CONTENT` nor "Not available
+   offline" is showing and the spinner (`ActivityIndicator`) is up instead; the other
+   keeps the original "content eventually renders" assertion with a separately
+   resolving mock. Verified the first case actually fails without the fix (reverted
+   `setContentLoading(true)` locally, reran, watched it fail, restored it) before
+   trusting it.
+
+2. **`SyncTrigger.run()` didn't isolate a failing consumer.** The `for` loop awaited
+   each consumer with no per-consumer try/catch, so a rejection aborted the remaining
+   consumers and escaped as an unhandled rejection out of `void SyncTrigger.run()` in
+   `useSyncTrigger`. `ArticlePrefetchService.run()` can reject in practice
+   (`isOffline()` can reject from `getNetworkStateAsync`; `evictBodiesOutsideCap` has no
+   internal catch around its `getDb()`/`runAsync` calls), and this is exactly the seam
+   task_ebf1 builds on — an outbox drain that rejects would otherwise silently stop
+   prefetch from running at all.
+
+   Fixed by wrapping each consumer's `await` in its own try/catch inside the loop
+   (logged via `console.error`, matching the file's existing error-handling style), and
+   pulled that loop out into an exported `runConsumersIsolated(fns)` so the isolation
+   behavior itself — not just the one real consumer that exists today — can be tested
+   directly with a synthetic two-consumer list. `SyncTrigger.run()`'s own consumer list
+   stays private; `runConsumersIsolated` is the only new export, and only for this.
+
+   Tests added: `SyncTrigger.run()` does not reject when its one real consumer rejects;
+   `runConsumersIsolated([firstRejects, second])` runs both and does not reject.
+
+`npm test` (214 tests), `npm run type-check`, and `npm run lint` (0 errors, same 12
+pre-existing warnings as before) all still pass from `apps/mobile` after both fixes.
