@@ -4,7 +4,7 @@ import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
 import { ArticleStore, ReadService } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
-import type { UserContentResponse } from '@cairn/shared';
+import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shared';
 
 // task_a8a4: opening a previously-read article must render its cached body
 // (decision 4: opportunistic body caching) without waiting on the network
@@ -132,5 +132,35 @@ describe('ReadArticleDetailScreen offline body cache', () => {
     expect(await screen.findByText('<p>Cached</p>')).toBeTruthy();
     expect(screen.queryByText('Not available offline')).toBeNull();
     expect(mockedReadService.getContentById).not.toHaveBeenCalled();
+  });
+
+  // task_06e5: regaining connectivity while this screen is open used to
+  // leave it stuck on a blank ArticleContent — the render guard
+  // (`!article.content && isOffline`) stopped matching once isOffline went
+  // false, but nothing re-triggered the fetch that would give it content.
+  it('fetches and renders content once connectivity returns, never falling through to a blank body', async () => {
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: true });
+    mockedArticleStore.getById.mockResolvedValue(null);
+
+    const { rerender } = render(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('Not available offline')).toBeTruthy();
+    expect(mockedReadService.getContentById).not.toHaveBeenCalled();
+
+    mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
+    mockedReadService.getContentById.mockResolvedValue(
+      { content_id: 'a1' } as unknown as UserContentDetailResponse,
+    );
+    mockedReadService.transformDetailToArticle.mockReturnValue({
+      ...summaryArticle,
+      content: '<p>Fresh</p>',
+    });
+
+    rerender(<ReadArticleDetailScreen />);
+
+    expect(await screen.findByText('<p>Fresh</p>')).toBeTruthy();
+    expect(screen.queryByText('Not available offline')).toBeNull();
+    expect(screen.queryByText('NO CONTENT')).toBeNull();
+    expect(mockedReadService.getContentById).toHaveBeenCalled();
   });
 });

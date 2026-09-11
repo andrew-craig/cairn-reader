@@ -60,3 +60,90 @@ removing the ref wholesale. If a different approach is cleaner, say so before bu
   "Not available offline", then connectivity returns -> content is fetched and rendered
   (never a blank body).
 - Existing mobile suite stays green; no new lint errors.
+
+## Plan (2026-09-11)
+1. `src/services/syncTrigger.ts` — non-React module: a fixed-order `consumers` array
+   (comment marks where task_ebf1 inserts the outbox drain, ahead of prefetch) and a
+   `SyncTrigger.run()` with its own module-level `inFlight` guard for the *composite*
+   sequence (separate from, and not a replacement for, `ArticlePrefetchService`'s own
+   guard). → verify: unit test, run() invokes the consumer, second concurrent call is a
+   no-op, a call after completion runs again.
+2. `src/hooks/useSyncTrigger.ts` — hook: tracks the previous `AppState` status and the
+   previous `isOffline` value in refs, calls `SyncTrigger.run()` only on
+   background/inactive→active and true→false transitions. → verify: unit tests for each
+   transition and each non-transition per the Verify list above.
+3. `src/components/common/SyncTriggerEffect.tsx` — trivial component (`useSyncTrigger();
+   return null;`) so it can be mounted the same way as `OfflineBanner` (a hook can't be
+   called conditionally inside `RootNavigator` itself — it already returns early for
+   `isLoading`/`!isAuthenticated` before any such call would sit). Exported from
+   `components/common/index.ts`.
+4. `RootNavigator.tsx` — render `<SyncTriggerEffect />` next to `<OfflineBanner />`,
+   after the auth gate. → verify: extend `RootNavigator.test.tsx` to assert the hook
+   fires only when authenticated.
+5. `ReadArticleDetailScreen.tsx` — content-loading effect fix, see design decision below.
+
+## Design decision: ReadArticleDetailScreen fix
+Going with the recommended approach, with one simplification. Rather than adding a new
+ref to track "do we still have no content", the effect can read `article.content`
+straight from render-scope state: the effect's dependency array will include `isOffline`,
+so every time it re-runs (on an offline→online *or* online→offline flip) the component
+has already re-rendered first, and the closure the effect runs with therefore already
+carries the latest `article` state — no separate ref needed to get a fresh read.
+Concretely:
+- Replace `isOfflineRef` (and the read through it) with the hook's `isOffline` value
+  directly, added to the effect's dependency list.
+- Replace the top-of-effect `if (initialArticle.content) return;` guard with
+  `if (article.content) return;` — on the initial run these are equivalent (`article`
+  state is seeded from `initialArticle`), but on a later, reconnect-triggered run it
+  correctly reflects "still missing" instead of the frozen initial value, which is what
+  stops a completed load from being restarted by later connectivity flapping (the
+  property the ref used to provide).
+- The rest of the effect body (store lookup, hash check, network fetch) is unchanged;
+  it already re-does the store lookup first, so a body written by the reconnect
+  prefetch's background `ArticleStore.saveBody` is picked up without a network call
+  when the hash still matches.
+No new listener is added; `useNetworkStatus()` is still the only connectivity source in
+this screen.
+
+## Review
+Built as planned, no deviations.
+
+- `src/services/syncTrigger.ts` (new) — `SyncTrigger.run()`, a fixed `consumers` array
+  (currently just `ArticlePrefetchService.run()`, with a comment marking where
+  task_ebf1's drain goes, ahead of it) and its own module-level `inFlight` guard so a
+  trigger firing mid-run doesn't stack a second pass through the consumers. Does not
+  touch `ArticlePrefetchService`'s own guard.
+- `src/hooks/useSyncTrigger.ts` (new) — tracks previous `isOffline` and previous
+  `AppState` status in refs/closure state; calls `SyncTrigger.run()` only on a
+  true→false connectivity flip and a non-active→active AppState change, never on an
+  unchanged re-render or an active→active event. Assumes 'active' as the AppState
+  baseline at mount (the tree it lives in only renders in the foreground), so it only
+  needs to catch later transitions.
+- `src/components/common/SyncTriggerEffect.tsx` (new) + export from
+  `components/common/index.ts` — trivial `useSyncTrigger(); return null;` wrapper,
+  needed because RootNavigator itself can't call the hook conditionally (it returns
+  early for the loading/unauthenticated states before any such call would sit).
+- `src/navigation/RootNavigator.tsx` — renders `<SyncTriggerEffect />` next to
+  `<OfflineBanner />`, after the auth gate, so it never mounts logged out.
+- `src/screens/ReadArticleDetailScreen.tsx` — content-loading effect now depends on
+  `isOffline` directly (dropped `isOfflineRef`) and gates re-entry on `article.content`
+  instead of the frozen `initialArticle.content`, per the design decision above. Fixes
+  the blank-body bug: reconnecting re-runs the effect, which re-checks the store first
+  (picking up a body the reconnect-triggered prefetch may have just written) and falls
+  back to a network fetch, so the screen goes straight from "Not available offline" to
+  rendered content.
+
+Tests added: `src/services/syncTrigger.test.ts`, `src/hooks/useSyncTrigger.test.ts`, two
+cases in `src/navigation/RootNavigator.test.tsx` (sync trigger mounts only when
+authenticated), one case in `src/screens/ReadArticleDetailScreen.test.tsx` (reconnect
+fetches and renders content, never a blank body).
+
+Tradeoff: `useSyncTrigger`'s AppState baseline assumes the tree is already in the
+foreground at mount (see above) rather than reading `AppState.currentState`. That value
+is a plain function in this project's RN jest mock (not a string), which would have
+made the very first genuine `active` event look like a transition in tests; hardcoding
+the assumption sidesteps that without weakening the real-world behavior, since the
+mount location already guarantees the app is foregrounded when this hook attaches.
+
+`npm test`, `npm run type-check`, and `npm run lint` all pass from `apps/mobile` (lint:
+0 errors, only pre-existing warnings on files this task didn't touch).

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import RootNavigator from './RootNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { useSyncTrigger } from '../hooks/useSyncTrigger';
 
 // The offline banner is an overlay sibling of the Stack.Navigator (see
 // apps/mobile/CLAUDE.md Safe Area Strategy) — it must appear/disappear
@@ -34,11 +35,25 @@ jest.mock('@react-navigation/stack', () => {
 });
 jest.mock('../contexts/AuthContext');
 jest.mock('../hooks/useNetworkStatus');
+jest.mock('../hooks/useSyncTrigger');
 jest.mock('./TabNavigator', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Text } = require('react-native');
   return {
     TabNavigator: () => <Text>MainTabsScreen</Text>,
+  };
+});
+// Only LoginScreen is stubbed — it's what actually renders in the
+// unauthenticated branch below, unlike the other '../screens' exports,
+// which the mocked Stack.Navigator above never invokes.
+jest.mock('../screens', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Text } = require('react-native');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const actual = jest.requireActual('../screens');
+  return {
+    ...actual,
+    LoginScreen: () => <Text>LoginScreen</Text>,
   };
 });
 
@@ -67,5 +82,24 @@ describe('RootNavigator offline banner', () => {
 
     expect(screen.queryByText(/offline/i)).toBeNull();
     expect(screen.getByText('MainTabsScreen')).toBeTruthy();
+  });
+
+  it('mounts the sync trigger when authenticated', () => {
+    (useNetworkStatus as jest.Mock).mockReturnValue({ isOffline: false });
+    render(<RootNavigator />);
+
+    expect(useSyncTrigger).toHaveBeenCalled();
+  });
+
+  it('does not mount the sync trigger when unauthenticated', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isAuthenticated: false,
+      isLoading: false,
+      login: jest.fn(),
+    });
+    render(<RootNavigator />);
+
+    expect(screen.getByText('LoginScreen')).toBeTruthy();
+    expect(useSyncTrigger).not.toHaveBeenCalled();
   });
 });
