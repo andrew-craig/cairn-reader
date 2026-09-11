@@ -2,14 +2,14 @@
 id: task_ebf1
 title: Mobile: offline mutation outbox and reconnect sync
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [mobile,offline]
 blocked_by: []
 parent: feature_90a5
 remote_task_url: null
 created_at: 2026-09-05T23:36:10Z
-updated_at: 2026-09-11T09:56:21Z
+updated_at: 2026-09-11T22:52:51Z
 ---
 Phase 4 of feature_90a5. Status, favorite, scroll_position and archive (DELETE) writes go store-first and enqueue an outbox row when the request fails with a NetworkError. A sync worker drains the outbox on reconnect, app foreground and pull-to-refresh, in created_at order, before the body prefetch runs. 2xx deletes the row; 404 on a replayed DELETE counts as success; definitive 4xx (except 401) drops the row and logs; network/5xx/401 keeps the row, bumps attempts and halts the batch to preserve order. Coalesce scroll_position (and repeated PATCHes) per article so the queue stays bounded. Verify with unit tests for enqueue, ordered replay, 4xx drop, 5xx halt and coalescing. Fixes the swallowed archive error from task_179f. Add-URL stays online-only.
 
@@ -129,3 +129,59 @@ Beyond enqueue / ordered replay / 4xx drop / 5xx halt / coalesce, the interleavi
 the note above calls for is mandatory: pending outbox write + a list sync arriving first
 + assert the user's value survives in the store. Also cover 404-on-replayed-delete and
 delete-supersedes-pending-patches.
+
+## Pre-assignment review (tech lead, 2026-09-11, second pass)
+Re-read the phase 1-3 code on main after task_06e5 landed. Four gaps in the scope above
+that would have blocked or silently mis-implemented the drain. These are decisions, not
+options — push back with a reason if one is wrong.
+
+### A. HTTP status is not available to the drain today — plumb it
+`ReadService.updateUserContent` (read.ts:176-178) and `deleteUserContent` (read.ts:207-210)
+collapse every non-2xx into `new Error(message)`. The status is discarded, so
+"404 on a replayed delete is success", "definitive 4xx drops the row" and "5xx halts"
+are all unimplementable as written.
+Decision: add `HttpError extends Error { readonly status: number }` to
+`apps/mobile/src/utils/errors.ts`, export it from `utils/index.ts`, and throw it from
+those two methods on `!response.ok`. **Keep the existing message text byte-for-byte** —
+`utils/retry.ts:32-37` classifies retryability by message substring, and
+`ExploreArticleDetailScreen.tsx:58` surfaces `error.message`. This is an error-type
+change only; no status/credential semantics change anywhere.
+
+### B. A pending `delete` must stop the list sync resurrecting the article
+Not covered by the user-state-column guard in decision 1 above, and a visible bug without
+it: archive offline -> `ArticleStore.remove()` drops the row and a `delete` outbox row is
+queued -> the next list sync still sees the article server-side -> `upsertMany` re-INSERTs
+it and the archived article reappears in the Read list until the drain succeeds.
+Decision: `upsertMany` must skip entirely (neither insert nor update) any row with a
+pending `delete` outbox entry. Test it.
+
+### C. Ordering needs a tiebreaker
+`created_at` in milliseconds collides — `markCompleted` and the unmount scroll flush can
+enqueue in the same tick. Order the drain by `created_at ASC, rowid ASC` so replay order
+is total and deterministic.
+
+### D. Guard granularity — per-article, not per-field
+The `EXISTS` guard in decision 1 keys on `article_id` alone, so any pending row for an
+article freezes all four user-state columns against the server, not just the one field
+queued. Accepted: simpler SQL, and the effect is transient (it lasts until the drain).
+Chosen deliberately — do not "fix" it to a per-field CASE ladder without raising it first.
+
+### E. Naming trap
+The outbox `field` values (`status`, `is_favorite`, `scroll_position`, `delete`) are the
+*server's* PATCH field names. The store's scroll column is `scroll_fraction`, and
+`articles.scroll_position` is a separate legacy column. `status` maps to the store's
+`is_read` + `read_at`. Map explicitly at the boundary; do not assume the names line up.
+
+### F. Module layout
+Preferred: extract `getDb()` and the migration ladder into `apps/mobile/src/services/db.ts`
+unchanged, so `articleStore.ts` and a new `outbox.ts` share one database and one migration
+ladder without either exporting its internals. Alternative layouts are fine if simpler —
+state the reason. Non-negotiable: one `cairnreader.db`, one migration ladder in one place,
+and `ArticleStore.clear()` clears the outbox too (AuthContext calls it on logout; a queued
+write must never replay against a different account).
+
+### G. Third trigger — pull-to-refresh
+`ReadScreen.tsx:44` calls `ArticlePrefetchService.run()` directly after `upsertMany`.
+Route it through `SyncTrigger.run()` instead, so the drain gets the pull-to-refresh trigger
+the description requires and the fixed consumer order (drain, then prefetch) is honoured in
+every path rather than only on reconnect/foreground.
