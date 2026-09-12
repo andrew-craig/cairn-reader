@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { LoginScreen } from './LoginScreen';
 import { AuthService } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { NetworkError } from '../utils/errors';
+import { NetworkError, HttpError } from '../utils/errors';
 import { LoginResponse } from '../types';
 
 // task_5bd6: offline-aware login. handleGetStarted's bare `catch {}` used to
@@ -112,6 +112,42 @@ describe('LoginScreen', () => {
 
   it('still falls back to register when device login is rejected for a real (non-network) reason', async () => {
     mockedAuthService.loginWithDevice.mockRejectedValue(new Error('Device login failed'));
+    mockedAuthService.registerWithDevice.mockResolvedValue(LOGIN_RESPONSE);
+    const onLoginSuccess = jest.fn();
+
+    render(<LoginScreen onLoginSuccess={onLoginSuccess} />);
+    fireEvent.press(screen.getByText('Explore'));
+
+    await waitFor(() => expect(onLoginSuccess).toHaveBeenCalled());
+    expect(mockedAuthService.loginWithDevice).toHaveBeenCalledTimes(1);
+    expect(mockedAuthService.registerWithDevice).toHaveBeenCalledTimes(1);
+  });
+
+  // task_f19d: a 5xx device login is a broken server, not a rejected
+  // credential, and must not trigger the register fallback — the same
+  // symptom task_5bd6 fixed for NetworkError, still reachable via HttpError
+  // before this fix (pre-change, only `instanceof NetworkError` was checked,
+  // so a 500 fell through to registerWithDevice() same as a 4xx).
+  it('makes exactly one network attempt and does not fall back to register when device login fails with a 5xx', async () => {
+    mockedAuthService.loginWithDevice.mockRejectedValue(new HttpError(500, 'Internal server error'));
+    const onLoginSuccess = jest.fn();
+
+    render(<LoginScreen onLoginSuccess={onLoginSuccess} />);
+    fireEvent.press(screen.getByText('Explore'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+
+    expect(mockedAuthService.loginWithDevice).toHaveBeenCalledTimes(1);
+    expect(mockedAuthService.registerWithDevice).not.toHaveBeenCalled();
+    expect(onLoginSuccess).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'Internal server error');
+  });
+
+  // Regression guard: a 4xx device login is a definitive rejection and must
+  // still fall back to register — the only case the fallback was ever meant
+  // for. Passes both before and after this change.
+  it('still falls back to register when device login fails with a 4xx', async () => {
+    mockedAuthService.loginWithDevice.mockRejectedValue(new HttpError(401, 'Invalid device credential'));
     mockedAuthService.registerWithDevice.mockResolvedValue(LOGIN_RESPONSE);
     const onLoginSuccess = jest.fn();
 

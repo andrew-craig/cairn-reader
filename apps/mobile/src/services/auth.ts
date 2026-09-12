@@ -11,7 +11,7 @@ import {
 } from '../types';
 import { getServerUrl } from '@cairn/shared';
 import { withRetry } from '../utils/retry';
-import { NetworkError } from '../utils/errors';
+import { NetworkError, HttpError } from '../utils/errors';
 import { fetchOrNetworkError } from '../utils/http';
 
 const ACCESS_TOKEN_KEY = '@cairn:access_token';
@@ -104,7 +104,7 @@ export class AuthService {
     const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Device login failed');
+      throw new HttpError(response.status, result.message || result.error || 'Device login failed');
     }
 
     const data: LoginResponse = result.data;
@@ -132,7 +132,7 @@ export class AuthService {
     const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Device registration failed');
+      throw new HttpError(response.status, result.message || result.error || 'Device registration failed');
     }
 
     const data: LoginResponse = result.data;
@@ -158,7 +158,7 @@ export class AuthService {
     const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Email login failed');
+      throw new HttpError(response.status, result.message || result.error || 'Email login failed');
     }
 
     const data: LoginResponse = result.data;
@@ -184,7 +184,7 @@ export class AuthService {
     const result = await this.parseJsonResponse(response);
 
     if (!response.ok) {
-      throw new Error(result.message || result.error || 'Email registration failed');
+      throw new HttpError(response.status, result.message || result.error || 'Email registration failed');
     }
 
     const data: LoginResponse = result.data;

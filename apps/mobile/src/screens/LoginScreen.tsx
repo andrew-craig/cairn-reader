@@ -18,7 +18,7 @@ import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constan
 import { AuthService } from '../services';
 import { getServerUrl, setServerUrl } from '@cairn/shared';
 import { DEFAULT_SERVER_URL } from '../config/storage';
-import { NetworkError } from '../utils/errors';
+import { NetworkError, HttpError } from '../utils/errors';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const LOGIN_FONT_SIZE_TITLE = 56;
@@ -62,10 +62,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         await AuthService.loginWithDevice();
         onLoginSuccess();
       } catch (error) {
-        if (error instanceof NetworkError) {
-          // Server unreachable, not a rejected login — a second doomed round
-          // trip to register would just make the user wait through two
-          // timeouts. Let it propagate to the outer catch's alert.
+        if (error instanceof NetworkError || (error instanceof HttpError && error.status >= 500)) {
+          // Server unreachable or broken, not a rejected login — a second
+          // doomed round trip to register would just make the user wait
+          // through two timeouts. Let it propagate to the outer catch's alert.
           throw error;
         }
         // Login was rejected for a real reason; try to register instead.

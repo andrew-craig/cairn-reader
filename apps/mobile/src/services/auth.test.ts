@@ -1,5 +1,10 @@
 import { AuthService } from './auth';
-import { NetworkError } from '../utils/errors';
+import { NetworkError, HttpError } from '../utils/errors';
+
+jest.mock('expo-application', () => ({
+  getIosIdForVendorAsync: jest.fn().mockResolvedValue('test-device-id'),
+  getAndroidId: jest.fn().mockReturnValue('test-device-id'),
+}));
 
 // H14: token refresh must never leak token material (raw token, token
 // prefix/preview, or full response bodies) to device logs, and diagnostic
@@ -203,5 +208,57 @@ describe('AuthService token refresh: offline vs rejected (task_cab7)', () => {
     await expect(AuthService.ensureValidToken()).resolves.toBe(false);
 
     expect(await AuthService.getAccessToken()).toBeNull();
+  });
+});
+
+// task_f19d: a 5xx auth response must be distinguishable, by type, from a 4xx
+// credential rejection, so LoginScreen (and any future caller) can tell
+// "server is broken" apart from "the credential was rejected" without
+// parsing the message text. These tests fail against pre-change code: the
+// four entry points below used to throw a plain Error for every non-2xx
+// status, so `toBeInstanceOf(HttpError)` fails regardless of status.
+describe('AuthService auth entry points: non-2xx responses throw HttpError (task_f19d)', () => {
+  beforeEach(() => {
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function mockJsonResponse(status: number, body: Record<string, unknown>) {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      text: () => Promise.resolve(JSON.stringify(body)),
+    }) as unknown as typeof fetch;
+  }
+
+  const entryPoints: [string, () => Promise<unknown>][] = [
+    ['loginWithDevice', () => AuthService.loginWithDevice()],
+    ['registerWithDevice', () => AuthService.registerWithDevice()],
+    ['loginWithEmail', () => AuthService.loginWithEmail({ email: 'a@b.com', password: 'x' })],
+    ['registerWithEmail', () => AuthService.registerWithEmail({ email: 'a@b.com', password: 'x' })],
+  ];
+
+  it.each(entryPoints)('%s throws an HttpError carrying the status and server message on a 500', async (_name, call) => {
+    mockJsonResponse(500, { message: 'internal error' });
+
+    const error = await call().catch((e) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(500);
+    expect((error as Error).message).toBe('internal error');
+  });
+
+  it.each(entryPoints)('%s throws an HttpError carrying the status and server message on a 401 (credential semantics unchanged)', async (_name, call) => {
+    mockJsonResponse(401, { message: 'invalid credentials' });
+
+    const error = await call().catch((e) => e);
+
+    expect(error).toBeInstanceOf(HttpError);
+    expect((error as HttpError).status).toBe(401);
+    expect((error as Error).message).toBe('invalid credentials');
   });
 });
