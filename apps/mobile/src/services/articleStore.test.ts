@@ -1,4 +1,6 @@
 import { ArticleStore } from './articleStore';
+import { Outbox } from './outbox';
+import { getDb } from './db';
 import { Article } from '../types';
 
 // __mocks__/expo-sqlite.js adapts openDatabaseAsync onto a real
@@ -248,6 +250,78 @@ describe('ArticleStore', () => {
 
       const recent = await ArticleStore.listRecent(10);
       expect(recent).toEqual([]);
+    });
+
+    // task_ebf1 (module layout, item F): a queued write must never replay
+    // against a different account — clear() (called on logout) drops the
+    // outbox alongside the articles it shares a database with.
+    it('also clears queued outbox rows', async () => {
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: true })]);
+      await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
+
+      await ArticleStore.clear();
+
+      // Re-seed the row (a plain insert, articles is empty post-clear) and
+      // then run a conflicting upsert. If clear() had left the outbox row
+      // behind, upsertMany's guard would freeze isFavorite instead of
+      // accepting the incoming value — so this only passes if the outbox
+      // was actually cleared.
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: true })]);
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: false })]);
+
+      const stored = await ArticleStore.getById('a1');
+      expect(stored?.isFavorite).toBe(false);
+    });
+  });
+
+  // task_ebf1: the tech lead's note on task_a8a4's review — upsertMany's
+  // "server rows win" sync would otherwise clobber a value the user just
+  // changed offline while its write is still queued. See scope clarification
+  // decision 1 (guard in SQL) and pre-assignment review item B (pending
+  // delete).
+  describe('outbox guard on upsertMany (interleaving with a pending write)', () => {
+    it('preserves a pending offline change when a list sync arrives before the drain', async () => {
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: false, title: 'Original' })]);
+      // Simulates ArticleMutations.setFavorite: store write happens first,
+      // the network write fails with a NetworkError and gets queued.
+      await ArticleStore.updateUserState('a1', { isFavorite: true });
+      await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
+
+      // A list sync arrives before the outbox drains, carrying the server's
+      // still-stale value.
+      await ArticleStore.upsertMany([
+        makeArticle({ id: 'a1', isFavorite: false, title: 'Refreshed' }),
+      ]);
+
+      const stored = await ArticleStore.getById('a1');
+      expect(stored?.isFavorite).toBe(true); // survives
+      expect(stored?.title).toBe('Refreshed'); // non-user-state columns still sync normally
+    });
+
+    it('does not resurrect an article with a pending delete (item B)', async () => {
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);
+      await ArticleStore.remove('a1');
+      await Outbox.enqueue('a1', 'delete', {});
+
+      // The next list sync still sees the article server-side.
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);
+
+      const stored = await ArticleStore.getById('a1');
+      expect(stored).toBeNull();
+    });
+
+    it('resumes normal syncing once the outbox row is gone', async () => {
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: true })]);
+      await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
+
+      // Drain succeeded and cleared its row — simulate directly.
+      const db = await getDb();
+      await db.runAsync("DELETE FROM outbox WHERE article_id = 'a1'");
+
+      await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: false })]);
+
+      const stored = await ArticleStore.getById('a1');
+      expect(stored?.isFavorite).toBe(false);
     });
   });
 });

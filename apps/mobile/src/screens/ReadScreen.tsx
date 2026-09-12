@@ -9,7 +9,7 @@ import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
-import { ArticlePrefetchService } from '../services/articlePrefetch';
+import { SyncTrigger } from '../services/syncTrigger';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 // Minimum ms between background refetches triggered by tab focus.
@@ -36,12 +36,14 @@ export const ReadScreen: React.FC = () => {
   );
 
   const onResetLoaded = useCallback((next: Article[]) => {
-    // Prefetch reads the post-sync store state (upsertMany already cleared
-    // any body whose hash changed), so it must run after upsertMany
-    // resolves, not alongside it. Kept in the service per task_c55c — this
-    // screen knows nothing about prefetching beyond this one call.
+    // SyncTrigger.run() drains the outbox and then runs prefetch, in that
+    // fixed order (task_ebf1) — prefetch reads the post-sync store state
+    // (upsertMany already cleared any body whose hash changed), so it must
+    // run after upsertMany resolves, not alongside it. Routing pull-to-
+    // refresh through the same entry point as the reconnect/foreground
+    // triggers means the outbox gets a drain on every path, not only those.
     void ArticleStore.upsertMany(next)
-      .then(() => ArticlePrefetchService.run())
+      .then(() => SyncTrigger.run())
       .catch((err) => console.error('Failed to sync articles to local store:', err));
     lastFetchedAtRef.current = Date.now();
     setIsStale(false);

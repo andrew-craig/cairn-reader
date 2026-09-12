@@ -1,11 +1,14 @@
+import { Outbox } from './outbox';
 import { ArticlePrefetchService } from './articlePrefetch';
 
 // Consumers run in this fixed order every time the trigger fires. The order
 // is this module's contract, not the caller's — see useSyncTrigger, which
-// only decides *when* to fire, never what runs or in what order.
-// task_ebf1 adds the outbox drain here, as the first entry, ahead of
-// prefetch — no restructuring needed, just insert it above.
+// only decides *when* to fire, never what runs or in what order. The outbox
+// drain runs first (task_ebf1): a queued write should reach the server ahead
+// of the prefetch pass, though the store-level guard in articleStore.ts's
+// UPSERT_SQL is what actually protects a pending write, not this ordering.
 const consumers: (() => Promise<void>)[] = [
+  () => Outbox.drain(),
   () => ArticlePrefetchService.run(),
 ];
 
