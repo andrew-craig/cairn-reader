@@ -30,7 +30,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_f19d** · P2 · open · Mobile: treat a 5xx auth response as unreachable, not as a rejected credential  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
-- **task_5bd6** · P3 · in_progress · Mobile: offline-aware login and loading states  (parent: feature_90a5)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
