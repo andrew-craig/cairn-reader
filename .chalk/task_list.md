@@ -38,7 +38,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_1d5d** · P3 · open · Export/import subscription list and likes
 - **feature_2920** · P3 · open · Mobile: Add filter/sort controls to ReadScreen
 - **feature_34cc** · P3 · open · Reading analytics and statistics  (parent: epic_7c9e)
-- **feature_90a5** · P3 · open · Offline reading mode
 - **feature_9d64** · P3 · open · Image hosting and optimization
 - **feature_9dba** · P3 · open · Article sharing via links
 - **feature_a849** · P3 · open · Enhanced article reader with adjustable fonts
@@ -57,7 +56,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
-- **task_de93** · P3 · open · Mobile: end-to-end airplane-mode QA pass for offline reading  (parent: feature_90a5)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
