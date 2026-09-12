@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    // DOM is here for the standard fetch types (Response, RequestInit, Headers)
+    // that the http/auth layer is written against — not for any browser-only
+    // API. React Native and the browser both provide these.
+    "lib": ["ES2022", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,

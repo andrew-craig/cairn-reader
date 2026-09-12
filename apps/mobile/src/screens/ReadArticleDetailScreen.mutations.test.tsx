@@ -5,7 +5,7 @@ import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
 import { ArticleStore, ArticleMutations } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
-import { HttpError } from '../utils/errors';
+import { HttpError } from '@cairn/shared';
 
 // task_ebf1 tech-lead review follow-up: two behaviors specific to the
 // ArticleMutations facade wiring, not covered by

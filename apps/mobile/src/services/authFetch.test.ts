@@ -1,6 +1,6 @@
 import { AuthService } from './auth';
 import { withRetry } from '../utils/retry';
-import { NetworkError } from '../utils/errors';
+import { NetworkError } from '@cairn/shared';
 
 // task_ca2d: mobile's read.ts and explore.ts each carried a private copy of the
 // authenticated-fetch policy. These are now one implementation on AuthService.
@@ -105,7 +105,7 @@ describe('AuthService.fetchWithAuth', () => {
 
     expect(res).toBe(ok);
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer access-1');
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer access-1');
   });
 
   it('refreshes once on 401 and retries the request with the new token', async () => {
@@ -129,7 +129,7 @@ describe('AuthService.fetchWithAuth', () => {
 
     expect(res).toBe(retried);
     const retryInit = fetchMock.mock.calls[2][1];
-    expect((retryInit.headers as Record<string, string>).Authorization).toBe('Bearer access-2');
+    expect((retryInit.headers as Headers).get('Authorization')).toBe('Bearer access-2');
   });
 
   it('clears tokens and throws the session-expired message when the 401 refresh fails', async () => {

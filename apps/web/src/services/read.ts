@@ -18,8 +18,8 @@ import {
   type UserContentsListResponse,
   type UnifiedSubscriptionsResponse,
   getServerUrl,
+  AuthService,
 } from '@cairn/shared';
-import { AuthService } from './auth';
 
 const PAGE_SIZE_DEFAULT = 20;
 

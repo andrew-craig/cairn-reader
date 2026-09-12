@@ -1,7 +1,7 @@
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
 import { Outbox, OutboxField } from './outbox';
-import { NetworkError } from '../utils/errors';
+import { NetworkError } from '@cairn/shared';
 
 /**
  * Runs a backend write; a `NetworkError` is queued for later replay instead

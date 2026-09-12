@@ -16,9 +16,8 @@ import { Button } from '../components/common';
 import { LogoMark } from '../components/LogoMark';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { AuthService } from '../services';
-import { getServerUrl, setServerUrl } from '@cairn/shared';
+import { getServerUrl, setServerUrl, HttpError } from '@cairn/shared';
 import { DEFAULT_SERVER_URL } from '../config/storage';
-import { HttpError } from '../utils/errors';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const LOGIN_FONT_SIZE_TITLE = 56;

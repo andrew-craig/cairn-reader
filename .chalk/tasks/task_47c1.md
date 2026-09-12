@@ -96,3 +96,118 @@ Reusable from `19ae572` (read it, don't cherry-pick it):
 - The subclass shape: `class AuthService extends SharedAuthService` on mobile, adding only `getDeviceId`, `loginWithDevice`/`registerWithDevice`, `upgradeAccount`, `fetchWithAuthAndRetry`; web reduced to a re-export.
 
 Unchanged constraints from the original task: preserve the refresh-dedup mutex, the 5-minute proactive-refresh buffer and the single-401 retry as-is, and keep the `Session expired. Please log in again.` / `Not authenticated` strings verbatim (see the hazard section above — `apps/mobile/src/utils/retry.ts:28` still matches on them).
+
+---
+
+## Implementation review (2026-09-13) — branch `task_47c1-shared-auth`
+
+### What moved
+
+`apps/shared/src/services/auth.ts` now holds the single token-refresh state
+machine: the session accessors, the proactive-refresh buffer, the refresh-dedup
+mutex, `ensureValidToken`, `fetchWithAuth`, email login/register, `logout` and
+`changePassword`. Persistence goes through the `StorageAdapter` that
+`configureStorage` already injects, so the module knows nothing about
+AsyncStorage or localStorage.
+
+Session state is module-level `let`, not static class fields. A static field
+assigned as `this.x = …` from a static method reached through the subclass
+creates an own property on the subclass and shadows the base — which would have
+split the session in two on mobile the moment anything touched the base class
+directly.
+
+- `apps/mobile/src/services/auth.ts`: 621 lines → 100. Now
+  `class AuthService extends SharedAuthService`, adding only `getDeviceId`,
+  `loginWithDevice`/`registerWithDevice` (through the shared `authenticate`
+  helper), `upgradeAccount`, and `fetchWithAuthAndRetry` (mobile's `withRetry`).
+- `apps/web/src/services/auth.ts`: **deleted**, not reduced to a re-export
+  (§4 — remove obsolete paths). Its five importers now take `AuthService` from
+  `@cairn/shared` directly.
+
+### Where NetworkError / fetchOrNetworkError ended up, and why
+
+Moved to `apps/shared/src/utils/errors.ts` and `apps/shared/src/utils/http.ts`,
+and deleted from `apps/mobile/src/utils/`. This was forced, not optional: the
+shared state machine has to throw the same `NetworkError` that mobile's ~18
+`instanceof NetworkError` call sites test against, and two copies of the class
+would make every one of those checks silently false. The 18 import lines were
+repointed at `@cairn/shared`; no other line in those files changed.
+
+`utils/retry.ts` stayed in mobile — `withRetry` is only used by mobile's
+`fetchWithAuthAndRetry`. `utils/http.test.ts` also stayed in mobile: its
+`DOMException`-is-not-an-`Error` assertion is true in React Native's runtime and
+false in Node, so it belongs in the suite that runs under jest-expo.
+
+### Behavior changes I could not avoid
+
+1. **Web inherits the mobile offline fix — bug_ad04 is fixed by this change.**
+   Consolidating means picking one refresh-failure policy, and the only way to
+   keep web's buggy one would have been a configuration seam whose sole purpose
+   is preserving a bug. Web now distinguishes "server rejected the credential"
+   (401/403 → clear tokens) from "never reached the server" (offline, unparseable
+   body, 400/404/429/5xx → keep tokens, surface `NetworkError`). **bug_ad04
+   should be closed as fixed here**, and 8 of the new shared tests fail against
+   the old web behavior (verified by reinstating it and re-running).
+2. **`fetchWithAuth` keeps web's `Headers`-based header builder**, not mobile's
+   object spread — it merges a `Headers` instance or entry array correctly, and
+   it always owns `Authorization` rather than letting caller headers override it.
+   Two header assertions in `authFetch.test.ts` moved from `.Authorization` to
+   `.get('Authorization')`.
+3. **Mobile's `__DEV__`-gated diagnostic `console.log`s in the auth flow are
+   gone.** `__DEV__` is a React Native global and does not exist in shared or on
+   web. `console.error` on real failures is unchanged, as is the H14 guarantee
+   that no token material is logged.
+4. **Mobile `changePassword` now goes through `fetchWithAuth`** (web's version),
+   so it gains the single 401 retry. `upgradeAccount` stayed on its own
+   `ensureValidToken` + `fetchOrNetworkError` path — it is mobile-only, so
+   nothing was gained by rewriting it.
+5. Web's login/register now throw `HttpError` (carrying status) instead of plain
+   `Error`, and the generic fallback message when the server sends none is
+   `'Email login failed'` rather than `'Authentication failed'`. `HttpError`
+   extends `Error`, so web's `err.message` handling is unaffected.
+
+### Left alone deliberately
+
+- **bug_8123 (H12)** — a second 401 after a successful refresh is still returned
+  to the caller. Both platforms had this identical bug, so moving it preserved
+  it exactly, in one place, with no seam required. There is a clearly labelled
+  characterization test for it in the shared suite; bug_8123 will invert that
+  assertion.
+- `utils/retry.ts`'s prose-matching `isRetryable`. The load-bearing strings
+  (`Session expired. Please log in again.`, `Not authenticated`) survive
+  verbatim; replacing the classifier with an HTTP-status one is a separate,
+  still-unfiled change.
+- The 5-minute refresh buffer, the dedup mutex and the single-401 retry are
+  byte-for-byte the same policy.
+
+### Verification (all green)
+
+| Package | Checks |
+| --- | --- |
+| `apps/shared` | `tsc --noEmit` clean · `vitest run` **32 passed** (new suite) |
+| `apps/web` | `tsc --noEmit` clean · `eslint .` 0 errors · `vitest run` **31 passed** |
+| `apps/mobile` | `tsc --noEmit` clean · `eslint .` 0 errors · `jest --ci` **273 passed / 37 suites** |
+
+The 12 remaining mobile and 1 web eslint warnings are all pre-existing on main
+(confirmed against `origin/main`) — none were introduced here.
+
+`apps/shared` gained a `vitest` dev-dep, `test`/`type-check` scripts, and a
+`shared` job in `web-checks.yml` (which already triggers on `apps/shared/**`, as
+does `mobile-checks.yml`). `apps/mobile/jest.setup.ts` is new: the suite never
+imports `src/config/init.ts`, so it has to wire `configureStorage` itself now
+that the session persists through the injected adapter.
+
+### Note for the reviewer
+
+This branch was developed in a working tree shared with another concurrent
+session that had unrelated uncommitted work in it (the bookmarks/votes count
+fix, bug_0099). Only task_47c1 paths were staged; for
+`apps/mobile/src/services/read.ts` and `apps/web/src/services/read.ts` — the two
+files both changes touched — the committed version was the import change alone,
+reconstructed from `HEAD`, leaving the other session's edits unstaged.
+
+That work has since landed on main as #396, and this branch was rebased onto it
+(`origin/main` @ 2fb8609). Both `read.ts` files merged without conflict: the
+import edits and the new `countUserContents` methods sit in different regions.
+The verification table above is from the post-rebase run, on a clean tree with
+no foreign changes in it.

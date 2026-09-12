@@ -2,7 +2,7 @@ import { ArticlePrefetchService } from './articlePrefetch';
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
 import { isOffline } from '../utils/network';
-import { NetworkError } from '../utils/errors';
+import { NetworkError } from '@cairn/shared';
 import { Article } from '../types';
 import type { UserContentDetailResponse } from '@cairn/shared';
 

@@ -1,6 +1,8 @@
-import { fetchOrNetworkError } from './http';
-import { NetworkError } from './errors';
+import { fetchOrNetworkError, NetworkError } from '@cairn/shared';
 
+// fetchOrNetworkError now lives in @cairn/shared (task_47c1), but its abort guard
+// exists because of React Native's runtime, so the test stays in the mobile suite.
+//
 // chore_1089: fetchOrNetworkError is the single place every service call site
 // routes through to convert "couldn't reach the server" into a NetworkError,
 // so callers can tell it apart from a rejected credential (4xx).

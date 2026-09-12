@@ -59,7 +59,9 @@ export function getDefaultServerUrl(): string {
   return resolveDefaultServerUrl();
 }
 
-function getStorage(): StorageAdapter {
+/** The configured persistence backend. Exported for the auth layer, which
+ *  persists the session through the same adapter. */
+export function getStorage(): StorageAdapter {
   if (!storage) {
     throw new Error('Storage adapter not configured. Call configureStorage() first.');
   }

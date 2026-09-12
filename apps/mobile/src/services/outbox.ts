@@ -1,7 +1,6 @@
 import { getDb } from './db';
 import { ReadService } from './read';
-import { HttpError } from '../utils/errors';
-import { UpdateUserContentRequest } from '@cairn/shared';
+import { HttpError, UpdateUserContentRequest } from '@cairn/shared';
 
 /**
  * The server's PATCH field names, plus `delete` for the archive (DELETE)
