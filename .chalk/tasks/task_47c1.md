@@ -2,14 +2,14 @@
 id: task_47c1
 title: [FE auth layer] Move the duplicated web/mobile auth.ts into apps/shared; fix H12 + offline-clears-tokens
 type: task
-status: open
+status: in_progress
 priority: 2
 labels: [quality,wave4,consolidation,frontend]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-09T06:53:56Z
+updated_at: 2026-09-12T12:14:05Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
