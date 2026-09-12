@@ -6,10 +6,10 @@ status: open
 priority: 2
 labels: [mobile,offline]
 blocked_by: []
-parent: feature_90a5
+parent: 
 remote_task_url: null
 created_at: 2026-09-12T10:38:48Z
-updated_at: 2026-09-12T10:38:48Z
+updated_at: 2026-09-12T22:37:45Z
 ---
 Found during the task_de93 coverage check on `apps/mobile/src/services/articlePrefetch.ts`.
 
