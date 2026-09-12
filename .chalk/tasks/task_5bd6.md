@@ -72,3 +72,26 @@ Cover it with a test.
 No change to any auth service, token handling, or 4xx/credential semantics. No retry or
 auto-retry-on-reconnect for login — if the user is offline they can tap again once the
 banner clears.
+
+## Review (implementer, 2026-09-12)
+Implemented all six scope items as specified; no disagreements.
+
+- `LoginScreen.handleGetStarted`: the inner `catch` now re-throws `NetworkError`
+  instead of falling through to `registerWithDevice`, so an offline device login
+  makes exactly one network attempt.
+- `LoginScreen`: added offline-specific copy under the header (`useNetworkStatus`),
+  shown only while offline. Submit buttons unchanged (still gated on `isLoading`
+  only, per item 5).
+- `RootNavigator`: both the `isLoading` and `!isAuthenticated` early returns now
+  render `<OfflineBanner />` alongside their content. `SyncTriggerEffect` untouched
+  — still only rendered in the authenticated tree.
+- New `LoginScreen.test.tsx` (5 tests) and 3 new tests in `RootNavigator.test.tsx`
+  (7 total in that file). Verified against pre-fix code: the "exactly one network
+  attempt" and "offline copy" LoginScreen tests fail without the fix (2/5 fail);
+  the "banner on loading branch" and "banner on login branch" RootNavigator tests
+  fail without the fix (2/7 fail). The cold-start-offline-with-valid-tokens
+  RootNavigator test passes on both pre- and post-fix code, as expected — it is a
+  regression guard for existing behavior (task_cab7), not a new-bug repro.
+
+Verified: `npx tsc --noEmit` clean; `npm run lint` still 12 warnings / 0 errors
+(unchanged from main); `npm test` 37/37 suites, 258/258 tests (was 36/250 before).
