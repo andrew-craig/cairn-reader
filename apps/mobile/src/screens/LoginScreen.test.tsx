@@ -51,6 +51,8 @@ const LOGIN_RESPONSE: LoginResponse = {
 };
 
 describe('LoginScreen', () => {
+  const originalFetch = global.fetch;
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockedUseNetworkStatus.mockReturnValue({ isOffline: false });
@@ -59,6 +61,11 @@ describe('LoginScreen', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    // jest.restoreAllMocks() only undoes jest.spyOn spies — it doesn't touch
+    // a direct `global.fetch = ...` assignment (see the unparseable-body
+    // test below), so restore it explicitly or the stub leaks into later
+    // tests in this file.
+    global.fetch = originalFetch;
   });
 
   it('makes exactly one network attempt when device login fails offline, and does not fall back to register', async () => {
