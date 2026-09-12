@@ -37,7 +37,7 @@ export class AuthService {
     try {
       return JSON.parse(text);
     } catch {
-      throw new Error('Unable to reach the server. Please try again later.');
+      throw new NetworkError();
     }
   }
 

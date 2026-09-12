@@ -25,6 +25,11 @@ jest.mock('../services', () => ({
 
 jest.mock('../hooks/useNetworkStatus');
 
+jest.mock('expo-application', () => ({
+  getIosIdForVendorAsync: jest.fn().mockResolvedValue('test-device-id'),
+  getAndroidId: jest.fn().mockReturnValue('test-device-id'),
+}));
+
 jest.mock('@cairn/shared', () => ({
   getServerUrl: jest.fn(() => 'https://api.test'),
   setServerUrl: jest.fn(),
@@ -69,6 +74,33 @@ describe('LoginScreen', () => {
     expect(mockedAuthService.registerWithDevice).not.toHaveBeenCalled();
     expect(onLoginSuccess).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith('Error', expect.stringMatching(/reach the server/i));
+  });
+
+  it('does not fall back to register when device login fails on an unparseable response body (e.g. captive portal)', async () => {
+    // Exercises the real AuthService.loginWithDevice (not the mock above) so
+    // this test proves out auth.ts's parseJsonResponse, not just LoginScreen's
+    // own instanceof check. A captive-portal WiFi network responds 200 with an
+    // HTML login page instead of JSON; that must surface as NetworkError, or
+    // this screen's login-then-register fallback runs anyway and the user
+    // waits through a second doomed round trip before seeing the error.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AuthService: RealAuthService } = jest.requireActual('../services');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('<html><body>Please log in to the WiFi network</body></html>'),
+    }) as unknown as typeof fetch;
+    mockedAuthService.loginWithDevice.mockImplementationOnce(() => RealAuthService.loginWithDevice());
+    const onLoginSuccess = jest.fn();
+
+    render(<LoginScreen onLoginSuccess={onLoginSuccess} />);
+    fireEvent.press(screen.getByText('Explore'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+
+    expect(mockedAuthService.loginWithDevice).toHaveBeenCalledTimes(1);
+    expect(mockedAuthService.registerWithDevice).not.toHaveBeenCalled();
+    expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 
   it('still falls back to register when device login is rejected for a real (non-network) reason', async () => {
