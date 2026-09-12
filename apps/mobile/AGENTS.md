@@ -220,7 +220,7 @@ interface ButtonProps {
 - Displays user's saved articles
 - Search functionality
 - Integrates with Read service
-- Store-first render (`ArticleStore.listRecent`) with a stale banner while a background refetch is in flight; every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`
+- Store-first render (`ArticleStore.listRecent`), with a "Showing cached data" banner if the background refetch then fails rather than an alert; every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`
 
 **ReadArticleDetailScreen.tsx** - Full article view
 - Displays article content via `ArticleContent` (`react-native-render-html`)
