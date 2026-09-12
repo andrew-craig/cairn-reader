@@ -1,7 +1,7 @@
 /**
  * Thrown when a request could not be completed because the server was
- * unreachable (network failure, timeout, 5xx response, or a malformed/
- * unparseable body) — as opposed to a definitive rejection (4xx).
+ * unreachable (network failure, timeout, or a malformed/unparseable body) —
+ * as opposed to a definitive rejection (4xx).
  *
  * Distinguishing the two matters: retry.ts treats unrecognized errors as
  * retryable, and callers must not treat "couldn't reach the server" the same

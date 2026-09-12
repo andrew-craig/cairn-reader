@@ -18,7 +18,7 @@ import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constan
 import { AuthService } from '../services';
 import { getServerUrl, setServerUrl } from '@cairn/shared';
 import { DEFAULT_SERVER_URL } from '../config/storage';
-import { NetworkError } from '../utils/errors';
+import { HttpError } from '../utils/errors';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const LOGIN_FONT_SIZE_TITLE = 56;
@@ -62,13 +62,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         await AuthService.loginWithDevice();
         onLoginSuccess();
       } catch (error) {
-        if (error instanceof NetworkError) {
-          // Server unreachable, not a rejected login — a second doomed round
-          // trip to register would just make the user wait through two
-          // timeouts. Let it propagate to the outer catch's alert.
+        if (!(error instanceof HttpError && error.status === 401)) {
+          // 401 is the only status meaning "this device isn't registered
+          // yet" — every other case (unreachable, another HttpError status,
+          // or an unrecognized error) is not evidence this device needs an
+          // account, so propagate to the outer catch's alert instead of
+          // risking a second doomed (or lockout-deepening) round trip.
           throw error;
         }
-        // Login was rejected for a real reason; try to register instead.
+        // Device isn't registered; register it instead.
         await AuthService.registerWithDevice();
         onLoginSuccess();
       }
