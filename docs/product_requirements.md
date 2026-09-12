@@ -28,7 +28,8 @@ Reading progress saved and synced
   - Resume reading on any device
   - Character-based position for consistent experience across screen sizes
 - **Favorites**: Star articles for quick access. Favorites synced across devices
-- **Offline availability**: saved content is stored on device for access offline. Changes are synced when the connection is restored
+- **Offline availability** (mobile only — shipped): saved content is stored on device (SQLite) for access offline. Reading-status, favorite, scroll-position, and archive changes made offline are queued and synced when the connection is restored
+  - Non-goals: web/PWA offline access (out of scope for the web app, see `docs/detailed_requirements/web_app_requirements.md`); image caching for offline viewing (tracked separately as image hosting/optimization); backend delta-sync or ETag support; server-side conflict resolution — v1 sync is last-write-wins; manual per-article "download for offline" control (article bodies are prefetched automatically, not user-triggered)
 
 
 ## Product Requirements - Content Discovery (Explore)
@@ -205,8 +206,6 @@ The following features are **not** included in the initial release:
 - Feed discovery engine
 
 ### Mobile Features
-- Offline reading mode
-- Download for offline access
 - Dark mode reading
 - Text-to-speech
 - Adjustable fonts and spacing

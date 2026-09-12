@@ -92,7 +92,7 @@ The Mobile App is a React Native (Expo) client for iOS, Android, and web that le
 - Tab-based navigation across Read (saved articles), Explore (recommendations), and You (profile/settings), plus modal/stack screens for article detail, adding links, and search
 - Device-ID and email/password authentication, with proactive access-token refresh before each API call
 - A service layer (`AuthService`, `ReadService`, `ExploreService`) that attaches `Authorization: Bearer` headers and retries on 401/5xx
-- Local persistence via AsyncStorage: auth tokens, the chosen backend server URL, and stale-while-revalidate caches for the Read and Explore lists
+- Local persistence via AsyncStorage (auth tokens, the chosen backend server URL, and a stale-while-revalidate cache for the Explore list) and SQLite (the offline-capable Read-list article store — see "Offline Reading" below)
 - Runtime backend switching (a server URL field on the login screen) for pointing the app at a self-hosted or local backend without a rebuild
 
 **Technology Stack**:
@@ -100,7 +100,7 @@ The Mobile App is a React Native (Expo) client for iOS, Android, and web that le
 - TypeScript, React Navigation (stack + bottom tabs)
 - React Context (`AuthContext`) for auth state
 - `@cairn/shared` workspace package for the API config layer and data types (shared with the web app)
-- AsyncStorage for local persistence
+- AsyncStorage for the Explore cache and auth/session state; `expo-sqlite` for the offline Read-list store; `expo-network` for connectivity detection
 - `react-native-render-html` for rendering saved article content
 
 ### App Architecture
@@ -183,6 +183,17 @@ flowchart LR
 ```
 
 The app talks to a single backend server URL (defaulting to `https://cairn.seatrain.net`, overridable per-device) rather than per-service hosts; the ports above are the underlying services that URL's `/api/v1/...` paths route to in the dev `docker-compose` environment. The Explore Fetcher service (dev port `:8088`) is internal-only and never called directly by the app.
+
+### Offline Reading
+
+Saved (Read-list) articles are readable with no network connection, and edits made offline sync once the connection returns. Explore content is never cached and stays online-only.
+
+- **Local store**: a single on-device SQLite database (`expo-sqlite`, `apps/mobile/src/services/db.ts`) holds an `articles` table (metadata, user state, and an opportunistically cached `body`) and an `outbox` table, migrated via `PRAGMA user_version`. `ArticleStore` is a read-through cache for the initial render of the Read, Bookmarks, and article-detail screens — pagination against the network is unaffected.
+- **Body prefetch**: after every list sync, `ArticlePrefetchService` downloads `cleaned_html` in the background for unread/reading articles with no cached body — newest first, 3 concurrent workers, capped at the 100 most recently added Read-list articles, then evicts cached bodies outside that cap. A body is diffed against the server's `content_hash` from the list page, so an unchanged body is never re-downloaded; a changed hash clears the stale cached body until it's refetched.
+- **Mutation outbox**: status, favorite, scroll-position, and archive edits write to the local store first, then attempt the backend call; a `NetworkError` (server unreachable) queues the write in the `outbox` table instead of losing it. The outbox drains in FIFO order on reconnect, replaying each row until one comes back retryable (network/401/5xx), which halts the batch to preserve ordering — a definitive 4xx drops the row instead of retrying it forever.
+- **Connectivity and sync triggers**: `expo-network` backs a global offline banner and gates the prefetch pass and the article-detail network fetch (both skip outright while offline; mutations instead just attempt the call and let a thrown `NetworkError` route them to the outbox). A sync (outbox drain, then prefetch) fires on reconnect, on the app returning to the foreground, and on every Read-list sync (including pull-to-refresh) — never merely because the app happens to be online or active.
+- **Conflict resolution**: last-write-wins, no client timestamps or server versioning — acceptable for a single-device-dominant read-it-later app, but a replayed offline write can clobber a newer value written from another device in the meantime.
+- **Out of scope**: the web app (no service worker/IndexedDB — an explicit non-goal per `docs/detailed_requirements/web_app_requirements.md`), image caching (remote `<img>` URLs still fail silently offline; tracked separately), backend delta-sync/ETag support, and manual per-article download (prefetch is automatic, not user-triggered).
 
 ---
 
