@@ -181,3 +181,112 @@ Did not touch `parseJsonResponse`, `doRefreshAccessToken`, `upgradeAccount`,
 credential semantics (message text, which statuses clear tokens, which trigger the
 register fallback) are unchanged and covered by the existing and new regression
 tests.
+
+## Review addendum: scope amendment (implementer, 2026-09-12)
+
+Implemented the amendment exactly as specified: the register fallback in
+`LoginScreen.handleGetStarted` now runs only for `error instanceof HttpError &&
+error.status === 401`; everything else (`NetworkError`, any other `HttpError`
+status, any unrecognized error) propagates to the outer catch.
+
+### Change
+`apps/mobile/src/screens/LoginScreen.tsx`:
+```ts
+if (!(error instanceof HttpError && error.status === 401)) {
+  // 401 is the only status meaning "this device isn't registered
+  // yet" — every other case (unreachable, another HttpError status,
+  // or an unrecognized error) is not evidence this device needs an
+  // account, so propagate to the outer catch's alert instead of
+  // risking a second doomed (or lockout-deepening) round trip.
+  throw error;
+}
+// Device isn't registered; register it instead.
+await AuthService.registerWithDevice();
+```
+`NetworkError` is no longer referenced in this file (the `>= 500` HttpError branch
+and the explicit `NetworkError` check are both gone, subsumed by the inverted
+default), so its import was dropped — otherwise it would have been an orphaned
+import from this change.
+
+### Tests
+`apps/mobile/src/screens/LoginScreen.test.tsx`:
+- Added `it.each([403, 429, 400])` — three new tests, each asserting exactly one
+  `loginWithDevice` call, no `registerWithDevice` call, and the server's message
+  surfaced via `Alert.alert`.
+- Rewrote the pre-existing "still falls back to register when device login is
+  rejected for a real (non-network) reason" test (which used a bare
+  `new Error(...)`, i.e. an unrecognized error type) into "propagates (does not
+  fall back to register) when device login fails with an unrecognized error
+  type" — the old test's premise (unrecognized ⇒ fallback) is exactly what the
+  amendment inverts, so keeping its old assertions would have made the suite
+  contradict the new spec.
+- Renamed/re-commented the existing 401 test to "still falls back to register
+  when device login fails with a 401 (device not registered)" — same assertions,
+  since 401 behaves identically under both the old (`>= 500` threshold, where 401
+  fell below it) and new (`=== 401`) conditions.
+- Left the 5xx-does-not-fall-back test and the offline/NetworkError tests
+  unchanged — still valid, since `HttpError(500, ...)` and `NetworkError` both
+  still fail the new `=== 401` check.
+
+### Verification
+Confirmed all four new/changed tests fail against the branch's committed state
+(commit `d5da206`, i.e. the `status >= 500` version) by stashing only the
+`LoginScreen.tsx` source edit and running `LoginScreen.test.tsx` with the test
+file already updated:
+```
+✕ propagates (does not fall back to register) when device login fails with an unrecognized error type
+✕ makes exactly one network attempt and does not fall back to register when device login fails with a 403
+✕ makes exactly one network attempt and does not fall back to register when device login fails with a 429
+✕ makes exactly one network attempt and does not fall back to register when device login fails with a 400
+Tests: 4 failed, 7 passed, 11 total
+```
+The 7 passing tests included the 401 fallback guard and the 5xx/offline/
+unparseable-body tests, confirming those were unaffected. Restored the source
+edit (`git stash pop`) afterward.
+
+Post-fix, from `apps/mobile`:
+- `npx jest` → 37 suites / **273** tests, all passing (270 + 3 net new: +3 from
+  `it.each([403, 429, 400])`, with the unrecognized-error and 401 tests rewritten
+  in place rather than added).
+- `npx tsc --noEmit` → exit 0, no output.
+- `npx eslint .` → 0 errors, 12 warnings — same baseline list as before (none in
+  touched files).
+
+Did not push and did not open a PR, per instruction.
+
+## Scope amendment (tech lead, 2026-09-12)
+The original scope decision above said "a 4xx still falls through to
+`registerWithDevice()` — that is the only case the fallback was ever meant for."
+**That was wrong**, and the implementation faithfully followed it, so the gap is in the
+instruction rather than the work. Confirmed against the backend source, not inferred:
+
+`authService.LoginMobile` (`services/users/internal/services/auth_service.go:310`) and
+`serviceErrorTable` (`services/users/internal/handlers/errors.go:37`) return:
+
+| Status | Sentinel | Means | Register fallback correct? |
+|---|---|---|---|
+| 401 | `ErrInvalidCredentials` (from `ErrUserNotFound`) | device is not registered | **yes — the only one** |
+| 403 | `ErrHybridAccountDeviceLogin` | an email/password account already exists | no |
+| 429 | `ErrAccountLocked`, plus per-IP auth rate limiting (default 10/min) | locked out / throttled | no — a retry deepens it |
+| 400 | `ErrInvalidInput` | empty `expo_device_id` | no |
+
+`services/users/api/openapi.yaml` documents 400/401/403/413/500 for
+`POST /auth/login/mobile`, matching. So `status >= 500` leaves 400/403/429 still making
+a second doomed round trip — the exact bug class this task exists to kill, and on a
+locked or rate-limited account the retry makes the situation worse.
+
+`doRefreshAccessToken` in this same file already gets this right by enumerating which
+statuses are credential rejections (401/403 there) with a comment naming rate limiting.
+`LoginScreen` should be as precise.
+
+**Amended requirement:** the register fallback runs **only** for
+`error instanceof HttpError && error.status === 401`. Every other error — `NetworkError`,
+any other `HttpError` status, anything unrecognized — propagates to the outer catch so
+the user gets the server's message after exactly one attempt.
+
+Note the inversion: unrecognized error types now propagate rather than triggering a
+register attempt. That is the safer default — an unknown error is not evidence that this
+device needs an account.
+
+Add tests that 403, 429 and 400 each make exactly one network attempt, and keep the 401
+fallback guard.
