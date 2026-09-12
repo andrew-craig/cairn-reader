@@ -53,3 +53,46 @@ if (msg.includes('not authenticated') || msg.includes('session expired') || ...)
 ```
 The substrings `Session expired. Please log in again.` and `Not authenticated` must survive the move into `apps/shared` intact. Rephrase either message and those auth errors silently become **retryable** — the client retries a request that can never succeed instead of prompting re-login. Pin the message-to-retryability contract with a test before refactoring.
 
+
+---
+
+## Status re-assessment (2026-09-12) — the first attempt is orphaned, and the scope has shrunk
+
+### What happened to the first attempt
+
+This task was implemented once and lost to a stacked-PR mishap, 70 seconds wide:
+
+| PR | Head → Base | Merged | Result |
+|---|---|---|---|
+| #364 | `tier4/mobile-fetchwithauth` → **`main`** | 2026-08-30 08:17:39Z | squash-merged as `a482cee` — task_ca2d landed |
+| #365 | `fe-auth/shared-auth` → **`tier4/mobile-fetchwithauth`** | 2026-08-30 08:18:49Z | merged into **tier4**, not main |
+
+PR #365's base was never repointed at `main` after #364 merged, so its merge commit `19ae572` landed on a branch that had already been squash-merged away. GitHub reports #365 as MERGED; its content reached no other ref. `origin/tier4/mobile-fetchwithauth` is now 2 ahead / 39 behind main and exists only to hold that commit.
+
+**Do not rebase or merge that branch.** `apps/mobile/src/services/auth.ts` has drifted 218 lines on main since the merge base, concentrated in exactly the region `19ae572` deletes, and main's offline model is the better one (see below). Redo the work fresh; harvest `19ae572` as a design reference only.
+
+### Superseded — drop from this task's scope
+
+- **task_ca2d** (the sequencing prerequisite noted above) is **closed and on main**. `read.ts` and `explore.ts` now call `AuthService.fetchWithAuth*`; the two private copies are gone. Mobile is already down to one implementation.
+- **The offline-clears-tokens bug, on mobile only**, was fixed independently on main by **task_cab7 (#381)** and refined by **task_f19d (#391)**. Main converts unreachable-server failures to `NetworkError` via `apps/mobile/src/utils/http.ts` `fetchOrNetworkError`, keeps tokens in that case, and (task_f19d) treats a 5xx refresh response as unreachable rather than as a rejection. This supersedes `19ae572`'s `RefreshRejectedError`/`RefreshNetworkError` split — **carry main's `NetworkError` model into the shared module, not the branch's.**
+
+### Split out — no longer this task's job
+
+- **bug_ad04** — web still clears tokens on *any* refresh error (`apps/web/src/services/auth.ts:283`). The mobile fix never crossed over.
+- **bug_8123** — H12, the swallowed second 401, still live on **both** platforms (`apps/mobile/src/services/auth.ts:529`, `apps/web/src/services/auth.ts:342`).
+
+Both are cheap standalone fixes and are deliberately independent of the consolidation. If they land first, this task inherits them; if this task lands first, they apply to the shared copy. Neither blocks the other — just don't fix the same bug twice in two places.
+
+### What remains in scope here
+
+The consolidation itself, and only that. Still true on main as of 2026-09-12:
+
+- `apps/shared/src/services/` **does not exist**; `apps/shared/src/index.ts` exports only `./types`, `./config/api`, `./utils/throttle`.
+- `apps/mobile/src/services/auth.ts` is 621 lines, `apps/web/src/services/auth.ts` is 372 — still two parallel token-refresh state machines.
+
+Reusable from `19ae572` (read it, don't cherry-pick it):
+- `apps/shared/src/services/auth.test.ts` — 250 lines of vitest against an in-memory `StorageAdapter`.
+- `apps/shared/vitest.config.ts`, the `apps/shared` `test`/`type-check` scripts, and the `shared` job added to `.github/workflows/web-checks.yml`.
+- The subclass shape: `class AuthService extends SharedAuthService` on mobile, adding only `getDeviceId`, `loginWithDevice`/`registerWithDevice`, `upgradeAccount`, `fetchWithAuthAndRetry`; web reduced to a re-export.
+
+Unchanged constraints from the original task: preserve the refresh-dedup mutex, the 5-minute proactive-refresh buffer and the single-401 retry as-is, and keep the `Session expired. Please log in again.` / `Not authenticated` strings verbatim (see the hazard section above — `apps/mobile/src/utils/retry.ts:28` still matches on them).

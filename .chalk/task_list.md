@@ -9,6 +9,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **bug_0099** · P2 · in_progress · Mobile/Web: You-page and Sidebar Bookmarks/Votes counts are wrong
 - **chore_6449** · P2 · in_progress · Selfhost image: mobile-only root-lockfile changes bust the web build cache
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
+- **task_f19d** · P2 · in_progress · Mobile: treat a 5xx auth response as unreachable, not as a rejected credential  (parent: feature_90a5)
+- **bug_8123** · P2 · open · H12: a second 401 after a successful token refresh is silently returned to the caller  (parent: epic_fefa)
+- **bug_ad04** · P2 · open · Web: refresh failure clears tokens even when the server was never reached  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
