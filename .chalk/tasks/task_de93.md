@@ -29,8 +29,8 @@ cap `PREFETCH_LIMIT = 100`). Note one article you opened and one you did not.
 - [ ] The offline banner reads "You're offline" and is visible on the loading branch and,
       if you sign out, on LoginScreen too (task_5bd6).
 - [ ] Signed out + offline: LoginScreen shows the offline-specific copy, and the submit
-      buttons are still **enabled** (deliberate — see task_5bd6 item 5). Tapping Get
-      Started makes exactly one failed attempt, not two.
+      buttons are still **enabled** (deliberate — see task_5bd6 item 5). Tapping Explore
+      (the device-login button) makes exactly one failed attempt, not two.
 
 ### B. Offline reading (task_a8a4, task_c55c)
 - [ ] Read list renders last-synced articles; Bookmarks renders favourites.
