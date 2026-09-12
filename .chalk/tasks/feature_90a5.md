@@ -141,9 +141,8 @@ created alongside these.
 ## Review (task_de93, 2026-09-12)
 
 Written from the merged code on `main` and the closed sub-tasks
-(`task_cab7`, `task_a8a4`, `task_c87c`, `task_c55c`, `task_ebf1`, `task_06e5`, `task_5bd6`
-in `.chalk/tasks/closed/`, plus `task_f19d`, whose commit is on `main` — `0a8b813` —
-though the task file itself is still `in_progress`), not from this plan text. Checkboxes
+(`task_cab7`, `task_a8a4`, `task_c87c`, `task_c55c`, `task_ebf1`, `task_06e5`, `task_5bd6`,
+`task_f19d`, all in `.chalk/tasks/closed/`), not from this plan text. Checkboxes
 above are ticked for the phases confirmed shipped; Phase 5 (this task) and Phase 6
 (`task_43fc`, docs) are not done and stay open.
 

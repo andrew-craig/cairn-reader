@@ -2,14 +2,14 @@
 id: task_f19d
 title: Mobile: treat a 5xx auth response as unreachable, not as a rejected credential
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: feature_90a5
 remote_task_url: null
 created_at: 2026-09-12T03:54:54Z
-updated_at: 2026-09-12T04:07:24Z
+updated_at: 2026-09-12T10:45:23Z
 ---
 
 
