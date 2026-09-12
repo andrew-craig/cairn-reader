@@ -14,6 +14,7 @@ The Cairn mobile app is a React Native application built with Expo that provides
 - ⭐ Favorites and archive functionality
 - 🌓 Dark mode support (follows system preference)
 - 💾 Local persistence with SQLite (read-list articles) and AsyncStorage (explore cache, auth)
+- 📡 Offline reading: saved articles readable with no connection; edits queue in a mutation outbox and sync when it returns
 - 🔄 Backend integration with JWT authentication
 
 ## Project Structure
@@ -39,8 +40,10 @@ apps/mobile/
     │   │   ├── CustomTabBar.tsx     # Custom tab bar
     │   │   ├── HeaderPopover.tsx    # Popover menu anchored to a header
     │   │   ├── IconButton.tsx       # Icon-only button
+    │   │   ├── OfflineBanner.tsx    # "You're offline" overlay banner
     │   │   ├── QuickAccessButton.tsx # Icon button used in BottomActionMenu
     │   │   ├── ScreenHeader.tsx     # Shared screen header
+    │   │   ├── SyncTriggerEffect.tsx # Mounts useSyncTrigger() inside the authenticated tree
     │   │   └── TopBlurGradient.tsx  # Top-of-screen blur/gradient overlay
     │   ├── icons/                   # SVG icon components
     │   ├── AddLinkModal.tsx         # Modal for adding URLs
@@ -57,6 +60,10 @@ apps/mobile/
     │   └── index.ts                 # Exports
     ├── contexts/                    # React contexts
     │   └── AuthContext.tsx          # Authentication state
+    ├── hooks/                       # Custom hooks
+    │   ├── useCursorArticleList.ts  # Cursor-paginated list state (Read/Explore/Bookmarks/Votes)
+    │   ├── useNetworkStatus.ts      # Connectivity boolean (expo-network), for the banner + screens
+    │   └── useSyncTrigger.ts        # Fires SyncTrigger.run() on reconnect / app-foreground
     ├── navigation/                  # Navigation setup
     │   ├── RootNavigator.tsx        # Stack navigator (root)
     │   └── TabNavigator.tsx         # Bottom tab navigator
@@ -76,8 +83,12 @@ apps/mobile/
     │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/Feeds/etc.)
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
+    │   ├── db.ts                    # Shared SQLite connection + migration ladder (ArticleStore, Outbox)
     │   ├── articleStore.ts          # Local read-list article store (SQLite)
     │   ├── articlePrefetch.ts       # Background body prefetch for the local store
+    │   ├── articleMutations.ts      # Store-first write facade; queues to Outbox on NetworkError
+    │   ├── outbox.ts                # Offline mutation queue (SQLite), drained on reconnect
+    │   ├── syncTrigger.ts           # Runs Outbox.drain() then ArticlePrefetchService.run()
     │   ├── auth.ts                  # Authentication service
     │   ├── explore.ts               # Explore/recommendations API
     │   ├── read.ts                  # Read service API
@@ -88,6 +99,7 @@ apps/mobile/
     │   ├── navigation.ts            # Navigation param types (client-specific)
     │   └── index.ts                 # Re-exports @cairn/shared types + navigation.ts
     └── utils/                       # Utility functions
+        ├── errors.ts                # NetworkError / HttpError — unreachable vs. a definitive rejection
         ├── helpers.ts               # Helper functions
         ├── retry.ts                 # Retry with exponential backoff for transient failures
         └── index.ts                 # Exports
@@ -134,6 +146,7 @@ The app uses React hooks and Context API for state management:
 
 3. **Local Persistence**:
    - Read-list articles: `ArticleStore` (SQLite via `expo-sqlite`)
+   - Offline mutation queue: `Outbox` (same SQLite database as `ArticleStore`, see `db.ts`)
    - Explore cache, tokens, and user data: AsyncStorage via `StorageService`/`AuthService`
 
 ### Service Layer Pattern
@@ -145,6 +158,9 @@ All backend communication goes through service classes:
 - **StorageService** (`src/services/storage.ts`): Explore cache persistence (AsyncStorage)
 - **ArticleStore** (`src/services/articleStore.ts`): Local read-list article store (SQLite)
 - **ArticlePrefetchService** (`src/services/articlePrefetch.ts`): Background body prefetch into the local store
+- **Outbox** (`src/services/outbox.ts`): Offline mutation queue, drained on reconnect
+- **ArticleMutations** (`src/services/articleMutations.ts`): Store-first write facade used by the reading screens
+- **SyncTrigger** (`src/services/syncTrigger.ts`): Runs the outbox drain, then the prefetch pass
 
 **Key Patterns:**
 - Services are static classes (no instantiation needed)
@@ -204,6 +220,7 @@ interface ButtonProps {
 - Displays user's saved articles
 - Search functionality
 - Integrates with Read service
+- Store-first render (`ArticleStore.listRecent`), with a "Showing cached data" banner if the background refetch then fails rather than an alert; every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`
 
 **ReadArticleDetailScreen.tsx** - Full article view
 - Displays article content via `ArticleContent` (`react-native-render-html`)
@@ -211,6 +228,7 @@ interface ButtonProps {
 - Mark as read/unread
 - Favorite/unfavorite actions
 - Archive functionality
+- Offline-first: resolves the article by id from `ArticleStore` (not just route params), skips the network fetch when the stored body's `contentHash` already matches, and shows a "Not available offline" state when offline with nothing cached
 
 **LoginScreen.tsx** - Authentication
 - Device ID login (automatic on first launch)
@@ -327,8 +345,9 @@ an unchanged body is never re-downloaded. It is a read-through cache for the
 initial render of `ReadScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`,
 not a paginated query engine — `useCursorArticleList` still drives pagination
 against the network. Sync is upsert-only; rows are only removed via the
-explicit archive path or `clear()` (called on logout). Explore articles are
-never written here. Schema changes since the original table apply via a
+explicit archive path or `clear()` (called on logout, which also empties
+`Outbox` — a queued write must never replay against a different account).
+Explore articles are never written here. Schema changes since the original table apply via a
 `PRAGMA user_version`-driven migration inside `getDb()` — see the migration
 comment in the source before widening the table further.
 
@@ -360,6 +379,87 @@ screen directly; no other screen calls it.
 ```typescript
 ArticlePrefetchService.run(): Promise<void>
 ```
+
+### Outbox (`src/services/outbox.ts`)
+SQLite-backed mutation queue (the `outbox` table added by `db.ts`'s
+migration, in the same database as `ArticleStore`), keyed on
+`(article_id, field)` so a repeated write to the same field coalesces into
+one row instead of piling up. `field` is one of `status` | `is_favorite` |
+`scroll_position` | `delete` — the server's PATCH field names, plus
+`delete` for an offline archive. Enqueuing a `delete` first clears any
+other pending row for that article, since a PATCH replayed against a
+since-deleted article is a guaranteed 404. `drain()` replays rows in
+`created_at` order (ties broken by `rowid`) and stops at the first row that
+cannot yet succeed, so a later write can never reach the server ahead of an
+earlier one still pending:
+- 2xx, or a 404 on a replayed `delete` → row removed (counts as success)
+- a definitive 4xx other than 401 → row dropped and logged (retrying can
+  only fail the same way)
+- `NetworkError`, 401, or 5xx → row kept, `attempts` incremented
+  (bookkeeping only — no backoff or drop-after-N in v1), rest of the batch
+  left queued for the next drain
+
+**Methods:**
+```typescript
+Outbox.enqueue(articleId: string, field: OutboxField, payload: Record<string, unknown>): Promise<void>
+Outbox.drain(): Promise<void>
+```
+
+### ArticleMutations (`src/services/articleMutations.ts`)
+Facade the reading screens call for status/favorite/scroll/archive edits:
+writes the local store first, then attempts the backend call, and queues
+the write in `Outbox` only on a `NetworkError` — a definitive rejection
+(4xx, an auth failure) still rethrows to the caller. Add-URL and Explore are
+untouched; they stay online-only.
+
+**Methods:**
+```typescript
+ArticleMutations.markCompleted(articleId: string, readAt: number): Promise<void>
+ArticleMutations.markReading(articleId: string): Promise<void>
+ArticleMutations.saveScrollPosition(articleId: string, fraction: number): Promise<void>
+ArticleMutations.setFavorite(articleId: string, isFavorite: boolean): Promise<void>
+ArticleMutations.archive(articleId: string): Promise<void>
+```
+
+### SyncTrigger (`src/services/syncTrigger.ts`)
+Runs `Outbox.drain()` then `ArticlePrefetchService.run()`, in that fixed
+order, isolating each consumer's rejection from the next so one failing
+doesn't stop the other from running. Single-flight, like
+`ArticlePrefetchService`. Fired by `useSyncTrigger` (below) on a transition
+from offline to online or from background to foreground, and by
+`ReadScreen` after every list sync — including pull-to-refresh — so the
+outbox gets a drain on every path, not only reconnect/foreground.
+
+**Methods:**
+```typescript
+SyncTrigger.run(): Promise<void>
+```
+
+### Connectivity (`src/hooks/useNetworkStatus.ts`, `src/utils/network.ts`)
+`useNetworkStatus()` wraps `expo-network`'s `useNetworkState()` into a
+single `{ isOffline }` boolean for components; `isOffline()` in
+`utils/network.ts` is the equivalent one-off check for non-React service
+code (e.g. `ArticlePrefetchService`). Both treat an unknown/undetermined
+network state as online — only an explicit `isConnected: false` counts as
+offline, so the UI is never blocked on an unreliable signal.
+`OfflineBanner` (`src/components/common/OfflineBanner.tsx`) renders a
+"You're offline" overlay from this hook and is mounted in
+`RootNavigator`'s loading, logged-out, and authenticated states alike.
+
+### Sync trigger hook (`src/hooks/useSyncTrigger.ts`)
+Calls `SyncTrigger.run()` on a *transition* to the foreground (`AppState`)
+and on a *transition* from offline to online — never merely because the app
+is currently active or online. Mounted once via `SyncTriggerEffect`
+(`src/components/common/SyncTriggerEffect.tsx`), rendered only inside
+`RootNavigator`'s authenticated tree so the trigger never runs logged out.
+
+### Errors (`src/utils/errors.ts`)
+`NetworkError` (server unreachable: network failure, timeout, or an
+unparseable body) and `HttpError` (a definitive non-2xx response, carrying
+`status`) are distinct classes so callers can tell "couldn't reach the
+server" apart from "server said no" without parsing message text.
+`ArticleMutations`, `Outbox.drain()`, and `ArticlePrefetchService` all key
+off this distinction.
 
 ### AuthService (`src/services/auth.ts`)
 Authentication and token management.
