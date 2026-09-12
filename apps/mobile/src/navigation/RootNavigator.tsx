@@ -18,14 +18,22 @@ export default function RootNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+        <OfflineBanner />
+      </>
     );
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen onLoginSuccess={login} />;
+    return (
+      <>
+        <LoginScreen onLoginSuccess={login} />
+        <OfflineBanner />
+      </>
+    );
   }
 
   return (

@@ -8,7 +8,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_e848** · P1 · open · [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)  (parent: epic_fefa)
 - **chore_6449** · P2 · in_progress · Selfhost image: mobile-only root-lockfile changes bust the web build cache
 - **task_2315** · P2 · in_progress · "Fix: prod Vault init never provisions content-service AppRole"  (parent: epic_fefa)
-- **task_ebf1** · P2 · in_progress · Mobile: offline mutation outbox and reconnect sync  (parent: feature_90a5)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -28,8 +27,10 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_f19d** · P2 · open · Mobile: treat a 5xx auth response as unreachable, not as a rejected credential  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
+- **task_5bd6** · P3 · in_progress · Mobile: offline-aware login and loading states  (parent: feature_90a5)
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
@@ -51,7 +52,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
-- **task_5bd6** · P3 · open · Mobile: offline-aware login and loading states  (parent: feature_90a5)
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)

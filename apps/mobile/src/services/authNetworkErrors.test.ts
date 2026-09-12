@@ -16,6 +16,18 @@ jest.mock('expo-application', () => ({
 
 const OFFLINE = () => jest.fn().mockRejectedValue(new TypeError('Network request failed')) as unknown as typeof fetch;
 
+// A captive-portal WiFi network responds 200 with an HTML login page instead
+// of the expected JSON body. This must surface as NetworkError too — not a
+// plain Error — so callers that branch on `instanceof NetworkError` (e.g.
+// LoginScreen's login-then-register fallback) don't mistake it for a
+// definitive rejection.
+const UNPARSEABLE_BODY = () =>
+  jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve('<html><body>Please log in to the WiFi network</body></html>'),
+  }) as unknown as typeof fetch;
+
 describe('AuthService network-error wrapping', () => {
   beforeEach(() => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -35,6 +47,11 @@ describe('AuthService network-error wrapping', () => {
   it('registerWithDevice rejects with NetworkError when the server is unreachable', async () => {
     global.fetch = OFFLINE();
     await expect(AuthService.registerWithDevice()).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it('loginWithDevice rejects with NetworkError, not a plain Error, when the response body is unparseable', async () => {
+    global.fetch = UNPARSEABLE_BODY();
+    await expect(AuthService.loginWithDevice()).rejects.toBeInstanceOf(NetworkError);
   });
 
   it('loginWithEmail rejects with NetworkError when the server is unreachable', async () => {

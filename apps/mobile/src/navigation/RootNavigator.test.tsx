@@ -102,4 +102,58 @@ describe('RootNavigator offline banner', () => {
     expect(screen.getByText('LoginScreen')).toBeTruthy();
     expect(useSyncTrigger).not.toHaveBeenCalled();
   });
+
+  // task_5bd6: RootNavigator's isLoading and !isAuthenticated early returns
+  // never rendered OfflineBanner, so a login attempt (or the loading spinner
+  // itself) gave no connectivity indication. SyncTriggerEffect must stay out
+  // of both — its doc comment is explicit that living inside the
+  // authenticated tree only is what keeps the sync trigger from running
+  // logged out.
+  it('shows the offline banner on the loading branch, without mounting the sync trigger', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isAuthenticated: false,
+      isLoading: true,
+      login: jest.fn(),
+    });
+    (useNetworkStatus as jest.Mock).mockReturnValue({ isOffline: true });
+    render(<RootNavigator />);
+
+    expect(screen.getByText(/offline/i)).toBeTruthy();
+    expect(screen.queryByText('LoginScreen')).toBeNull();
+    expect(screen.queryByText('MainTabsScreen')).toBeNull();
+    expect(useSyncTrigger).not.toHaveBeenCalled();
+  });
+
+  it('shows the offline banner on the login branch, without mounting the sync trigger', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isAuthenticated: false,
+      isLoading: false,
+      login: jest.fn(),
+    });
+    (useNetworkStatus as jest.Mock).mockReturnValue({ isOffline: true });
+    render(<RootNavigator />);
+
+    expect(screen.getByText(/offline/i)).toBeTruthy();
+    expect(screen.getByText('LoginScreen')).toBeTruthy();
+    expect(useSyncTrigger).not.toHaveBeenCalled();
+  });
+
+  // task_cab7 (see LEARNINGS.md, 2026-09-06) made a cold start offline with
+  // valid persisted tokens keep the user signed in — AuthContext resolves
+  // isAuthenticated: true despite isOffline: true. RootNavigator must route
+  // that state to the authenticated tree, never to LoginScreen. AuthContext's
+  // own resolution of that state is covered separately in
+  // AuthContext.test.tsx; this asserts RootNavigator's side of the contract.
+  it('cold start offline with valid tokens renders the authenticated tree, not LoginScreen', () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      login: jest.fn(),
+    });
+    (useNetworkStatus as jest.Mock).mockReturnValue({ isOffline: true });
+    render(<RootNavigator />);
+
+    expect(screen.getByText('MainTabsScreen')).toBeTruthy();
+    expect(screen.queryByText('LoginScreen')).toBeNull();
+  });
 });

@@ -18,6 +18,8 @@ import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constan
 import { AuthService } from '../services';
 import { getServerUrl, setServerUrl } from '@cairn/shared';
 import { DEFAULT_SERVER_URL } from '../config/storage';
+import { NetworkError } from '../utils/errors';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 const LOGIN_FONT_SIZE_TITLE = 56;
 const LOGIN_FONT_SIZE_SUBTITLE = 26;
@@ -34,6 +36,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  const { isOffline } = useNetworkStatus();
 
   const [showEmailLogin, setShowEmailLogin] = useState(false);
   const [email, setEmail] = useState('');
@@ -58,8 +61,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       try {
         await AuthService.loginWithDevice();
         onLoginSuccess();
-      } catch {
-        // If login fails, try to register
+      } catch (error) {
+        if (error instanceof NetworkError) {
+          // Server unreachable, not a rejected login — a second doomed round
+          // trip to register would just make the user wait through two
+          // timeouts. Let it propagate to the outer catch's alert.
+          throw error;
+        }
+        // Login was rejected for a real reason; try to register instead.
         await AuthService.registerWithDevice();
         onLoginSuccess();
       }
@@ -160,6 +169,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Read and discover{'\n'}what you love
             </Text>
+            {isOffline && (
+              <Text style={[styles.offlineNotice, { color: colors.warning }]}>
+                You&rsquo;re offline. Signing in needs a connection.
+              </Text>
+            )}
           </View>
 
           {!showEmailLogin ? (
@@ -333,6 +347,11 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.heading,
     textAlign: 'center',
     lineHeight: 32,
+  },
+  offlineNotice: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.defaultMedium,
+    textAlign: 'center',
   },
   buttonContainer: {
     gap: LOGIN_GAP_BUTTONS,
