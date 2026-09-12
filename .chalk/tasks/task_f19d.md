@@ -97,6 +97,43 @@ the false "5xx response" clause) rather than satisfied.
   stays 0 errors / 12 warnings. Run jest directly, not `npm test` — the npm workspace
   wrapper reports a spurious non-zero exit.
 
+## Scope amendment (tech lead, 2026-09-12)
+The original scope decision above said "a 4xx still falls through to
+`registerWithDevice()` — that is the only case the fallback was ever meant for."
+**That was wrong**, and the implementation faithfully followed it, so the gap is in the
+instruction rather than the work. Confirmed against the backend source, not inferred:
+
+`authService.LoginMobile` (`services/users/internal/services/auth_service.go:310`) and
+`serviceErrorTable` (`services/users/internal/handlers/errors.go:37`) return:
+
+| Status | Sentinel | Means | Register fallback correct? |
+|---|---|---|---|
+| 401 | `ErrInvalidCredentials` (from `ErrUserNotFound`) | device is not registered | **yes — the only one** |
+| 403 | `ErrHybridAccountDeviceLogin` | an email/password account already exists | no |
+| 429 | `ErrAccountLocked`, plus per-IP auth rate limiting (default 10/min) | locked out / throttled | no — a retry deepens it |
+| 400 | `ErrInvalidInput` | empty `expo_device_id` | no |
+
+`services/users/api/openapi.yaml` documents 400/401/403/413/500 for
+`POST /auth/login/mobile`, matching. So `status >= 500` leaves 400/403/429 still making
+a second doomed round trip — the exact bug class this task exists to kill, and on a
+locked or rate-limited account the retry makes the situation worse.
+
+`doRefreshAccessToken` in this same file already gets this right by enumerating which
+statuses are credential rejections (401/403 there) with a comment naming rate limiting.
+`LoginScreen` should be as precise.
+
+**Amended requirement:** the register fallback runs **only** for
+`error instanceof HttpError && error.status === 401`. Every other error — `NetworkError`,
+any other `HttpError` status, anything unrecognized — propagates to the outer catch so
+the user gets the server's message after exactly one attempt.
+
+Note the inversion: unrecognized error types now propagate rather than triggering a
+register attempt. That is the safer default — an unknown error is not evidence that this
+device needs an account.
+
+Add tests that 403, 429 and 400 each make exactly one network attempt, and keep the 401
+fallback guard.
+
 ## Review (implementer, 2026-09-12)
 
 Implemented exactly what the scope decision specifies, nothing more.
@@ -253,40 +290,3 @@ Post-fix, from `apps/mobile`:
   touched files).
 
 Did not push and did not open a PR, per instruction.
-
-## Scope amendment (tech lead, 2026-09-12)
-The original scope decision above said "a 4xx still falls through to
-`registerWithDevice()` — that is the only case the fallback was ever meant for."
-**That was wrong**, and the implementation faithfully followed it, so the gap is in the
-instruction rather than the work. Confirmed against the backend source, not inferred:
-
-`authService.LoginMobile` (`services/users/internal/services/auth_service.go:310`) and
-`serviceErrorTable` (`services/users/internal/handlers/errors.go:37`) return:
-
-| Status | Sentinel | Means | Register fallback correct? |
-|---|---|---|---|
-| 401 | `ErrInvalidCredentials` (from `ErrUserNotFound`) | device is not registered | **yes — the only one** |
-| 403 | `ErrHybridAccountDeviceLogin` | an email/password account already exists | no |
-| 429 | `ErrAccountLocked`, plus per-IP auth rate limiting (default 10/min) | locked out / throttled | no — a retry deepens it |
-| 400 | `ErrInvalidInput` | empty `expo_device_id` | no |
-
-`services/users/api/openapi.yaml` documents 400/401/403/413/500 for
-`POST /auth/login/mobile`, matching. So `status >= 500` leaves 400/403/429 still making
-a second doomed round trip — the exact bug class this task exists to kill, and on a
-locked or rate-limited account the retry makes the situation worse.
-
-`doRefreshAccessToken` in this same file already gets this right by enumerating which
-statuses are credential rejections (401/403 there) with a comment naming rate limiting.
-`LoginScreen` should be as precise.
-
-**Amended requirement:** the register fallback runs **only** for
-`error instanceof HttpError && error.status === 401`. Every other error — `NetworkError`,
-any other `HttpError` status, anything unrecognized — propagates to the outer catch so
-the user gets the server's message after exactly one attempt.
-
-Note the inversion: unrecognized error types now propagate rather than triggering a
-register attempt. That is the safer default — an unknown error is not evidence that this
-device needs an account.
-
-Add tests that 403, 429 and 400 each make exactly one network attempt, and keep the 401
-fallback guard.
