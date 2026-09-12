@@ -25,9 +25,10 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
+- **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever  (parent: feature_90a5)
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
+- **task_c894** · P2 · open · Mobile: a live 5xx on a mutation is dropped, but the same 5xx on an outbox replay is retried  (parent: feature_90a5)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
-- **task_f19d** · P2 · open · Mobile: treat a 5xx auth response as unreachable, not as a rejected credential  (parent: feature_90a5)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **decision_4052** · P3 · open · Decide to offer hosted service

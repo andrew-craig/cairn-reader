@@ -2,6 +2,53 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-12 — The canonical error type ends the bug class only where it's actually consumed (task_5bd6, task_f19d)
+
+**Correction:** The 2026-09-07 entry below tallied four windows where an unwrapped
+fetch rejection could clear valid tokens or log a user out, and named chore_1089's
+lint rule (fail CI on a raw `fetch`) the fix — "not more review." That closed the
+*construction* side: every fetch in `auth.ts` now produces a well-typed
+`NetworkError`/`HttpError`. Two more instances turned up anyway, both on the
+*consumption* side of those same types.
+
+`task_5bd6`: `LoginScreen.handleGetStarted` wraps `AuthService.loginWithDevice()` in
+a bare `catch {}` that falls through to `registerWithDevice()` — correct for "this
+device isn't registered yet," wrong for "I couldn't reach the server." Offline, the
+first call already threw a well-formed `NetworkError` (chore_1089 had wrapped
+`loginWithDevice` itself), but the bare catch swallowed it and made a second,
+equally doomed request before alerting.
+
+`task_f19d`: the same four auth entry points threw a plain `Error` on any
+`!response.ok`, so a 5xx was indistinguishable *by type* from the one status — 401 —
+that actually means "register this device." The first scope decision picked
+`status >= 500` as the "unreachable-ish" threshold; a follow-up pass against the
+backend source (`auth_service.go`, `errors.go`) found that was still wrong; 403
+(hybrid account conflict) and 429 (rate limit / lockout) are not credential
+rejections either, and a round-number threshold was never going to match the
+backend's actual contract. The fix that stuck came from enumerating exactly which
+statuses `LoginMobile` returns and what each means — the same way
+`doRefreshAccessToken` already handles 401/403 for the refresh endpoint, in the
+same file.
+
+**Why it happened:** `NetworkError`/`HttpError` existing, and being thrown
+correctly, is necessary but not sufficient. Every site that *branches* on the
+result — a register fallback, a retry, a user-facing message — carries its own
+separate assumption about which outcomes mean what, and fixing the type at the
+throw site does not automatically correct that assumption at the catch site. Six
+instances now, across two different bugs (a swallowed error, and an error typed but
+misclassified by threshold), and the last two both happened in code that already
+had the right error type available to it.
+
+**How to apply:** Fixing where an error is *thrown* does not fix where it is
+*handled*. After introducing or correcting a status-carrying error type,
+separately audit every `catch` that branches on the outcome — not "does it
+compile against the new type" but "does this fallback/retry only fire for the
+outcome it was actually designed for." And when that branch is a status-code
+threshold, don't estimate one that sounds right (`>= 500`, "surely not a client
+problem") — read the actual handler on the other end of the call and enumerate the
+statuses it can return, the way this same file's `doRefreshAccessToken` already
+modeled for this exact endpoint family.
+
 ## 2026-09-11 — A swallowed error and a surfaced error are not interchangeable (task_ebf1)
 
 Scope item 4 said to remove the `.catch(console.error)` swallowing at the six
