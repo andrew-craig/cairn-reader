@@ -10,6 +10,7 @@ import {
   UpdateUserContentRequest,
   SearchParams,
   ListContentsParams,
+  CountContentsParams,
   DetectURLResponse,
   DiscoverFeedResponse,
   AddURLRequest,
@@ -70,6 +71,44 @@ export class ReadService {
       };
     } catch (error) {
       console.error('Error listing user contents:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Count user's content matching optional status/favorite filters, without
+   * paging through results. Use for summary displays (e.g. a bookmarks count) —
+   * listUserContents' pagination never returns a total.
+   */
+  static async countUserContents(params?: CountContentsParams): Promise<number> {
+    try {
+      const userId = await AuthService.getUserId();
+
+      if (!userId) {
+        throw new Error('Not authenticated');
+      }
+
+      const queryParams = new URLSearchParams();
+      if (params?.status) queryParams.append('status', params.status);
+      if (params?.is_favorite !== undefined) {
+        queryParams.append('is_favorite', params.is_favorite.toString());
+      }
+
+      const url = `${getServerUrl()}/api/v1/content/user/${userId}/count${
+        queryParams.toString() ? `?${queryParams.toString()}` : ''
+      }`;
+
+      const response = await AuthService.fetchWithAuthAndRetry(url);
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || result.error || 'Failed to count user contents');
+      }
+
+      return result.data.count as number;
+    } catch (error) {
+      console.error('Error counting user contents:', error);
       throw error;
     }
   }

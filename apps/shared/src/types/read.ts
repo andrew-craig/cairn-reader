@@ -144,6 +144,10 @@ export interface ListContentsParams {
   cursor?: string;
 }
 
+// Params for the count-only endpoint (GET .../count) — no pagination fields,
+// since it returns a single number rather than a page of results.
+export type CountContentsParams = Pick<ListContentsParams, 'status' | 'is_favorite'>;
+
 // Feed Subscription Types (Legacy - kept for backward compatibility)
 interface FeedSubscriptionResponse {
   subscription_id: string;

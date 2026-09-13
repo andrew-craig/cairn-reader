@@ -200,6 +200,64 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 	}, "v1")
 }
 
+// CountUserContents handles GET /api/v1/content/user/:user_id/count
+// Returns a count of the user's content matching the optional status/is_favorite filters,
+// for summary displays (e.g. a bookmarks count) that don't need the actual paginated rows.
+func (h *UserContentHandler) CountUserContents(w http.ResponseWriter, r *http.Request) {
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only access their own content", nil, "v1")
+		return
+	}
+
+	var status *string
+	var isFavorite *bool
+
+	if statusStr := r.URL.Query().Get("status"); statusStr != "" {
+		if !middleware.ValidateStatus(statusStr) {
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid status. Must be 'unread', 'reading', 'completed', or 'archived'", nil, "v1")
+			return
+		}
+		status = &statusStr
+	}
+
+	if isFavStr := r.URL.Query().Get("is_favorite"); isFavStr != "" {
+		switch isFavStr {
+		case "true":
+			fav := true
+			isFavorite = &fav
+		case "false":
+			fav := false
+			isFavorite = &fav
+		default:
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid is_favorite. Must be 'true' or 'false'", nil, "v1")
+			return
+		}
+	}
+
+	count, err := h.userContentRepo.CountByUser(r.Context(), userID, status, isFavorite)
+	if err != nil {
+		slog.Error("failed to count user contents", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to count user contents", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]interface{}{"count": count}, "v1")
+}
+
 // GetUserContent handles GET /api/v1/content/user/:user_id/:content_id
 // Returns the full content detail including cleaned_html.
 func (h *UserContentHandler) GetUserContent(w http.ResponseWriter, r *http.Request) {

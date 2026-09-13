@@ -29,6 +29,10 @@ type UserContentRepository interface {
 	// Callers should request limit+1 rows to determine whether a next page exists.
 	ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
+	// CountByUser returns the count of a user's content matching the optional status/favorite filters.
+	// A single COUNT(*) query — not for use on the hot cursor-pagination path, only for summary counts.
+	CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error)
+
 	// Update updates an existing user-content record
 	Update(ctx context.Context, userContent *models.UserContent) error
 
@@ -265,6 +269,32 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 	}
 
 	return userContents, nil
+}
+
+// CountByUser returns the count of a user's content matching the optional status/favorite filters.
+func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error) {
+	query := `SELECT COUNT(*) FROM user_contents WHERE user_id = $1`
+
+	args := []interface{}{userID}
+	argPos := 2
+
+	if status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argPos)
+		args = append(args, *status)
+		argPos++
+	}
+
+	if isFavorite != nil {
+		query += fmt.Sprintf(" AND is_favorite = $%d", argPos)
+		args = append(args, *isFavorite)
+	}
+
+	var count int
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count user contents: %w", err)
+	}
+
+	return count, nil
 }
 
 // Update updates an existing user-content record

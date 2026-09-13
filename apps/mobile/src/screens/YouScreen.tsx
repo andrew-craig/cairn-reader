@@ -100,7 +100,7 @@ export const YouScreen: React.FC = () => {
         const [voteResult, subscriptionsResult, bookmarksResult] = await Promise.allSettled([
           ExploreService.getUserVoteStats(),
           ReadService.listAllSubscriptions(),
-          ReadService.listUserContents({ limit: 1 }),
+          ReadService.countUserContents({ is_favorite: true }),
         ]);
 
         // Show the first error encountered so the user knows something failed.
@@ -124,7 +124,7 @@ export const YouScreen: React.FC = () => {
         }
 
         if (bookmarksResult.status === 'fulfilled') {
-          setBookmarksCount(bookmarksResult.value.total_count);
+          setBookmarksCount(bookmarksResult.value);
         } else {
           console.error('Error fetching bookmarks:', bookmarksResult.reason);
           if (!errorMsg) errorMsg = 'Failed to load bookmark data';

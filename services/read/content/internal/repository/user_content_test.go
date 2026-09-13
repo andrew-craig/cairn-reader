@@ -458,3 +458,44 @@ func TestUserContentRepository_DeleteWithTx_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestUserContentRepository_CountByUser_NoFilters(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	ctx := context.Background()
+
+	userID := uuid.New()
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1`).
+		WithArgs(userID).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
+
+	count, err := repo.CountByUser(ctx, userID, nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, 5, count)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserContentRepository_CountByUser_WithFavoriteFilter(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	ctx := context.Background()
+
+	userID := uuid.New()
+	isFavorite := true
+
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND is_favorite = \$2`).
+		WithArgs(userID, isFavorite).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+
+	count, err := repo.CountByUser(ctx, userID, nil, &isFavorite)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, count)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

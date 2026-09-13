@@ -797,6 +797,77 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/user/{user_id}/count:
+    get:
+      tags:
+        - User Contents
+      summary: Count user's contents
+      description: |
+        Return the count of a user's content matching the optional status/is_favorite
+        filters, via a single COUNT(*) query. For summary displays (e.g. a bookmarks
+        count) that need an exact total without paging through the full list — the
+        cursor-paginated list endpoint above does not return a total.
+      operationId: countUserContents
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [unread, reading, completed, archived]
+          description: Filter by reading status
+        - name: is_favorite
+          in: query
+          schema:
+            type: boolean
+          description: Filter by favorite status
+      responses:
+        '200':
+          description: Count retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        example: 3
+        '400':
+          description: Bad request - invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}/{content_id}:
     patch:
       tags:

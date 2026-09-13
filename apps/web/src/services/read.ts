@@ -10,6 +10,7 @@ import {
   type DetectURLResponse,
   type DiscoverFeedResponse,
   type ListContentsParams,
+  type CountContentsParams,
   type SearchParams,
   type UpdateUserContentRequest,
   type UserContentResponse,
@@ -123,6 +124,37 @@ export class ReadService {
       cursor: pagination.cursor || '',
       has_more: pagination.has_more === true,
     };
+  }
+
+  /**
+   * Count the current user's content matching optional status/favorite filters,
+   * without paging through results. Mirrors mobile's countUserContents — use for
+   * summary displays (e.g. the sidebar's bookmarks count); listUserContents'
+   * pagination never returns a total.
+   */
+  static async countUserContents(params?: CountContentsParams): Promise<number> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.is_favorite !== undefined) {
+      queryParams.append('is_favorite', params.is_favorite.toString());
+    }
+
+    const query = queryParams.toString();
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/count${query ? `?${query}` : ''}`;
+
+    const response = await AuthService.fetchWithAuth(url);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to count user contents');
+    }
+
+    return result.data.count as number;
   }
 
   /** Search the current user's saved content. Mirrors mobile's searchUserContents. */
