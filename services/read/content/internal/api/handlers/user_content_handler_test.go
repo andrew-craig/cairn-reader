@@ -463,6 +463,31 @@ func TestCountUserContents_InvalidUserID(t *testing.T) {
 	assert.Equal(t, "bad_request", response["error"])
 }
 
+// TestCountUserContents_InvalidFavorite tests handling of an invalid is_favorite value
+func TestCountUserContents_InvalidFavorite(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+
+	userID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/count?is_favorite=maybe", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+
+	handler.CountUserContents(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	var response map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&response)
+	assert.Equal(t, "validation_error", response["error"])
+	mockUserContentRepo.AssertNotCalled(t, "CountByUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 // TestCountUserContents_Forbidden tests that a user cannot count another user's content
 func TestCountUserContents_Forbidden(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)

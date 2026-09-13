@@ -242,6 +242,9 @@ func (h *UserContentHandler) CountUserContents(w http.ResponseWriter, r *http.Re
 		case "false":
 			fav := false
 			isFavorite = &fav
+		default:
+			api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid is_favorite. Must be 'true' or 'false'", nil, "v1")
+			return
 		}
 	}
 

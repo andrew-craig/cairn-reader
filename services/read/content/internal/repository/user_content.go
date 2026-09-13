@@ -287,7 +287,6 @@ func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUI
 	if isFavorite != nil {
 		query += fmt.Sprintf(" AND is_favorite = $%d", argPos)
 		args = append(args, *isFavorite)
-		argPos++
 	}
 
 	var count int
