@@ -107,6 +107,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 
 			r.Get("/", userContentHandler.ListUserContents)
 			r.Post("/", userContentHandler.AddContentToUser)
+			r.Get("/count", userContentHandler.CountUserContents)
 			r.Get("/search", userContentHandler.SearchUserContents)
 			r.Get("/{content_id}", userContentHandler.GetUserContent)
 			r.Patch("/{content_id}", userContentHandler.UpdateUserContent)

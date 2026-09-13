@@ -118,6 +118,10 @@ func (m *mockUserContentRepo) SearchWithCursor(ctx context.Context, userID uuid.
 	return nil, nil
 }
 
+func (m *mockUserContentRepo) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error) {
+	return 0, nil
+}
+
 func (m *mockUserContentRepo) BulkCreate(ctx context.Context, userContents []*models.UserContent) error {
 	return nil
 }

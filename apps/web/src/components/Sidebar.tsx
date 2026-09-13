@@ -104,7 +104,7 @@ export default function Sidebar() {
     const [voteResult, subscriptionsResult, bookmarksResult] = await Promise.allSettled([
       ExploreService.getUserVoteStats(),
       ReadService.listAllSubscriptions(),
-      ReadService.listUserContents({ limit: 1 }),
+      ReadService.countUserContents({ is_favorite: true }),
     ]);
 
     setCounts((prev) => {
@@ -122,7 +122,7 @@ export default function Sidebar() {
         console.error('Error fetching subscriptions:', subscriptionsResult.reason);
       }
       if (bookmarksResult.status === 'fulfilled') {
-        next.bookmarks = bookmarksResult.value.total_count;
+        next.bookmarks = bookmarksResult.value;
       } else {
         console.error('Error fetching bookmarks:', bookmarksResult.reason);
       }
