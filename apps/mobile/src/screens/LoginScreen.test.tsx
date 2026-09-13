@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { LoginScreen } from './LoginScreen';
 import { AuthService } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { NetworkError, HttpError } from '../utils/errors';
+import { NetworkError, HttpError } from '@cairn/shared';
 import { LoginResponse } from '../types';
 
 // task_5bd6: offline-aware login. handleGetStarted's bare `catch {}` used to
@@ -30,7 +30,11 @@ jest.mock('expo-application', () => ({
   getAndroidId: jest.fn().mockReturnValue('test-device-id'),
 }));
 
+// Only the server-URL accessors are stubbed; the rest of @cairn/shared is real,
+// since the error classes this file constructs now live there too (task_47c1)
+// and a wholesale stub would leave them undefined.
 jest.mock('@cairn/shared', () => ({
+  ...jest.requireActual('@cairn/shared'),
   getServerUrl: jest.fn(() => 'https://api.test'),
   setServerUrl: jest.fn(),
 }));

@@ -237,3 +237,47 @@ terminates.
 against the old code, and re-running that proof myself, is what would have exposed
 this had I missed it a second time — the AuthContext test fails on the old code for
 a different reason than the service tests do.
+
+---
+
+## A stacked PR whose base is never repointed merges into nothing (task_47c1, 2026-09-13)
+
+**What happened:** task_47c1 was implemented once, in PR #365, and lost. #365 was
+stacked on #364 with `base: tier4/mobile-fetchwithauth` and a note saying "base will
+move to `main` once #364 merges". #364 squash-merged into `main` at 08:17:39, which
+deleted the branch's history from main's perspective; #365 merged 70 seconds later
+into `tier4/mobile-fetchwithauth` — a branch that no longer led anywhere. GitHub
+reports #365 as MERGED. Its content reached no other ref, and the work sat orphaned
+for two weeks while main independently re-fixed part of it.
+
+**Why it happened:** "merged" was read as "landed". For a stacked PR those are
+different claims, and the difference is invisible in the PR list — the merge badge
+looks identical whether the base was `main` or a branch that has since been squashed
+away.
+
+**How to apply:** For any stacked PR, verify the *base* at merge time, not just the
+merge badge: `git merge-base --is-ancestor <merge-sha> origin/main` is the only
+question that matters. When the parent PR squash-merges, the child's base branch
+ceases to exist meaningfully — repoint the child to `main` before merging it, or
+expect to lose it. When picking up an old branch, check ancestry before trusting
+either the PR state or the branch name.
+
+**Corollary that cost real work here:** by the time the orphan was found, main had
+fixed the mobile half of the same bug with a better model (`NetworkError` +
+`fetchOrNetworkError`, task_cab7/task_f19d) than the orphan's own
+`RefreshRejectedError`/`RefreshNetworkError`. Rebasing the orphan would have
+regressed main. An orphaned branch's *design* can be worth harvesting long after its
+*diff* has become a liability — read it, don't rebase it.
+
+## Committing from a working tree another session is also editing
+
+**What happened:** partway through task_47c1 a `git diff HEAD` showed 41 lines of a
+`countUserContents` method, a Go handler, an openapi block and a new shared type that
+I had not written. A concurrent interactive session was working in the same checkout.
+
+**How to apply:** `git status` at the start of a task is a snapshot, not a lease. When
+a diff contains something you cannot account for, stop and find out who wrote it
+before staging anything — do not assume it is yours or stale. Stage explicit paths,
+never `git add -A`. For a file holding both your change and theirs, rebuild it from
+`HEAD`, re-apply only your edit, `git add` it, then restore their version to the
+working tree so their work survives as an unstaged change.

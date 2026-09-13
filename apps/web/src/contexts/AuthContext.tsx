@@ -5,8 +5,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react';
-import { type User, loadServerUrl } from '@cairn/shared';
-import { AuthService } from '../services/auth';
+import { AuthService, type User, loadServerUrl } from '@cairn/shared';
 
 // Same shape as the mobile AuthContext (web_app_requirements.md §Auth state):
 // user, isAuthenticated, isLoading, login, logout, plus the "clear tokens →

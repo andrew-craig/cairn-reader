@@ -8,7 +8,7 @@
  * Does NOT retry on 4xx client errors.
  */
 
-import { NetworkError } from './errors';
+import { NetworkError } from '@cairn/shared';
 
 const DEFAULT_MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;

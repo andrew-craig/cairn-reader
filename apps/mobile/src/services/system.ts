@@ -1,5 +1,4 @@
-import { getServerUrl } from '@cairn/shared';
-import { fetchOrNetworkError } from '../utils/http';
+import { getServerUrl, fetchOrNetworkError } from '@cairn/shared';
 
 /**
  * SystemService exposes backend metadata that isn't tied to a user session.

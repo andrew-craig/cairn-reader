@@ -1,7 +1,7 @@
 import { AuthService } from './auth';
-import { HttpError } from '../utils/errors';
 import { Article } from '../types';
 import {
+  HttpError,
   UserContentsListResponse,
   UserContentResponse,
   UserContentDetailResponse,

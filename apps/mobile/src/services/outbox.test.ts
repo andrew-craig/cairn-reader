@@ -1,7 +1,7 @@
 import { Outbox } from './outbox';
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
-import { HttpError, NetworkError } from '../utils/errors';
+import { HttpError, NetworkError } from '@cairn/shared';
 import { getDb } from './db';
 
 // __mocks__/expo-sqlite.js adapts openDatabaseAsync onto a real node:sqlite

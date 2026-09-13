@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthService } from '@cairn/shared';
 import { useAuth } from '../contexts/AuthContext';
-import { AuthService } from '../services/auth';
 import './Account.css';
 
 export default function Account() {

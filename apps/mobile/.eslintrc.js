@@ -13,7 +13,7 @@ module.exports = {
           {
             selector: "CallExpression[callee.name='fetch']",
             message:
-              'Use fetchOrNetworkError from ../utils/http instead of bare fetch, so a dropped connection surfaces as NetworkError rather than a bare TypeError.',
+              'Use fetchOrNetworkError from @cairn/shared instead of bare fetch, so a dropped connection surfaces as NetworkError rather than a bare TypeError.',
           },
         ],
       },

@@ -1,7 +1,7 @@
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
 import { isOffline } from '../utils/network';
-import { NetworkError } from '../utils/errors';
+import { NetworkError } from '@cairn/shared';
 
 // Cap on both the prefetch selection and the post-run eviction — the same
 // "100 most recent Read-list articles" window the task describes.

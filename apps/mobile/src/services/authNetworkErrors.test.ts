@@ -1,5 +1,5 @@
 import { AuthService } from './auth';
-import { NetworkError } from '../utils/errors';
+import { NetworkError } from '@cairn/shared';
 
 // chore_1089: every previously-bare fetch in auth.ts is now routed through
 // the shared fetchOrNetworkError helper. These tests assert each newly

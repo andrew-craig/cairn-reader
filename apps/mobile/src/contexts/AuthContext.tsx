@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthService, ArticleStore } from '../services';
-import { loadServerUrl } from '@cairn/shared';
+import { NetworkError, loadServerUrl } from '@cairn/shared';
 import { User } from '../types';
-import { NetworkError } from '../utils';
 
 interface AuthContextType {
   user: User | null;

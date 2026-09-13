@@ -2,7 +2,7 @@ import { ArticleMutations } from './articleMutations';
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
 import { Outbox } from './outbox';
-import { HttpError, NetworkError } from '../utils/errors';
+import { HttpError, NetworkError } from '@cairn/shared';
 
 // task_ebf1 (decision 4): each of the reading screen's six mutation call
 // sites goes through this facade instead of repeating "write the store, try

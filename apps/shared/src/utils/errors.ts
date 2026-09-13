@@ -3,12 +3,12 @@
  * unreachable (network failure, timeout, or a malformed/unparseable body) —
  * as opposed to a definitive rejection (4xx).
  *
- * Distinguishing the two matters: retry.ts treats unrecognized errors as
- * retryable, and callers must not treat "couldn't reach the server" the same
- * as "server said no" (e.g. by logging the user out). Keep this message free
- * of the substrings retry.ts uses to classify non-retryable auth failures
- * ('session expired', 'not authenticated', 'unauthorized', 'forbidden',
- * 'not found', 'bad request').
+ * Distinguishing the two matters: mobile's utils/retry.ts treats unrecognized
+ * errors as retryable, and callers must not treat "couldn't reach the server"
+ * the same as "server said no" (e.g. by logging the user out). Keep this
+ * message free of the substrings that classifier uses to spot non-retryable
+ * auth failures ('session expired', 'not authenticated', 'unauthorized',
+ * 'forbidden', 'not found', 'bad request').
  */
 export class NetworkError extends Error {
   constructor(message: string = 'Unable to reach the server. Please try again later.') {
@@ -24,8 +24,8 @@ export class NetworkError extends Error {
  * HTTP status so callers (the outbox drain, task_ebf1) can tell a definitive
  * rejection (4xx) apart from a transient one (401/5xx) without parsing the
  * message text. An error-type change only — the message text callers already
- * key off of (see NetworkError's doc comment, and retry.ts's classification)
- * is unchanged.
+ * key off of (see NetworkError's doc comment, and mobile's retry
+ * classification) is unchanged.
  */
 export class HttpError extends Error {
   readonly status: number;

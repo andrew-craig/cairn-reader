@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { render, renderHook, screen, waitFor, act } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from './AuthContext';
 import { AuthService, ArticleStore } from '../services';
-import { NetworkError } from '../utils';
+import { NetworkError } from '@cairn/shared';
 import { User } from '../types';
 
 // task_cab7: checkAuthStatus is the offline app-launch path. Before this fix,
@@ -26,7 +26,11 @@ jest.mock('../services', () => ({
   },
 }));
 
+// Only loadServerUrl is stubbed; the rest of @cairn/shared is real, since the
+// error classes this file constructs now live there too (task_47c1) and a
+// wholesale stub would leave them undefined.
 jest.mock('@cairn/shared', () => ({
+  ...jest.requireActual('@cairn/shared'),
   loadServerUrl: jest.fn().mockResolvedValue('https://api.test'),
 }));
 
