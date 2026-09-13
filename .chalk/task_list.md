@@ -25,9 +25,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
-- **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever  (parent: feature_90a5)
+- **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
-- **task_c894** · P2 · open · Mobile: a live 5xx on a mutation is dropped, but the same 5xx on an outbox replay is retried  (parent: feature_90a5)
+- **task_c894** · P2 · open · Mobile: a live 5xx on a mutation is dropped, but the same 5xx on an outbox replay is retried
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
@@ -38,7 +38,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_1d5d** · P3 · open · Export/import subscription list and likes
 - **feature_2920** · P3 · open · Mobile: Add filter/sort controls to ReadScreen
 - **feature_34cc** · P3 · open · Reading analytics and statistics  (parent: epic_7c9e)
-- **feature_90a5** · P3 · open · Offline reading mode
 - **feature_9d64** · P3 · open · Image hosting and optimization
 - **feature_9dba** · P3 · open · Article sharing via links
 - **feature_a849** · P3 · open · Enhanced article reader with adjustable fonts
@@ -48,7 +47,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
-- **task_43fc** · P3 · open · Docs: offline reading architecture, requirements and mobile CLAUDE.md  (parent: feature_90a5)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
@@ -57,7 +55,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
 - **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
-- **task_de93** · P3 · open · Mobile: end-to-end airplane-mode QA pass for offline reading  (parent: feature_90a5)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal

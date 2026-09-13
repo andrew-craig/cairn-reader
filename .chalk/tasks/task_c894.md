@@ -6,10 +6,10 @@ status: open
 priority: 2
 labels: [mobile,offline]
 blocked_by: []
-parent: feature_90a5
+parent: 
 remote_task_url: null
 created_at: 2026-09-12T10:45:39Z
-updated_at: 2026-09-12T10:45:39Z
+updated_at: 2026-09-12T22:37:45Z
 ---
 Found by the tech lead reviewing feature_90a5 before closing it out. Same bug class as
 task_cab7, task_c87c, task_5bd6 and task_f19d — see the 2026-09-12 entry in
