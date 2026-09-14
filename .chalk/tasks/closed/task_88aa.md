@@ -2,14 +2,14 @@
 id: task_88aa
 title: [P2-C1] Downstream services never refresh the JWT public key → scheduled auth outage
 type: task
-status: in_progress
+status: closed
 priority: 0
 labels: [quality,security,wave1,ops]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:41:40Z
-updated_at: 2026-08-09T06:55:57Z
+updated_at: 2026-09-14T11:57:04Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -99,3 +99,26 @@ Validation approved; implementing per the shape identified above. Branch: `fix/p
 **Deviation from the original validation note:** none found — self-host remains confirmed out of scope (static file key, no rotation), and the three services remain confirmed to have no shared runtime object, matching the "new `pkg/auth` helper, not a shared instance" call made during validation.
 
 **Status:** left as `in_progress` per instruction; not closed. PR not opened — coordinator/user is handling push + PR after reviewing this commit.
+
+## Closed (2026-09-14, backlog housekeeping sweep)
+Left `in_progress` because the implementing session was told not to push or open a PR
+("coordinator/user is handling both after review"). That handoff happened — the work is on
+`main` — but the task was never moved. Closing it now; no code was written in this sweep.
+
+**Verified on `main` at `ba7ac84`**, not taken from the Review section above:
+- `pkg/auth/key_refresher.go` and `pkg/auth/key_refresher_test.go` both present.
+- `NewKeyRefresher` is wired into all three downstream services, not merely available:
+  `services/read/content/cmd/content/main.go:129`,
+  `services/read/email/cmd/email_ingest/main.go:137`,
+  `services/explore/recommender/cmd/explore_recommender/main.go:118`.
+- `JWT_PUBLIC_KEY_REFRESH_INTERVAL` defaults to `5m` in all three configs
+  (`services/read/content/internal/config/config.go:58`,
+  `services/read/email/internal/config/config.go:106`,
+  `services/explore/recommender/internal/config/config.go:64`) — comfortably under the 24h
+  `JWT_KEY_ROTATION_INTERVAL` default, as the task required.
+
+**Landed via `bbcad8f` (#346)**, a PR titled "Tag services/users integration tests with
+`//go:build integration`" — the P2-C1 files were carried in on that branch rather than in a
+PR of their own. That mismatch is why the fix was invisible to a title-level scan of the log
+and why this task sat `in_progress` for five weeks. Noted as a process observation only; the
+code itself is correct and complete against the "Done when" criteria.

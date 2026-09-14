@@ -2,6 +2,40 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-14 — A task's status field is a claim about the tree, not evidence of it (task_88aa and 4 others)
+
+**What happened:** a backlog sweep found all five `in_progress` tasks were already
+merged to `main` — including **task_88aa, a P0 auth outage, stranded for five weeks**.
+The board said five things were mid-flight; the tree said all five were done. Every
+suggestion built on that board would have been wrong.
+
+Two distinct causes, and the P0's is the instructive one:
+
+- **task_88aa** was implemented under an explicit "do not push, do not open a PR — the
+  coordinator is handling it" instruction. The handoff happened, but the code landed
+  inside `bbcad8f` (#346), *"Tag services/users integration tests with `//go:build
+  integration`"*. Nothing in that title mentions JWT keys, so no log scan, changelog
+  read, or PR-title search would ever surface it. The task could only be closed by
+  someone who went looking for `pkg/auth/key_refresher.go` directly.
+- **task_2315, chore_6449, bug_0099, task_47c1** merged under their own honest titles
+  and simply never got the `chalk close`.
+
+**How to apply:** when a task claims `in_progress`, verify it against the working tree
+before acting on it or reporting it — `ls` the file it was supposed to add, `grep` for
+the symbol it was supposed to wire in. Checking that the artifact *exists* is not
+enough either: `pkg/auth/key_refresher.go` existing proves a file landed, while
+`grep -rn NewKeyRefresher --include=*.go` proves it is wired into all three services
+rather than sitting there uncalled. Prefer the grep that would fail if the work were
+half-done.
+
+**And the upstream fix:** when a PR carries commits outside what its title describes,
+name them in the PR body. A stacked or piggy-backed change that lands under an
+unrelated title is invisible to everyone who was not in the room, and the task tracking
+it goes stale silently — for five weeks, in the case of a P0. This is the same family
+as the stacked-PR entry below: **branch topology that diverges from the PR's stated
+subject is how work gets lost, in both directions** — task_47c1's first attempt was
+lost by being orphaned, task_88aa's by being carried.
+
 ## 2026-09-12 — The canonical error type ends the bug class only where it's actually consumed (task_5bd6, task_f19d)
 
 **Correction:** The 2026-09-07 entry below tallied four windows where an unwrapped

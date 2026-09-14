@@ -2,14 +2,14 @@
 id: chore_6449
 title: Selfhost image: mobile-only root-lockfile changes bust the web build cache
 type: chore
-status: in_progress
+status: closed
 priority: 2
 labels: [selfhost,docker,ci]
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-09-06T13:16:08Z
-updated_at: 2026-09-06T13:16:11Z
+updated_at: 2026-09-14T11:57:29Z
 ---
 
 ## Problem
@@ -95,3 +95,19 @@ and the same bug — flagged, not touched (out of scope for this task).
   instead of a from-scratch rebuild.
 
 
+
+## Closed (2026-09-14, backlog housekeeping sweep)
+Landed on `main` as `9f12e91` (#384, "Selfhost: mobile-only lockfile changes no longer rebuild
+the web image"). Closing; no code was written in this sweep.
+
+**Verified on `main` at `ba7ac84`:** `infrastructure/docker/selfhost/Dockerfile` opens with the
+`lockfile` stage (`FROM node:24-alpine AS lockfile`, line 10) and `web-builder` consumes the
+pruned lockfile via `COPY --from=lockfile /app/package.json /app/package-lock.json ./`
+(line 25) — both halves of the plan, not just the stage.
+
+The two out-of-scope items flagged above remain true on `main` and are **not** tracked by any
+task: `apps/web/Dockerfile` still has the identical cache-bust pattern, and the
+`docker-build-selfhost.yml` / `selfhost-compose-smoke.yml` `paths:` filters still list
+`package-lock.json`. Deliberately left unfiled here — the second is now cosmetic (a triggered
+build that is a near-full cache hit), and the first should be judged on whether the web image
+is still built separately at all. Mentioned so the next reader does not assume they were lost.

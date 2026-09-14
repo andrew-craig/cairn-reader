@@ -2,14 +2,14 @@
 id: task_47c1
 title: [FE auth layer] Move the duplicated web/mobile auth.ts into apps/shared; fix H12 + offline-clears-tokens
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [quality,wave4,consolidation,frontend]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-09-12T12:14:05Z
+updated_at: 2026-09-14T11:57:16Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -211,3 +211,26 @@ That work has since landed on main as #396, and this branch was rebased onto it
 import edits and the new `countUserContents` methods sit in different regions.
 The verification table above is from the post-rebase run, on a clean tree with
 no foreign changes in it.
+
+## Closed (2026-09-14, backlog housekeeping sweep)
+Landed on `main` as `ba7ac84` (#397, "[task_47c1] Move the web/mobile auth state machine into
+@cairn/shared"). Closing; no code was written in this sweep.
+
+**Verified on `main` at `ba7ac84`:**
+- `apps/shared/src/services/auth.ts` + `auth.test.ts` exist — one implementation.
+- `apps/web/src/services/auth.ts` is **deleted**.
+- `apps/mobile/src/services/auth.ts` is now a 103-line subclass of the shared `AuthService`,
+  carrying only the genuinely mobile-specific pieces (device-ID login flavors, account
+  upgrade, the `withRetry` wrapper) — matching step 3's "repoint and delete in the same PR".
+- The offline-clears-tokens fix is in: `fetchWithAuth` rethrows `NetworkError` and keeps
+  tokens, clearing them only on a real rejection (`apps/shared/src/services/auth.ts:445-453`).
+- The load-bearing string `Session expired. Please log in again.` survived the move intact
+  (`apps/shared/src/services/auth.ts:453`), so `apps/mobile/src/utils/retry.ts`'s substring
+  classifier still sees auth errors as non-retryable. This was the task's headline hazard.
+
+**Not delivered by this task, and correctly so — H12 is still live on `main`.** The retried
+request's status is still unchecked: `apps/shared/src/services/auth.ts:441` returns
+`fetchOrNetworkError(...)` directly, so a second 401 after a successful refresh is still handed
+back to the caller as an ordinary response. That is tracked as **bug_8123**, split out of this
+task on 2026-09-12 precisely so the consolidation could land without it. This closure does not
+imply H12 is fixed. The upside: bug_8123 is now a one-file fix instead of a two-platform one.
