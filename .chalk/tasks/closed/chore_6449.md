@@ -105,9 +105,15 @@ the web image"). Closing; no code was written in this sweep.
 pruned lockfile via `COPY --from=lockfile /app/package.json /app/package-lock.json ./`
 (line 25) — both halves of the plan, not just the stage.
 
-The two out-of-scope items flagged above remain true on `main` and are **not** tracked by any
-task: `apps/web/Dockerfile` still has the identical cache-bust pattern, and the
-`docker-build-selfhost.yml` / `selfhost-compose-smoke.yml` `paths:` filters still list
-`package-lock.json`. Deliberately left unfiled here — the second is now cosmetic (a triggered
-build that is a near-full cache hit), and the first should be judged on whether the web image
-is still built separately at all. Mentioned so the next reader does not assume they were lost.
+### Update (2026-09-14) — both out-of-scope items are now filed
+Originally left unfiled; filed on request later the same day, after verifying both on `main`:
+- **chore_88f9** (P3) — `apps/web/Dockerfile:10-13` still carries the identical cache-bust
+  pattern. My earlier note guessed this might be moot if the web image is no longer built
+  separately. It is not moot: `docker-build-web.yml` is indeed disabled (`if: false` at `:32`),
+  but `docker-test.yml`'s `build-web` job (`:260-279`) builds this Dockerfile on every
+  triggering change and is correctly wired, so the full-from-scratch rebuild is live in CI.
+- **chore_3ea1** (P4, blocked on chore_88f9) — the `paths:` filters. Confirmed cosmetic-ish as
+  suspected, and with a trap the original note did not capture: `package-lock.json` cannot
+  simply be dropped from the filters, because a genuine web/shared dependency bump appears
+  only in the root lockfile. Removing it would trade a cheap false positive for an expensive
+  false negative.

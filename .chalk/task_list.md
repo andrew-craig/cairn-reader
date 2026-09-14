@@ -29,6 +29,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
+- **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
 - **feature_0365** · P3 · open · Add Vault response caching with TTL  (parent: epic_7c9e)
@@ -55,6 +56,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
+- **chore_3ea1** · P4 · open · CI paths: filters over-trigger web/selfhost builds on mobile-only lockfile changes
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support
 - **feature_a85d** · P4 · open · Add recent URLs history in AddLinkModal
