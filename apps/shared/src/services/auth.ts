@@ -438,10 +438,19 @@ export class AuthService {
         const newAccessToken = await this.getAccessToken();
 
         // Retry the request with new token
-        return await fetchOrNetworkError(url, {
+        const retryResponse = await fetchOrNetworkError(url, {
           ...options,
           headers: buildHeaders(newAccessToken ?? ''),
         });
+
+        if (retryResponse.status === 401) {
+          // The rotated token was rejected too — a dead session, not an
+          // ordinary error response. Falls into the catch below to clear
+          // tokens and throw the load-bearing session-expired message.
+          throw new Error('Session expired. Please log in again.');
+        }
+
+        return retryResponse;
       } catch (error) {
         if (error instanceof NetworkError) {
           // Server unreachable — not a rejection. Keep tokens and let the
