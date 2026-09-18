@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_e848** · P1 · in_progress · [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)  (parent: epic_fefa)
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **bug_54f6** · P2 · open · Prod Vault init never provisions email-ingest AppRole  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services

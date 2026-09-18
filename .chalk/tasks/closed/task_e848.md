@@ -2,14 +2,14 @@
 id: task_e848
 title: [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)
 type: task
-status: in_progress
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-29T23:49:04Z
-updated_at: 2026-09-18T21:32:59Z
+updated_at: 2026-09-18T21:38:25Z
 ---
 
 
