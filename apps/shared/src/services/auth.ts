@@ -433,24 +433,16 @@ export class AuthService {
 
     // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
     if (response.status === 401) {
+      let retryResponse: Response;
       try {
         await this.refreshAccessToken();
         const newAccessToken = await this.getAccessToken();
 
         // Retry the request with new token
-        const retryResponse = await fetchOrNetworkError(url, {
+        retryResponse = await fetchOrNetworkError(url, {
           ...options,
           headers: buildHeaders(newAccessToken ?? ''),
         });
-
-        if (retryResponse.status === 401) {
-          // The rotated token was rejected too — a dead session, not an
-          // ordinary error response. Falls into the catch below to clear
-          // tokens and throw the load-bearing session-expired message.
-          throw new Error('Session expired. Please log in again.');
-        }
-
-        return retryResponse;
       } catch (error) {
         if (error instanceof NetworkError) {
           // Server unreachable — not a rejection. Keep tokens and let the
@@ -462,6 +454,15 @@ export class AuthService {
         await this.clearTokens();
         throw new Error('Session expired. Please log in again.');
       }
+
+      if (retryResponse.status === 401) {
+        // The rotated token was rejected too — a dead session, not an
+        // ordinary error response.
+        await this.clearTokens();
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      return retryResponse;
     }
 
     return response;
