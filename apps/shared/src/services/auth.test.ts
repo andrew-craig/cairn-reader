@@ -307,24 +307,21 @@ describe('fetchWithAuth', () => {
     expect(await AuthService.getAccessToken()).toBe('access-1');
   });
 
-  // Characterization test for the known H12 gap, tracked as bug_8123: a retried
-  // request that is *also* rejected is handed back to the caller as an ordinary
-  // 401 response rather than ending the session. task_47c1 moved this behavior
-  // without changing it, so both platforms now share the one copy to fix.
-  // bug_8123 will invert this assertion — that is expected, not a regression.
-  it('currently returns a second 401 to the caller instead of ending the session (bug_8123)', async () => {
+  // H12 (bug_8123): a retried request that is *also* rejected must end the
+  // session rather than being handed back to the caller as an ordinary 401
+  // response.
+  it('clears tokens and throws session-expired when the retried request is also a 401', async () => {
     await withValidToken();
-    const secondUnauthorized = { status: 401, ok: false } as Response;
     global.fetch = vi
       .fn()
       .mockResolvedValueOnce({ status: 401, ok: false } as Response)
       .mockResolvedValueOnce(jsonResponse(200, { data: SESSION }))
-      .mockResolvedValueOnce(secondUnauthorized);
+      .mockResolvedValueOnce({ status: 401, ok: false } as Response);
 
-    await expect(AuthService.fetchWithAuth('https://api.test/x')).resolves.toBe(
-      secondUnauthorized,
+    await expect(AuthService.fetchWithAuth('https://api.test/x')).rejects.toThrow(
+      'Session expired. Please log in again.',
     );
-    expect(await AuthService.getAccessToken()).toBe('access-2');
+    expect(await AuthService.getAccessToken()).toBeNull();
   });
 });
 

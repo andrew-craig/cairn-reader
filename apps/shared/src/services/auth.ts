@@ -433,12 +433,13 @@ export class AuthService {
 
     // Handle 401 Unauthorized - try to refresh token (fallback for edge cases)
     if (response.status === 401) {
+      let retryResponse: Response;
       try {
         await this.refreshAccessToken();
         const newAccessToken = await this.getAccessToken();
 
         // Retry the request with new token
-        return await fetchOrNetworkError(url, {
+        retryResponse = await fetchOrNetworkError(url, {
           ...options,
           headers: buildHeaders(newAccessToken ?? ''),
         });
@@ -453,6 +454,15 @@ export class AuthService {
         await this.clearTokens();
         throw new Error('Session expired. Please log in again.');
       }
+
+      if (retryResponse.status === 401) {
+        // The rotated token was rejected too — a dead session, not an
+        // ordinary error response.
+        await this.clearTokens();
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      return retryResponse;
     }
 
     return response;
