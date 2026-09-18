@@ -56,7 +56,8 @@ func NewItemProcessor(
 	}
 
 	httpClient := &http.Client{
-		Timeout: config.ContentFetchTimeout,
+		Timeout:   config.ContentFetchTimeout,
+		Transport: fetch.NewTransport(),
 	}
 
 	return &ItemProcessor{

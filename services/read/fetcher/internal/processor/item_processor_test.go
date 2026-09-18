@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
@@ -263,7 +264,7 @@ func TestItemProcessor_OutboxPayloadCarriesRawHTML(t *testing.T) {
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
 
-	require.NoError(t, p.processItem(context.Background(), item))
+	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 	require.NotNil(t, capturedOutbox)
 
 	// Round-trip through JSON to mirror the outbox repository's JSONB
@@ -311,7 +312,7 @@ func TestItemProcessor_NoSubscribers_SkipsOutbox(t *testing.T) {
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
 
-	require.NoError(t, p.processItem(context.Background(), item))
+	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 
 	feedItemRepo.AssertExpectations(t)
 	subRepo.AssertExpectations(t)
@@ -353,7 +354,7 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
 
-	require.NoError(t, p.processItem(context.Background(), item))
+	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 	require.NotNil(t, capturedOutbox)
 	assert.Equal(t, desc, capturedOutbox.ContentPayload[models.PayloadKeyRawHTML])
 }
@@ -396,7 +397,7 @@ func TestItemProcessor_FiltersSubscribersBySubscriptionTime(t *testing.T) {
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
 
-	require.NoError(t, p.processItem(context.Background(), item))
+	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 	require.NotNil(t, capturedOutbox)
 	assert.Equal(t, []uuid.UUID{earlyUserID}, capturedOutbox.UserIDs)
 }
@@ -429,7 +430,7 @@ func TestItemProcessor_AllSubscribersAfterItem_SkipsOutbox(t *testing.T) {
 	feedItemRepo.On("UpdateProcessingStatus", mock.Anything, itemID, models.ProcessingStatusCompleted,
 		(*string)(nil), (*uuid.UUID)(nil), mock.AnythingOfType("*time.Time")).Return(nil).Once()
 
-	require.NoError(t, p.processItem(context.Background(), item))
+	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 
 	outboxRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 }
@@ -452,7 +453,7 @@ func TestItemProcessor_FetchRejectsOversizedBody(t *testing.T) {
 	cfg := DefaultItemProcessorConfig()
 	p := NewItemProcessor(cfg, feedItemRepo, subRepo, outboxRepo)
 
-	_, err := p.fetchArticleContent(context.Background(), srv.URL+"/big")
+	_, err := p.fetchArticleContent(fetchtest.AllowLoopback(context.Background()), srv.URL+"/big")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds maximum")
 }
@@ -476,7 +477,7 @@ func TestItemProcessor_FetchAcceptsBodyAtExactCap(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	p := NewItemProcessor(cfg, feedItemRepo, subRepo, outboxRepo)
-	got, err := p.fetchArticleContent(context.Background(), srv.URL+"/exact")
+	got, err := p.fetchArticleContent(fetchtest.AllowLoopback(context.Background()), srv.URL+"/exact")
 	require.NoError(t, err)
 	assert.Equal(t, int64(len(got)), cfg.MaxContentSize)
 }

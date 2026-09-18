@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/scheduler"
@@ -60,6 +61,7 @@ func NewFeedFetcher(
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
 		IdleConnTimeout:     90 * time.Second,
+		DialContext:         fetch.DialContext,
 	}
 
 	httpClient := &http.Client{

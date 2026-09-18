@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/client"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/fetcher"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
@@ -53,7 +54,10 @@ func NewUpdateDetector(
 		config = DefaultUpdateDetectorConfig()
 	}
 
-	httpClient := &http.Client{Timeout: config.ContentFetchTimeout}
+	httpClient := &http.Client{
+		Timeout:   config.ContentFetchTimeout,
+		Transport: fetch.NewTransport(),
+	}
 	conditionalFetcher := fetcher.NewConditionalFetcher(httpClient)
 	conditionalFetcher.MaxBodySize = config.MaxContentSize
 

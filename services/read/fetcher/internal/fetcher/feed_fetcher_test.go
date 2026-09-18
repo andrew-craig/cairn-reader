@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrew-craig/cairn-reader/pkg/rss/fetch/fetchtest"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/models"
 	"github.com/andrew-craig/cairn-reader/services/read/fetcher/internal/repository"
 	"github.com/google/uuid"
@@ -321,7 +322,7 @@ func TestProcessFeed_Success(t *testing.T) {
 		Return(nil)
 
 	// Execute
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	// Assert
 	require.NoError(t, err)
@@ -360,7 +361,7 @@ func TestProcessFeed_UpdatesMetadata(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.NoError(t, err)
 	assert.NotNil(t, feed.Title)
@@ -402,7 +403,7 @@ func TestProcessFeed_SkipsDuplicateItems(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.NoError(t, err)
 	// Only one Create call should be made (for the new item)
@@ -437,7 +438,7 @@ func TestProcessFeed_FetchError(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.Error(t, err)
 	mockFeedRepo.AssertExpectations(t)
@@ -470,7 +471,7 @@ func TestProcessFeed_IncrementConsecutiveErrors(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.Error(t, err)
 	mockFeedRepo.AssertExpectations(t)
@@ -509,7 +510,7 @@ func TestProcessFeed_HTTPTimeout(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context deadline exceeded")
@@ -552,7 +553,7 @@ func TestProcessFeed_MaxRedirects(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stopped after")
@@ -600,7 +601,7 @@ func TestProcessFeed_FollowsValidRedirects(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, redirectCount, 3)
@@ -702,7 +703,7 @@ func TestProcessFeed_ItemCreationError(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	// Should succeed overall even if one item fails
 	require.NoError(t, err)
@@ -736,7 +737,7 @@ func TestProcessFeed_EmptyFeed(t *testing.T) {
 	mockFeedRepo.On("UpdatePollingInfo", mock.Anything, feedID, mock.Anything, mock.Anything, mock.Anything, models.PollingTierActive).
 		Return(nil)
 
-	err := fetcher.ProcessFeed(context.Background(), feed)
+	err := fetcher.ProcessFeed(fetchtest.AllowLoopback(context.Background()), feed)
 
 	require.NoError(t, err)
 	mockFeedItemRepo.AssertNotCalled(t, "Create")
