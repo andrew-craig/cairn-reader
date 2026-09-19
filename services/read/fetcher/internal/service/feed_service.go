@@ -76,7 +76,8 @@ func NewFeedService(
 		feedRepo:         feedRepo,
 		subscriptionRepo: subscriptionRepo,
 		httpClient: &http.Client{
-			Timeout: FeedFetchTimeout,
+			Timeout:   FeedFetchTimeout,
+			Transport: fetch.NewTransport(),
 		},
 	}
 }

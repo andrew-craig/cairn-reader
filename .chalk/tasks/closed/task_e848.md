@@ -2,14 +2,14 @@
 id: task_e848
 title: [read/fetcher] SSRF: all three outbound HTTP clients unguarded (feed_service, feed_fetcher, update_detector)
 type: task
-status: open
+status: closed
 priority: 1
 labels: []
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-29T23:49:04Z
-updated_at: 2026-08-29T23:49:19Z
+updated_at: 2026-09-18T21:38:25Z
 ---
 
 
@@ -38,3 +38,28 @@ to feed_fetcher's existing transport. Then migrate the affected unit tests
 otherwise fail with "blocked address", exactly as explore/fetcher did in bug_96d7.
 
 Priority: this is Tier-1 security (anonymous-ish: any registered user). Should land before task_dbca.
+
+## Resolution
+
+Applied the minimal fix to all three listed constructors, plus a fourth unguarded client found
+during implementation: `processor.NewItemProcessor` (`internal/processor/item_processor.go:58`)
+also fetches `item.ItemURL` unconditionally (before the subscriber check in `processItem`) using a
+bare `&http.Client{Timeout: ...}` — same vulnerability class, reached from the same
+`ingest_rss_worker` timer path as `update_detector`. The original audit's table only covered three;
+this one was missed. Fixed with the same `Transport: fetch.NewTransport()` pattern.
+
+Changes:
+- `feed_service.go`: `Transport: fetch.NewTransport()` on the Subscribe-validation client.
+- `feed_fetcher.go`: added `DialContext: fetch.DialContext` to the existing hand-rolled transport.
+- `update_detector.go`: `Transport: fetch.NewTransport()` on the conditional-fetch client.
+- `item_processor.go`: `Transport: fetch.NewTransport()` on the first-fetch client (new finding, not in original table).
+
+Test migration: of the five files named in the task, only `feed_fetcher_test.go` and
+`item_processor_test.go` actually exercise the guarded client against an `httptest` (127.0.0.1)
+server — both migrated to `fetchtest.AllowLoopback`. The other three
+(`conditional_fetcher_test.go`, `parser_test.go`, `feed_service_test.go`) construct their own
+unguarded `http.Client`/pass `server.Client()` directly, or never reach a network call at all, so
+they were unaffected and left untouched (verified by running them before making any test changes).
+
+Verified: `go build ./...`, `go vet ./...`, and `go test ./...` all pass in `services/read`;
+`gofmt -l .` clean.
