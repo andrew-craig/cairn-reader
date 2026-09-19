@@ -250,6 +250,25 @@ path "auth/token/lookup-self" {
 EOF
 echo "  - content-service policy created"
 
+# Email Ingest Policy (only needs public key)
+vault policy write email-ingest - <<EOF
+# Email Ingest Policy
+# Read-only access to JWT public key for verification
+
+path "secret/data/jwt/public-key" {
+  capabilities = ["read"]
+}
+
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+EOF
+echo "  - email-ingest policy created"
+
 # Create AppRoles for each service
 echo "Creating AppRoles..."
 
@@ -292,6 +311,19 @@ CONTENT_SERVICE_SECRET_ID=$(vault write -format=json -f auth/approle/role/conten
 
 echo "  - content-service AppRole created"
 
+# Email Ingest AppRole
+vault write auth/approle/role/email-ingest \
+    token_policies="email-ingest" \
+    token_ttl=1h \
+    token_max_ttl=4h \
+    secret_id_ttl=0 \
+    secret_id_num_uses=0
+
+EMAIL_INGEST_ROLE_ID=$(vault read -format=json auth/approle/role/email-ingest/role-id | grep -o '"role_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+EMAIL_INGEST_SECRET_ID=$(vault write -format=json -f auth/approle/role/email-ingest/secret-id | grep -o '"secret_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
+
+echo "  - email-ingest AppRole created"
+
 # Write AppRole credentials to file for services to use
 # In production, consider using Docker secrets or another secure method
 cat > /vault-keys/approle-credentials.env << EOF
@@ -310,6 +342,10 @@ EXPLORE_RECOMMENDER_SECRET_ID=$EXPLORE_RECOMMENDER_SECRET_ID
 # Content Service
 CONTENT_SERVICE_ROLE_ID=$CONTENT_SERVICE_ROLE_ID
 CONTENT_SERVICE_SECRET_ID=$CONTENT_SERVICE_SECRET_ID
+
+# Email Ingest
+EMAIL_INGEST_ROLE_ID=$EMAIL_INGEST_ROLE_ID
+EMAIL_INGEST_SECRET_ID=$EMAIL_INGEST_SECRET_ID
 EOF
 
 chmod 600 /vault-keys/approle-credentials.env
@@ -331,6 +367,10 @@ echo ""
 echo "  Content Service:"
 echo "    VAULT_ROLE_ID=$CONTENT_SERVICE_ROLE_ID"
 echo "    VAULT_SECRET_ID=$CONTENT_SERVICE_SECRET_ID"
+echo ""
+echo "  Email Ingest:"
+echo "    VAULT_ROLE_ID=$EMAIL_INGEST_ROLE_ID"
+echo "    VAULT_SECRET_ID=$EMAIL_INGEST_SECRET_ID"
 echo ""
 echo "SECURITY REMINDERS:"
 echo "  1. Retrieve and securely store the unseal keys from /vault-keys/UNSEAL_KEYS.txt"
