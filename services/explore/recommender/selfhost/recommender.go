@@ -14,6 +14,7 @@ import (
 	recDB "github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/db"
 	"github.com/andrew-craig/cairn-reader/services/explore/recommender/internal/recommend"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RecommenderConfig holds configuration for the recommender service.
@@ -32,7 +33,8 @@ func RunMigrations(connString string, migrations fs.FS) error {
 }
 
 // Mount initializes the recommender service and mounts routes.
-func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (func(), error) {
+// Returns the underlying *pgxpool.Pool for health checks, a cleanup function, and any error.
+func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (*pgxpool.Pool, func(), error) {
 	dbConfig := recDB.Config{
 		Host:     cfg.DBHost,
 		Port:     cfg.DBPort,
@@ -43,7 +45,7 @@ func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddlew
 
 	database, err := dbConfig.Connect(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("recommender db: %w", err)
+		return nil, nil, fmt.Errorf("recommender db: %w", err)
 	}
 
 	articleRepo := recDB.NewArticleRepository(database)
@@ -61,7 +63,7 @@ func Mount(ctx context.Context, cfg RecommenderConfig, r chi.Router, authMiddlew
 	r.Handle("/api/v1/explore", handler)
 	r.Handle("/api/v1/explore/*", handler)
 
-	return func() {
+	return database, func() {
 		cleanupJob.Stop()
 		database.Close()
 	}, nil

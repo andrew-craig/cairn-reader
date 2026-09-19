@@ -325,7 +325,7 @@ jobs:
 
   selfhost-compose-smoke:
     name: Selfhost docker-compose smoke test
-    needs: [build-selfhost]
+    needs: [changes, build-selfhost]
     if: needs.changes.outputs.selfhost == 'true'
     runs-on: ubuntu-latest
     permissions:

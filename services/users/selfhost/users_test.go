@@ -78,7 +78,7 @@ func TestMountUsers_VerifyEmailDoesNotPanic(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cleanup, err := MountUsers(ctx, cfg, router, slog.Default())
+	_, cleanup, err := MountUsers(ctx, cfg, router, slog.Default())
 	require.NoError(t, err)
 	defer cleanup()
 

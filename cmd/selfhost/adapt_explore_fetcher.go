@@ -19,7 +19,7 @@ func runFetcherMigrations(cfg *Config) error {
 }
 
 func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
-	return fetcherSelfhost.Mount(ctx, fetcherSelfhost.FetcherConfig{
+	pool, closer, err := fetcherSelfhost.Mount(ctx, fetcherSelfhost.FetcherConfig{
 		DBHost:         cfg.DB.Host,
 		DBPort:         fmt.Sprintf("%d", cfg.DB.Port),
 		DBUser:         cfg.DB.User,
@@ -31,4 +31,10 @@ func mountExploreFetcher(ctx context.Context, cfg *Config, r chi.Router, interna
 		RecommenderURL: fmt.Sprintf("http://localhost:%s", cfg.Port),
 		InternalAPIKey: cfg.InternalAPIKey,
 	}, r, internalAuthMiddleware, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	health.addPinger("explore-fetcher", pool)
+	return closer, nil
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // envInt returns the int value of the given env var, or fallback if unset/invalid.
@@ -63,8 +64,8 @@ func RunUsersMigrations(cfg UsersConfig, migrations fs.FS) error {
 }
 
 // MountUsers initializes the user service and mounts routes on the provided router.
-// Returns a cleanup function and any error.
-func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog.Logger) (func(), error) {
+// Returns the underlying *pgxpool.Pool for health checks, a cleanup function, and any error.
+func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog.Logger) (*pgxpool.Pool, func(), error) {
 	dbCfg := &userDB.Config{
 		Host:            cfg.DBHost,
 		Port:            cfg.DBPort,
@@ -79,7 +80,7 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 
 	db, err := userDB.New(dbCfg)
 	if err != nil {
-		return nil, fmt.Errorf("users db: %w", err)
+		return nil, nil, fmt.Errorf("users db: %w", err)
 	}
 
 	// Initialize repositories
@@ -148,7 +149,7 @@ func MountUsers(ctx context.Context, cfg UsersConfig, r chi.Router, logger *slog
 	r.Handle("/api/v1/user", router)
 	r.Handle("/api/v1/user/*", router)
 
-	return func() { db.Close() }, nil
+	return db.Pool, func() { db.Close() }, nil
 }
 
 func tokenCleanupLoop(ctx context.Context, svc *userAuth.RefreshTokenService) {
