@@ -6,9 +6,10 @@ import { HttpError, NetworkError } from '@cairn/shared';
 
 // task_ebf1 (decision 4): each of the reading screen's six mutation call
 // sites goes through this facade instead of repeating "write the store, try
-// the network, enqueue on NetworkError" inline. Only NetworkError enqueues —
-// a definitive rejection (HttpError) surfaces exactly as it does without the
-// facade.
+// the network, enqueue on a retryable error" inline. task_c894: a retryable
+// error (NetworkError, HttpError(401), HttpError(5xx) — the same set
+// outbox.ts's sendRow treats as transient) enqueues; a definitive 4xx other
+// than 401 surfaces exactly as it does without the facade.
 
 jest.mock('./articleStore', () => ({
   ArticleStore: {
@@ -25,6 +26,7 @@ jest.mock('./read', () => ({
 }));
 
 jest.mock('./outbox', () => ({
+  ...jest.requireActual('./outbox'),
   Outbox: {
     enqueue: jest.fn(),
   },
@@ -70,6 +72,18 @@ describe('ArticleMutations', () => {
 
       expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     });
+
+    // task_c894: a live 503 was previously indistinguishable from a
+    // definitive 4xx here, so the DELETE/PATCH was rethrown after the store
+    // write had already landed, and nothing was queued to freeze the value
+    // against the next sync.
+    it('enqueues on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
+
+      await expect(ArticleMutations.markCompleted('a1', 500)).resolves.toBeUndefined();
+
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'completed' });
+    });
   });
 
   describe('markReading', () => {
@@ -84,6 +98,14 @@ describe('ArticleMutations', () => {
 
     it('enqueues on NetworkError', async () => {
       mockedReadService.updateUserContent.mockRejectedValue(new NetworkError());
+
+      await expect(ArticleMutations.markReading('a1')).resolves.toBeUndefined();
+
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'reading' });
+    });
+
+    it('enqueues on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
 
       await expect(ArticleMutations.markReading('a1')).resolves.toBeUndefined();
 
@@ -105,6 +127,14 @@ describe('ArticleMutations', () => {
       mockedReadService.updateUserContent.mockRejectedValue(new NetworkError());
 
       await ArticleMutations.saveScrollPosition('a1', 0.42);
+
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'scroll_position', { scroll_position: 0.42 });
+    });
+
+    it('enqueues on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
+
+      await expect(ArticleMutations.saveScrollPosition('a1', 0.42)).resolves.toBeUndefined();
 
       expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'scroll_position', { scroll_position: 0.42 });
     });
@@ -135,6 +165,14 @@ describe('ArticleMutations', () => {
 
       expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     });
+
+    it('enqueues on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
+
+      await expect(ArticleMutations.setFavorite('a1', true)).resolves.toBeUndefined();
+
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'is_favorite', { is_favorite: true });
+    });
   });
 
   describe('archive', () => {
@@ -164,6 +202,18 @@ describe('ArticleMutations', () => {
       await expect(ArticleMutations.archive('a1')).rejects.toThrow('forbidden');
 
       expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
+    });
+
+    // The motivating case from task_c894: online, backend returns 503 on
+    // archive — ArticleStore.remove() already ran, and without this the
+    // DELETE would be rethrown with nothing queued, leaving the article gone
+    // locally but still present on the server.
+    it('enqueues a delete on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.deleteUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
+
+      await expect(ArticleMutations.archive('a1')).resolves.toBeUndefined();
+
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'delete', {});
     });
   });
 });
