@@ -1,6 +1,6 @@
 import { getDb } from './db';
 import { ReadService } from './read';
-import { HttpError, UpdateUserContentRequest } from '@cairn/shared';
+import { HttpError, NetworkError, UpdateUserContentRequest } from '@cairn/shared';
 
 /**
  * The server's PATCH field names, plus `delete` for the archive (DELETE)
@@ -29,10 +29,12 @@ const ENQUEUE_SQL = `
 type SendOutcome = 'success' | 'drop' | 'halt';
 
 /**
- * True for an error that a later retry might resolve: NetworkError (server
- * unreachable), HttpError(401), HttpError(5xx), or anything unrecognized.
- * False only for a definitive 4xx other than 401 — replaying that can only
- * fail the same way.
+ * True for a *known* transient error: NetworkError (server unreachable),
+ * HttpError(401), or HttpError(5xx). False for a definitive 4xx and for
+ * any other/unrecognized error — this only names the errors worth
+ * queueing for replay, it does not decide what to do with the rest, since
+ * `sendRow` and `withOutboxOnRetryableError` want different fallbacks for
+ * "unrecognized" (see each call site).
  *
  * `fetchWithAuth` already retries once on 401 internally, so a live
  * `HttpError(401)` reaching a caller of this predicate means that retry
@@ -44,10 +46,10 @@ type SendOutcome = 'success' | 'drop' | 'halt';
  *
  * Shared by `sendRow` (below) and `articleMutations.ts`'s
  * `withOutboxOnRetryableError` so the two halves of the offline write path
- * can never classify the same error differently (task_c894).
+ * can never classify a *recognized* error differently (task_c894).
  */
 export function isRetryable(error: unknown): boolean {
-  return !(error instanceof HttpError && error.status !== 401 && error.status < 500);
+  return error instanceof NetworkError || (error instanceof HttpError && (error.status === 401 || error.status >= 500));
 }
 
 /**
@@ -56,8 +58,10 @@ export function isRetryable(error: unknown): boolean {
  *   record of it — exactly what the delete wanted).
  * - drop: a definitive 4xx other than 401. Replaying it again can only fail
  *   the same way.
- * - halt: anything `isRetryable` calls retryable (NetworkError, 401, 5xx, or
- *   unrecognized).
+ * - halt: NetworkError, 401, 5xx (per `isRetryable`), or anything else
+ *   unrecognized — unlike `withOutboxOnRetryableError`, an unrecognized
+ *   error here still keeps the row for a later retry rather than dropping
+ *   or rethrowing it.
  */
 async function sendRow(row: OutboxRow): Promise<SendOutcome> {
   try {
@@ -74,7 +78,7 @@ async function sendRow(row: OutboxRow): Promise<SendOutcome> {
     if (row.field === 'delete' && error instanceof HttpError && error.status === 404) {
       return 'success';
     }
-    if (!isRetryable(error)) {
+    if (error instanceof HttpError && !isRetryable(error)) {
       console.error(
         `Outbox: dropping ${row.field} write for article ${row.article_id} (non-retryable):`,
         error,

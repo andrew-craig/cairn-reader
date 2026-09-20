@@ -84,6 +84,18 @@ describe('ArticleMutations', () => {
 
       expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'completed' });
     });
+
+    // isRetryable only recognizes NetworkError/401/5xx as transient; a
+    // session-expired failure (the plain Error fetchWithAuth throws when
+    // its own internal 401 retry fails) is neither of those and must keep
+    // surfacing, not get silently queued.
+    it('surfaces a session-expired error instead of enqueuing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new Error('Session expired, please log in again'));
+
+      await expect(ArticleMutations.markCompleted('a1', 500)).rejects.toThrow('Session expired');
+
+      expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
+    });
   });
 
   describe('markReading', () => {
