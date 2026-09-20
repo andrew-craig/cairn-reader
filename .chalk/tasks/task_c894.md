@@ -142,4 +142,29 @@ scope.
 - `LEARNINGS.md` — added a 2026-09-20 entry documenting this as a sixth instance of
   the "throw site fixed, catch site drifted" bug class.
 
-Branch: `task_c894`. Not pushed; no PR opened, per instructions.
+Branch: `task_c894`. Pushed as PR #401.
+
+## Follow-up (2026-09-20): fixed a regression flagged by automated review
+
+The `magpie-reviewer` bot on PR #401 caught a real bug: `isRetryable` was defined
+as `!(error instanceof HttpError && error.status !== 401 && error.status < 500)`
+— a literal inversion of `sendRow`'s old drop-check — which returns `true` for
+**any** non-`HttpError`, not just `NetworkError`. `withOutboxOnRetryableError`
+therefore silently enqueued the plain `Error('Session expired...')` that
+`fetchWithAuth` throws when its own internal 401 retry fails, instead of
+rethrowing it as the PR's own doc comments and LEARNINGS entry claimed. No
+existing test covered a plain-Error/session-expired rethrow, so it slipped
+through review.
+
+**Fix:** narrowed `isRetryable` to a positive allowlist (`NetworkError`,
+`HttpError(401)`, `HttpError(5xx)`) instead of an inverted drop-check.
+`sendRow`'s drop-check now reads `error instanceof HttpError && !isRetryable(error)`
+— the added `instanceof HttpError` guard keeps its own "unrecognized → halt"
+fallback intact, since `sendRow` and `withOutboxOnRetryableError` genuinely want
+different policy for an error neither one recognizes (halt-and-retry vs.
+rethrow), which was never something they needed to share.
+
+Verified the regression test fails against the pre-fix predicate (confirmed by
+temporarily reverting it) and passes after. Full suite: 279/279 tests, `tsc
+--noEmit` and `eslint` clean. Pushed as a follow-up commit (`38f6a9a`) on the
+same PR #401 branch.
