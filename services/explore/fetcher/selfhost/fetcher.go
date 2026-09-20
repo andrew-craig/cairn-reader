@@ -15,6 +15,7 @@ import (
 	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/fetcher"
 	"github.com/andrew-craig/cairn-reader/services/explore/fetcher/internal/sync"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // FetcherConfig holds configuration for the fetcher service.
@@ -37,7 +38,8 @@ func RunMigrations(connString string, migrations fs.FS) error {
 }
 
 // Mount initializes the fetcher service and mounts routes.
-func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (func(), error) {
+// Returns the underlying *pgxpool.Pool for health checks, a cleanup function, and any error.
+func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMiddleware *auth.InternalAuthMiddleware, logger *slog.Logger) (*pgxpool.Pool, func(), error) {
 	dbConfig := &fetcherDB.Config{
 		Host:     cfg.DBHost,
 		Port:     cfg.DBPort,
@@ -48,7 +50,7 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMid
 
 	database, err := dbConfig.Connect(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("fetcher db: %w", err)
+		return nil, nil, fmt.Errorf("fetcher db: %w", err)
 	}
 
 	feedRepo := fetcherDB.NewFeedRepository(database)
@@ -76,5 +78,5 @@ func Mount(ctx context.Context, cfg FetcherConfig, r chi.Router, internalAuthMid
 	r.Handle("/api/v1/explore/feed", handler)
 	r.Handle("/api/v1/explore/feed/*", handler)
 
-	return func() { database.Close() }, nil
+	return database, func() { database.Close() }, nil
 }

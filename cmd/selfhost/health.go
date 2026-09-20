@@ -8,18 +8,42 @@ import (
 	"time"
 )
 
+// pinger is satisfied by both *sql.DB (via sqlPinger below) and
+// *pgxpool.Pool, which already implements Ping(ctx context.Context) error
+// natively. This lets the same health checker cover services built on
+// database/sql (content, email, rss) and services built on pgx (users,
+// explore-recommender, explore-fetcher).
+type pinger interface {
+	Ping(ctx context.Context) error
+}
+
+// sqlPinger adapts *sql.DB's PingContext to the pinger interface.
+type sqlPinger struct {
+	db *sql.DB
+}
+
+func (s sqlPinger) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
 type healthChecker struct {
-	checks map[string]*sql.DB
+	checks map[string]pinger
 }
 
 func newHealthChecker() *healthChecker {
 	return &healthChecker{
-		checks: make(map[string]*sql.DB),
+		checks: make(map[string]pinger),
 	}
 }
 
 func (h *healthChecker) addDB(name string, db *sql.DB) {
-	h.checks[name] = db
+	h.checks[name] = sqlPinger{db}
+}
+
+// addPinger registers any connection pool that implements Ping(ctx) error
+// (e.g. *pgxpool.Pool) for readiness checks.
+func (h *healthChecker) addPinger(name string, p pinger) {
+	h.checks[name] = p
 }
 
 func (h *healthChecker) livenessHandler(w http.ResponseWriter, r *http.Request) {
@@ -41,8 +65,8 @@ func (h *healthChecker) readinessHandler(w http.ResponseWriter, r *http.Request)
 	checks := make(map[string]string)
 	allOK := true
 
-	for name, db := range h.checks {
-		if err := db.PingContext(ctx); err != nil {
+	for name, p := range h.checks {
+		if err := p.Ping(ctx); err != nil {
 			checks[name] = "error"
 			allOK = false
 		} else {

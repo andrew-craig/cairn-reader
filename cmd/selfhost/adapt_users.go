@@ -25,7 +25,7 @@ func runUsersMigrations(cfg *Config) error {
 }
 
 func mountUserService(ctx context.Context, cfg *Config, r chi.Router, privateKey *rsa.PrivateKey, publicKey *rsa.PublicKey, health *healthChecker, logger *slog.Logger) (func(), error) {
-	return usersSelfhost.MountUsers(ctx, usersSelfhost.UsersConfig{
+	pool, closer, err := usersSelfhost.MountUsers(ctx, usersSelfhost.UsersConfig{
 		DBHost:           cfg.DB.Host,
 		DBPort:           fmt.Sprintf("%d", cfg.DB.Port),
 		DBUser:           cfg.DB.User,
@@ -38,4 +38,10 @@ func mountUserService(ctx context.Context, cfg *Config, r chi.Router, privateKey
 		JWTRefreshExpiry: cfg.JWTRefreshExpiry,
 		BcryptCost:       cfg.BcryptCost,
 	}, r, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	health.addPinger("users", pool)
+	return closer, nil
 }

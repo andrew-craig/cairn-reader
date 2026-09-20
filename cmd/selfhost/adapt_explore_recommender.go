@@ -19,7 +19,7 @@ func runRecommenderMigrations(cfg *Config) error {
 }
 
 func mountExploreRecommender(ctx context.Context, cfg *Config, r chi.Router, authMiddleware *auth.Middleware, internalAuthMiddleware *auth.InternalAuthMiddleware, health *healthChecker, logger *slog.Logger) (func(), error) {
-	return recSelfhost.Mount(ctx, recSelfhost.RecommenderConfig{
+	pool, closer, err := recSelfhost.Mount(ctx, recSelfhost.RecommenderConfig{
 		DBHost:               cfg.DB.Host,
 		DBPort:               fmt.Sprintf("%d", cfg.DB.Port),
 		DBUser:               cfg.DB.User,
@@ -27,4 +27,10 @@ func mountExploreRecommender(ctx context.Context, cfg *Config, r chi.Router, aut
 		DBName:               cfg.DBNameRecommender,
 		ArticleRetentionDays: cfg.ArticleRetentionDays,
 	}, r, authMiddleware, internalAuthMiddleware, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	health.addPinger("explore-recommender", pool)
+	return closer, nil
 }
