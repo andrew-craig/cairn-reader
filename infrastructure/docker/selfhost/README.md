@@ -124,6 +124,13 @@ docker compose exec cairn-db pg_dumpall -U cairn > backup.sql
 docker compose exec -i cairn-db psql -U cairn -d postgres < backup.sql
 ```
 
+**Automate it:** `scripts/backup.sh` wraps the command above with gzip and
+30-day retention. Schedule it with cron, e.g. nightly at 2am:
+
+```bash
+0 2 * * * BACKUP_DIR=/path/to/backups infrastructure/docker/selfhost/scripts/backup.sh >> /path/to/backups/backup.log 2>&1
+```
+
 ## TLS / HTTPS
 
 The selfhost binary listens on plain HTTP (port 8099 by default). **You must place a TLS-terminating reverse proxy in front of it** before exposing it to the internet.
