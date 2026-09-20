@@ -2,6 +2,38 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-20 — A sixth instance of "fixing the throw site doesn't fix the catch site" (task_c894)
+
+**What happened:** `outbox.ts`'s `sendRow` and `articleMutations.ts`'s
+`withOutboxOnNetworkError` both catch the same `HttpError`/`NetworkError` types thrown
+by `ReadService.updateUserContent`/`deleteUserContent`, but classified an identical
+`HttpError(5xx)` oppositely — `sendRow` treated it as transient (halt, keep the row,
+retry next drain), `withOutboxOnNetworkError` treated it as definitive (rethrow,
+nothing queued). Online, a live 503 on archive meant `ArticleStore.remove()` had
+already run, the DELETE was rethrown, and no outbox row existed to freeze the value
+against the next sync — the one case the outbox was built for that it never saw. Same
+bug class as the 2026-09-12 entry below (task_5bd6, task_f19d): the error type was
+already correct at both throw sites, but the two catch sites carried independently
+drifted assumptions about what it meant.
+
+**Fix:** extracted the classification into one exported predicate
+(`outbox.ts`'s `isRetryable`) used by both `sendRow` and (renamed)
+`withOutboxOnRetryableError`, instead of leaving each module free to redefine
+"retryable" on its own. Investigated rather than assumed the 401 case: `fetchWithAuth`
+already retries once internally, and a persistent failure there surfaces as a plain
+`Error('Session expired...')`, not an `HttpError(401)` — so `HttpError(401)` cannot
+currently reach either catch site from a real `ReadService` call. Kept 401 in the
+shared predicate anyway (defensive, matches `sendRow`'s existing documented
+contract) rather than special-casing it out, since the point of a shared predicate is
+one classification, not two call sites each carrying their own carve-out.
+
+**How to apply:** when two call sites downstream of the same well-typed error branch
+on it independently, that's latent drift waiting to happen — extract one predicate
+function they both call, don't let each decide "retryable" for itself. And when a
+task says "confirm this case rather than assuming symmetry," actually trace the
+throw path (here, into `fetchWithAuth`) instead of pattern-matching the other
+module's handling onto it.
+
 ## 2026-09-14 — A task's status field is a claim about the tree, not evidence of it (task_88aa and 4 others)
 
 **What happened:** a backlog sweep found all five `in_progress` tasks were already

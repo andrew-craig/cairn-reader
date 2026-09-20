@@ -86,7 +86,7 @@ apps/mobile/
     │   ├── db.ts                    # Shared SQLite connection + migration ladder (ArticleStore, Outbox)
     │   ├── articleStore.ts          # Local read-list article store (SQLite)
     │   ├── articlePrefetch.ts       # Background body prefetch for the local store
-    │   ├── articleMutations.ts      # Store-first write facade; queues to Outbox on NetworkError
+    │   ├── articleMutations.ts      # Store-first write facade; queues to Outbox on a retryable error (NetworkError/401/5xx)
     │   ├── outbox.ts                # Offline mutation queue (SQLite), drained on reconnect
     │   ├── syncTrigger.ts           # Runs Outbox.drain() then ArticlePrefetchService.run()
     │   ├── auth.ts                  # Authentication service
@@ -408,9 +408,10 @@ Outbox.drain(): Promise<void>
 ### ArticleMutations (`src/services/articleMutations.ts`)
 Facade the reading screens call for status/favorite/scroll/archive edits:
 writes the local store first, then attempts the backend call, and queues
-the write in `Outbox` only on a `NetworkError` — a definitive rejection
-(4xx, an auth failure) still rethrows to the caller. Add-URL and Explore are
-untouched; they stay online-only.
+the write in `Outbox` on the same retryable set `Outbox`'s drain uses
+(`NetworkError`, `HttpError(401)`, `HttpError(5xx)` — see `outbox.ts`'s
+exported `isRetryable`) — a definitive 4xx other than 401 still rethrows to
+the caller. Add-URL and Explore are untouched; they stay online-only.
 
 **Methods:**
 ```typescript

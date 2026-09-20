@@ -1,6 +1,6 @@
 import { getDb } from './db';
 import { ReadService } from './read';
-import { HttpError, UpdateUserContentRequest } from '@cairn/shared';
+import { HttpError, NetworkError, UpdateUserContentRequest } from '@cairn/shared';
 
 /**
  * The server's PATCH field names, plus `delete` for the archive (DELETE)
@@ -29,15 +29,39 @@ const ENQUEUE_SQL = `
 type SendOutcome = 'success' | 'drop' | 'halt';
 
 /**
+ * True for a *known* transient error: NetworkError (server unreachable),
+ * HttpError(401), or HttpError(5xx). False for a definitive 4xx and for
+ * any other/unrecognized error — this only names the errors worth
+ * queueing for replay, it does not decide what to do with the rest, since
+ * `sendRow` and `withOutboxOnRetryableError` want different fallbacks for
+ * "unrecognized" (see each call site).
+ *
+ * `fetchWithAuth` already retries once on 401 internally, so a live
+ * `HttpError(401)` reaching a caller of this predicate means that retry
+ * genuinely failed — transient from here, same as a 5xx or an unreachable
+ * server. In practice `fetchWithAuth` converts a persistent 401 into a plain
+ * `Error('Session expired...')` rather than an `HttpError`, so this branch
+ * is defensive rather than currently reachable from `ReadService` — see
+ * `articleMutations.ts`.
+ *
+ * Shared by `sendRow` (below) and `articleMutations.ts`'s
+ * `withOutboxOnRetryableError` so the two halves of the offline write path
+ * can never classify a *recognized* error differently (task_c894).
+ */
+export function isRetryable(error: unknown): boolean {
+  return error instanceof NetworkError || (error instanceof HttpError && (error.status === 401 || error.status >= 500));
+}
+
+/**
  * Replays one row against the backend and classifies the result:
  * - success: 2xx, or a 404 on a replayed `delete` (the server already has no
  *   record of it — exactly what the delete wanted).
  * - drop: a definitive 4xx other than 401. Replaying it again can only fail
  *   the same way.
- * - halt: NetworkError, 401, 5xx, or anything unrecognized. `fetchWithAuth`
- *   already retries once on 401 internally, so a 401 reaching here means
- *   refresh genuinely failed — transient from this module's point of view,
- *   same as a 5xx or an unreachable server.
+ * - halt: NetworkError, 401, 5xx (per `isRetryable`), or anything else
+ *   unrecognized — unlike `withOutboxOnRetryableError`, an unrecognized
+ *   error here still keeps the row for a later retry rather than dropping
+ *   or rethrowing it.
  */
 async function sendRow(row: OutboxRow): Promise<SendOutcome> {
   try {
@@ -54,14 +78,13 @@ async function sendRow(row: OutboxRow): Promise<SendOutcome> {
     if (row.field === 'delete' && error instanceof HttpError && error.status === 404) {
       return 'success';
     }
-    if (error instanceof HttpError && error.status !== 401 && error.status < 500) {
+    if (error instanceof HttpError && !isRetryable(error)) {
       console.error(
         `Outbox: dropping ${row.field} write for article ${row.article_id} (non-retryable):`,
         error,
       );
       return 'drop';
     }
-    // NetworkError, HttpError(401/5xx), or anything else unrecognized.
     return 'halt';
   }
 }

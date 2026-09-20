@@ -1,15 +1,21 @@
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
-import { Outbox, OutboxField } from './outbox';
-import { NetworkError } from '@cairn/shared';
+import { Outbox, OutboxField, isRetryable } from './outbox';
 
 /**
- * Runs a backend write; a `NetworkError` is queued for later replay instead
- * of surfacing (store-first — the local write already happened). Any other
- * rejection (a definitive 4xx, an auth failure, ...) is a real rejection and
- * is rethrown, exactly as an unqueued write would surface today.
+ * Runs a backend write; an error `isRetryable` (NetworkError, HttpError(401),
+ * HttpError(5xx)) is queued for later replay instead of surfacing —
+ * store-first, so the local write already happened and would otherwise
+ * silently revert on the next sync with nothing in the outbox to freeze it
+ * (task_c894). A definitive 4xx other than 401 is a real rejection and is
+ * rethrown, exactly as an unqueued write would surface today.
+ *
+ * Uses the same `isRetryable` predicate as `outbox.ts`'s `sendRow` rather
+ * than a private copy — a live 5xx and a replayed 5xx must be classified the
+ * same way (see `outbox.ts` for why a live 401 in practice never reaches
+ * here as an `HttpError`).
  */
-async function withOutboxOnNetworkError(
+async function withOutboxOnRetryableError(
   articleId: string,
   field: OutboxField,
   payload: Record<string, unknown>,
@@ -18,7 +24,7 @@ async function withOutboxOnNetworkError(
   try {
     await send();
   } catch (error) {
-    if (error instanceof NetworkError) {
+    if (isRetryable(error)) {
       await Outbox.enqueue(articleId, field, payload);
       return;
     }
@@ -29,13 +35,13 @@ async function withOutboxOnNetworkError(
 /**
  * Facade for the reading screen's mutations (task_ebf1): each writes the
  * local store first, then attempts the backend write, queuing it in the
- * outbox on `NetworkError` rather than losing it. Add-URL and Explore are
+ * outbox on a retryable error rather than losing it. Add-URL and Explore are
  * untouched — they stay online-only.
  */
 export const ArticleMutations = {
   async markCompleted(articleId: string, readAt: number): Promise<void> {
     await ArticleStore.updateUserState(articleId, { isRead: true, readAt });
-    await withOutboxOnNetworkError(articleId, 'status', { status: 'completed' }, () =>
+    await withOutboxOnRetryableError(articleId, 'status', { status: 'completed' }, () =>
       ReadService.updateUserContent(articleId, { status: 'completed' }),
     );
   },
@@ -43,14 +49,14 @@ export const ArticleMutations = {
   // No store write: the store tracks `is_read` (a boolean), not an
   // intermediate "reading" status, so there is nothing local to persist.
   async markReading(articleId: string): Promise<void> {
-    await withOutboxOnNetworkError(articleId, 'status', { status: 'reading' }, () =>
+    await withOutboxOnRetryableError(articleId, 'status', { status: 'reading' }, () =>
       ReadService.updateUserContent(articleId, { status: 'reading' }),
     );
   },
 
   async saveScrollPosition(articleId: string, fraction: number): Promise<void> {
     await ArticleStore.updateUserState(articleId, { scrollFraction: fraction });
-    await withOutboxOnNetworkError(
+    await withOutboxOnRetryableError(
       articleId,
       'scroll_position',
       { scroll_position: fraction },
@@ -60,14 +66,14 @@ export const ArticleMutations = {
 
   async setFavorite(articleId: string, isFavorite: boolean): Promise<void> {
     await ArticleStore.updateUserState(articleId, { isFavorite });
-    await withOutboxOnNetworkError(articleId, 'is_favorite', { is_favorite: isFavorite }, () =>
+    await withOutboxOnRetryableError(articleId, 'is_favorite', { is_favorite: isFavorite }, () =>
       ReadService.updateUserContent(articleId, { is_favorite: isFavorite }),
     );
   },
 
   async archive(articleId: string): Promise<void> {
     await ArticleStore.remove(articleId);
-    await withOutboxOnNetworkError(articleId, 'delete', {}, () =>
+    await withOutboxOnRetryableError(articleId, 'delete', {}, () =>
       ReadService.deleteUserContent(articleId),
     );
   },
