@@ -344,9 +344,9 @@ jobs:
       - name: Wait for readiness
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/health/ready >/dev/null 2>&1; then
+            if curl -fsS http://localhost:8099/health/ready >/dev/null 2>&1; then
               echo "selfhost is ready"
-              curl -s http://localhost:8080/health/ready
+              curl -s http://localhost:8099/health/ready
               exit 0
             fi
             echo "waiting for selfhost... ($i/60)"
@@ -357,7 +357,7 @@ jobs:
           docker compose -f infrastructure/docker/selfhost/docker-compose.yml logs --tail=100 cairn-db
           exit 1
       - name: Check liveness endpoint
-        run: curl -fsS http://localhost:8080/health/live
+        run: curl -fsS http://localhost:8099/health/live
       - name: Dump container logs on failure
         if: failure()
         working-directory: infrastructure/docker/selfhost
