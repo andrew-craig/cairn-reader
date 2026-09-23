@@ -95,7 +95,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 | [ ] | H10 + logging | Recovery middleware registered before request-ID middleware in all 6 routers → panics logged with `request_id=unknown`; per-request logger used in only one handler repo-wide | 2 | [R6](#r6--operational-fixes) |
 | [x] #347 | Sentinel bug | Routine token expiry logs at ERROR (wrong sentinel: `auth.ErrTokenExpired` vs `apperrors.ErrTokenExpired`) — makes error-rate monitoring useless | 2 | [R6](#r6--operational-fixes) |
 | [ ] | Worker liveness | Outbox/fetcher workers: heartbeat log + `recover()` in loop + circuit-breaker state via slog (currently `fmt.Printf`) | 2 | [R6](#r6--operational-fixes) |
-| [ ] | Readiness | Self-host `/health/ready` checks only 3 of 6 DBs → reports healthy while half the system is down (and CI smoke-curls it → false green) | 2 | [R6](#r6--operational-fixes) |
+| [x] #403 | Readiness | Self-host `/health/ready` checks only 3 of 6 DBs → reports healthy while half the system is down (and CI smoke-curls it → false green) | 2 | [R6](#r6--operational-fixes) |
 | [ ] | P2-C4 | Decide the prod deploy story: image publishing is `if: false`, Vault init misses two AppRoles, dev compose broken for content-service. Either fix `prod/` or delete it and document selfhost as the only path | 2 | needs owner decision — write up options in the task, ask |
 
 #### Wave 4 — Consolidation (make fixes land once)
@@ -108,9 +108,9 @@ Do this *after* Waves 1–2: consolidation is safest when the behavior being con
 | [ ] | Fetch dedup | Collapse the 4+ HTTP fetch+size-cap copies onto `pkg/rss/fetch` (which by now carries the SSRF guard from Wave 1) | 2 | [R11](#r11--consolidating-duplicates) |
 | [ ] | Env parsing | Collapse `pkg/env` vs `pkg/config` vs two service-local copies into one, with one duration-parsing behavior | 3 | [R11](#r11--consolidating-duplicates) |
 | [x] #362 | Email sanitizer | Replace email's hand-maintained bluemonday policy with `pkg/rss/sanitize` | 2 | [R11](#r11--consolidating-duplicates) |
-| [ ] | FE auth layer | Move the near-verbatim web/mobile `auth.ts` token state machine into `apps/shared` (injectable-adapter pattern already demonstrated there); fix H12 (swallowed second 401) and offline-clears-tokens in the shared copy | 2 | [R11](#r11--consolidating-duplicates) |
+| [x] #397 | FE auth layer | Move the near-verbatim web/mobile `auth.ts` token state machine into `apps/shared` (injectable-adapter pattern already demonstrated there); fix H12 (swallowed second 401) and offline-clears-tokens in the shared copy | 2 | [R11](#r11--consolidating-duplicates) |
 | [x] #339 | Theme 4 | `FOR UPDATE SKIP LOCKED` on all job-claim queries (read/fetcher, explore/fetcher, email outbox) — prerequisite for ever running >1 replica | 2 | [R7](#r7--db-write-path-bugs) |
-| [ ] | FE resilience | React error boundaries (both apps), mobile list error states, mobile `accessibilityLabel` on the reader action bar, destructive-action confirmations (web) | 2 | standard FE work; test per [§2.2](#22-choosing-the-test-level) |
+| [x] #370–#378 | FE resilience | React error boundaries (both apps), mobile list error states, mobile `accessibilityLabel` on the reader action bar, destructive-action confirmations (web) | 2 | standard FE work; test per [§2.2](#22-choosing-the-test-level) |
 
 #### Wave 5 — Steady state
 
