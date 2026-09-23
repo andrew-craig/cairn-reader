@@ -2,14 +2,14 @@
 id: bug_54f6
 title: Prod Vault init never provisions email-ingest AppRole
 type: bug
-status: open
+status: closed
 priority: 2
 labels: [quality,infrastructure,vault,bugfix]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-09-14T11:56:13Z
-updated_at: 2026-09-14T11:56:13Z
+updated_at: 2026-09-23T07:53:02Z
 ---
 **Source:** follow-up promised by task_2315 (content-service AppRole, merged as #374) and never filed. Recorded here during a backlog housekeeping sweep on 2026-09-14, re-verified against `main` at `ba7ac84`.
 
@@ -138,3 +138,5 @@ Diff: 1 file changed, 40 insertions(+), 0 deletions. Committed on branch `bug_54
   syntax check + prior team knowledge support it.
 - Verified with the `hashicorp/vault:1.18` image pinned in `vault-init/Dockerfile`'s default
   `ARG VAULT_VERSION=1.18`, matching what prod actually builds.
+
+**Landed:** merged to `main` as #402. Closed during backlog housekeeping on 2026-09-23.

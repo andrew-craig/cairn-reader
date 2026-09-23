@@ -2,14 +2,14 @@
 id: task_fd42
 title: [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,wave3,ops]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-09T06:53:56Z
-updated_at: 2026-08-09T06:53:56Z
+updated_at: 2026-09-23T07:53:02Z
 ---
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. Read the full finding text in docs/CODE_QUALITY_REVIEW.md. One finding, one branch, one PR. Re-verify on main first — cited line numbers are from 2026-07-05 and drift.
 
@@ -99,3 +99,5 @@ Could not actually execute the GitHub Actions workflow (no `act` or equivalent a
 
 Status field left untouched — leaving `open`/close decision to the reviewer, per instructions.
 
+
+**Landed:** merged to `main` as #403. Closed during backlog housekeeping on 2026-09-23.
