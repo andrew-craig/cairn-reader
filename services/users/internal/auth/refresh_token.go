@@ -11,6 +11,7 @@ import (
 	"time"
 
 	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/models"
 	"github.com/google/uuid"
@@ -153,7 +154,7 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 		if tokenModel.TokenFamily != nil {
 			err := s.repo.RevokeTokenFamily(ctx, *tokenModel.TokenFamily)
 			if err != nil {
-				slog.Error("failed to revoke token family on reuse",
+				logging.FromContext(ctx).Error("failed to revoke token family on reuse",
 					slog.String("user_id", tokenModel.UserID.String()),
 					slog.String("token_family", tokenModel.TokenFamily.String()),
 					slog.Any("error", err),
@@ -163,7 +164,7 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 			// Fallback: revoke all user tokens if no family tracking
 			err := s.repo.RevokeAllUserTokens(ctx, tokenModel.UserID)
 			if err != nil {
-				slog.Error("failed to revoke user tokens on reuse",
+				logging.FromContext(ctx).Error("failed to revoke user tokens on reuse",
 					slog.String("user_id", tokenModel.UserID.String()),
 					slog.Any("error", err),
 				)
@@ -195,7 +196,7 @@ func (s *RefreshTokenService) ValidateAndRotateToken(
 	if err != nil {
 		// If we fail to revoke the old token, we should still succeed but log the error
 		// The old token will be cleaned up eventually
-		slog.Warn("failed to revoke old token during rotation",
+		logging.FromContext(ctx).Warn("failed to revoke old token during rotation",
 			slog.String("user_id", tokenModel.UserID.String()),
 			slog.String("token_id", tokenModel.ID.String()),
 			slog.Any("error", err),

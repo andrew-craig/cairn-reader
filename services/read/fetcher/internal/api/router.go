@@ -22,8 +22,8 @@ func NewRouter(db *database.DB, internalAuthMiddleware *auth.InternalAuthMiddlew
 	r := chi.NewRouter()
 
 	// Apply global middleware
-	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(slog.Default()))
+	r.Use(sharedmw.Recovery)
 	r.Use(sharedmw.SecureHeadersRelaxed)
 	r.Use(chimiddleware.Timeout(60 * time.Second))
 

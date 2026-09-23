@@ -13,6 +13,7 @@ import (
 	"time"
 
 	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/models"
@@ -261,7 +262,7 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 		)
 		// Record failed attempt; ignore secondary error so primary error is returned
 		if recordErr := s.userRepo.RecordFailedLogin(ctx, user.ID, s.lockoutThreshold, s.lockoutDuration); recordErr != nil {
-			slog.Warn("failed to record failed login attempt",
+			logging.FromContext(ctx).Warn("failed to record failed login attempt",
 				slog.String("user_id", user.ID.String()),
 				slog.Any("error", recordErr),
 			)
@@ -271,7 +272,7 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 
 	// Successful login: reset failed-login tracking
 	if err := s.userRepo.ResetFailedLogins(ctx, user.ID); err != nil {
-		slog.Warn("failed to reset failed login counter",
+		logging.FromContext(ctx).Warn("failed to reset failed login counter",
 			slog.String("user_id", user.ID.String()),
 			slog.Any("error", err),
 		)
@@ -280,7 +281,7 @@ func (s *authService) Login(ctx context.Context, email, password, deviceInfo, ip
 	// Update last login timestamp
 	if err := s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
 		// Log error but don't fail login
-		slog.Warn("failed to update last login timestamp",
+		logging.FromContext(ctx).Warn("failed to update last login timestamp",
 			slog.String("user_id", user.ID.String()),
 			slog.Any("error", err),
 		)
@@ -346,7 +347,7 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 
 	// Successful login: reset failed-login tracking
 	if err := s.userRepo.ResetFailedLogins(ctx, user.ID); err != nil {
-		slog.Warn("failed to reset failed login counter",
+		logging.FromContext(ctx).Warn("failed to reset failed login counter",
 			slog.String("user_id", user.ID.String()),
 			slog.Any("error", err),
 		)
@@ -355,7 +356,7 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 	// Update last login timestamp
 	if err := s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
 		// Log error but don't fail login
-		slog.Warn("failed to update last login timestamp",
+		logging.FromContext(ctx).Warn("failed to update last login timestamp",
 			slog.String("user_id", user.ID.String()),
 			slog.Any("error", err),
 		)
@@ -384,11 +385,11 @@ func (s *authService) LoginMobile(ctx context.Context, expoDeviceID, deviceInfo,
 func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, deviceInfo, ipAddress string) (*AuthResponse, error) {
 	// Validate input
 	if refreshToken == "" {
-		slog.Warn("refresh token validation: empty token provided")
+		logging.FromContext(ctx).Warn("refresh token validation: empty token provided")
 		return nil, ErrInvalidInput
 	}
 
-	slog.Debug("refresh token validation: starting")
+	logging.FromContext(ctx).Debug("refresh token validation: starting")
 
 	// Prepare device info and IP for token creation
 	var deviceInfoPtr, ipAddressPtr *string
@@ -408,7 +409,7 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 	)
 	if err != nil {
 		if errors.Is(err, auth.ErrTokenReused) {
-			slog.Warn("refresh token validation: token reuse detected",
+			logging.FromContext(ctx).Warn("refresh token validation: token reuse detected",
 				slog.String("error", err.Error()),
 			)
 			auditEvent("token_reuse_detected",
@@ -418,29 +419,29 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 			return nil, fmt.Errorf("%w: %w", ErrTokenReused, err)
 		}
 		if errors.Is(err, auth.ErrRefreshTokenNotFound) {
-			slog.Warn("refresh token validation: token not found")
+			logging.FromContext(ctx).Warn("refresh token validation: token not found")
 			return nil, ErrInvalidCredentials
 		}
 		if errors.Is(err, auth.ErrTokenExpired) {
-			slog.Warn("refresh token validation: token expired",
+			logging.FromContext(ctx).Warn("refresh token validation: token expired",
 				slog.String("error", err.Error()),
 			)
 			return nil, ErrRefreshTokenExpired
 		}
-		slog.Error("refresh token validation: unexpected error",
+		logging.FromContext(ctx).Error("refresh token validation: unexpected error",
 			slog.String("error", err.Error()),
 		)
 		return nil, fmt.Errorf("failed to validate refresh token: %w", err)
 	}
 
-	slog.Debug("refresh token validation: token validated successfully",
+	logging.FromContext(ctx).Debug("refresh token validation: token validated successfully",
 		slog.String("user_id", userID.String()),
 	)
 
 	// Retrieve user
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		slog.Error("refresh token validation: failed to retrieve user",
+		logging.FromContext(ctx).Error("refresh token validation: failed to retrieve user",
 			slog.String("user_id", userID.String()),
 			slog.String("error", err.Error()),
 		)
@@ -450,14 +451,14 @@ func (s *authService) RefreshAccessToken(ctx context.Context, refreshToken, devi
 	// Generate new access token
 	accessToken, err := s.jwtManager.GenerateToken(user.ID)
 	if err != nil {
-		slog.Error("refresh token validation: failed to generate access token",
+		logging.FromContext(ctx).Error("refresh token validation: failed to generate access token",
 			slog.String("user_id", userID.String()),
 			slog.String("error", err.Error()),
 		)
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	slog.Debug("refresh token validation: completed successfully",
+	logging.FromContext(ctx).Debug("refresh token validation: completed successfully",
 		slog.String("user_id", userID.String()),
 	)
 

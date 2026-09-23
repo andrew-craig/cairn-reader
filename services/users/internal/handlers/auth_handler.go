@@ -243,11 +243,11 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		ipAddress := getClientIP(r)
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
-			slog.Warn("refresh request: body too large", slog.String("ip", ipAddress))
+			logging.FromContext(r.Context()).Warn("refresh request: body too large", slog.String("ip", ipAddress))
 			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
 			return
 		}
-		slog.Error("refresh request: failed to parse JSON",
+		logging.FromContext(r.Context()).Error("refresh request: failed to parse JSON",
 			slog.String("error", err.Error()),
 			slog.String("ip", ipAddress),
 		)

@@ -22,12 +22,12 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
-- **task_8efb** · P2 · open · [H10] Recovery middleware registered before request-ID middleware in all 6 routers → request_id=unknown  (parent: epic_fefa)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
 - **task_c894** · P2 · open · Mobile: a live 5xx on a mutation is dropped, but the same 5xx on an outbox replay is retried
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
+- **task_fc02** · P2 · open · Selfhost compose smoke test curls port 8080, but stack publishes on 8099  (parent: epic_fefa)
 - **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
@@ -49,6 +49,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_5baa** · P3 · open · Explore: Add Vault connectivity to health check
+- **task_603e** · P3 · open · [H10 follow-up] Repoint request-path error logs at the per-request logger in explore, read/content, read/fetcher, read/email  (parent: epic_fefa)
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)

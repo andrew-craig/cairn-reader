@@ -46,8 +46,8 @@ func (s *Server) Routes() http.Handler {
 	r := chi.NewRouter()
 
 	// Global middleware
-	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(s.logger))
+	r.Use(sharedmw.Recovery)
 	// CORS is applied globally (before route/method resolution) so it covers health
 	// checks and reliably answers browser preflight OPTIONS for Authorization requests.
 	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))

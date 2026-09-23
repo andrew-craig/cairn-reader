@@ -1,16 +1,19 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	internalAuth "github.com/andrew-craig/cairn-reader/services/users/internal/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 	"github.com/google/uuid"
@@ -130,4 +133,27 @@ func requireLogoutAllStatus(t *testing.T, router http.Handler, token string, wan
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	require.Equal(t, want, w.Code, "logout-all response body: %s", w.Body.String())
+}
+
+// Handler error logs go through the per-request logger, so they carry the
+// request's ID rather than being uncorrelatable global log lines.
+func TestRouter_HandlerErrorLogCarriesRequestID(t *testing.T) {
+	var buf bytes.Buffer
+	router := Router(RouterConfig{
+		AuthService:              &stubAuthService{},
+		EmailVerificationService: &mockEmailVerificationService{},
+		Logger:                   slog.New(slog.NewJSONHandler(&buf, nil)),
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader("{not json"))
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set(logging.HeaderXRequestID, "refresh-request-id")
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Contains(t, buf.String(), `"msg":"refresh request: failed to parse JSON"`)
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if strings.Contains(line, `"msg":"refresh request: failed to parse JSON"`) {
+			require.Contains(t, line, `"request_id":"refresh-request-id"`)
+		}
+	}
 }

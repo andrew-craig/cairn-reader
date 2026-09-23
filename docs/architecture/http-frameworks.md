@@ -31,12 +31,12 @@ pkg/logging/chi_middleware.go  → structured request logging (ChiRequestLogger)
 
 ### Global Middleware (all routes)
 
-Applied via `r.Use(...)` at the top of each router:
+Applied via `r.Use(...)` at the top of each router, in this order. `ChiRequestLogger` must wrap `Recovery`, or panics are logged with `request_id=unknown` (enforced by each router's `TestRouter_PanicLogCarriesRequestID`):
 
 | Middleware | Package | Purpose |
 |---|---|---|
+| `ChiRequestLogger` | `pkg/logging` | Structured `slog` logging; generates `X-Request-ID`; puts the request-scoped logger in context (`logging.FromContext`); logs status, duration, size |
 | `Recovery` | `pkg/middleware` | Catches panics; logs with request ID; returns `500` JSON — never leaks internals |
-| `ChiRequestLogger` | `pkg/logging` | Structured `slog` logging; generates `X-Request-ID`; logs status, duration, size |
 | `SecureHeadersRelaxed` | `pkg/middleware` | Sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection`, `Strict-Transport-Security`, `Referrer-Policy` |
 
 ### Route-Group Middleware

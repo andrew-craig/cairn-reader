@@ -2,9 +2,11 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/andrew-craig/cairn-reader/pkg/auth"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	sharedmw "github.com/andrew-craig/cairn-reader/pkg/middleware"
 	"github.com/andrew-craig/cairn-reader/services/read/email/internal/api/handlers"
 	"github.com/andrew-craig/cairn-reader/services/read/email/internal/api/middleware"
@@ -29,9 +31,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	// Middleware
-	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
-	r.Use(chimw.Logger)
+	r.Use(logging.ChiRequestLogger(slog.Default()))
 	r.Use(sharedmw.Recovery)
 	// CORS is applied globally (before route/method resolution) so it covers health
 	// checks and reliably answers browser preflight OPTIONS for Authorization requests.
