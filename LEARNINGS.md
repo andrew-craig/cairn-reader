@@ -2,6 +2,39 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-09-23 — A root-cause diagnosis is only as good as the execution environment it assumes (task_9def, PR #406)
+
+**What happened:** task_9def and PR #406 asserted, as a confirmed root cause, that the
+`selfhost-compose-smoke` CI job collided with the real self-hosted deployment's Docker
+volume on the same physical server — same pinned Compose project name, CI's
+`DB_PASSWORD` override not matching the already-initialized Postgres role — producing
+a `password authentication failed for user cairn` incident and app crash loop on
+2026-09-20. The task's own author wrote this up as "root-caused" and shipped it. It
+shipped wrong: `.github/workflows/docker-test.yml` sets `runs-on: ubuntu-latest` on
+every job, including this one — a GitHub-hosted, ephemeral, single-tenant VM that
+cannot share a Docker daemon, network, or volume namespace with the physical server.
+The collision mechanism described was never possible given how the job is configured.
+An automated review bot (magpie) caught it on the PR; a human re-checked `runs-on`
+directly in the workflow file and confirmed the bot was right.
+
+**Why it happened:** the diagnosis was built entirely from symptom-side evidence — the
+error message, the shared project name in the compose file, the timing — without ever
+checking the one fact that determined whether the mechanism was physically possible:
+where the job actually executes. A pinned Compose project name is real evidence of a
+*latent hazard*; it is not evidence that the hazard fired in this specific incident,
+and nothing in the symptoms distinguished those two claims.
+
+**How to apply:** before writing up a root-cause diagnosis — especially one that
+explains away a real production incident — check the actual execution environment the
+mechanism depends on (`runs-on`, network topology, which host/process really touched
+the resource) before treating it as fact, not after. "This mechanism is plausible and
+explains the symptoms" is not the same claim as "this mechanism is what happened," and
+only the second belongs in a task's "root-caused" line or a PR's summary. When the
+distinguishing fact is one `grep` away (here, `runs-on: ubuntu-latest`, present on
+every job in the same file), not checking it before asserting the diagnosis as
+confirmed is the actual error — the keep-worthy code fix was never in question, only
+the story wrapped around it.
+
 ## 2026-09-20 — A sixth instance of "fixing the throw site doesn't fix the catch site" (task_c894)
 
 **What happened:** `outbox.ts`'s `sendRow` and `articleMutations.ts`'s
