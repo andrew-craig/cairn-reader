@@ -330,6 +330,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # Isolate this job's compose project from any real self-host deployment
+      # that might share this Docker host. The compose file pins a stable
+      # `name:` for real operators, but COMPOSE_PROJECT_NAME (read by the
+      # docker compose CLI) takes precedence over it, so a unique-per-run
+      # value here keeps this job's containers/volumes from ever colliding
+      # with (or being deleted by `down -v` alongside) a real deployment's.
+      COMPOSE_PROJECT_NAME: selfhost-smoke-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v5
       - name: Create .env from example
