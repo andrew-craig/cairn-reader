@@ -13,7 +13,7 @@ DB_USER="${DB_USER:-cairn}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 DATE=$(date +%Y%m%d_%H%M%S)
 
-mkdir -p "$BACKUP_DIR"
+install -d -m 0700 "$BACKUP_DIR"
 
 OUT_FILE="$BACKUP_DIR/cairn_all_$DATE.sql.gz"
 TMP_FILE="$OUT_FILE.tmp"
@@ -21,6 +21,7 @@ TMP_FILE="$OUT_FILE.tmp"
 if docker compose --project-directory "$COMPOSE_DIR" -f "$COMPOSE_DIR/docker-compose.yml" \
      exec -T cairn-db pg_dumpall -U "$DB_USER" | gzip > "$TMP_FILE"; then
   mv "$TMP_FILE" "$OUT_FILE"
+  chmod 600 "$OUT_FILE"
 else
   rm -f "$TMP_FILE"
   echo "Backup failed: pg_dumpall did not complete" >&2

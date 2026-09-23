@@ -128,7 +128,7 @@ docker compose exec -i cairn-db psql -U cairn -d postgres < backup.sql
 30-day retention. Schedule it with cron, e.g. nightly at 2am:
 
 ```bash
-0 2 * * * BACKUP_DIR=/path/to/backups infrastructure/docker/selfhost/scripts/backup.sh >> /path/to/backups/backup.log 2>&1
+0 2 * * * BACKUP_DIR=/home/operator/cairn-backups /home/operator/cairn-reader/infrastructure/docker/selfhost/scripts/backup.sh >> /home/operator/cairn-backups/backup.log 2>&1
 ```
 
 ## TLS / HTTPS
