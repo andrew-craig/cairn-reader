@@ -110,7 +110,7 @@ Do this *after* Waves 1–2: consolidation is safest when the behavior being con
 | [x] #362 | Email sanitizer | Replace email's hand-maintained bluemonday policy with `pkg/rss/sanitize` | 2 | [R11](#r11--consolidating-duplicates) |
 | [x] #397 | FE auth layer | Move the near-verbatim web/mobile `auth.ts` token state machine into `apps/shared` (injectable-adapter pattern already demonstrated there); fix H12 (swallowed second 401) and offline-clears-tokens in the shared copy | 2 | [R11](#r11--consolidating-duplicates) |
 | [x] #339 | Theme 4 | `FOR UPDATE SKIP LOCKED` on all job-claim queries (read/fetcher, explore/fetcher, email outbox) — prerequisite for ever running >1 replica | 2 | [R7](#r7--db-write-path-bugs) |
-| [x] #370–#378 | FE resilience | React error boundaries (both apps), mobile list error states, mobile `accessibilityLabel` on the reader action bar, destructive-action confirmations (web) | 2 | standard FE work; test per [§2.2](#22-choosing-the-test-level) |
+| [x] #370–#372, #376–#378 | FE resilience | React error boundaries (both apps), mobile list error states, mobile `accessibilityLabel` on the reader action bar, destructive-action confirmations (web) | 2 | standard FE work; test per [§2.2](#22-choosing-the-test-level) |
 
 #### Wave 5 — Steady state
 
