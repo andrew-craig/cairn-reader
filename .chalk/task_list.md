@@ -4,8 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **task_9def** · P2 · in_progress · Isolate selfhost-compose-smoke CI project from real deployments  (parent: epic_fefa)
-- **bug_54f6** · P2 · open · Prod Vault init never provisions email-ingest AppRole  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -24,11 +22,8 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
-- **task_c894** · P2 · open · Mobile: a live 5xx on a mutation is dropped, but the same 5xx on an outbox replay is retried
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
-- **task_fc02** · P2 · open · Selfhost compose smoke test curls port 8080, but stack publishes on 8099  (parent: epic_fefa)
-- **task_fd42** · P2 · open · [Readiness] Self-host /health/ready checks only 3 of 6 DBs → healthy while half the system is down  (parent: epic_fefa)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch

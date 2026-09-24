@@ -2,14 +2,14 @@
 id: task_9def
 title: Isolate selfhost-compose-smoke CI project from real deployments
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [quality,ci,infrastructure]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-09-20T20:41:26Z
-updated_at: 2026-09-20T20:41:59Z
+updated_at: 2026-09-23T07:53:02Z
 ---
 infrastructure/docker/selfhost/docker-compose.yml pins a top-level 'name: cairn-selfhost', and that name is baked into the compose file itself rather than being CI-scoped. Any docker compose invocation of this file on a shared Docker host resolves to the same project name/volumes (e.g. cairn-selfhost_cairn_db_data) regardless of who runs it or from what directory — that's a real latent hazard independent of any specific incident. Fix: give the CI job an isolated COMPOSE_PROJECT_NAME (unique per run, incorporating ${{ github.run_id }}) so it can never collide with or delete a real deployment's containers/volumes, without touching the shared compose file's name: field (that field is what real self-host operators rely on for stable container names across restarts).
 
@@ -44,3 +44,5 @@ Verified:
 - `actionlint` (if present) run against the file — see PR for result.
 - Manually traced all 5 `docker compose` call sites in the job; all are subject to the job-level env var.
 - Not verified: actually running the job in GitHub Actions (can't do that from this environment). The PR description notes this honestly.
+
+**Landed:** merged to `main` as #406. Closed during backlog housekeeping on 2026-09-23.

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
+  useColorScheme,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,8 @@ interface HeaderPopoverProps {
 
 export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, children }) => {
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const topOffset = insets.top + Layout.headerHeight;
 
   return (
@@ -27,7 +30,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, 
         <BlurView
           style={StyleSheet.absoluteFill}
           intensity={Platform.OS === 'ios' ? 8 : 16}
-          tint="light"
+          tint={colorScheme === 'dark' ? 'dark' : 'light'}
         />
         <TouchableOpacity
           style={[styles.overlay, { paddingTop: topOffset }]}
@@ -40,7 +43,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, 
           >
             <TouchableOpacity
               activeOpacity={1}
-              style={[styles.card, { backgroundColor: Colors.light.hover }]}
+              style={[styles.card, { backgroundColor: colors.hover }]}
               onPress={(e) => e.stopPropagation()}
             >
               {children}

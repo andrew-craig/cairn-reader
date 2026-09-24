@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { IconButton } from '../components/common/IconButton';
 import { HeaderPopover } from '../components/common/HeaderPopover';
 import { SubscriptionListScreen } from '../components/SubscriptionListScreen';
-import { Colors, FontSizes, FontFamily } from '../constants/theme';
+import { Colors, FontSizes, FontFamily, Spacing } from '../constants/theme';
 import { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
 
@@ -20,15 +21,42 @@ const AddNewsletterModal: React.FC<{
 }> = ({ visible, onClose, emailAddress, error }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = async () => {
+    if (!emailAddress) return;
+    try {
+      await Clipboard.setStringAsync(emailAddress);
+      setCopied(true);
+    } catch (err) {
+      console.error('Failed to copy newsletter address:', err);
+    }
+  };
 
   return (
     <HeaderPopover visible={visible} onClose={onClose}>
       <Text style={[styles.modalLabel, { color: colors.text }]}>
         Send or forward emails to
       </Text>
-      <Text style={[styles.modalEmail, { color: colors.text }]}>
-        {error ?? emailAddress ?? 'Loading…'}
-      </Text>
+      <View style={styles.emailRow}>
+        <Text style={[styles.modalEmail, { color: colors.text }]} selectable>
+          {error ?? emailAddress ?? 'Loading…'}
+        </Text>
+        {!error && emailAddress && (
+          <IconButton
+            icon={copied ? 'checkmark' : 'copy-outline'}
+            onPress={handleCopy}
+            size={20}
+            accessibilityLabel={copied ? 'Copied' : 'Copy address'}
+          />
+        )}
+      </View>
       <Text style={[styles.modalDescription, { color: colors.textSecondary }]}>
         New subscriptions will be automatically added to your reading list.
       </Text>
@@ -90,7 +118,14 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.default,
     textAlign: 'center',
   },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
   modalEmail: {
+    flexShrink: 1,
     fontSize: FontSizes.md,
     fontFamily: FontFamily.defaultBold,
     textAlign: 'center',

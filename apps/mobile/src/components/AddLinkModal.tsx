@@ -299,9 +299,9 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                   activeOpacity={0.7}
                 >
                   {loading || detecting ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={colors.background} size="small" />
                   ) : (
-                    <Text style={styles.primaryButtonText}>{getSubmitButtonText()}</Text>
+                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>{getSubmitButtonText()}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -370,7 +370,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#FFFFFF',
     fontSize: FontSizes.md,
     fontFamily: FontFamily.defaultSemiBold,
   },

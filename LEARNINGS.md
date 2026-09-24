@@ -101,6 +101,12 @@ as the stacked-PR entry below: **branch topology that diverges from the PR's sta
 subject is how work gets lost, in both directions** — task_47c1's first attempt was
 lost by being orphaned, task_88aa's by being carried.
 
+**Recurred 2026-09-23:** five more tasks (bug_54f6, task_fd42, task_fc02, task_9def,
+task_c894) had merged with a `## Review` section written but `status: open` — each PR
+filled in the review and stopped one command short. The top four slots of `chalk ready`
+were finished work. **Run `chalk close <id>` in the PR that lands the work**, alongside
+the Review section; a separate housekeeping pass is the fallback, not the process.
+
 ## 2026-09-12 — The canonical error type ends the bug class only where it's actually consumed (task_5bd6, task_f19d)
 
 **Correction:** The 2026-09-07 entry below tallied four windows where an unwrapped
