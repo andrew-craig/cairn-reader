@@ -55,7 +55,13 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       onRequestClose={handleClose}
     >
       <TouchableOpacity
-        style={[styles.overlay, { paddingTop: modalTopPosition }]}
+        style={[
+          styles.overlay,
+          {
+            paddingTop: modalTopPosition,
+            backgroundColor: colorScheme === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+          },
+        ]}
         activeOpacity={1}
         onPress={handleClose}
       >
@@ -101,7 +107,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'flex-start',
     paddingHorizontal: Spacing.md,
   },
