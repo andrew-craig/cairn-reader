@@ -2,14 +2,14 @@
 id: task_fc02
 title: Selfhost compose smoke test curls port 8080, but stack publishes on 8099
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,ci]
-blocked_by: [task_fd42]
+blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-09-20T03:14:25Z
-updated_at: 2026-09-20T03:14:25Z
+updated_at: 2026-09-23T07:53:10Z
 ---
 **Source:** discovered by the task_fd42 agent (PR #403) while fixing the "readiness probe lies" finding. Filed separately per that PR's recommendation rather than folding it in, since it's a distinct bug in the same job.
 
@@ -45,3 +45,5 @@ Depends on PR #403 (task_fd42) landing first — that's what fixes the `needs:` 
 **YAML validated:** `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/docker-test.yml'))"` succeeds.
 
 Leaving `status: open` per instructions — reviewer to close after confirming the PR run.
+
+**Landed:** merged to `main` as #405. Closed during backlog housekeeping on 2026-09-23.
