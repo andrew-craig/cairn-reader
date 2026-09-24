@@ -31,8 +31,8 @@ func NewRouter(bgCtx context.Context, database Pinger, feedRepo db.FeedRepositor
 	r := chi.NewRouter()
 
 	// Global middleware
-	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(logger))
+	r.Use(sharedmw.Recovery)
 	r.Use(sharedmw.SecureHeadersRelaxed)
 
 	// Health check endpoints

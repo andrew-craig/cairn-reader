@@ -340,7 +340,7 @@ flowchart TD
 
     subgraph US["User Service (PORT=8080 in container, dev host :8082)"]
         direction TB
-        Router["chi Router<br/>internal/handlers/router.go<br/>Recovery -> RequestLogger -> CORS -> RequireHTTPS -> SecurityHeaders"]
+        Router["chi Router<br/>internal/handlers/router.go<br/>RequestLogger -> Recovery -> CORS -> RequireHTTPS -> SecurityHeaders"]
         RateLimiter["pkg/middleware RateLimit<br/>per-IP, in-memory, applies to /api/v1/auth/* only"]
         AuthMW["pkg/auth RequireAuth middleware<br/>validates RS256 JWT, puts user_id on request context"]
         AuthHandler["AuthHandler<br/>/api/v1/auth/*"]

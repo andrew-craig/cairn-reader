@@ -181,8 +181,8 @@ func main() {
 // with the middleware stack those services sit behind.
 func newMasterRouter(logger *slog.Logger) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(logger))
+	r.Use(sharedmw.Recovery)
 	r.Use(sharedmw.SecureHeadersRelaxed)
 	// Each individual service enforces HTTPS by checking the X-Forwarded-Proto
 	// header, which is what any TLS-terminating reverse proxy sets. The selfhost

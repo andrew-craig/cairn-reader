@@ -43,8 +43,8 @@ func Router(config RouterConfig) http.Handler {
 	r := chi.NewRouter()
 
 	// Apply recovery and logging globally (needed for all routes including health checks)
-	r.Use(sharedmw.Recovery)
 	r.Use(logging.ChiRequestLogger(config.Logger))
+	r.Use(sharedmw.Recovery)
 	// CORS is applied globally (before route/method resolution) so it also covers
 	// the public /health/* endpoints and reliably answers browser preflight OPTIONS.
 	r.Use(sharedmw.CORS(sharedmw.DefaultCORSConfig()))
