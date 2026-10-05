@@ -1,8 +1,10 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -191,6 +193,31 @@ func TestContentServiceClient_CircuitBreaker_OpensAfterConsecutiveFailures(t *te
 	_, err := c.DeliverContent(context.Background(), newTestPayload())
 	assert.Error(t, err)
 	assert.Equal(t, countAfterOpen, atomic.LoadInt32(&callCount), "circuit breaker should prevent server call")
+}
+
+func TestContentServiceClient_CircuitBreaker_StateChangeLogsWarn(t *testing.T) {
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
+	for i := 0; i < 5; i++ {
+		//nolint:errcheck
+		c.DeliverContent(context.Background(), newTestPayload())
+	}
+
+	out := buf.String()
+	assert.Contains(t, out, "level=WARN")
+	assert.Contains(t, out, "circuit breaker state changed")
+	assert.Contains(t, out, "name=EmailContentService")
+	assert.Contains(t, out, "from=closed")
+	assert.Contains(t, out, "to=open")
 }
 
 func TestContentServiceClient_ContextCancellation(t *testing.T) {

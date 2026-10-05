@@ -1,8 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -585,4 +588,23 @@ type customError struct {
 
 func (e *customError) Error() string {
 	return e.msg
+}
+
+func TestContentServiceClient_CircuitBreakerStateChangeLogsWarnViaSlog(t *testing.T) {
+	var buf bytes.Buffer // Execute below is synchronous, so no locking needed
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	c := NewContentServiceClient(ContentServiceConfig{BaseURL: "http://localhost:8080"})
+	for i := 0; i < 5; i++ {
+		_, _ = c.circuitBreaker.Execute(func() (interface{}, error) { return nil, errors.New("down") })
+	}
+
+	out := buf.String()
+	assert.Contains(t, out, "level=WARN")
+	assert.Contains(t, out, `msg="Circuit breaker state changed"`)
+	assert.Contains(t, out, "name=ContentService")
+	assert.Contains(t, out, "from=closed")
+	assert.Contains(t, out, "to=open")
 }

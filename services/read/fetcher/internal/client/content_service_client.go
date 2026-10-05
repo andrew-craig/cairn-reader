@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -172,8 +173,7 @@ func NewContentServiceClient(config ContentServiceConfig) *ContentServiceClient 
 			return counts.Requests >= 5 && failureRatio >= 0.6
 		},
 		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
-			// Log state changes (could be integrated with structured logging)
-			fmt.Printf("Circuit breaker state changed from %s to %s\n", from, to)
+			slog.Warn("Circuit breaker state changed", "name", name, "from", from.String(), "to", to.String())
 		},
 	}
 

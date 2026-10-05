@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -108,7 +109,11 @@ func NewContentServiceClient(cfg ContentServiceConfig) *ContentServiceClient {
 			return counts.ConsecutiveFailures >= 5
 		},
 		OnStateChange: func(name string, from, to gobreaker.State) {
-			fmt.Printf("circuit breaker %q: %s → %s\n", name, from, to)
+			slog.Warn("circuit breaker state changed",
+				slog.String("name", name),
+				slog.String("from", from.String()),
+				slog.String("to", to.String()),
+			)
 		},
 	}
 

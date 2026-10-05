@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -119,6 +120,14 @@ func (ow *OutboxWorker) pollPendingEntries() {
 
 // fetchAndQueuePendingEntries fetches pending entries and queues them for processing
 func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
+	// A panic in one tick must not kill the poller goroutine: log it and let
+	// the loop continue on the next tick.
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("Panic in outbox poll tick", "panic", r, "stack", string(debug.Stack()))
+		}
+	}()
+
 	ctx := context.Background()
 
 	entries, err := ow.outboxRepo.GetPendingEntries(ctx, ow.config.BatchSize)
@@ -127,14 +136,11 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 		return
 	}
 
-	if len(entries) > 0 {
-		slog.Info("Fetched pending outbox entries for delivery", "count", len(entries))
-	}
-
+	queued := 0
 	for i, entry := range entries {
 		select {
 		case ow.outboxQueue <- entry:
-			// Entry queued successfully
+			queued++
 		case <-ow.stopCh:
 			// Worker is stopping. entries[i:] (including this one) were
 			// already claimed into 'sending' by GetPendingEntries but never
@@ -152,6 +158,10 @@ func (ow *OutboxWorker) fetchAndQueuePendingEntries() {
 			slog.Warn("Outbox queue is full, entry released for retry on next poll", "entry_id", entry.ID)
 		}
 	}
+
+	// Heartbeat on every tick, including idle ones, so a stalled poller is
+	// visible as a missing log line.
+	slog.Info("Outbox poll tick", "fetched", len(entries), "queued", queued)
 }
 
 // releaseUnqueued releases the atomic claim on entries that were fetched by
@@ -189,6 +199,17 @@ func (ow *OutboxWorker) worker(id int) {
 
 // processOutboxEntry processes a single outbox entry
 func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOutbox) {
+	// One bad entry must not kill this worker goroutine (or the process).
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("Panic processing outbox entry",
+				"worker_id", workerID,
+				"entry_id", entry.ID,
+				"panic", r,
+				"stack", string(debug.Stack()))
+		}
+	}()
+
 	ctx := context.Background()
 
 	slog.Info("Processing outbox entry",
