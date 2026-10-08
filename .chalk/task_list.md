@@ -5,6 +5,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **task_7df9** · P1 · open · Content service: per-source routing to Feed or Reads  (parent: epic_6e4d)
+- **task_85bd** · P1 · open · Remove Explore from mobile and web clients  (parent: epic_6e4d)
+- **task_f9ad** · P1 · open · Mobile: Feed and Reads tabs  (parent: epic_6e4d)
 - **task_0849** · P2 · in_progress · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
@@ -12,7 +15,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_02c8** · P2 · open · [Audit/Tier 3] Vote counters: collapse the transition ladder AND fix the asymmetric RowsAffected handling  (parent: epic_fefa)
 - **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 - **task_19a9** · P2 · open · [explore/fetcher] Integration suite: test isolation + EndToEndFlow hardcoded IDs + EmptyResponse behavior  (parent: epic_fefa)
+- **task_30e3** · P2 · open · Decommission the Explore backend (fetcher + recommender)  (parent: epic_6e4d)
 - **task_317b** · P2 · open · Subscription aggregator silently swallows per-source failures (200 with a short list)  (parent: epic_fefa)
+- **task_47d5** · P2 · open · Merge Feeds + Newsletters settings into one Sources screen  (parent: epic_6e4d)
 - **task_499a** · P2 · open · [Audit F-S11-1 + F-S08-1/Tier 3] Type the outbox payloads in both services — producer/consumer drift, sequence together (X2)  (parent: epic_fefa)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
@@ -23,7 +28,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b5bd** · P2 · open · Verify mobile shown-tracking adoption before Phase B cutover  (parent: epic_c482)
+- **task_d0f5** · P2 · open · Feed retention: delete feed items after 30 days  (parent: epic_6e4d)
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_f4ac** · P2 · open · Web: Feed and Reads routes  (parent: epic_6e4d)
 - **task_f84d** · P2 · open · Log mobile app version on /shown requests  (parent: epic_c482)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
@@ -41,6 +48,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
+- **task_082f** · P3 · open · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
