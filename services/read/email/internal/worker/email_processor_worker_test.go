@@ -295,3 +295,94 @@ func TestEmailProcessorWorker_Start_StopsOnContextCancel(t *testing.T) {
 		t.Fatal("worker did not stop after context cancellation")
 	}
 }
+
+func TestEmailProcessorWorker_Start_IdleTickEmitsHeartbeat(t *testing.T) {
+	logs := captureLogs(t)
+
+	secondTick := make(chan struct{})
+	var calls int
+	rawRepo := &mockRawEmailRepo{getPendingFunc: func(context.Context, int) ([]*models.RawEmail, error) {
+		calls++
+		if calls == 2 {
+			close(secondTick)
+		}
+		return nil, nil
+	}}
+	w := makeWorker(rawRepo, &mockOutboxRepo{}, &mockSenderService{})
+	w.pollInterval = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		w.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-secondTick:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not tick")
+	}
+	cancel()
+	<-done
+
+	out := logs.String()
+	assert.Contains(t, out, "worker heartbeat")
+	assert.Contains(t, out, "worker=email_processor")
+	assert.Contains(t, out, "entries=0")
+}
+
+func TestEmailProcessorWorker_Start_RecoversFromPanicAndKeepsRunning(t *testing.T) {
+	logs := captureLogs(t)
+
+	secondTick := make(chan struct{})
+	var calls int
+	rawRepo := &mockRawEmailRepo{getPendingFunc: func(context.Context, int) ([]*models.RawEmail, error) {
+		calls++
+		if calls == 1 {
+			panic("boom from repo")
+		}
+		if calls == 2 {
+			close(secondTick)
+		}
+		return nil, nil
+	}}
+	w := makeWorker(rawRepo, &mockOutboxRepo{}, &mockSenderService{})
+	w.pollInterval = 5 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		w.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-secondTick:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not keep ticking after a panic")
+	}
+	cancel()
+	<-done
+
+	out := logs.String()
+	assert.Contains(t, out, "level=ERROR")
+	assert.Contains(t, out, "worker tick panicked")
+	assert.Contains(t, out, "boom from repo")
+}
+
+func TestEmailProcessorWorker_ProcessBatch_PanicInEmailGoroutineIsRecovered(t *testing.T) {
+	logs := captureLogs(t)
+
+	email := makeEmail()
+	rawRepo := &mockRawEmailRepo{getPendingFunc: func(context.Context, int) ([]*models.RawEmail, error) {
+		return []*models.RawEmail{email}, nil
+	}}
+	sender := &mockSenderService{upsertFunc: func(context.Context, uuid.UUID, string, string, time.Time) (*models.EmailSender, error) {
+		panic("boom from sender")
+	}}
+	w := makeWorker(rawRepo, &mockOutboxRepo{}, sender)
+
+	assert.NotPanics(t, func() { w.processBatch(context.Background()) })
+	assert.Contains(t, logs.String(), "boom from sender")
+}

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -158,6 +161,49 @@ func TestOutboxWorker_DeliverBatch_FailedEntryDoesNotBlockSubsequentEntries(t *t
 	}
 }
 
+// A panic while delivering one entry must not strand the rest of the batch in
+// 'sending' (head-of-line blocking): the next entry is still delivered and the
+// panic is logged with the offending entry's ID.
+func TestOutboxWorker_DeliverBatch_PanicInEntryDoesNotBlockSubsequentEntries(t *testing.T) {
+	logs := captureLogs(t)
+	entry1 := makeOutboxEntryWithURL("email://entry-1")
+	entry2 := makeOutboxEntryWithURL("email://entry-2")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/api/v1/content/bulk" {
+			fmt.Fprint(w, `{"data":{},"meta":{}}`)
+			return
+		}
+		fmt.Fprintf(w, `{"data":{"created":[{"id":%q}],"existing":[],"failed":[]}}`, uuid.New())
+	}))
+	defer server.Close()
+
+	var delivered []uuid.UUID
+	repo := &mockFullOutboxRepo{
+		getPendingFunc: func(context.Context, int) ([]*models.ContentOutbox, error) {
+			return []*models.ContentOutbox{entry1, entry2}, nil
+		},
+		updateDeliveryFunc: func(_ context.Context, id uuid.UUID, _ models.DeliveryStatus, _ *uuid.UUID, _ *time.Time) error {
+			if id == entry1.ID {
+				panic("boom delivering entry")
+			}
+			delivered = append(delivered, id)
+			return nil
+		},
+	}
+
+	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: server.URL, InternalAPIKey: "test-key"})
+	w := NewOutboxWorker(repo, cc, OutboxWorkerConfig{BatchSize: 10, PollInterval: time.Hour})
+
+	assert.NotPanics(t, func() { w.deliverBatch(context.Background()) })
+	assert.Equal(t, []uuid.UUID{entry2.ID}, delivered, "entry 2 must still be delivered")
+
+	out := logs.String()
+	assert.Contains(t, out, "boom delivering entry")
+	assert.Contains(t, out, "outbox_id="+entry1.ID.String())
+}
+
 func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 	entry := makeOutboxEntry()
 	contentID := uuid.New()
@@ -290,6 +336,110 @@ func TestOutboxWorker_Start_StopsOnContextCancel(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("outbox worker did not stop after context cancellation")
 	}
+}
+
+// syncBuffer is a goroutine-safe log sink for capturing slog output.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// captureLogs routes the default slog logger into a buffer until the test ends.
+func captureLogs(t *testing.T) *syncBuffer {
+	t.Helper()
+	buf := &syncBuffer{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return buf
+}
+
+func TestOutboxWorker_Start_IdleTickEmitsHeartbeat(t *testing.T) {
+	logs := captureLogs(t)
+
+	secondTick := make(chan struct{})
+	var calls int
+	repo := &mockFullOutboxRepo{getPendingFunc: func(context.Context, int) ([]*models.ContentOutbox, error) {
+		calls++
+		if calls == 2 {
+			close(secondTick)
+		}
+		return nil, nil
+	}}
+	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: "http://test"})
+	w := NewOutboxWorker(repo, cc, OutboxWorkerConfig{PollInterval: 5 * time.Millisecond})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		w.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-secondTick:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not tick")
+	}
+	cancel()
+	<-done
+
+	out := logs.String()
+	assert.Contains(t, out, "worker heartbeat")
+	assert.Contains(t, out, "worker=outbox")
+	assert.Contains(t, out, "entries=0")
+}
+
+func TestOutboxWorker_Start_RecoversFromPanicAndKeepsRunning(t *testing.T) {
+	logs := captureLogs(t)
+
+	secondTick := make(chan struct{})
+	var calls int
+	repo := &mockFullOutboxRepo{getPendingFunc: func(context.Context, int) ([]*models.ContentOutbox, error) {
+		calls++
+		if calls == 1 {
+			panic("boom from repo")
+		}
+		if calls == 2 {
+			close(secondTick)
+		}
+		return nil, nil
+	}}
+	cc := client.NewContentServiceClient(client.ContentServiceConfig{BaseURL: "http://test"})
+	w := NewOutboxWorker(repo, cc, OutboxWorkerConfig{PollInterval: 5 * time.Millisecond})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		w.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-secondTick:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not keep ticking after a panic")
+	}
+	cancel()
+	<-done
+
+	out := logs.String()
+	assert.Contains(t, out, "level=ERROR")
+	assert.Contains(t, out, "worker tick panicked")
+	assert.Contains(t, out, "boom from repo")
+	assert.Contains(t, out, "stack=")
 }
 
 func TestOutboxToContentItem_AllFields(t *testing.T) {

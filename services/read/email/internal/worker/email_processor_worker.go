@@ -78,19 +78,20 @@ func (w *EmailProcessorWorker) Start(ctx context.Context) {
 			slog.Info("email processor worker stopped")
 			return
 		case <-ticker.C:
-			w.processBatch(ctx)
+			runTick("email_processor", func() int { return w.processBatch(ctx) })
 		}
 	}
 }
 
-func (w *EmailProcessorWorker) processBatch(ctx context.Context) {
+// processBatch returns the number of emails claimed this tick.
+func (w *EmailProcessorWorker) processBatch(ctx context.Context) int {
 	emails, err := w.rawEmailRepo.GetPendingEmails(ctx, w.batchSize)
 	if err != nil {
 		slog.Error("failed to fetch pending emails", slog.Any("error", err))
-		return
+		return 0
 	}
 	if len(emails) == 0 {
-		return
+		return 0
 	}
 
 	slog.Info("processing email batch", slog.Int("count", len(emails)))
@@ -119,6 +120,8 @@ func (w *EmailProcessorWorker) processBatch(ctx context.Context) {
 		go func(e *models.RawEmail) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			// A panic in a goroutine can't be caught by runTick's recover.
+			defer recoverAndLog("email_processor")
 			if err := w.processEmail(ctx, e); err != nil {
 				slog.Error("failed to process email",
 					slog.String("email_id", e.ID.String()),
@@ -129,6 +132,7 @@ func (w *EmailProcessorWorker) processBatch(ctx context.Context) {
 	}
 
 	wg.Wait()
+	return len(emails)
 }
 
 func (w *EmailProcessorWorker) processEmail(ctx context.Context, email *models.RawEmail) error {

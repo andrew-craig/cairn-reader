@@ -62,19 +62,20 @@ func (w *OutboxWorker) Start(ctx context.Context) {
 			slog.Info("outbox worker stopped")
 			return
 		case <-ticker.C:
-			w.deliverBatch(ctx)
+			runTick("outbox", func() int { return w.deliverBatch(ctx) })
 		}
 	}
 }
 
-func (w *OutboxWorker) deliverBatch(ctx context.Context) {
+// deliverBatch returns the number of entries claimed this tick.
+func (w *OutboxWorker) deliverBatch(ctx context.Context) int {
 	entries, err := w.outboxRepo.GetPendingEntries(ctx, w.batchSize)
 	if err != nil {
 		slog.Error("failed to fetch pending outbox entries", slog.Any("error", err))
-		return
+		return 0
 	}
 	if len(entries) == 0 {
-		return
+		return 0
 	}
 
 	slog.Info("delivering outbox batch", slog.Int("count", len(entries)))
@@ -93,10 +94,16 @@ func (w *OutboxWorker) deliverBatch(ctx context.Context) {
 					)
 				}
 			}
-			return
+			return len(entries)
 		}
-		w.deliverEntry(ctx, entry)
+		// Recover per entry so a poison entry can't strand the rest of the
+		// batch in 'sending' until lease expiry.
+		func() {
+			defer recoverAndLog("outbox", slog.String("outbox_id", entry.ID.String()))
+			w.deliverEntry(ctx, entry)
+		}()
 	}
+	return len(entries)
 }
 
 func (w *OutboxWorker) deliverEntry(ctx context.Context, entry *models.ContentOutbox) {

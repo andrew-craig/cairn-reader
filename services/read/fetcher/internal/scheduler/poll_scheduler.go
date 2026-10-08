@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -98,6 +99,14 @@ func (s *PollScheduler) run() {
 
 // pollFeeds fetches feeds due for polling and processes them
 func (s *PollScheduler) pollFeeds() {
+	// A panic in one tick must not kill the scheduler goroutine: log it and
+	// let the loop continue on the next tick.
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("Panic in poll scheduler tick", "panic", r, "stack", string(debug.Stack()))
+		}
+	}()
+
 	ctx := context.Background()
 
 	// Get feeds due for polling
@@ -107,23 +116,24 @@ func (s *PollScheduler) pollFeeds() {
 		return
 	}
 
-	if len(feeds) == 0 {
-		return
-	}
-
-	slog.Info("Found feeds due for polling", "count", len(feeds))
-
 	// Process each feed using the worker pool. Each feed was already
 	// atomically claimed by GetFeedsDueForPolling; if Submit couldn't queue
 	// it (pool stopping, or queue full), release the claim so it's retried
 	// on the next poll instead of sitting claimed for the full lease.
+	submitted := 0
 	for _, feed := range feeds {
-		if !s.feedWorker.Submit(feed) {
-			if err := s.feedRepo.ReleaseClaim(ctx, feed.ID); err != nil {
-				slog.Error("Error releasing feed claim", "feed_id", feed.ID, "error", err)
-			}
+		if s.feedWorker.Submit(feed) {
+			submitted++
+			continue
+		}
+		if err := s.feedRepo.ReleaseClaim(ctx, feed.ID); err != nil {
+			slog.Error("Error releasing feed claim", "feed_id", feed.ID, "error", err)
 		}
 	}
+
+	// Heartbeat on every tick, including idle ones, so a stalled scheduler is
+	// visible as a missing log line.
+	slog.Info("Poll scheduler tick", "due", len(feeds), "polled", submitted)
 }
 
 // GetPollingInterval returns the polling interval for a given tier
