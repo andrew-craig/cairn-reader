@@ -75,14 +75,25 @@ type RawEmail struct {
 	ProcessedAt *time.Time `json:"processed_at,omitempty"`
 }
 
+// EmailContentPayload is the JSONB content_payload of an email outbox row. It is
+// the single contract between the producer (EmailProcessorWorker) and the
+// consumer (OutboxWorker).
+type EmailContentPayload struct {
+	URL        string `json:"url"`
+	HTML       string `json:"html"`
+	Title      string `json:"title"`
+	Author     string `json:"author"`
+	SourceType string `json:"source_type"`
+}
+
 // ContentOutbox represents a content item ready to be delivered to the Content Service
 type ContentOutbox struct {
 	ID         uuid.UUID `json:"id"`
 	RawEmailID uuid.UUID `json:"raw_email_id"`
 
 	// Processed content ready for delivery
-	ContentPayload map[string]interface{} `json:"content_payload"` // JSONB data
-	UserID         uuid.UUID              `json:"user_id"`
+	ContentPayload EmailContentPayload `json:"content_payload"` // JSONB data
+	UserID         uuid.UUID           `json:"user_id"`
 
 	// Delivery status tracking
 	DeliveryStatus DeliveryStatus `json:"delivery_status"`

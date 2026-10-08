@@ -23,12 +23,13 @@ func TestOutboxRepository_Create_Success(t *testing.T) {
 	repo := NewOutboxRepository(db)
 	ctx := context.Background()
 
+	title := "Test Article"
 	outboxID := uuid.New()
 	feedItemID := uuid.New()
 	userIDs := []uuid.UUID{uuid.New(), uuid.New()}
-	payload := map[string]interface{}{
-		"title": "Test Article",
-		"url":   "https://example.com",
+	payload := models.FeedItemPayload{
+		Title:     &title,
+		SourceURL: "https://example.com",
 	}
 
 	outbox := &models.ContentOutbox{

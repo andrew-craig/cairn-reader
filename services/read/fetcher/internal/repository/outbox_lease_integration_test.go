@@ -39,7 +39,7 @@ func seedFeedItemForOutbox(t *testing.T, ctx context.Context, feedRepo FeedRepos
 func newTestOutboxEntry(feedItemID uuid.UUID) *models.ContentOutbox {
 	return &models.ContentOutbox{
 		FeedItemID:     feedItemID,
-		ContentPayload: map[string]interface{}{"title": "Test"},
+		ContentPayload: models.FeedItemPayload{SourceURL: "https://example.com/test", RawHTML: "<p>Test</p>"},
 		UserIDs:        []uuid.UUID{uuid.New()},
 		DeliveryStatus: models.DeliveryStatusPending,
 		MaxRetries:     6,

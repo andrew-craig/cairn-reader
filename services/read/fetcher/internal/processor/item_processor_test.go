@@ -272,24 +272,27 @@ func TestItemProcessor_OutboxPayloadCarriesRawHTML(t *testing.T) {
 	payloadJSON, err := json.Marshal(capturedOutbox.ContentPayload)
 	require.NoError(t, err)
 
-	var payload map[string]interface{}
+	var payload models.FeedItemPayload
 	require.NoError(t, json.Unmarshal(payloadJSON, &payload))
 
-	rawHTML, ok := payload[models.PayloadKeyRawHTML].(string)
-	require.True(t, ok)
-	assert.Equal(t, sentinelRawHTML, rawHTML)
-	assert.Contains(t, rawHTML, `<meta name="author" content="Sentinel Author">`)
-	assert.Contains(t, rawHTML, `<article class="post">`)
+	assert.Equal(t, sentinelRawHTML, payload.RawHTML)
+	assert.Contains(t, payload.RawHTML, `<meta name="author" content="Sentinel Author">`)
+	assert.Contains(t, payload.RawHTML, `<article class="post">`)
 
-	assert.Equal(t, title, payload[models.PayloadKeyTitle])
-	assert.Equal(t, author, payload[models.PayloadKeyAuthor])
-	assert.Equal(t, srv.URL+"/article", payload[models.PayloadKeySourceURL])
-	assert.Equal(t, feedID.String(), payload[models.PayloadKeySourceFeedID])
+	require.NotNil(t, payload.Title)
+	assert.Equal(t, title, *payload.Title)
+	require.NotNil(t, payload.Author)
+	assert.Equal(t, author, *payload.Author)
+	assert.Equal(t, srv.URL+"/article", payload.SourceURL)
+	assert.Equal(t, feedID, payload.SourceFeedID)
 
-	_, hasCleanedHTML := payload["cleaned_html"]
-	assert.False(t, hasCleanedHTML)
-	_, hasHash := payload["content_hash"]
-	assert.False(t, hasHash)
+	// Wire shape: exactly the keys the type declares, nothing else.
+	var keys map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(payloadJSON, &keys))
+	assert.Len(t, keys, 6)
+	assert.NotContains(t, keys, "cleaned_html")
+	assert.NotContains(t, keys, "content_hash")
+	assert.NotContains(t, keys, "raw_description")
 
 	feedItemRepo.AssertExpectations(t)
 	subRepo.AssertExpectations(t)
@@ -356,7 +359,7 @@ func TestItemProcessor_FetchFailureFallsBackToDescription(t *testing.T) {
 
 	require.NoError(t, p.processItem(fetchtest.AllowLoopback(context.Background()), item))
 	require.NotNil(t, capturedOutbox)
-	assert.Equal(t, desc, capturedOutbox.ContentPayload[models.PayloadKeyRawHTML])
+	assert.Equal(t, desc, capturedOutbox.ContentPayload.RawHTML)
 }
 
 // A user who subscribes after an item was published must not receive that

@@ -2,14 +2,14 @@
 id: task_499a
 title: [Audit F-S11-1 + F-S08-1/Tier 3] Type the outbox payloads in both services — producer/consumer drift, sequence together (X2)
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,consolidation,audit]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-08-17T12:50:50Z
-updated_at: 2026-08-17T12:50:50Z
+updated_at: 2026-10-08T21:34:50Z
 ---
 **Source:** Cairn Simplification Audit — https://claude.ai/code/artifact/286883fb-3f93-49c4-942f-4880251a409f · file:line detail supplied by the audit author 2026-08-17 and re-verified at HEAD `a6c56a1`.
 Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (definition of done) before starting. One finding, one branch, one PR.
@@ -36,3 +36,14 @@ Read docs/QUALITY_REMEDIATION_STRATEGY.md §0 (rules of engagement) and §2.6 (d
 
 ## Note on scope
 The repositories are correct as-is. If your diff touches `json.Marshal` in either `repository/outbox.go`, you have probably wandered out of the finding.
+
+## Review (2026-10-08)
+- [x] Re-verified both findings at HEAD bc6b823: `ContentPayload map[string]interface{}` in fetcher and email; producer and consumer agreed only by convention.
+- [x] Characterized writes vs reads. Fetcher wrote `raw_description` that was never read. Email wrote `published_at` that was never read. Neither client struct has a field for either, so both were dropped.
+- [x] Added one payload type per service, shared by producer and consumer: `models.FeedItemPayload` (fetcher) and `models.EmailContentPayload` (email). JSON tags match the existing keys, so rows already stored still decode. Deleted fetcher `outbox_payload.go`.
+- [x] `repository/outbox.go` untouched in both services.
+- [x] Tests: producer → JSON → consumer round-trip, plus decoding of legacy stored rows. Before the fix these failed to compile against the new types; the old code had no runtime failure.
+- [x] gofmt / vet (incl. integration tag) / golangci-lint / go test -race green in services/read and services/read/email. Integration tests compile-checked only (no Postgres).
+- Behaviour change: a hand-edited fetcher row with a malformed `source_feed_id`/`published_at` now fails to decode, where it used to be silently skipped.
+- Follow-up candidate (not done): email content is delivered without a published date. The email bulk-create client has no `PublishedAt` field.
+- No §1.3 ledger row exists for F-S11-1/F-S08-1.

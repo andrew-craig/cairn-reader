@@ -390,11 +390,11 @@ func TestOutboxPatternIntegration(t *testing.T) {
 	t.Run("CreateOutboxEntry", func(t *testing.T) {
 		userIDs := []uuid.UUID{uuid.New(), uuid.New()}
 
-		contentPayload := map[string]interface{}{
-			"url":          "https://example.com/article",
-			"title":        "Test Article",
-			"cleaned_html": "<p>Test</p>",
-			"source_type":  "rss",
+		title := "Test Article"
+		contentPayload := models.FeedItemPayload{
+			SourceURL: "https://example.com/article",
+			Title:     &title,
+			RawHTML:   "<p>Test</p>",
 		}
 
 		outboxEntry := &models.ContentOutbox{
@@ -422,8 +422,9 @@ func TestOutboxPatternIntegration(t *testing.T) {
 			outboxEntry := &models.ContentOutbox{
 				FeedItemID: createFeedItem(t),
 				UserIDs:    []uuid.UUID{uuid.New()},
-				ContentPayload: map[string]interface{}{
-					"title": fmt.Sprintf("Article %d", i),
+				ContentPayload: models.FeedItemPayload{
+					SourceURL: fmt.Sprintf("https://example.com/article-%d", i),
+					RawHTML:   "<p>Test</p>",
 				},
 				DeliveryStatus: models.DeliveryStatusPending,
 				NextRetryAt:    time.Now().Add(-1 * time.Hour),
@@ -444,7 +445,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		outboxEntry := &models.ContentOutbox{
 			FeedItemID:     createFeedItem(t),
 			UserIDs:        []uuid.UUID{uuid.New()},
-			ContentPayload: map[string]interface{}{"title": "Test"},
+			ContentPayload: models.FeedItemPayload{SourceURL: "https://example.com/test", RawHTML: "<p>Test</p>"},
 			DeliveryStatus: models.DeliveryStatusPending,
 		}
 		err := outboxRepo.Create(ctx, outboxEntry)
@@ -476,7 +477,7 @@ func TestOutboxPatternIntegration(t *testing.T) {
 		outboxEntry := &models.ContentOutbox{
 			FeedItemID:     createFeedItem(t),
 			UserIDs:        []uuid.UUID{uuid.New()},
-			ContentPayload: map[string]interface{}{"title": "Test"},
+			ContentPayload: models.FeedItemPayload{SourceURL: "https://example.com/test", RawHTML: "<p>Test</p>"},
 			DeliveryStatus: models.DeliveryStatusPending,
 			RetryCount:     0,
 			MaxRetries:     6,

@@ -1371,7 +1371,7 @@ CREATE INDEX idx_feed_items_feed_id ON feed_items(feed_id, discovered_at DESC);
 CREATE TABLE content_outbox (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     feed_item_id UUID NOT NULL REFERENCES feed_items(id) ON DELETE CASCADE,
-    content_payload JSONB NOT NULL,          -- Full content ready for Content Service API
+    content_payload JSONB NOT NULL,          -- {title, author, published_at, source_url, source_feed_id, raw_html} (models.FeedItemPayload)
     user_ids UUID[] NOT NULL,                -- Array of user IDs to deliver to
     delivery_status TEXT NOT NULL DEFAULT 'pending' CHECK (delivery_status IN ('pending', 'sending', 'delivered', 'failed')),
     content_service_id UUID,                 -- ID returned from Content Service

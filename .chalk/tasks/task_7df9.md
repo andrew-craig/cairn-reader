@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [read,backend]
-blocked_by: [task_499a]
+blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-08T11:32:05Z
+updated_at: 2026-10-08T21:34:50Z
 ---
 See epic_6e4d design section.
 - [ ] Migration 000005: user_contents.list ('feed'|'reads', NOT NULL, backfill 'reads'), index (user_id, list, added_at DESC); source_routes(user_id, source_type, source_key, list, PK on first three) → up/down integration test

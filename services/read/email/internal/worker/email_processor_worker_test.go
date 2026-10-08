@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -174,14 +175,27 @@ func TestEmailProcessorWorker_ProcessEmail_Success(t *testing.T) {
 	assert.Equal(t, email.UserID, outboxCreated.UserID)
 	assert.Equal(t, models.DeliveryStatusPending, outboxCreated.DeliveryStatus)
 
-	url, _ := outboxCreated.ContentPayload["url"].(string)
-	assert.Equal(t, "email://"+email.ID.String(), url)
+	assert.Equal(t, "email://"+email.ID.String(), outboxCreated.ContentPayload.URL)
+	assert.Equal(t, "Test Newsletter", outboxCreated.ContentPayload.Title)
+	assert.Equal(t, "email", outboxCreated.ContentPayload.SourceType)
 
-	title, _ := outboxCreated.ContentPayload["title"].(string)
-	assert.Equal(t, "Test Newsletter", title)
+	// Producer -> JSONB round trip -> consumer: every consumed field arrives.
+	raw, err := json.Marshal(outboxCreated.ContentPayload)
+	require.NoError(t, err)
+	var stored models.ContentOutbox
+	require.NoError(t, json.Unmarshal([]byte(`{"content_payload":`+string(raw)+`}`), &stored))
+	stored.UserID = outboxCreated.UserID
 
-	sourceType, _ := outboxCreated.ContentPayload["source_type"].(string)
-	assert.Equal(t, "email", sourceType)
+	item, err := outboxToContentItem(&stored)
+	require.NoError(t, err)
+	assert.Equal(t, "email://"+email.ID.String(), item.URL)
+	assert.Equal(t, outboxCreated.ContentPayload.HTML, item.HTML)
+	assert.NotEmpty(t, item.HTML)
+	assert.Equal(t, "Test Newsletter", item.Title)
+	assert.Equal(t, outboxCreated.ContentPayload.Author, item.Author)
+	assert.NotEmpty(t, item.Author)
+	assert.Equal(t, "email", item.SourceType)
+	assert.Equal(t, outboxCreated.UserID, item.UserID)
 }
 
 func TestEmailProcessorWorker_ProcessEmail_SenderError(t *testing.T) {

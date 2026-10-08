@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"sync"
@@ -98,12 +99,12 @@ func TestOutboxWorker_BuildContentItem_RoundTripsTitleAndAuthor(t *testing.T) {
 	entry := &models.ContentOutbox{
 		ID:         uuid.New(),
 		FeedItemID: uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"source_url":     "https://example.com/article",
-			"raw_html":       "<html><body><p>body</p></body></html>",
-			"source_feed_id": feedID.String(),
-			"title":          "RSS-supplied title",
-			"author":         "Jane Doe",
+		ContentPayload: models.FeedItemPayload{
+			SourceURL:    "https://example.com/article",
+			RawHTML:      "<html><body><p>body</p></body></html>",
+			SourceFeedID: feedID,
+			Title:        ptr("RSS-supplied title"),
+			Author:       ptr("Jane Doe"),
 		},
 	}
 
@@ -121,9 +122,9 @@ func TestOutboxWorker_BuildContentItem_OmitsMissingTitleAndAuthor(t *testing.T) 
 
 	entry := &models.ContentOutbox{
 		ID: uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"source_url": "https://example.com/article",
-			"raw_html":   "<html><body><p>body</p></body></html>",
+		ContentPayload: models.FeedItemPayload{
+			SourceURL: "https://example.com/article",
+			RawHTML:   "<html><body><p>body</p></body></html>",
 		},
 	}
 
@@ -139,8 +140,8 @@ func TestOutboxWorker_BuildContentItem_ErrorsWhenHTMLMissing(t *testing.T) {
 
 	entry := &models.ContentOutbox{
 		ID: uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"source_url": "https://example.com/article",
+		ContentPayload: models.FeedItemPayload{
+			SourceURL: "https://example.com/article",
 		},
 	}
 
@@ -275,4 +276,74 @@ func TestOutboxWorker_Worker_RecoversFromPanickingEntryAndProcessesNext(t *testi
 	assert.Contains(t, out, "Panic processing outbox entry")
 	assert.Contains(t, out, "boom in entry")
 	assert.True(t, strings.Contains(out, "entry_id="+bad.ID.String()), "panic log should carry the entry ID")
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// The payload is persisted as JSONB and read back by the repository, so the
+// consumer must see every field after a JSON round trip.
+func TestOutboxWorker_BuildContentItem_JSONRoundTripDeliversEveryField(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil, nil)
+
+	feedID := uuid.New()
+	publishedAt := time.Date(2025, 3, 4, 5, 6, 7, 0, time.UTC)
+	in := models.FeedItemPayload{
+		Title:        ptr("T"),
+		Author:       ptr("A"),
+		PublishedAt:  &publishedAt,
+		SourceURL:    "https://example.com/a",
+		SourceFeedID: feedID,
+		RawHTML:      "<p>x</p>",
+	}
+	raw, err := json.Marshal(in)
+	require.NoError(t, err)
+
+	var entry models.ContentOutbox
+	require.NoError(t, json.Unmarshal([]byte(`{"content_payload":`+string(raw)+`}`), &entry))
+
+	item, err := worker.buildContentItem(&entry)
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/a", item.URL)
+	assert.Equal(t, "<p>x</p>", item.HTML)
+	assert.Equal(t, "rss", item.SourceType)
+	require.NotNil(t, item.SourceFeedID)
+	assert.Equal(t, feedID, *item.SourceFeedID)
+	require.NotNil(t, item.PublishedAt)
+	assert.True(t, publishedAt.Equal(*item.PublishedAt))
+	require.NotNil(t, item.Title)
+	assert.Equal(t, "T", *item.Title)
+	require.NotNil(t, item.Author)
+	assert.Equal(t, "A", *item.Author)
+}
+
+// Rows already in content_outbox were written from a map, including a
+// raw_description key and explicit nulls. They must still decode and convert.
+func TestOutboxWorker_BuildContentItem_LegacyStoredPayload(t *testing.T) {
+	worker := NewOutboxWorker(nil, nil, nil, nil)
+
+	feedID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	legacy := `{
+		"title": "Legacy title",
+		"author": null,
+		"published_at": "2025-03-04T05:06:07.123456Z",
+		"source_url": "https://example.com/legacy",
+		"source_feed_id": "` + feedID.String() + `",
+		"raw_html": "<p>legacy</p>",
+		"raw_description": "dropped field"
+	}`
+
+	var payload models.FeedItemPayload
+	require.NoError(t, json.Unmarshal([]byte(legacy), &payload))
+
+	item, err := worker.buildContentItem(&models.ContentOutbox{ID: uuid.New(), ContentPayload: payload})
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/legacy", item.URL)
+	assert.Equal(t, "<p>legacy</p>", item.HTML)
+	require.NotNil(t, item.SourceFeedID)
+	assert.Equal(t, feedID, *item.SourceFeedID)
+	require.NotNil(t, item.PublishedAt)
+	assert.Equal(t, 2025, item.PublishedAt.Year())
+	require.NotNil(t, item.Title)
+	assert.Equal(t, "Legacy title", *item.Title)
+	assert.Nil(t, item.Author)
 }
