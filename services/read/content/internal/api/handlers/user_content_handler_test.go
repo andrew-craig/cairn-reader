@@ -59,8 +59,8 @@ func (m *MockUserContentRepository) GetByUserAndContent(ctx context.Context, use
 	return args.Get(0).(*models.UserContent), args.Error(1)
 }
 
-func (m *MockUserContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
-	args := m.Called(ctx, id, status, scrollPosition, isFavorite)
+func (m *MockUserContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool, list *string) error {
+	args := m.Called(ctx, id, status, scrollPosition, isFavorite, list)
 	return args.Error(0)
 }
 
@@ -84,21 +84,21 @@ func (m *MockUserContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx
 	return args.Error(0)
 }
 
-func (m *MockUserContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
-	args := m.Called(ctx, userID, status, isFavorite, limit, cursorTime, cursorID)
+func (m *MockUserContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	args := m.Called(ctx, userID, status, isFavorite, list, limit, cursorTime, cursorID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*models.UserContent), args.Error(1)
 }
 
-func (m *MockUserContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error) {
-	args := m.Called(ctx, userID, status, isFavorite)
+func (m *MockUserContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string) (int, error) {
+	args := m.Called(ctx, userID, status, isFavorite, list)
 	return args.Int(0), args.Error(1)
 }
 
-func (m *MockUserContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
-	args := m.Called(ctx, userID, query, limit, cursorTime, cursorID)
+func (m *MockUserContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+	args := m.Called(ctx, userID, query, list, limit, cursorTime, cursorID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -184,7 +184,7 @@ func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan ti
 func TestListUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -216,7 +216,7 @@ func TestListUserContents_Success(t *testing.T) {
 	contentMap := map[uuid.UUID]*models.Content{contentID: content}
 
 	// Handler fetches limit+1 (21) to detect has_more; only 1 item returned so has_more=false.
-	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), (*string)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(contentMap, nil)
 
@@ -244,13 +244,13 @@ func TestListUserContents_Success(t *testing.T) {
 func TestListUserContents_WithFilters(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	status := "completed"
 	isFavorite := true
 
-	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, &status, &isFavorite, 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, &status, &isFavorite, (*string)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return([]*models.UserContent{}, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(map[uuid.UUID]*models.Content{}, nil)
 
@@ -272,7 +272,7 @@ func TestListUserContents_WithFilters(t *testing.T) {
 func TestListUserContents_WithPagination(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -305,7 +305,7 @@ func TestListUserContents_WithPagination(t *testing.T) {
 	}
 	pagedContentMap := map[uuid.UUID]*models.Content{contentID: pagedContent}
 
-	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 51, (*time.Time)(nil), (*uuid.UUID)(nil)).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), (*string)(nil), 51, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(items, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(pagedContentMap, nil)
 
@@ -338,7 +338,7 @@ func TestListUserContents_WithPagination(t *testing.T) {
 func TestListUserContents_InvalidUserID(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	authUserID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/invalid-uuid/contents", nil)
@@ -361,7 +361,7 @@ func TestListUserContents_InvalidUserID(t *testing.T) {
 func TestListUserContents_InvalidStatus(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -385,11 +385,11 @@ func TestListUserContents_InvalidStatus(t *testing.T) {
 func TestCountUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID, (*string)(nil), (*bool)(nil)).
+	mockUserContentRepo.On("CountByUser", mock.Anything, userID, (*string)(nil), (*bool)(nil), (*string)(nil)).
 		Return(7, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/count", nil)
@@ -414,12 +414,12 @@ func TestCountUserContents_Success(t *testing.T) {
 func TestCountUserContents_WithFavoriteFilter(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	isFavorite := true
 
-	mockUserContentRepo.On("CountByUser", mock.Anything, userID, (*string)(nil), &isFavorite).
+	mockUserContentRepo.On("CountByUser", mock.Anything, userID, (*string)(nil), &isFavorite, (*string)(nil)).
 		Return(3, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/count?is_favorite=true", nil)
@@ -444,7 +444,7 @@ func TestCountUserContents_WithFavoriteFilter(t *testing.T) {
 func TestCountUserContents_InvalidUserID(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	authUserID := uuid.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/invalid-uuid/contents/count", nil)
@@ -467,7 +467,7 @@ func TestCountUserContents_InvalidUserID(t *testing.T) {
 func TestCountUserContents_InvalidFavorite(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -485,14 +485,14 @@ func TestCountUserContents_InvalidFavorite(t *testing.T) {
 	var response map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&response)
 	assert.Equal(t, "validation_error", response["error"])
-	mockUserContentRepo.AssertNotCalled(t, "CountByUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockUserContentRepo.AssertNotCalled(t, "CountByUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestCountUserContents_Forbidden tests that a user cannot count another user's content
 func TestCountUserContents_Forbidden(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	otherUserID := uuid.New()
@@ -514,7 +514,7 @@ func TestCountUserContents_Forbidden(t *testing.T) {
 func TestAddContentToUser_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -568,7 +568,7 @@ func TestAddContentToUser_Success(t *testing.T) {
 func TestAddContentToUser_BodyTooLarge(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -601,6 +601,7 @@ func TestAddContentToUser_MalformedURLWithContentID(t *testing.T) {
 	handler := NewUserContentHandler(
 		&mockUserContentRepo{},
 		&mockContentRepo{},
+		nil,
 		&mockContentService{},
 		&mockURLDetector{detectionType: service.URLTypePage},
 		nil, // ingestRSSClient not needed for page submissions
@@ -634,7 +635,7 @@ func TestAddContentToUser_MalformedURLWithContentID(t *testing.T) {
 func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -681,7 +682,7 @@ func TestAddContentToUser_DuplicatePrevention(t *testing.T) {
 func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -727,7 +728,7 @@ func TestAddContentToUser_FeedAlreadySubscribed(t *testing.T) {
 	defer fetcherServer.Close()
 
 	ingestRSSClient := service.NewIngestRSSClient(fetcherServer.URL, "test-key")
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, ingestRSSClient)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, ingestRSSClient)
 
 	userID := uuid.New()
 
@@ -769,7 +770,7 @@ func TestAddContentToUser_FeedLimitReached(t *testing.T) {
 	defer fetcherServer.Close()
 
 	ingestRSSClient := service.NewIngestRSSClient(fetcherServer.URL, "test-key")
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, ingestRSSClient)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, ingestRSSClient)
 
 	userID := uuid.New()
 
@@ -802,7 +803,7 @@ func TestAddContentToUser_FeedLimitReached(t *testing.T) {
 func TestUpdateUserContent_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -842,7 +843,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 	newFavorite := true
 
 	mockUserContentRepo.On("GetByUserAndContent", mock.Anything, userID, contentID).Return(existingUC, nil)
-	mockUserContentRepo.On("UpdateMetadata", mock.Anything, ucID, &newStatus, &newScroll, &newFavorite).Return(nil)
+	mockUserContentRepo.On("UpdateMetadata", mock.Anything, ucID, &newStatus, &newScroll, &newFavorite, (*string)(nil)).Return(nil)
 	mockUserContentRepo.On("GetByID", mock.Anything, ucID).Return(updatedUC, nil)
 	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
 
@@ -881,7 +882,7 @@ func TestUpdateUserContent_Success(t *testing.T) {
 func TestUpdateUserContent_BodyTooLarge(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -911,7 +912,7 @@ func TestUpdateUserContent_BodyTooLarge(t *testing.T) {
 func TestUpdateUserContent_NotFound(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -946,7 +947,7 @@ func TestUpdateUserContent_NotFound(t *testing.T) {
 func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -978,7 +979,7 @@ func TestUpdateUserContent_InvalidStatus(t *testing.T) {
 func TestDeleteUserContent_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -1005,7 +1006,7 @@ func TestDeleteUserContent_Success(t *testing.T) {
 func TestDeleteUserContent_Error(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -1035,7 +1036,7 @@ func TestDeleteUserContent_Error(t *testing.T) {
 func TestSearchUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -1066,7 +1067,7 @@ func TestSearchUserContents_Success(t *testing.T) {
 	searchContentMap := map[uuid.UUID]*models.Content{contentID: content}
 
 	// Handler fetches limit+1 (21); only 1 returned so has_more=false.
-	mockUserContentRepo.On("SearchWithCursor", mock.Anything, userID, "test query", 21, (*time.Time)(nil), (*uuid.UUID)(nil)).Return(userContents, nil)
+	mockUserContentRepo.On("SearchWithCursor", mock.Anything, userID, "test query", (*string)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).Return(userContents, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(searchContentMap, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/users/"+userID.String()+"/contents/search?q=test+query", nil)
@@ -1095,7 +1096,7 @@ func TestSearchUserContents_Success(t *testing.T) {
 func TestSearchUserContents_MissingQuery(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -1146,7 +1147,7 @@ func setupUserContentRequest(userID uuid.UUID, authUserID uuid.UUID, path string
 func TestListUserContents_MissingAuth(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 
@@ -1173,7 +1174,7 @@ func TestListUserContents_UnauthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
 
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	requestedUserID := uuid.New()
 	authenticatedUserID := uuid.New() // Different user
@@ -1197,7 +1198,7 @@ func TestListUserContents_UnauthorizedUserAccess(t *testing.T) {
 func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	userID := uuid.New()
 	contentID := uuid.New()
@@ -1226,7 +1227,7 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 
 	authContentMap := map[uuid.UUID]*models.Content{contentID: content}
 
-	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
+	mockUserContentRepo.On("ListByUserWithCursor", mock.Anything, userID, (*string)(nil), (*bool)(nil), (*string)(nil), 21, (*time.Time)(nil), (*uuid.UUID)(nil)).
 		Return(userContents, nil)
 	mockContentRepo.On("GetByIDs", mock.Anything, mock.Anything).Return(authContentMap, nil)
 
@@ -1251,7 +1252,7 @@ func TestListUserContents_AuthorizedUserAccess(t *testing.T) {
 func TestAddContentToUser_UnauthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	requestedUserID := uuid.New()
 	authenticatedUserID := uuid.New() // Different user
@@ -1273,7 +1274,7 @@ func TestAddContentToUser_UnauthorizedUserAccess(t *testing.T) {
 func TestUpdateUserContent_UnauthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	requestedUserID := uuid.New()
 	authenticatedUserID := uuid.New() // Different user
@@ -1307,7 +1308,7 @@ func TestUpdateUserContent_UnauthorizedUserAccess(t *testing.T) {
 func TestDeleteUserContent_UnauthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	requestedUserID := uuid.New()
 	authenticatedUserID := uuid.New() // Different user
@@ -1341,7 +1342,7 @@ func TestDeleteUserContent_UnauthorizedUserAccess(t *testing.T) {
 func TestSearchUserContents_UnauthorizedUserAccess(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)
 	mockContentRepo := new(MockContentRepository)
-	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
 
 	requestedUserID := uuid.New()
 	authenticatedUserID := uuid.New() // Different user

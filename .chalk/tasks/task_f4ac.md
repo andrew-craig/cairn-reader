@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [web]
-blocked_by: [task_85bd,task_47d5,task_7df9,task_317b]
+blocked_by: [task_85bd,task_47d5,task_317b]
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-08T11:32:05Z
+updated_at: 2026-10-09T11:00:47Z
 ---
 Mirror of the mobile task: /feed and /reads routes (Read.tsx → Reads with list filter, new Feed.tsx), Save to Reads action, Feed/Reads choice in AddLinkModal, per-source toggle on /you/sources.
 - Done when: tests pass; verified in browser against staging (webapp-staging-test skill)

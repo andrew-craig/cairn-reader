@@ -98,7 +98,7 @@ func (m *mockUserContentRepo) UpdateWithTx(ctx context.Context, tx *sql.Tx, uc *
 	return nil
 }
 
-func (m *mockUserContentRepo) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
+func (m *mockUserContentRepo) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool, list *string) error {
 	return nil
 }
 
@@ -110,15 +110,15 @@ func (m *mockUserContentRepo) DeleteWithTx(ctx context.Context, tx *sql.Tx, user
 	return nil
 }
 
-func (m *mockUserContentRepo) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+func (m *mockUserContentRepo) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	return nil, nil
 }
 
-func (m *mockUserContentRepo) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+func (m *mockUserContentRepo) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	return nil, nil
 }
 
-func (m *mockUserContentRepo) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error) {
+func (m *mockUserContentRepo) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string) (int, error) {
 	return 0, nil
 }
 
@@ -188,6 +188,7 @@ func TestURLBasedSubmission_Page(t *testing.T) {
 	handler := NewUserContentHandler(
 		&mockUserContentRepo{},
 		&mockContentRepo{},
+		nil,
 		&mockContentService{},
 		&mockURLDetector{detectionType: service.URLTypePage},
 		nil, // ingestRSSClient not needed for page submissions
@@ -244,6 +245,7 @@ func TestURLBasedSubmission_RequiresURLOrContentID(t *testing.T) {
 	handler := NewUserContentHandler(
 		&mockUserContentRepo{},
 		&mockContentRepo{},
+		nil,
 		&mockContentService{},
 		&mockURLDetector{detectionType: service.URLTypePage},
 		nil,

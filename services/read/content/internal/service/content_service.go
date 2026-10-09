@@ -43,9 +43,11 @@ type BulkContentItem struct {
 	HTML         string
 	SourceType   string
 	SourceFeedID *uuid.UUID
-	PublishedAt  *time.Time
-	Title        *string
-	Author       *string
+	// SourceSenderID is the email sender that produced the item (email only).
+	SourceSenderID *uuid.UUID
+	PublishedAt    *time.Time
+	Title          *string
+	Author         *string
 }
 
 // BulkCreateError represents an error for a specific bulk item
@@ -323,14 +325,15 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 
 		// Create the content model
 		content := &models.Content{
-			ContentHash:  processed.ContentHash,
-			CleanedHTML:  processed.CleanedHTML,
-			OriginalURL:  item.URL,
-			CanonicalURL: &processed.CanonicalURL,
-			Title:        title,
-			SourceType:   item.SourceType,
-			SourceFeedID: item.SourceFeedID,
-			PublishedAt:  item.PublishedAt,
+			ContentHash:    processed.ContentHash,
+			CleanedHTML:    processed.CleanedHTML,
+			OriginalURL:    item.URL,
+			CanonicalURL:   &processed.CanonicalURL,
+			Title:          title,
+			SourceType:     item.SourceType,
+			SourceFeedID:   item.SourceFeedID,
+			SourceSenderID: item.SourceSenderID,
+			PublishedAt:    item.PublishedAt,
 		}
 
 		// Prefer caller-supplied author; fall back to readability output.

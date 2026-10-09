@@ -26,15 +26,17 @@ type EmailContentItem struct {
 	Title      string    `json:"title"`
 	Author     string    `json:"author"`
 	SourceType string    `json:"source_type"`
+	SenderID   uuid.UUID `json:"sender_id"`
 }
 
 // bulkCreateItem is the per-item shape for POST /api/v1/content/bulk.
 type bulkCreateItem struct {
-	URL        string  `json:"url"`
-	HTML       string  `json:"html"`
-	SourceType string  `json:"source_type"`
-	Title      *string `json:"title,omitempty"`
-	Author     *string `json:"author,omitempty"`
+	URL            string     `json:"url"`
+	HTML           string     `json:"html"`
+	SourceType     string     `json:"source_type"`
+	SourceSenderID *uuid.UUID `json:"source_sender_id,omitempty"`
+	Title          *string    `json:"title,omitempty"`
+	Author         *string    `json:"author,omitempty"`
 }
 
 // bulkCreateRequest is the body sent to POST /api/v1/content/bulk.
@@ -176,6 +178,9 @@ func (c *ContentServiceClient) createContent(ctx context.Context, payload []Emai
 	for i := range payload {
 		p := &payload[i]
 		item := bulkCreateItem{URL: p.URL, HTML: p.HTML, SourceType: p.SourceType}
+		if p.SenderID != uuid.Nil {
+			item.SourceSenderID = &p.SenderID
+		}
 		if p.Title != "" {
 			item.Title = &p.Title
 		}

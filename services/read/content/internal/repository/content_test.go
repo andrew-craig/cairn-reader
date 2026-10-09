@@ -23,10 +23,10 @@ func contentRow(id uuid.UUID, contentHash, cleanedHTML, originalURL string, cano
 	return sqlmock.NewRows([]string{
 		"id", "content_hash", "cleaned_html", "original_url", "canonical_url",
 		"title", "author", "published_at", "description", "image_urls",
-		"source_type", "source_feed_id", "metadata", "created_at", "updated_at", "orphaned_at",
+		"source_type", "source_feed_id", "source_sender_id", "metadata", "created_at", "updated_at", "orphaned_at",
 	}).AddRow(id, contentHash, cleanedHTML, originalURL, canonicalURL,
 		title, author, publishedAt, description, imageURLs,
-		sourceType, sourceFeedID, metadata, createdAt, updatedAt, orphanedAt)
+		sourceType, sourceFeedID, nil, metadata, createdAt, updatedAt, orphanedAt)
 }
 
 func TestContentRepository_Create_Success(t *testing.T) {
@@ -65,6 +65,7 @@ func TestContentRepository_Create_Success(t *testing.T) {
 			content.ImageURLs,
 			content.SourceType,
 			content.SourceFeedID,
+			content.SourceSenderID,
 			content.Metadata,
 			sqlmock.AnyArg(), // created_at
 			sqlmock.AnyArg(), // updated_at
@@ -128,11 +129,11 @@ func TestContentRepository_GetByID_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "content_hash", "cleaned_html", "original_url", "canonical_url",
 			"title", "author", "published_at", "description", "image_urls",
-			"source_type", "source_feed_id", "metadata", "created_at", "updated_at", "orphaned_at",
+			"source_type", "source_feed_id", "source_sender_id", "metadata", "created_at", "updated_at", "orphaned_at",
 		}).AddRow(
 			contentID, "hash123", "<p>Test</p>", "https://example.com", canonicalURL,
 			"Test Article", author, now, description, pq.StringArray{"image1.jpg"},
-			"rss", feedID, models.JSONB{"key": "value"}, now, now, nil,
+			"rss", feedID, nil, models.JSONB{"key": "value"}, now, now, nil,
 		))
 
 	result, err := repo.GetByID(ctx, contentID)
@@ -184,11 +185,11 @@ func TestContentRepository_GetByContentHashAndFeedID_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "content_hash", "cleaned_html", "original_url", "canonical_url",
 			"title", "author", "published_at", "description", "image_urls",
-			"source_type", "source_feed_id", "metadata", "created_at", "updated_at", "orphaned_at",
+			"source_type", "source_feed_id", "source_sender_id", "metadata", "created_at", "updated_at", "orphaned_at",
 		}).AddRow(
 			contentID, "hash123", "<p>Test</p>", "https://example.com", nil,
 			"Test", nil, nil, nil, pq.StringArray{},
-			"rss", feedID, nil, now, now, nil,
+			"rss", feedID, nil, nil, now, now, nil,
 		))
 
 	result, err := repo.GetByContentHashAndFeedID(ctx, "hash123", feedID)
@@ -358,7 +359,7 @@ func TestContentRepository_BulkCreate_Success(t *testing.T) {
 		WillReturnRows(contentRow(uuid.New(), "hash1", "<p>1</p>", "https://example.com/1", nil,
 			"Title 1", nil, nil, nil, nil, "rss", nil, nil, now, now, nil).
 			AddRow(uuid.New(), "hash2", "<p>2</p>", "https://example.com/2", nil,
-				"Title 2", nil, nil, nil, nil, "rss", nil, nil, now, now, nil))
+				"Title 2", nil, nil, nil, nil, "rss", nil, nil, nil, now, now, nil))
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.NoError(t, err)

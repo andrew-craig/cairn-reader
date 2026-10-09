@@ -20,6 +20,8 @@ tags:
     description: User-specific content operations
   - name: Bulk Operations
     description: Bulk content operations for RSS Fetcher Service
+  - name: Subscriptions
+    description: Feed and newsletter subscriptions and where their items are delivered
   - name: URL Detection
     description: URL type detection and smart submission
 
@@ -621,6 +623,12 @@ paths:
           schema:
             type: boolean
           description: Filter by favorite status
+        - name: list
+          in: query
+          schema:
+            type: string
+            enum: [feed, reads]
+          description: Restrict to one list (omit for both)
         - name: limit
           in: query
           schema:
@@ -797,6 +805,143 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/user/{user_id}/subscriptions:
+    get:
+      tags:
+        - Subscriptions
+      summary: List the user's subscriptions
+      description: |
+        Unified list of RSS feeds and email senders. Each entry carries the list its new
+        items are delivered to; a source with no route reports `reads`. Entries that
+        failed to load from a source service are omitted.
+      operationId: listSubscriptions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Subscriptions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      subscriptions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UnifiedSubscription'
+                      total_count:
+                        type: integer
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list:
+    put:
+      tags:
+        - Subscriptions
+      summary: Choose where a source's new items land
+      description: |
+        Sets the destination list for an RSS feed (`key` = feed ID) or an email sender
+        (`key` = sender ID). Only the route changes: items already delivered stay in the list
+        they were delivered to, and only items delivered afterwards follow the new choice.
+      operationId: setSourceList
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [rss, email]
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Feed ID (rss) or sender ID (email)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [list]
+              properties:
+                list:
+                  type: string
+                  enum: [feed, reads]
+      responses:
+        '200':
+          description: Route updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [rss, email]
+                      key:
+                        type: string
+                        format: uuid
+                      list:
+                        type: string
+                        enum: [feed, reads]
+        '400':
+          description: Bad request - invalid type, key or list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only modify their own subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}/count:
     get:
       tags:
@@ -829,6 +974,12 @@ paths:
           schema:
             type: boolean
           description: Filter by favorite status
+        - name: list
+          in: query
+          schema:
+            type: string
+            enum: [feed, reads]
+          description: Restrict to one list (omit for both)
       responses:
         '200':
           description: Count retrieved successfully
@@ -1017,6 +1168,12 @@ paths:
             type: string
             minLength: 1
           description: Search query (searches in title and author fields)
+        - name: list
+          in: query
+          schema:
+            type: string
+            enum: [feed, reads]
+          description: Restrict to one list (omit for both)
         - name: limit
           in: query
           schema:
@@ -1097,6 +1254,13 @@ components:
           type: string
           format: uuid
           description: ID of the source RSS feed (optional, null for manually added content)
+        source_sender_id:
+          type: string
+          format: uuid
+          description: |
+            Bulk create only. ID of the email sender that produced the item (email content only).
+            The Content Service stores it so a user's route for that sender decides which list
+            the item lands in when it is delivered.
 
     UpdateContentRequest:
       type: object
@@ -1420,6 +1584,12 @@ components:
         is_favorite:
           type: boolean
           description: Initial favorite flag
+        list:
+          type: string
+          enum: [feed, reads]
+          description: |
+            Feed subscriptions only: where the feed's new items are delivered (default reads).
+            Pages and content_id saves always land in Reads.
 
     AddFeedResponse:
       type: object
@@ -1465,6 +1635,10 @@ components:
             title:
               type: string
               description: Feed title
+            list:
+              type: string
+              enum: [feed, reads]
+              description: Where this feed's new items are delivered
             subscribed_at:
               type: string
               format: date-time
@@ -1499,6 +1673,10 @@ components:
         is_favorite:
           type: boolean
           description: Favorite flag
+        list:
+          type: string
+          enum: [feed, reads]
+          description: Move the item to this list (e.g. "Save to Reads")
 
     UserContentResponse:
       type: object
@@ -1515,6 +1693,10 @@ components:
           type: string
           enum: [unread, reading, completed, archived]
           description: Reading status
+        list:
+          type: string
+          enum: [feed, reads]
+          description: The list this item lives in
         scroll_position:
           type: number
           format: float
@@ -1532,6 +1714,29 @@ components:
           description: Last access timestamp
         content:
           $ref: '#/components/schemas/ContentResponse'
+
+    UnifiedSubscription:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [rss, email]
+        title:
+          type: string
+        subscribed_at:
+          type: string
+        list:
+          type: string
+          enum: [feed, reads]
+          description: Where this source's new items are delivered
+        rss_data:
+          type: object
+          description: Present for type rss (feed_id is the key for the list endpoint)
+        email_data:
+          type: object
+          description: Present for type email (id is the sender ID, the key for the list endpoint)
 
     ListUserContentsResponse:
       type: object

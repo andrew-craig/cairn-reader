@@ -9,6 +9,9 @@ import (
 	"github.com/andrew-craig/cairn-reader/pkg/api"
 	"github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/dto"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/api/middleware"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
+	"github.com/andrew-craig/cairn-reader/services/read/content/internal/repository"
 	"github.com/andrew-craig/cairn-reader/services/read/content/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,16 +21,19 @@ import (
 type SubscriptionAggregatorHandler struct {
 	ingestRSSClient   *service.IngestRSSClient
 	emailIngestClient *service.EmailIngestClient
+	routeRepo         repository.SourceRouteRepository
 }
 
 // NewSubscriptionAggregatorHandler creates a new SubscriptionAggregatorHandler
 func NewSubscriptionAggregatorHandler(
 	ingestRSSClient *service.IngestRSSClient,
 	emailIngestClient *service.EmailIngestClient,
+	routeRepo repository.SourceRouteRepository,
 ) *SubscriptionAggregatorHandler {
 	return &SubscriptionAggregatorHandler{
 		ingestRSSClient:   ingestRSSClient,
 		emailIngestClient: emailIngestClient,
+		routeRepo:         routeRepo,
 	}
 }
 
@@ -87,6 +93,25 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 		}
 	}
 
+	// Stamp each subscription with its destination list; no route means Reads.
+	routes, err := h.routeRepo.ListByUser(r.Context(), userID)
+	if err != nil {
+		slog.Error("Failed to fetch source routes", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch subscriptions", nil, "v1")
+		return
+	}
+	routed := make(map[string]string, len(routes))
+	for _, route := range routes {
+		routed[route.SourceType+"/"+route.SourceKey.String()] = route.List
+	}
+	for i := range allSubscriptions {
+		sub := &allSubscriptions[i]
+		sub.List = models.ListReads
+		if list, ok := routed[string(sub.Type)+"/"+sourceKeyOf(sub)]; ok {
+			sub.List = list
+		}
+	}
+
 	// Build response
 	response := dto.ListSubscriptionsResponse{
 		Subscriptions: allSubscriptions,
@@ -135,10 +160,88 @@ func (h *SubscriptionAggregatorHandler) UnsubscribeRSS(w http.ResponseWriter, r 
 		return
 	}
 
+	// The route only has meaning while subscribed; drop it so a later
+	// re-subscribe starts from the default rather than a stale choice.
+	feedID, _ := uuid.Parse(feedIDStr)
+	if err := h.routeRepo.Delete(r.Context(), userID, models.SourceTypeRSS, feedID); err != nil {
+		slog.Error("Failed to delete route for unsubscribed feed", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Unsubscribed from feed but failed to clear its list", nil, "v1")
+		return
+	}
+
 	api.WriteSuccess(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Successfully unsubscribed from feed",
 	}, "v1")
+}
+
+// SetSourceList handles PUT /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list.
+// It changes where a source's future items are delivered (type is "rss" or "email"; key is the
+// feed ID or sender ID). Only the route changes: items already delivered stay in their list.
+func (h *SubscriptionAggregatorHandler) SetSourceList(w http.ResponseWriter, r *http.Request) {
+	authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
+	if err != nil {
+		slog.Error("user ID not found in context", slog.Any("error", err))
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Authentication context error", nil, "v1")
+		return
+	}
+
+	userID, err := uuid.Parse(chi.URLParam(r, "user_id"))
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid user ID format", nil, "v1")
+		return
+	}
+
+	if authenticatedUserID != userID {
+		api.WriteError(w, http.StatusForbidden, api.ErrCodeForbidden, "User can only modify their own subscriptions", nil, "v1")
+		return
+	}
+
+	sourceType := chi.URLParam(r, "type")
+	if sourceType != models.SourceTypeRSS && sourceType != models.SourceTypeEmail {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid subscription type. Must be 'rss' or 'email'", nil, "v1")
+		return
+	}
+
+	sourceKey, err := uuid.Parse(chi.URLParam(r, "key"))
+	if err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid subscription key format", nil, "v1")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxSimpleRequestSize)
+
+	var req dto.SetSourceListRequest
+	if err := middleware.DecodeJSONBody(r, &req); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid request body", nil, "v1")
+		return
+	}
+	if err := req.Validate(); err != nil {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, err.Error(), nil, "v1")
+		return
+	}
+
+	route := &models.SourceRoute{UserID: userID, SourceType: sourceType, SourceKey: sourceKey, List: req.List}
+	if err := h.routeRepo.Upsert(r.Context(), route); err != nil {
+		slog.Error("Failed to set source list", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to update list", nil, "v1")
+		return
+	}
+
+	api.WriteSuccess(w, http.StatusOK, map[string]any{
+		"type": sourceType,
+		"key":  sourceKey,
+		"list": req.List,
+	}, "v1")
+}
+
+// sourceKeyOf returns the source_routes key for a unified subscription: the feed ID for RSS,
+// the sender ID for email.
+func sourceKeyOf(sub *dto.UnifiedSubscription) string {
+	if sub.Type == dto.SubscriptionTypeRSS && sub.RSSData != nil {
+		return sub.RSSData.FeedID
+	}
+	return sub.ID
 }
 
 // fetchRSSSubscriptions fetches and transforms RSS subscriptions from Ingest RSS service
