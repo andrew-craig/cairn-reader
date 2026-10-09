@@ -545,6 +545,8 @@ paths:
         Bulk add existing content items to the authenticated user's reading list.
         Requires a valid JWT token. All items in the request must target the authenticated
         user — attempting to add content to another user's account returns 403.
+        Like ingest, each item lands in the list the user's route for the content's source
+        names (Reads when there is none).
 
         Internal services (e.g. Ingest RSS Service) should use
         `POST /api/v1/internal/content/user/bulk` instead, which does not require authentication.
@@ -628,7 +630,9 @@ paths:
           schema:
             type: string
             enum: [feed, reads]
-          description: Restrict to one list (omit for both)
+          description: |
+            Restrict to one list. Omitting it returns both lists, so clients that show only
+            Reads must pass `list=reads`.
         - name: limit
           in: query
           schema:
@@ -861,8 +865,9 @@ paths:
       summary: Choose where a source's new items land
       description: |
         Sets the destination list for an RSS feed (`key` = feed ID) or an email sender
-        (`key` = sender ID). Only the route changes: items already delivered stay in the list
-        they were delivered to, and only items delivered afterwards follow the new choice.
+        (`key` = sender ID). The user must currently be subscribed to the source (404 otherwise).
+        Only the route changes: items already delivered stay in the list they were delivered to,
+        and only items delivered afterwards follow the new choice.
       operationId: setSourceList
       security:
         - BearerAuth: []
@@ -931,6 +936,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Forbidden - user can only modify their own subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: The user is not subscribed to that source
           content:
             application/json:
               schema:
@@ -1588,8 +1599,11 @@ components:
           type: string
           enum: [feed, reads]
           description: |
-            Feed subscriptions only: where the feed's new items are delivered (default reads).
-            Pages and content_id saves always land in Reads.
+            Feed subscriptions only: where the feed's new items are delivered (default reads;
+            omitting it writes no route and leaves any existing one untouched). Sending `list`
+            with a page or content_id save is rejected with 400, since those always land in Reads.
+            If the route write fails after the subscribe succeeded, the response is a 500 even
+            though the subscription exists; re-fetch subscriptions and use the list endpoint.
 
     AddFeedResponse:
       type: object

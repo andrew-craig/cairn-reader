@@ -440,7 +440,8 @@ func (h *UserContentHandler) handleURLBasedSubmission(w http.ResponseWriter, r *
 
 // handleFeedSubmission subscribes the user to an RSS feed
 func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, feedURL, list string) {
-	if list == "" {
+	routed := list != ""
+	if !routed {
 		list = models.ListReads
 	}
 
@@ -460,22 +461,26 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Record where this feed's future items should land. The subscription
-	// already exists at this point, so a failure here leaves it routed to
-	// Reads (the default); the client can correct it via the list endpoint.
-	feedID, err := uuid.Parse(subscription.FeedID)
-	if err == nil {
-		err = h.routeRepo.Upsert(r.Context(), &models.SourceRoute{
-			UserID:     userID,
-			SourceType: models.SourceTypeRSS,
-			SourceKey:  feedID,
-			List:       list,
-		})
-	}
-	if err != nil {
-		slog.Error("Failed to set route for new subscription", "error", err)
-		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
-		return
+	// Record where this feed's future items should land. Reads is the
+	// default, so with no explicit list no route is written (and any existing
+	// route is left alone). The subscription already exists at this point, so a
+	// failure here leaves it routed to Reads; the client can correct it via the
+	// list endpoint after re-fetching subscriptions.
+	if routed {
+		feedID, err := uuid.Parse(subscription.FeedID)
+		if err == nil {
+			err = h.routeRepo.Upsert(r.Context(), &models.SourceRoute{
+				UserID:     userID,
+				SourceType: models.SourceTypeRSS,
+				SourceKey:  feedID,
+				List:       list,
+			})
+		}
+		if err != nil {
+			slog.Error("Failed to set route for new subscription", "error", err)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
+			return
+		}
 	}
 
 	// Build feed response
@@ -498,6 +503,11 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 
 // handlePageSubmission extracts content from a web page and adds to reading list
 func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, url string, req *dto.AddContentToUserRequest) {
+	if req.List != "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "list only applies to feed subscriptions; saved pages always go to Reads", nil, "v1")
+		return
+	}
+
 	// Create content from URL using ContentService
 	content, err := h.contentService.CreateFromURL(r.Context(), url, "manual", nil, nil)
 	if err != nil {
@@ -558,6 +568,11 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 
 // handleContentIDBasedSubmission handles legacy content-ID-based submission
 func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, req *dto.AddContentToUserRequest) {
+	if req.List != "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "list only applies to feed subscriptions; saved pages always go to Reads", nil, "v1")
+		return
+	}
+
 	contentID := *req.ContentID
 
 	// Validate content ID exists

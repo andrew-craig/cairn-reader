@@ -145,7 +145,8 @@ func (h *SubscriptionAggregatorHandler) UnsubscribeRSS(w http.ResponseWriter, r 
 	}
 
 	feedIDStr := chi.URLParam(r, "feed_id")
-	if _, err := uuid.Parse(feedIDStr); err != nil {
+	feedID, err := uuid.Parse(feedIDStr)
+	if err != nil {
 		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "Invalid feed ID format", nil, "v1")
 		return
 	}
@@ -162,7 +163,6 @@ func (h *SubscriptionAggregatorHandler) UnsubscribeRSS(w http.ResponseWriter, r 
 
 	// The route only has meaning while subscribed; drop it so a later
 	// re-subscribe starts from the default rather than a stale choice.
-	feedID, _ := uuid.Parse(feedIDStr)
 	if err := h.routeRepo.Delete(r.Context(), userID, models.SourceTypeRSS, feedID); err != nil {
 		slog.Error("Failed to delete route for unsubscribed feed", "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Unsubscribed from feed but failed to clear its list", nil, "v1")
@@ -221,6 +221,19 @@ func (h *SubscriptionAggregatorHandler) SetSourceList(w http.ResponseWriter, r *
 		return
 	}
 
+	// Only a source the user is currently subscribed to can be routed; this
+	// also stops a PUT after unsubscribe from resurrecting a deleted route.
+	subscribed, err := h.isSubscribed(r.Context(), userID, sourceType, sourceKey)
+	if err != nil {
+		slog.Error("Failed to verify subscription", "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to verify subscription", nil, "v1")
+		return
+	}
+	if !subscribed {
+		api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "Subscription not found", nil, "v1")
+		return
+	}
+
 	route := &models.SourceRoute{UserID: userID, SourceType: sourceType, SourceKey: sourceKey, List: req.List}
 	if err := h.routeRepo.Upsert(r.Context(), route); err != nil {
 		slog.Error("Failed to set source list", "error", err)
@@ -233,6 +246,37 @@ func (h *SubscriptionAggregatorHandler) SetSourceList(w http.ResponseWriter, r *
 		"key":  sourceKey,
 		"list": req.List,
 	}, "v1")
+}
+
+// isSubscribed reports whether the user currently has the given RSS feed or email sender.
+func (h *SubscriptionAggregatorHandler) isSubscribed(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) (bool, error) {
+	key := sourceKey.String()
+	if sourceType == models.SourceTypeRSS {
+		resp, err := h.ingestRSSClient.ListUserSubscriptions(ctx, userID.String())
+		if err != nil {
+			return false, err
+		}
+		for _, sub := range resp.Subscriptions {
+			if sub.FeedID == key {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if h.emailIngestClient == nil {
+		return false, nil
+	}
+	resp, err := h.emailIngestClient.ListUserSenders(ctx, userID.String())
+	if err != nil {
+		return false, err
+	}
+	for _, sender := range resp.Senders {
+		if sender.ID == key {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // sourceKeyOf returns the source_routes key for a unified subscription: the feed ID for RSS,
