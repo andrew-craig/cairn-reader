@@ -26,9 +26,9 @@ func TestOutboxRepository_Create(t *testing.T) {
 	userID := uuid.New()
 	now := time.Now()
 
-	payload := map[string]interface{}{
-		"title": "Test Email",
-		"html":  "<p>Test content</p>",
+	payload := models.EmailContentPayload{
+		Title: "Test Email",
+		HTML:  "<p>Test content</p>",
 	}
 
 	outbox := &models.ContentOutbox{

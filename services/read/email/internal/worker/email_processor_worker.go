@@ -171,13 +171,12 @@ func (w *EmailProcessorWorker) processEmail(ctx context.Context, email *models.R
 		author = *sender.SenderName
 	}
 
-	payload := map[string]interface{}{
-		"url":          fmt.Sprintf("email://%s", email.ID.String()),
-		"html":         content.SanitizedHTML,
-		"title":        subject,
-		"author":       author,
-		"source_type":  "email",
-		"published_at": email.ReceivedAt,
+	payload := models.EmailContentPayload{
+		URL:        fmt.Sprintf("email://%s", email.ID.String()),
+		HTML:       content.SanitizedHTML,
+		Title:      subject,
+		Author:     author,
+		SourceType: "email",
 	}
 
 	outbox := &models.ContentOutbox{

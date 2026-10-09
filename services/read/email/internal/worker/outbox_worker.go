@@ -163,23 +163,17 @@ func outboxBackoff(retryCount int) time.Duration {
 func outboxToContentItem(entry *models.ContentOutbox) (client.EmailContentItem, error) {
 	p := entry.ContentPayload
 
-	url, _ := p["url"].(string)
-	if url == "" {
+	if p.URL == "" {
 		return client.EmailContentItem{}, fmt.Errorf("missing url in content payload for outbox entry %s", entry.ID)
 	}
 
-	html, _ := p["html"].(string)
-	title, _ := p["title"].(string)
-	author, _ := p["author"].(string)
-	sourceType, _ := p["source_type"].(string)
-
 	return client.EmailContentItem{
 		UserID:     entry.UserID,
-		URL:        url,
+		URL:        p.URL,
 		Type:       "email",
-		HTML:       html,
-		Title:      title,
-		Author:     author,
-		SourceType: sourceType,
+		HTML:       p.HTML,
+		Title:      p.Title,
+		Author:     p.Author,
+		SourceType: p.SourceType,
 	}, nil
 }

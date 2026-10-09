@@ -330,40 +330,31 @@ func (ow *OutboxWorker) processOutboxEntry(workerID int, entry *models.ContentOu
 func (ow *OutboxWorker) buildContentItem(entry *models.ContentOutbox) (client.BulkContentItem, error) {
 	payload := entry.ContentPayload
 
-	url, ok := payload[models.PayloadKeySourceURL].(string)
-	if !ok || url == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid '%s' field", models.PayloadKeySourceURL)
+	if payload.SourceURL == "" {
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'source_url' field")
 	}
-
-	html, _ := payload[models.PayloadKeyRawHTML].(string)
-	if html == "" {
-		return client.BulkContentItem{}, fmt.Errorf("missing or invalid '%s' field", models.PayloadKeyRawHTML)
+	if payload.RawHTML == "" {
+		return client.BulkContentItem{}, fmt.Errorf("missing or invalid 'raw_html' field")
 	}
 
 	item := client.BulkContentItem{
-		URL:        url,
-		HTML:       html,
-		SourceType: "rss",
+		URL:         payload.SourceURL,
+		HTML:        payload.RawHTML,
+		SourceType:  "rss",
+		PublishedAt: payload.PublishedAt,
 	}
 
-	if feedIDStr, ok := payload[models.PayloadKeySourceFeedID].(string); ok && feedIDStr != "" {
-		if feedID, err := uuid.Parse(feedIDStr); err == nil {
-			item.SourceFeedID = &feedID
-		}
+	if payload.SourceFeedID != uuid.Nil {
+		feedID := payload.SourceFeedID
+		item.SourceFeedID = &feedID
 	}
 
-	if publishedAtStr, ok := payload[models.PayloadKeyPublishedAt].(string); ok && publishedAtStr != "" {
-		if publishedAt, err := time.Parse(time.RFC3339, publishedAtStr); err == nil {
-			item.PublishedAt = &publishedAt
-		}
+	if payload.Title != nil && *payload.Title != "" {
+		item.Title = payload.Title
 	}
 
-	if title, ok := payload[models.PayloadKeyTitle].(string); ok && title != "" {
-		item.Title = &title
-	}
-
-	if author, ok := payload[models.PayloadKeyAuthor].(string); ok && author != "" {
-		item.Author = &author
+	if payload.Author != nil && *payload.Author != "" {
+		item.Author = payload.Author
 	}
 
 	return item, nil

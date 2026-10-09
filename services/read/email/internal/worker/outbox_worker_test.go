@@ -71,12 +71,12 @@ func makeOutboxEntry() *models.ContentOutbox {
 		ID:         uuid.New(),
 		RawEmailID: uuid.New(),
 		UserID:     uuid.New(),
-		ContentPayload: map[string]interface{}{
-			"url":         "email://abc123",
-			"html":        "<p>hello</p>",
-			"title":       "Test Email",
-			"author":      "Author",
-			"source_type": "email",
+		ContentPayload: models.EmailContentPayload{
+			URL:        "email://abc123",
+			HTML:       "<p>hello</p>",
+			Title:      "Test Email",
+			Author:     "Author",
+			SourceType: "email",
 		},
 		DeliveryStatus: models.DeliveryStatusPending,
 		RetryCount:     0,
@@ -87,7 +87,7 @@ func makeOutboxEntry() *models.ContentOutbox {
 
 func makeOutboxEntryWithURL(url string) *models.ContentOutbox {
 	entry := makeOutboxEntry()
-	entry.ContentPayload["url"] = url
+	entry.ContentPayload.URL = url
 	return entry
 }
 
@@ -253,7 +253,7 @@ func TestOutboxWorker_DeliverEntry_Success(t *testing.T) {
 
 func TestOutboxWorker_DeliverEntry_MissingURL(t *testing.T) {
 	entry := makeOutboxEntry()
-	delete(entry.ContentPayload, "url")
+	entry.ContentPayload.URL = ""
 
 	var retryCount int
 	repo := &mockFullOutboxRepo{
@@ -447,12 +447,12 @@ func TestOutboxToContentItem_AllFields(t *testing.T) {
 	entry := &models.ContentOutbox{
 		ID:     uuid.New(),
 		UserID: userID,
-		ContentPayload: map[string]interface{}{
-			"url":         "email://test-id",
-			"html":        "<p>body</p>",
-			"title":       "My Title",
-			"author":      "John Doe",
-			"source_type": "email",
+		ContentPayload: models.EmailContentPayload{
+			URL:        "email://test-id",
+			HTML:       "<p>body</p>",
+			Title:      "My Title",
+			Author:     "John Doe",
+			SourceType: "email",
 		},
 	}
 
@@ -465,4 +465,30 @@ func TestOutboxToContentItem_AllFields(t *testing.T) {
 	assert.Equal(t, "email", item.SourceType)
 	assert.Equal(t, "email", item.Type)
 	assert.Equal(t, userID, item.UserID)
+}
+
+// Rows already in content_outbox carry a published_at key that the type no
+// longer declares. They must still decode and convert.
+func TestOutboxToContentItem_LegacyStoredPayload(t *testing.T) {
+	legacy := `{
+		"url": "email://legacy-id",
+		"html": "<p>legacy</p>",
+		"title": "Legacy",
+		"author": "Sender",
+		"source_type": "email",
+		"published_at": "2025-03-04T05:06:07.123456Z"
+	}`
+
+	var payload models.EmailContentPayload
+	require.NoError(t, json.Unmarshal([]byte(legacy), &payload))
+
+	userID := uuid.New()
+	item, err := outboxToContentItem(&models.ContentOutbox{ID: uuid.New(), UserID: userID, ContentPayload: payload})
+	require.NoError(t, err)
+	assert.Equal(t, userID, item.UserID)
+	assert.Equal(t, "email://legacy-id", item.URL)
+	assert.Equal(t, "<p>legacy</p>", item.HTML)
+	assert.Equal(t, "Legacy", item.Title)
+	assert.Equal(t, "Sender", item.Author)
+	assert.Equal(t, "email", item.SourceType)
 }

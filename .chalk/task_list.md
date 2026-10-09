@@ -18,7 +18,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_30e3** · P2 · open · Decommission the Explore backend (fetcher + recommender)  (parent: epic_6e4d)
 - **task_317b** · P2 · open · Subscription aggregator silently swallows per-source failures (200 with a short list)  (parent: epic_fefa)
 - **task_47d5** · P2 · open · Merge Feeds + Newsletters settings into one Sources screen  (parent: epic_6e4d)
-- **task_499a** · P2 · open · [Audit F-S11-1 + F-S08-1/Tier 3] Type the outbox payloads in both services — producer/consumer drift, sequence together (X2)  (parent: epic_fefa)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)

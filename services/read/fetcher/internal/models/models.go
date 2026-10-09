@@ -112,14 +112,26 @@ type FeedItem struct {
 	ProcessedAt  *time.Time `json:"processed_at,omitempty"`
 }
 
+// FeedItemPayload is the JSONB content_payload of a feed-item outbox row. It is
+// the single contract between the producer (processor.ItemProcessor) and the
+// consumer (worker.OutboxWorker).
+type FeedItemPayload struct {
+	Title        *string    `json:"title"`
+	Author       *string    `json:"author"`
+	PublishedAt  *time.Time `json:"published_at"`
+	SourceURL    string     `json:"source_url"`
+	SourceFeedID uuid.UUID  `json:"source_feed_id"`
+	RawHTML      string     `json:"raw_html"`
+}
+
 // ContentOutbox represents a content item ready to be delivered to the Content Service
 type ContentOutbox struct {
 	ID         uuid.UUID `json:"id"`
 	FeedItemID uuid.UUID `json:"feed_item_id"`
 
 	// Processed content ready for delivery
-	ContentPayload map[string]interface{} `json:"content_payload"` // JSONB data
-	UserIDs        []uuid.UUID            `json:"user_ids"`
+	ContentPayload FeedItemPayload `json:"content_payload"` // JSONB data
+	UserIDs        []uuid.UUID     `json:"user_ids"`
 
 	// Delivery status tracking
 	DeliveryStatus DeliveryStatus `json:"delivery_status"`

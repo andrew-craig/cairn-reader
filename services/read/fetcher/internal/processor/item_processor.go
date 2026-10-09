@@ -127,14 +127,13 @@ func (p *ItemProcessor) processItem(ctx context.Context, item *models.FeedItem) 
 		rawHTML = *item.Description
 	}
 
-	contentPayload := map[string]interface{}{
-		models.PayloadKeyTitle:          item.Title,
-		models.PayloadKeyAuthor:         item.Author,
-		models.PayloadKeyPublishedAt:    item.PublishedAt,
-		models.PayloadKeySourceURL:      item.ItemURL,
-		models.PayloadKeyRawHTML:        rawHTML,
-		models.PayloadKeySourceFeedID:   item.FeedID.String(),
-		models.PayloadKeyRawDescription: item.Description,
+	contentPayload := models.FeedItemPayload{
+		Title:        item.Title,
+		Author:       item.Author,
+		PublishedAt:  item.PublishedAt,
+		SourceURL:    item.ItemURL,
+		SourceFeedID: item.FeedID,
+		RawHTML:      rawHTML,
 	}
 
 	// Get list of users subscribed to this feed

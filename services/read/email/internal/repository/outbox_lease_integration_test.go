@@ -28,7 +28,7 @@ func seedRawEmailForOutbox(t *testing.T, ctx context.Context, rawRepo RawEmailRe
 func newTestEmailOutboxEntry(rawEmailID uuid.UUID) *models.ContentOutbox {
 	return &models.ContentOutbox{
 		RawEmailID:     rawEmailID,
-		ContentPayload: map[string]interface{}{"title": "Test"},
+		ContentPayload: models.EmailContentPayload{URL: "email://test", HTML: "<p>Test</p>", Title: "Test", SourceType: "email"},
 		UserID:         uuid.New(),
 		DeliveryStatus: models.DeliveryStatusPending,
 		MaxRetries:     6,
