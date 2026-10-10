@@ -202,4 +202,6 @@ export interface UnifiedSubscription {
 export interface UnifiedSubscriptionsResponse {
   subscriptions: UnifiedSubscription[];
   total_count: number;
+  /** Sources that failed to load; their subscriptions are missing from the list. */
+  failed_sources: Array<'rss' | 'email'>;
 }

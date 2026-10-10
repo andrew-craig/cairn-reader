@@ -816,8 +816,9 @@ paths:
       summary: List the user's subscriptions
       description: |
         Unified list of RSS feeds and email senders. Each entry carries the list its new
-        items are delivered to; a source with no route reports `reads`. Entries that
-        failed to load from a source service are omitted.
+        items are delivered to; a source with no route reports `reads`. If a source service
+        cannot be reached its entries are omitted and the source is named in `failed_sources`
+        (the response is still 200), so a short list can be told apart from an empty one.
       operationId: listSubscriptions
       security:
         - BearerAuth: []
@@ -845,6 +846,12 @@ paths:
                           $ref: '#/components/schemas/UnifiedSubscription'
                       total_count:
                         type: integer
+                      failed_sources:
+                        type: array
+                        description: Sources that could not be loaded; empty when all answered
+                        items:
+                          type: string
+                          enum: [rss, email]
         '401':
           description: Unauthorized - missing or invalid authentication token
           content:

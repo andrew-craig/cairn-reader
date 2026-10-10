@@ -64,13 +64,15 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 
 	// Aggregate subscriptions from all sources
 	allSubscriptions := []dto.UnifiedSubscription{}
+	failedSources := []dto.SubscriptionType{}
 
 	// 1. Fetch RSS subscriptions
 	rssSubscriptions, err := h.fetchRSSSubscriptions(r.Context(), userID.String())
 	if err != nil {
 		slog.Error("Failed to fetch RSS subscriptions", "error", err)
-		// Don't fail the entire request - just log and continue
-		// This allows partial results if one subscription source is down
+		// Don't fail the entire request: return the other sources' results, and
+		// report this one in failed_sources so clients can tell the list is short.
+		failedSources = append(failedSources, dto.SubscriptionTypeRSS)
 	} else {
 		allSubscriptions = append(allSubscriptions, rssSubscriptions...)
 	}
@@ -88,6 +90,7 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 		emailSubscriptions, err := h.fetchEmailSubscriptions(r.Context(), userID.String())
 		if err != nil {
 			slog.Error("Failed to fetch email subscriptions", "error", err)
+			failedSources = append(failedSources, dto.SubscriptionTypeEmail)
 		} else {
 			allSubscriptions = append(allSubscriptions, emailSubscriptions...)
 		}
@@ -116,6 +119,7 @@ func (h *SubscriptionAggregatorHandler) ListAllSubscriptions(w http.ResponseWrit
 	response := dto.ListSubscriptionsResponse{
 		Subscriptions: allSubscriptions,
 		TotalCount:    len(allSubscriptions),
+		FailedSources: failedSources,
 	}
 
 	api.WriteSuccess(w, http.StatusOK, response, "v1")

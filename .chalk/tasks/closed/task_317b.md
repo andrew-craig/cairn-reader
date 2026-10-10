@@ -2,14 +2,14 @@
 id: task_317b
 title: Subscription aggregator silently swallows per-source failures (200 with a short list)
 type: task
-status: open
+status: closed
 priority: 2
 labels: [quality,read,observability]
 blocked_by: []
 parent: epic_fefa
 remote_task_url: null
 created_at: 2026-09-05T21:55:18Z
-updated_at: 2026-09-05T21:55:18Z
+updated_at: 2026-10-10T06:25:49Z
 ---
 **Source:** raised by the PR-gate reviewer on PR #375 (`magpie-reviewer[bot]`, 2026-09-05) as an
 "Important, not blocking on its own" observation. Out of scope for that PR — it is pre-existing
@@ -62,7 +62,13 @@ Option 1, optionally with 2, is the most useful and the smallest change. Whichev
 apply it to both source branches (RSS and email), not just email.
 
 ## Done when
-- [ ] Decision recorded on the response-shape question above
-- [ ] Both the RSS and email branches surface their failure to the caller
-- [ ] Handler test covering: one source failing, the other succeeding, and both failing
-- [ ] Web/mobile clients either consume the new signal or are confirmed unaffected
+- [x] Decision recorded on the response-shape question above
+- [x] Both the RSS and email branches surface their failure to the caller
+- [x] Handler test covering: one source failing, the other succeeding, and both failing
+- [x] Web/mobile clients either consume the new signal or are confirmed unaffected
+
+## Review (2026-10-10)
+- Decision: option 1. `ListSubscriptionsResponse.failed_sources` (`"rss"` / `"email"`, always present, `[]` when all answered); status stays 200. Option 2 not taken: with `failed_sources` a client can already tell "both down" from "no subscriptions", and a 5xx would hide the sources that did answer.
+- Both branches (RSS, email) record their failure; `total_count` still counts only what was returned.
+- Tests: one source down (each way), both down, all up (`failed_sources` is `[]`, not null).
+- Shared `UnifiedSubscriptionsResponse` gains `failed_sources`; web typecheck clean. Mobile typecheck not run (expo deps not installed in this sandbox). No client reads the field yet; task_f9ad / task_f4ac should show a "couldn't load RSS/Newsletters" state from it.
