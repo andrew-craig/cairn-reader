@@ -39,6 +39,7 @@ const article = (id: string): Article => ({
   tags: [],
   isRead: false,
   isFavorite: true,
+  list: 'reads' as const,
   addedAt: Date.now(),
 });
 

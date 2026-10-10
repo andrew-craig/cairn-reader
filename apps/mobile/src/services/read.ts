@@ -11,6 +11,9 @@ import {
   SearchParams,
   ListContentsParams,
   CountContentsParams,
+  ContentList,
+  SourceRouteType,
+  SetSourceListResponse,
   DetectURLResponse,
   DiscoverFeedResponse,
   AddURLRequest,
@@ -39,6 +42,7 @@ export class ReadService {
       // Build query parameters
       const queryParams = new URLSearchParams();
       if (params?.status) queryParams.append('status', params.status);
+      if (params?.list) queryParams.append('list', params.list);
       if (params?.is_favorite !== undefined) {
         queryParams.append('is_favorite', params.is_favorite.toString());
       }
@@ -90,6 +94,7 @@ export class ReadService {
 
       const queryParams = new URLSearchParams();
       if (params?.status) queryParams.append('status', params.status);
+      if (params?.list) queryParams.append('list', params.list);
       if (params?.is_favorite !== undefined) {
         queryParams.append('is_favorite', params.is_favorite.toString());
       }
@@ -128,6 +133,7 @@ export class ReadService {
 
       const queryParams = new URLSearchParams();
       queryParams.append('q', params.q);
+      if (params.list) queryParams.append('list', params.list);
       if (params.limit) queryParams.append('limit', params.limit.toString());
       if (params.cursor) queryParams.append('cursor', params.cursor);
 
@@ -223,6 +229,14 @@ export class ReadService {
       console.error('Error updating content:', error);
       throw error;
     }
+  }
+
+  /**
+   * Save a Feed item to Reads. The backend re-stamps added_at, so the item
+   * lands at the top of Reads.
+   */
+  static async moveToReads(contentId: string): Promise<UserContentResponse> {
+    return ReadService.updateUserContent(contentId, { list: 'reads' });
   }
 
   /**
@@ -390,6 +404,36 @@ export class ReadService {
   }
 
   /**
+   * Choose where a source's new items land. `key` is the feed ID for 'rss'
+   * and the subscription ID (the sender ID) for 'email'. Only items delivered
+   * afterwards follow the new choice; existing items stay where they are.
+   */
+  static async setSourceList(
+    type: SourceRouteType,
+    key: string,
+    list: ContentList,
+  ): Promise<SetSourceListResponse> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await AuthService.fetchWithAuth(
+      `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions/${type}/${key}/list`,
+      { method: 'PUT', body: JSON.stringify({ list }) },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to update source list');
+    }
+
+    return result.data;
+  }
+
+  /**
    * List user's feed subscriptions (RSS only)
    * @deprecated Use listAllSubscriptions() for unified subscriptions across all sources
    */
@@ -498,6 +542,7 @@ export class ReadService {
         tags: [],
         isRead: userContent.status === 'completed',
         isFavorite: userContent.is_favorite,
+        list: userContent.list,
         addedAt: new Date(userContent.added_at).getTime(),
         scrollPosition: userContent.scroll_position || undefined,
       };
@@ -518,6 +563,7 @@ export class ReadService {
       tags: [],
       isRead: userContent.status === 'completed',
       isFavorite: userContent.is_favorite,
+      list: userContent.list,
       addedAt: new Date(userContent.added_at).getTime(),
       readAt: userContent.status === 'completed' ? new Date(userContent.updated_at).getTime() : undefined,
       scrollPosition: userContent.scroll_position || undefined,
@@ -539,6 +585,7 @@ export class ReadService {
         tags: [],
         isRead: userContent.status === 'completed',
         isFavorite: userContent.is_favorite,
+        list: userContent.list,
         addedAt: new Date(userContent.added_at).getTime(),
         scrollPosition: userContent.scroll_position || undefined,
       };
@@ -558,6 +605,7 @@ export class ReadService {
       tags: [],
       isRead: userContent.status === 'completed',
       isFavorite: userContent.is_favorite,
+      list: userContent.list,
       addedAt: new Date(userContent.added_at).getTime(),
       readAt: userContent.status === 'completed' ? new Date(userContent.updated_at).getTime() : undefined,
       scrollPosition: userContent.scroll_position || undefined,

@@ -88,6 +88,7 @@ const baseArticle: Article = {
   tags: [],
   isRead: true, // skip the "mark as reading" effect — irrelevant here
   isFavorite: false,
+  list: 'reads' as const,
   addedAt: Date.now(),
   content: '<p>Body</p>',
 };

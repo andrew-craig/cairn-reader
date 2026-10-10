@@ -10,6 +10,7 @@ function page(ids: string[], cursor: string, hasMore: boolean): UserContentsList
       user_id: 'u',
       content_id: id,
       status: 'unread' as const,
+      list: 'reads' as const,
       scroll_position: 0,
       is_favorite: false,
       added_at: '2025-01-01T00:00:00Z',
