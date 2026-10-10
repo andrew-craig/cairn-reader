@@ -51,4 +51,7 @@ type EmailSubscriptionData struct {
 type ListSubscriptionsResponse struct {
 	Subscriptions []UnifiedSubscription `json:"subscriptions"`
 	TotalCount    int                   `json:"total_count"`
+	// FailedSources lists the sources that could not be loaded; their subscriptions are
+	// missing from Subscriptions and TotalCount. Empty when every source answered.
+	FailedSources []SubscriptionType `json:"failed_sources"`
 }
