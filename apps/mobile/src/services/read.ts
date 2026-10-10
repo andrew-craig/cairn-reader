@@ -226,34 +226,6 @@ export class ReadService {
   }
 
   /**
-   * Delete content from user's reading list
-   */
-  static async deleteUserContent(contentId: string): Promise<void> {
-    try {
-      const userId = await AuthService.getUserId();
-
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await AuthService.fetchWithAuth(
-        `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new HttpError(response.status, `Failed to delete content: ${error}`);
-      }
-    } catch (error) {
-      console.error('Error deleting content:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Detect URL type (feed or page)
    * Requires authentication. Non-blocking with 10s timeout
    */

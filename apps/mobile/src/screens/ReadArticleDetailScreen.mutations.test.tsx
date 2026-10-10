@@ -17,7 +17,7 @@ import { HttpError } from '@cairn/shared';
 //    the store write too, not just the optimistic UI — otherwise this
 //    screen and BookmarksScreen (listFavorites()) disagree until the next
 //    list sync.
-// 2. handleArchive: navigation must not wait on the backend delete — only a
+// 2. handleArchive: navigation must not wait on the backend archive — only a
 //    genuine (non-NetworkError) failure should surface, via Alert, after
 //    navigation has already happened.
 
@@ -132,7 +132,7 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
   });
 
   describe('handleArchive', () => {
-    it('navigates back immediately without waiting on the backend delete', async () => {
+    it('navigates back immediately without waiting on the backend archive', async () => {
       let resolveArchive: () => void;
       mockedArticleMutations.archive.mockReturnValue(
         new Promise((resolve) => {
@@ -172,7 +172,7 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('does not alert when the backend delete succeeds', async () => {
+    it('does not alert when the backend archive succeeds', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       mockedArticleMutations.archive.mockResolvedValue(undefined);
 

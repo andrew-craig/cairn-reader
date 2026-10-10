@@ -256,7 +256,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
     onArchived?.(targetId);
     navigation.goBack();
     // Deliberately not awaited: offline is fast (ArticleMutations.archive
-    // queues it on NetworkError), but waiting on a slow-but-online DELETE
+    // queues it on NetworkError), but waiting on a slow-but-online PATCH
     // would freeze the archive button with no spinner. A real failure still
     // surfaces via the alert below — it just does so after navigation
     // instead of blocking it.

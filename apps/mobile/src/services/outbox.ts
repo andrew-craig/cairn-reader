@@ -3,14 +3,13 @@ import { ReadService } from './read';
 import { HttpError, NetworkError, UpdateUserContentRequest } from '@cairn/shared';
 
 /**
- * The server's PATCH field names, plus `delete` for the archive (DELETE)
- * path. Deliberately the server's vocabulary, not the store's: the store's
- * scroll column is `scroll_fraction`, and `articles.scroll_position` is a
- * separate legacy column — see articleStore.ts. Payloads enqueued under
- * `status`/`is_favorite`/`scroll_position` are `UpdateUserContentRequest`
- * fragments and are replayed as-is; `delete` carries no payload.
+ * The server's PATCH field names. Deliberately the server's vocabulary, not
+ * the store's: the store's scroll column is `scroll_fraction`, and
+ * `articles.scroll_position` is a separate legacy column — see
+ * articleStore.ts. Payloads are `UpdateUserContentRequest` fragments and are
+ * replayed as-is. An archive is a `status` row with `{ status: 'archived' }`.
  */
-export type OutboxField = 'status' | 'is_favorite' | 'scroll_position' | 'delete';
+export type OutboxField = 'status' | 'is_favorite' | 'scroll_position';
 
 interface OutboxRow {
   article_id: string;
@@ -54,8 +53,7 @@ export function isRetryable(error: unknown): boolean {
 
 /**
  * Replays one row against the backend and classifies the result:
- * - success: 2xx, or a 404 on a replayed `delete` (the server already has no
- *   record of it — exactly what the delete wanted).
+ * - success: 2xx.
  * - drop: a definitive 4xx other than 401. Replaying it again can only fail
  *   the same way.
  * - halt: NetworkError, 401, 5xx (per `isRetryable`), or anything else
@@ -65,19 +63,12 @@ export function isRetryable(error: unknown): boolean {
  */
 async function sendRow(row: OutboxRow): Promise<SendOutcome> {
   try {
-    if (row.field === 'delete') {
-      await ReadService.deleteUserContent(row.article_id);
-    } else {
-      await ReadService.updateUserContent(
-        row.article_id,
-        JSON.parse(row.payload) as UpdateUserContentRequest,
-      );
-    }
+    await ReadService.updateUserContent(
+      row.article_id,
+      JSON.parse(row.payload) as UpdateUserContentRequest,
+    );
     return 'success';
   } catch (error) {
-    if (row.field === 'delete' && error instanceof HttpError && error.status === 404) {
-      return 'success';
-    }
     if (error instanceof HttpError && !isRetryable(error)) {
       console.error(
         `Outbox: dropping ${row.field} write for article ${row.article_id} (non-retryable):`,
@@ -94,9 +85,7 @@ export const Outbox = {
    * Queue a mutation for replay once connectivity returns. Coalesced by
    * (article_id, field): a later enqueue for the same pair replaces the
    * payload in place, leaving `created_at` untouched so the row keeps its
-   * spot in the queue instead of jumping to the back. Enqueuing a `delete`
-   * first clears any other pending row for that article — a PATCH replayed
-   * against a since-deleted article is a guaranteed 404.
+   * spot in the queue instead of jumping to the back.
    */
   async enqueue(
     articleId: string,
@@ -104,11 +93,6 @@ export const Outbox = {
     payload: Record<string, unknown>,
   ): Promise<void> {
     const db = await getDb();
-    if (field === 'delete') {
-      await db.runAsync("DELETE FROM outbox WHERE article_id = $article_id AND field != 'delete'", {
-        $article_id: articleId,
-      });
-    }
     await db.runAsync(ENQUEUE_SQL, {
       $article_id: articleId,
       $field: field,

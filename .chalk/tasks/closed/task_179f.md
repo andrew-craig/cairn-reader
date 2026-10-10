@@ -2,14 +2,14 @@
 id: task_179f
 title: Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 type: task
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-07-05T06:45:55Z
-updated_at: 2026-09-08T23:05:50Z
+updated_at: 2026-10-10T07:57:56Z
 ---
 
 Found while investigating the "archived article still shows in Read list"
@@ -30,3 +30,8 @@ bug (fixed separately). Out of scope for that fix but worth addressing:
   and `READ_LIST_CACHE_KEY` used by `getReadListCache`/`saveReadListCache`).
   `ReadScreen` only reads/writes the latter; `handleArchive` only touches the
   former. Worth reconciling into a single source of truth.
+
+## Resolution
+- Swallowed archive error and dual caches were already fixed by task_ebf1 (`ArticleMutations` + outbox; `ArticleStore` is the single store).
+- Decision: archive means status, not delete. Mobile `ArticleMutations.archive` now PATCHes `status: 'archived'`; the outbox `delete` field and mobile `ReadService.deleteUserContent` are removed; the store's resurrection guard keys on a pending archived `status` row.
+- Backend: user-content list, count and search exclude archived unless `status` is explicitly requested, so archived items leave the Read list (also fixes web).

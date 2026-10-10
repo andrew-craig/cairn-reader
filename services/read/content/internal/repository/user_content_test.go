@@ -470,7 +470,7 @@ func TestUserContentRepository_CountByUser_NoFilters(t *testing.T) {
 
 	userID := uuid.New()
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND status != 'archived'`).
 		WithArgs(userID).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 
@@ -491,7 +491,7 @@ func TestUserContentRepository_CountByUser_WithFavoriteFilter(t *testing.T) {
 	userID := uuid.New()
 	isFavorite := true
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND is_favorite = \$2`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND status != 'archived' AND is_favorite = \$2`).
 		WithArgs(userID, isFavorite).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 

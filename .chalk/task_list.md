@@ -11,7 +11,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_c482** · P2 · open · Phase B: switch Explore shown tracking to mobile-driven
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_02c8** · P2 · open · [Audit/Tier 3] Vote counters: collapse the transition ladder AND fix the asymmetric RowsAffected handling  (parent: epic_fefa)
-- **task_179f** · P2 · open · Mobile: fix archive semantics (hard delete vs status, swallowed errors, dual caches)
 - **task_19a9** · P2 · open · [explore/fetcher] Integration suite: test isolation + EndToEndFlow hardcoded IDs + EmptyResponse behavior  (parent: epic_fefa)
 - **task_30e3** · P2 · open · Decommission the Explore backend (fetcher + recommender)  (parent: epic_6e4d)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)

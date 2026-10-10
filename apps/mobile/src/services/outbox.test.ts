@@ -13,7 +13,6 @@ jest.mock('expo-sqlite');
 jest.mock('./read', () => ({
   ReadService: {
     updateUserContent: jest.fn(),
-    deleteUserContent: jest.fn(),
   },
 }));
 
@@ -55,32 +54,15 @@ describe('Outbox', () => {
       expect(mockedReadService.updateUserContent).toHaveBeenCalledTimes(2);
     });
 
-    it('enqueuing a delete supersedes that article\'s other pending rows', async () => {
-      await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
-      await Outbox.enqueue('a1', 'scroll_position', { scroll_position: 0.5 });
-
-      await Outbox.enqueue('a1', 'delete', {});
-
-      mockedReadService.deleteUserContent.mockResolvedValue(undefined);
-      await Outbox.drain();
-
-      // Only the delete should have been replayed — the superseded PATCH
-      // rows must never reach the network (a 404 waiting to happen).
-      expect(mockedReadService.updateUserContent).not.toHaveBeenCalled();
-      expect(mockedReadService.deleteUserContent).toHaveBeenCalledTimes(1);
-      expect(mockedReadService.deleteUserContent).toHaveBeenCalledWith('a1');
-    });
-
     it('does not disturb a different article\'s pending rows', async () => {
       await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
-      await Outbox.enqueue('a2', 'delete', {});
+      await Outbox.enqueue('a2', 'status', { status: 'archived' });
 
       mockedReadService.updateUserContent.mockResolvedValue(undefined as never);
-      mockedReadService.deleteUserContent.mockResolvedValue(undefined);
       await Outbox.drain();
 
       expect(mockedReadService.updateUserContent).toHaveBeenCalledWith('a1', { is_favorite: true });
-      expect(mockedReadService.deleteUserContent).toHaveBeenCalledWith('a2');
+      expect(mockedReadService.updateUserContent).toHaveBeenCalledWith('a2', { status: 'archived' });
     });
   });
 
@@ -126,17 +108,6 @@ describe('Outbox', () => {
     it('a 2xx (resolved) write deletes the row', async () => {
       await Outbox.enqueue('a1', 'is_favorite', { is_favorite: true });
       mockedReadService.updateUserContent.mockResolvedValue(undefined as never);
-
-      await Outbox.drain();
-
-      const db = await getDb();
-      const remaining = await db.getAllAsync('SELECT * FROM outbox');
-      expect(remaining).toHaveLength(0);
-    });
-
-    it('a 404 on a replayed delete counts as success and deletes the row', async () => {
-      await Outbox.enqueue('a1', 'delete', {});
-      mockedReadService.deleteUserContent.mockRejectedValue(new HttpError(404, 'Not found'));
 
       await Outbox.drain();
 

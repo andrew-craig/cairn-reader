@@ -21,7 +21,6 @@ jest.mock('./articleStore', () => ({
 jest.mock('./read', () => ({
   ReadService: {
     updateUserContent: jest.fn(),
-    deleteUserContent: jest.fn(),
   },
 }));
 
@@ -188,28 +187,28 @@ describe('ArticleMutations', () => {
   });
 
   describe('archive', () => {
-    it('removes from the store, then deletes on the backend', async () => {
-      mockedReadService.deleteUserContent.mockResolvedValue(undefined);
+    it('removes from the store, then archives on the backend', async () => {
+      mockedReadService.updateUserContent.mockResolvedValue(undefined as never);
 
       await ArticleMutations.archive('a1');
 
       expect(mockedArticleStore.remove).toHaveBeenCalledWith('a1');
-      expect(mockedReadService.deleteUserContent).toHaveBeenCalledWith('a1');
+      expect(mockedReadService.updateUserContent).toHaveBeenCalledWith('a1', { status: 'archived' });
       const storeOrder = mockedArticleStore.remove.mock.invocationCallOrder[0];
-      const networkOrder = mockedReadService.deleteUserContent.mock.invocationCallOrder[0];
+      const networkOrder = mockedReadService.updateUserContent.mock.invocationCallOrder[0];
       expect(storeOrder).toBeLessThan(networkOrder);
     });
 
-    it('enqueues a delete on NetworkError instead of throwing', async () => {
-      mockedReadService.deleteUserContent.mockRejectedValue(new NetworkError());
+    it('enqueues an archive on NetworkError instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new NetworkError());
 
       await expect(ArticleMutations.archive('a1')).resolves.toBeUndefined();
 
-      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'delete', {});
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'archived' });
     });
 
     it('surfaces a definitive 4xx instead of enqueuing (fixes the swallowed archive error)', async () => {
-      mockedReadService.deleteUserContent.mockRejectedValue(new HttpError(403, 'forbidden'));
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(403, 'forbidden'));
 
       await expect(ArticleMutations.archive('a1')).rejects.toThrow('forbidden');
 
@@ -218,14 +217,14 @@ describe('ArticleMutations', () => {
 
     // The motivating case from task_c894: online, backend returns 503 on
     // archive — ArticleStore.remove() already ran, and without this the
-    // DELETE would be rethrown with nothing queued, leaving the article gone
+    // PATCH would be rethrown with nothing queued, leaving the article gone
     // locally but still present on the server.
-    it('enqueues a delete on a live HttpError(503) instead of throwing', async () => {
-      mockedReadService.deleteUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
+    it('enqueues an archive on a live HttpError(503) instead of throwing', async () => {
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(503, 'Service Unavailable'));
 
       await expect(ArticleMutations.archive('a1')).resolves.toBeUndefined();
 
-      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'delete', {});
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'archived' });
     });
   });
 });

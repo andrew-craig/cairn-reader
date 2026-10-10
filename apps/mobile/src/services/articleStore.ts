@@ -36,11 +36,12 @@ interface ArticleRow {
 //
 // task_ebf1 adds two guards against a queued offline write being clobbered
 // by a list sync that runs before the outbox drains:
-// - A pending `delete` row for this article (an offline archive) skips the
-//   insert/update entirely — the WHERE on the SELECT source makes the insert
-//   produce zero rows, so ON CONFLICT never even fires. Otherwise the server
-//   still listing the article would resurrect it in the store the moment a
-//   sync ran, ahead of the queued DELETE actually reaching the backend.
+// - A pending archive (a `status` row with `{"status":"archived"}`) for this
+//   article skips the insert/update entirely — the WHERE on the SELECT source
+//   makes the insert produce zero rows, so ON CONFLICT never even fires.
+//   Otherwise the server still listing the article would resurrect it in the
+//   store the moment a sync ran, ahead of the queued PATCH reaching the
+//   backend.
 // - Any other pending outbox row for this article (status/is_favorite/
 //   scroll_position) freezes the four user-state columns at their current
 //   stored value instead of accepting the server's — those are exactly the
@@ -60,7 +61,8 @@ const UPSERT_SQL = `
     $reading_time, $tags, $is_read, $is_favorite, $added_at, $read_at,
     $scroll_position, $scroll_fraction, $body, $content_hash
   WHERE NOT EXISTS (
-    SELECT 1 FROM outbox WHERE article_id = $id AND field = 'delete'
+    SELECT 1 FROM outbox
+    WHERE article_id = $id AND field = 'status' AND json_extract(payload, '$.status') = 'archived'
   )
   ON CONFLICT(id) DO UPDATE SET
     url = excluded.url,
