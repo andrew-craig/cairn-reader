@@ -126,6 +126,10 @@ func (m *mockUserContentRepo) BulkCreate(ctx context.Context, userContents []*mo
 	return nil
 }
 
+func (m *mockUserContentRepo) DeleteExpiredFeed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	return 0, nil
+}
+
 type mockContentRepo struct{}
 
 func (m *mockContentRepo) Create(ctx context.Context, content *models.Content) error {

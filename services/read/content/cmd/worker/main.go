@@ -49,9 +49,10 @@ func main() {
 
 	// Initialize repositories
 	contentRepo := repository.NewContentRepository(db.DB)
+	userContentRepo := repository.NewUserContentRepository(db.DB)
 
 	// Initialize jobs
-	cleanupJob := jobs.NewCleanupJob(contentRepo, logger, 0)
+	cleanupJob := jobs.NewCleanupJob(contentRepo, userContentRepo, logger, 0)
 
 	// Create cron scheduler
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
@@ -70,7 +71,7 @@ func main() {
 		slog.String("cleanup_schedule", cleanupCron),
 	)
 	slog.Info("background jobs")
-	slog.Info("- orphaned content cleanup (runs daily at 2 AM)")
+	slog.Info("- feed expiry (30 days) and orphaned content cleanup (runs daily at 2 AM)")
 
 	// Start health check HTTP server
 	healthPort := getEnv("HEALTH_PORT", "8082")
