@@ -5,11 +5,11 @@ type: task
 status: in_progress
 priority: 1
 labels: [mobile]
-blocked_by: []
+blocked_by: [task_66b2]
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-10T08:19:45Z
+updated_at: 2026-10-10T08:28:37Z
 ---
 - [ ] Shared types: list on UserContentResponse + UnifiedSubscription; ReadService.listUserContents({list}), setSourceList, moveToReads
 - [ ] Tabs: Feed | Reads | You
@@ -62,7 +62,7 @@ Shape: build bottom-up (types → service → shared list plumbing → screens �
 - [ ] `npm run typecheck`, `npm run lint`, `npm test` in `apps/mobile` (and `apps/shared` if it has its own).
 - [ ] Manual run against a remote backend: subscribe to an RSS feed as Feed → new items appear in Feed, not Reads; toggle to Reads → only new items move; Save to Reads moves an item; offline Reads still opens; Feed offline shows the stale/offline state.
 
-### Open questions (need owner input before step 3)
-1. **Feed offline/stale cache.** Spec says "online-only with a stale cache". I read that as an in-memory/AsyncStorage snapshot of the last Feed page (not `ArticleStore`, so it can't pollute Reads offline sync). OK, or should Feed show nothing offline?
-2. **Save to Reads ordering.** The backend keeps `added_at` on move, so the saved item can land deep in Reads (see the `task_7df9` review). Accept, or ask backend to bump the sort key?
-3. **Favoriting in Feed.** The task says "Save to Reads instead of status triage". I'm keeping Favorite in the Feed reader since retention exempts favorites. Confirm.
+### Decisions (owner, 2026-10-10)
+1. **Feed offline:** show the last loaded Feed page from an AsyncStorage snapshot (separate from `ArticleStore`) with the "Showing cached data" banner; opening an item offline shows the reader's "Not available offline" state. (Recommended option A, pending owner confirmation after explanation.)
+2. **Save to Reads:** newly saved content lands at the top of Reads. Needs a backend change, tracked as `task_66b2` (moving to reads re-stamps `added_at`). The 'Save to Reads' action depends on it.
+3. **Favorites:** kept in the Feed reader; favorited items are exempt from retention (`task_d0f5`).
