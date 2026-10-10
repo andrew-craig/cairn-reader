@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { HeaderPopover } from './common/HeaderPopover';
+import { ListToggle } from './common/ListToggle';
 import { ReadService } from '../services/read';
-import { DetectURLResponse } from '@cairn/shared';
+import { ContentList, DetectURLResponse } from '@cairn/shared';
 
 interface AddLinkModalProps {
   visible: boolean;
@@ -34,6 +35,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
+  // Where a subscribed feed's new items land. Reads is the backend default.
+  const [feedList, setFeedList] = useState<ContentList>('reads');
 
   // Handle to the in-flight detection so a dismiss can abandon it (detection is
   // not user-initiated — it fires on every URL change — so it must never block
@@ -132,13 +135,17 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
         url: normalizedUrl,
         type: detectionResult?.type,
         title: detectionResult?.title ?? undefined,
+        // Only feeds have a destination to choose; pages always land in Reads.
+        ...(detectionResult?.type === 'feed' && { list: feedList }),
       });
 
       // Show success message based on response type
       if (response.type === 'feed') {
         Alert.alert(
           'Success',
-          `Subscribed to ${response.subscription.title}`,
+          `Subscribed to ${response.subscription.title}. New items will appear in ${
+            response.subscription.list === 'feed' ? 'Feed' : 'Reads'
+          }.`,
           [{ text: 'OK' }]
         );
       } else {
@@ -151,6 +158,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
       setUrl('');
       setDetectionResult(null);
+      setFeedList('reads');
       onClose();
 
       // Call success callback if provided
@@ -239,6 +247,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     setUrl('');
     setError(null);
     setDetectionResult(null);
+    setFeedList('reads');
     onClose();
   };
 
@@ -283,6 +292,15 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                 </Text>
               )}
             </View>
+
+            {detectionResult?.type === 'feed' && (
+              <View style={styles.listChoice}>
+                <Text style={[styles.listChoiceLabel, { color: colors.textSecondary }]}>
+                  New items go to
+                </Text>
+                <ListToggle subject="this feed" list={feedList} onChange={setFeedList} disabled={loading} />
+              </View>
+            )}
 
             <View style={styles.buttonContainer}>
               <View style={styles.buttonWrapper}>
@@ -354,6 +372,16 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.default,
     marginTop: Spacing.sm,
     marginLeft: Spacing.xs,
+  },
+  listChoice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  listChoiceLabel: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
   },
   buttonContainer: {
     flexDirection: 'row',

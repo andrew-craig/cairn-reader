@@ -13,6 +13,7 @@ import { Article } from '../types';
 jest.mock('../services/read', () => ({
   ReadService: {
     listUserContents: jest.fn(),
+    transformToArticle: jest.requireActual('../services/read').ReadService.transformToArticle,
   },
 }));
 
@@ -39,6 +40,7 @@ const article = (id: string): Article => ({
   tags: [],
   isRead: false,
   isFavorite: true,
+  list: 'reads' as const,
   addedAt: Date.now(),
 });
 
@@ -72,4 +74,51 @@ describe('BookmarksScreen offline-first render', () => {
     expect(screen.queryByText("Couldn't load your bookmarks. Check your connection and try again.")).toBeNull();
     expect(screen.getByText('Favorite fav-1')).toBeTruthy();
   });
+
+  it('keeps favorited Feed items out of the offline store', async () => {
+    mockedArticleStore.listFavorites.mockResolvedValue([]);
+    mockedReadService.listUserContents.mockResolvedValue({
+      contents: [
+        userContent('reads-1', 'reads'),
+        userContent('feed-1', 'feed'),
+      ],
+      total_count: 2,
+      limit: 20,
+      cursor: '',
+      has_more: false,
+    });
+
+    render(<BookmarksScreen />);
+
+    // Both are listed...
+    expect(await screen.findByText('Item reads-1')).toBeTruthy();
+    expect(screen.getByText('Item feed-1')).toBeTruthy();
+    // ...but only the Reads one is cached for offline.
+    await waitFor(() => expect(mockedArticleStore.upsertMany).toHaveBeenCalled());
+    const stored = mockedArticleStore.upsertMany.mock.calls[0][0];
+    expect(stored.map((a) => a.id)).toEqual(['reads-1']);
+  });
 });
+
+function userContent(id: string, list: 'feed' | 'reads') {
+  return {
+    id: `uc-${id}`,
+    user_id: 'u',
+    content_id: id,
+    status: 'unread' as const,
+    list,
+    scroll_position: 0,
+    is_favorite: true,
+    added_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+    content: {
+      id,
+      content_hash: id,
+      original_url: `https://example.com/${id}`,
+      title: `Item ${id}`,
+      source_type: 'rss',
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+    },
+  };
+}

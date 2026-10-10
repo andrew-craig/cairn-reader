@@ -1,4 +1,5 @@
-export * from './ReadScreen';
+export * from './FeedScreen';
+export * from './ReadsScreen';
 export * from './YouScreen';
 export * from './AddArticleScreen';
 export * from './ReadArticleDetailScreen';
@@ -6,5 +7,5 @@ export * from './LoginScreen';
 export * from './BookmarksScreen';
 export * from './AccountScreen';
 export * from './AboutScreen';
-export * from './FeedsScreen';
+export * from './RssScreen';
 export * from './NewslettersScreen';

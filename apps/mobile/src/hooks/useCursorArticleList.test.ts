@@ -10,6 +10,7 @@ function page(ids: string[], cursor: string, hasMore: boolean): UserContentsList
       user_id: 'u',
       content_id: id,
       status: 'unread' as const,
+      list: 'reads' as const,
       scroll_position: 0,
       is_favorite: false,
       added_at: '2025-01-01T00:00:00Z',
@@ -110,6 +111,21 @@ describe('useCursorArticleList', () => {
 
     expect(result.current.searchQuery).toBe('term');
     expect(result.current.articles.map((a) => a.id)).toEqual(['s1', 's2']);
+  });
+
+  it('scopes search to the list the hook was given', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page([], '', false));
+    const searchSpy = jest
+      .spyOn(ReadService, 'searchUserContents')
+      .mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage, list: 'feed' }));
+
+    await act(async () => {
+      await result.current.search('term');
+    });
+
+    expect(searchSpy).toHaveBeenCalledWith(expect.objectContaining({ q: 'term', list: 'feed' }));
   });
 
   it('clears the refreshing indicator after a pull-to-refresh during search', async () => {

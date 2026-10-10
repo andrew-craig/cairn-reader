@@ -1,16 +1,16 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
-import { ReadScreen } from './ReadScreen';
+import { ReadsScreen } from './ReadsScreen';
 import { ReadService } from '../services/read';
 
-// Regression proof for the PR #382 review defect: ReadScreen's focus effect
+// Regression proof for the PR #382 review defect: ReadsScreen's focus effect
 // only calls `load(true)` (the network refresh) inside
 // `ArticleStore.listRecent(...).then(...)`, with no `.catch`. If the SQLite
 // read rejected, `load(true)` would never run and the screen would be stuck
 // on the initial spinner forever.
 //
 // This file deliberately does NOT mock '../services/articleStore' (unlike
-// ReadScreen.test.tsx) — it exercises the *real* ArticleStore against a DB
+// ReadsScreen.test.tsx) — it exercises the *real* ArticleStore against a DB
 // that fails to open, to prove the screen recovers via articleStore.ts's
 // "reads never reject" contract rather than a screen-level `.catch` (the
 // task explicitly rejects adding one per call site).
@@ -33,7 +33,7 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
 
-describe('ReadScreen recovers when the local store read fails', () => {
+describe('ReadsScreen recovers when the local store read fails', () => {
   it('still fires the network load and clears the spinner', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
     mockedReadService.listUserContents.mockResolvedValue({
@@ -44,7 +44,7 @@ describe('ReadScreen recovers when the local store read fails', () => {
       has_more: false,
     });
 
-    render(<ReadScreen />);
+    render(<ReadsScreen />);
 
     await waitFor(() => expect(mockedReadService.listUserContents).toHaveBeenCalled());
     expect(await screen.findByText('No saved articles yet')).toBeTruthy();

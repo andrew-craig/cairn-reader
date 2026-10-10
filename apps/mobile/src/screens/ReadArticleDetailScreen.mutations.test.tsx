@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
-import { ArticleStore, ArticleMutations } from '../services';
+import { ArticleStore, ArticleMutations, ReadService, invalidateReads } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
 import { HttpError } from '@cairn/shared';
@@ -32,7 +32,9 @@ jest.mock('../services', () => ({
     getContentById: jest.fn(),
     updateUserContent: jest.fn(),
     transformDetailToArticle: jest.fn(),
+    moveToReads: jest.fn(),
   },
+  invalidateReads: jest.fn(),
   ArticleMutations: {
     markCompleted: jest.fn(),
     markReading: jest.fn(),
@@ -78,6 +80,8 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
+const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
+const mockedInvalidateReads = invalidateReads as jest.Mock;
 const mockedArticleMutations = ArticleMutations as jest.Mocked<typeof ArticleMutations>;
 const mockedUseNetworkStatus = useNetworkStatus as jest.Mock;
 
@@ -88,6 +92,7 @@ const baseArticle: Article = {
   tags: [],
   isRead: true, // skip the "mark as reading" effect — irrelevant here
   isFavorite: false,
+  list: 'reads' as const,
   addedAt: Date.now(),
   content: '<p>Body</p>',
 };
@@ -183,6 +188,85 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
       expect(alertSpy).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
+    });
+  });
+
+  describe('Feed items', () => {
+    const feedArticle: Article = { ...baseArticle, list: 'feed' as const };
+
+    beforeEach(() => {
+      mockRouteParams = { article: feedArticle, onArchived: jest.fn() };
+    });
+
+    it('offers Save to Reads instead of Archive', () => {
+      render(<ReadArticleDetailScreen />);
+      expect(screen.getByText('Save to Reads:off')).toBeTruthy();
+      expect(screen.queryByText('Archive:off')).toBeNull();
+      // Favorite stays: favorited Feed items are exempt from retention.
+      expect(screen.getByText('Favorite:off')).toBeTruthy();
+    });
+
+    it('keeps Archive for Reads items', () => {
+      mockRouteParams = { article: baseArticle, onArchived: jest.fn() };
+      render(<ReadArticleDetailScreen />);
+      expect(screen.getByText('Archive:off')).toBeTruthy();
+      expect(screen.queryByText('Save to Reads:off')).toBeNull();
+    });
+
+    it('moves the item, marks Reads stale, then leaves the reader', async () => {
+      mockedReadService.moveToReads.mockResolvedValue({} as never);
+
+      render(<ReadArticleDetailScreen />);
+      fireEvent.press(screen.getByText('Save to Reads:off'));
+
+      await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
+      expect(mockedReadService.moveToReads).toHaveBeenCalledWith('a1');
+      expect(mockedInvalidateReads).toHaveBeenCalledTimes(1);
+      expect(mockRouteParams.onArchived).toHaveBeenCalledWith('a1');
+      // Not an archive: no status mutation, no outbox.
+      expect(mockedArticleMutations.archive).not.toHaveBeenCalled();
+    });
+
+    it('stays in the reader and alerts when the move fails', async () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      mockedReadService.moveToReads.mockRejectedValue(new HttpError(500, 'boom'));
+
+      render(<ReadArticleDetailScreen />);
+      fireEvent.press(screen.getByText('Save to Reads:off'));
+
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to save to Reads'));
+      expect(mockGoBack).not.toHaveBeenCalled();
+      expect(mockRouteParams.onArchived).not.toHaveBeenCalled();
+      expect(mockedInvalidateReads).not.toHaveBeenCalled();
+
+      // The failure releases the guard, so the user can retry.
+      mockedReadService.moveToReads.mockResolvedValue({} as never);
+      fireEvent.press(screen.getByText('Save to Reads:off'));
+      await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
+
+      alertSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('ignores a second tap while the move is in flight', async () => {
+      let resolveMove: () => void;
+      mockedReadService.moveToReads.mockReturnValue(
+        new Promise((resolve) => {
+          resolveMove = () => resolve({} as never);
+        }),
+      );
+
+      render(<ReadArticleDetailScreen />);
+      fireEvent.press(screen.getByText('Save to Reads:off'));
+      fireEvent.press(screen.getByText('Save to Reads:off'));
+      expect(mockedReadService.moveToReads).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveMove!();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
     });
   });
 });

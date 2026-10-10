@@ -7,11 +7,12 @@ export type RootStackParamList = {
   Bookmarks: undefined;
   Account: undefined;
   About: undefined;
-  Feeds: undefined;
+  RSS: undefined;
   Newsletters: undefined;
 };
 
 export type MainTabParamList = {
-  Read: undefined;
+  Feed: undefined;
+  Reads: undefined;
   You: undefined;
 };

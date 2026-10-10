@@ -3,7 +3,7 @@ import { useColorScheme, TouchableOpacity, ActivityIndicator, View } from 'react
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types';
-import { AddArticleScreen, ReadArticleDetailScreen, LoginScreen, BookmarksScreen, AccountScreen, AboutScreen, FeedsScreen, NewslettersScreen } from '../screens';
+import { AddArticleScreen, ReadArticleDetailScreen, LoginScreen, BookmarksScreen, AccountScreen, AboutScreen, RssScreen, NewslettersScreen } from '../screens';
 import { TabNavigator } from './TabNavigator';
 import { Colors } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
@@ -106,8 +106,8 @@ export default function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="Feeds"
-          component={FeedsScreen}
+          name="RSS"
+          component={RssScreen}
           options={{
             headerShown: false,
             presentation: 'card',

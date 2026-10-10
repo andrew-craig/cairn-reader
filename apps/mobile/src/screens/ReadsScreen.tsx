@@ -10,6 +10,7 @@ import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
 import { SyncTrigger } from '../services/syncTrigger';
+import { readsInvalidatedSince } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 // Minimum ms between background refetches triggered by tab focus.
@@ -18,10 +19,10 @@ const FOCUS_REFETCH_TTL_MS = 30_000;
 // read-through cache for the first render, not a paginated query engine.
 const STORED_ARTICLES_LIMIT = 100;
 
-type ReadScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
+type ReadsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
-export const ReadScreen: React.FC = () => {
-  const navigation = useNavigation<ReadScreenNavigationProp>();
+export const ReadsScreen: React.FC = () => {
+  const navigation = useNavigation<ReadsScreenNavigationProp>();
   const [modalVisible, setModalVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
   const [isStale, setIsStale] = useState(false);
@@ -31,7 +32,8 @@ export const ReadScreen: React.FC = () => {
   const lastFetchedAtRef = useRef<number | null>(null);
 
   const fetchPage = useCallback(
-    (cursor: string | undefined) => ReadService.listUserContents({ limit: PAGE_SIZE, cursor }),
+    (cursor: string | undefined) =>
+      ReadService.listUserContents({ limit: PAGE_SIZE, cursor, list: 'reads' }),
     [],
   );
 
@@ -76,7 +78,7 @@ export const ReadScreen: React.FC = () => {
     clearSearch,
     handleRefresh,
     handleLoadMore,
-  } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError });
+  } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'reads' });
 
   // Mirror the current list so the archive mutation can compute the next list
   // (and persist it) without a side effect inside a state updater.
@@ -92,7 +94,8 @@ export const ReadScreen: React.FC = () => {
       const now = Date.now();
       const ttlExpired =
         lastFetchedAtRef.current === null ||
-        now - lastFetchedAtRef.current > FOCUS_REFETCH_TTL_MS;
+        now - lastFetchedAtRef.current > FOCUS_REFETCH_TTL_MS ||
+        readsInvalidatedSince(lastFetchedAtRef.current);
 
       if (!ttlExpired) return;
 
@@ -136,7 +139,7 @@ export const ReadScreen: React.FC = () => {
   return (
     <>
       <ArticleListScreen
-        title="Read"
+        title="Reads"
         articles={articles}
         loading={loading}
         headerActions={headerActions}
