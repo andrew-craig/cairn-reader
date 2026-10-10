@@ -5,7 +5,7 @@ type: task
 status: open
 priority: 1
 labels: [mobile]
-blocked_by: [task_47d5,task_179f,task_317b]
+blocked_by: [task_179f,task_317b]
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
@@ -16,5 +16,6 @@ updated_at: 2026-10-10T03:11:10Z
 - [ ] Reads = current ReadScreen with list='reads'; offline store, prefetch and outbox scoped to Reads only
 - [ ] Feed = ArticleListScreen + useCursorArticleList({list:'feed'}); opens in the existing reader; 'Save to Reads' action instead of status triage; no unread counts; online-only with a stale cache
 - [ ] AddLinkModal: 'Add Feed' asks Feed or Reads before subscribing
-- [ ] Sources screen: per-row Feed/Reads toggle (applies to new items only — say so in the UI)
+- [ ] Feeds and Newsletters stay separate screens; both get a per-row Feed/Reads toggle (applies to new items only — say so in the UI), via the shared SubscriptionListScreen and ReadService.setSourceList
+- [ ] Rename the Feeds screen and You menu entry to RSS so "Feed" only means the list (Newsletters keeps its name); unsubscribe stays RSS-only
 - Done when: typecheck, lint, tests pass; manual run shows routed items landing in the right tab

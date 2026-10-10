@@ -41,5 +41,5 @@ Explore is removed entirely for now.
 Prerequisites:
 - task_499a — type the outbox payloads (email payload gains `sender_id` in Phase 1)
 - task_179f — mobile archive semantics (Feed items share the reader)
-- task_317b — aggregator hides per-source failures (Sources screen sets routing)
-Then the subtasks under this epic: Explore removal, Sources screen rename, backend routing, Feed retention, mobile, web, docs. See `chalk list --parent=epic_6e4d`.
+- task_317b — aggregator hides per-source failures (the RSS and Newsletters screens set routing)
+Then the subtasks under this epic: Explore removal, backend routing, Feed retention, mobile, web, docs. See `chalk list --parent=epic_6e4d`.
