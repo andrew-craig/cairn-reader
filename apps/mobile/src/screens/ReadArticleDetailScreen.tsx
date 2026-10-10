@@ -11,7 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
-import { ArticleStore, ReadService, ArticleMutations } from '../services';
+import { ArticleStore, ReadService, ArticleMutations, invalidateReads } from '../services';
 import { Colors, GlobalStyles } from '../constants';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { ArticleContent, BottomActionMenu } from '../components/common';
@@ -266,6 +266,28 @@ export const ReadArticleDetailScreen: React.FC = () => {
     });
   };
 
+  // Feed items are triaged by saving them to Reads, not by archiving. Awaited
+  // (unlike archive): it's online-only, and the item should only leave the
+  // Feed once the server has actually moved it.
+  const savingToReadsRef = useRef(false);
+  const handleSaveToReads = async () => {
+    if (savingToReadsRef.current) return;
+    savingToReadsRef.current = true;
+    const targetId = article.id;
+    try {
+      await ReadService.moveToReads(targetId);
+    } catch (error) {
+      console.error('Failed to save article to Reads:', error);
+      Alert.alert('Error', 'Failed to save to Reads');
+      savingToReadsRef.current = false;
+      return;
+    }
+    invalidateReads();
+    // The list screen's "item left this list" callback (named for archive).
+    onArchived?.(targetId);
+    navigation.goBack();
+  };
+
   if (contentLoading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
@@ -316,11 +338,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
             onPress: handleToggleFavorite,
             active: isFavorite,
           },
-          {
-            icon: 'archive',
-            label: 'Archive',
-            onPress: handleArchive,
-          },
+          article.list === 'feed'
+            ? { icon: 'save-to-reads', label: 'Save to Reads', onPress: handleSaveToReads }
+            : { icon: 'archive', label: 'Archive', onPress: handleArchive },
         ]}
       />
     </View>

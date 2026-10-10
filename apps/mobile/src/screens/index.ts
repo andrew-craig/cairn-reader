@@ -1,3 +1,4 @@
+export * from './FeedScreen';
 export * from './ReadsScreen';
 export * from './YouScreen';
 export * from './AddArticleScreen';

@@ -2,6 +2,8 @@ export * from './articleStore';
 export * from './articlePrefetch';
 export * from './articleMutations';
 export * from './outbox';
+export * from './feedCache';
+export * from './readsInvalidation';
 export * from './auth';
 export * from './read';
 export * from './system';

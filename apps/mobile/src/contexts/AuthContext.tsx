@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthService, ArticleStore } from '../services';
+import { AuthService, ArticleStore, FeedCache } from '../services';
 import { NetworkError, loadServerUrl } from '@cairn/shared';
 import { User } from '../types';
 
@@ -83,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AuthService.logout();
       await ArticleStore.clear().catch((err) =>
         console.error('Failed to clear local articles on logout:', err),
+      );
+      await FeedCache.clear().catch((err) =>
+        console.error('Failed to clear cached feed on logout:', err),
       );
       setUser(null);
     } catch (error) {
