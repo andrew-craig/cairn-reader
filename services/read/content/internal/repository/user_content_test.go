@@ -236,6 +236,23 @@ func TestUserContentRepository_UpdateMetadata_StatusOnly(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUserContentRepository_UpdateMetadata_ListReadsRestampsAddedAt(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	ucID := uuid.New()
+	reads := models.ListReads
+
+	mock.ExpectExec(`UPDATE user_contents SET updated_at = \$1, list = \$2, added_at = CASE WHEN list <> 'reads' THEN \$1 ELSE added_at END WHERE id = \$3`).
+		WithArgs(sqlmock.AnyArg(), reads, ucID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	assert.NoError(t, repo.UpdateMetadata(context.Background(), ucID, nil, nil, nil, &reads))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestUserContentRepository_UpdateMetadata_NotFound(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

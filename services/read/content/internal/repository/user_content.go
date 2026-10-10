@@ -406,7 +406,8 @@ func (r *userContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, us
 	return nil
 }
 
-// UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite)
+// UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite, list).
+// Moving an item into Reads also re-stamps added_at.
 func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool, list *string) error {
 	// Build dynamic update query based on which fields are provided
 	query := "UPDATE user_contents SET updated_at = $1"
@@ -435,6 +436,12 @@ func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID
 		query += fmt.Sprintf(", list = $%d", argPos)
 		args = append(args, *list)
 		argPos++
+		if *list == models.ListReads {
+			// An item moved into Reads is newly saved there, so it goes to the
+			// top of the added_at ordering. The CASE reads the pre-update list,
+			// so re-asserting Reads on a Reads item leaves its position alone.
+			query += ", added_at = CASE WHEN list <> 'reads' THEN $1 ELSE added_at END"
+		}
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argPos)
