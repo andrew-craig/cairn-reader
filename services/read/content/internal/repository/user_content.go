@@ -59,6 +59,10 @@ type UserContentRepository interface {
 	// is Reads. Any List set on the input is ignored and overwritten with the
 	// resolved value.
 	BulkCreate(ctx context.Context, userContents []*models.UserContent) error
+
+	// DeleteExpiredFeed deletes up to batchSize non-favorited Feed-list rows
+	// added more than olderThan ago. Reads and favorited rows are never touched.
+	DeleteExpiredFeed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 // userContentRepository implements UserContentRepository
@@ -634,4 +638,29 @@ func (r *userContentRepository) BulkCreate(ctx context.Context, userContents []*
 	}
 
 	return nil
+}
+
+// DeleteExpiredFeed deletes up to batchSize non-favorited Feed-list rows added more than olderThan ago.
+// Contents rows left without any user_contents are reclaimed by the orphan trigger and DeleteOrphaned.
+func (r *userContentRepository) DeleteExpiredFeed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	query := `
+		DELETE FROM user_contents
+		WHERE id IN (
+			SELECT id FROM user_contents
+			WHERE list = 'feed' AND is_favorite = false AND added_at < $1
+			LIMIT $2
+		)
+	`
+
+	result, err := r.db.ExecContext(ctx, query, time.Now().Add(-olderThan), batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete expired feed items: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected, nil
 }

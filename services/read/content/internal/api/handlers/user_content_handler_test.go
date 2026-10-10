@@ -1359,3 +1359,8 @@ func TestSearchUserContents_UnauthorizedUserAccess(t *testing.T) {
 	assert.Equal(t, "forbidden", response["error"])
 	mockUserContentRepo.AssertNotCalled(t, "Search")
 }
+
+func (m *MockUserContentRepository) DeleteExpiredFeed(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	args := m.Called(ctx, olderThan, batchSize)
+	return args.Get(0).(int64), args.Error(1)
+}
