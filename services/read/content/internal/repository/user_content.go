@@ -27,6 +27,7 @@ type UserContentRepository interface {
 	// ListByUserWithCursor retrieves content for a user with optional filtering and keyset (cursor) pagination.
 	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
 	// Callers should request limit+1 rows to determine whether a next page exists.
+	// Archived content is excluded unless status explicitly asks for it.
 	ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
 	// CountByUser returns the count of a user's content matching the optional status/favorite/list filters.
@@ -51,6 +52,7 @@ type UserContentRepository interface {
 	// SearchWithCursor searches user's content using full-text search with keyset (cursor) pagination.
 	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
 	// Callers should request limit+1 rows to determine whether a next page exists.
+	// Archived content is excluded unless status explicitly asks for it.
 	SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
 	// BulkCreate creates multiple user-content relationships in a transaction.
@@ -226,6 +228,7 @@ func (r *userContentRepository) GetByUserAndContent(ctx context.Context, userID,
 }
 
 // ListByUserWithCursor retrieves content for a user with optional filters and keyset pagination.
+// Archived content is excluded unless status explicitly asks for it.
 func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	query := `
 		SELECT id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
@@ -240,6 +243,8 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 		query += fmt.Sprintf(" AND status = $%d", argPos)
 		args = append(args, *status)
 		argPos++
+	} else {
+		query += " AND status != 'archived'"
 	}
 
 	if isFavorite != nil {
@@ -297,6 +302,7 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 }
 
 // CountByUser returns the count of a user's content matching the optional status/favorite filters.
+// Archived content is excluded unless status explicitly asks for it.
 func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string) (int, error) {
 	query := `SELECT COUNT(*) FROM user_contents WHERE user_id = $1`
 
@@ -307,6 +313,8 @@ func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUI
 		query += fmt.Sprintf(" AND status = $%d", argPos)
 		args = append(args, *status)
 		argPos++
+	} else {
+		query += " AND status != 'archived'"
 	}
 
 	if isFavorite != nil {
@@ -498,6 +506,7 @@ func (r *userContentRepository) DeleteWithTx(ctx context.Context, tx *sql.Tx, us
 }
 
 // SearchWithCursor searches user's content using full-text search with keyset pagination.
+// Archived content is never returned.
 func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	sqlQuery := `
 		SELECT uc.id, uc.user_id, uc.content_id, uc.status, uc.list, uc.scroll_position, uc.is_favorite, uc.added_at, uc.updated_at
@@ -506,6 +515,8 @@ func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uui
 		WHERE uc.user_id = $1
 		AND to_tsvector('english', coalesce(c.title, '') || ' ' || coalesce(c.author, '')) @@ plainto_tsquery('english', $2)
 	`
+
+	sqlQuery += " AND uc.status != 'archived'"
 
 	args := []interface{}{userID, query}
 	argPos := 3

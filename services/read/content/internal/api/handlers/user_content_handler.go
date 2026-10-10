@@ -501,6 +501,24 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	api.WriteSuccess(w, http.StatusCreated, response, "v1")
 }
 
+// createOrUnarchive adds fresh to the user's list, or, when the user already
+// has an archived row for the same content (existing), restores that row to
+// fresh's status instead. Archiving is a status change rather than a delete, so
+// the (user_id, content_id) row outlives it and re-saving must reuse it.
+func (h *UserContentHandler) createOrUnarchive(ctx context.Context, existing, fresh *models.UserContent) (*models.UserContent, error) {
+	if existing == nil {
+		if err := h.userContentRepo.Create(ctx, fresh); err != nil {
+			return nil, err
+		}
+		return fresh, nil
+	}
+	if err := h.userContentRepo.UpdateMetadata(ctx, existing.ID, &fresh.Status, nil, nil, nil); err != nil {
+		return nil, err
+	}
+	existing.Status = fresh.Status
+	return existing, nil
+}
+
 // handlePageSubmission extracts content from a web page and adds to reading list
 func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, url string, req *dto.AddContentToUserRequest) {
 	if req.List != "" {
@@ -521,7 +539,7 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to check existing content: "+err.Error(), nil, "v1")
 		return
 	}
-	if existing != nil {
+	if existing != nil && existing.Status != models.StatusArchived {
 		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "User already has this content", nil, "v1")
 		return
 	}
@@ -532,16 +550,14 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 		status = models.StatusUnread
 	}
 
-	// Create user-content relationship
-	userContent := &models.UserContent{
+	userContent, err := h.createOrUnarchive(r.Context(), existing, &models.UserContent{
 		UserID:         userID,
 		ContentID:      content.ID,
 		Status:         status,
 		ScrollPosition: req.ScrollPosition,
 		IsFavorite:     req.IsFavorite,
-	}
-
-	if err := h.userContentRepo.Create(r.Context(), userContent); err != nil {
+	})
+	if err != nil {
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to add content to user: "+err.Error(), nil, "v1")
 		return
 	}
@@ -592,7 +608,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to check existing content: "+err.Error(), nil, "v1")
 		return
 	}
-	if existing != nil {
+	if existing != nil && existing.Status != models.StatusArchived {
 		api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "User already has this content", nil, "v1")
 		return
 	}
@@ -609,16 +625,14 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 		return
 	}
 
-	// Create user-content relationship
-	userContent := &models.UserContent{
+	userContent, err := h.createOrUnarchive(r.Context(), existing, &models.UserContent{
 		UserID:         userID,
 		ContentID:      contentID,
 		Status:         status,
 		ScrollPosition: req.ScrollPosition,
 		IsFavorite:     req.IsFavorite,
-	}
-
-	if err := h.userContentRepo.Create(r.Context(), userContent); err != nil {
+	})
+	if err != nil {
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to add content to user: "+err.Error(), nil, "v1")
 		return
 	}

@@ -73,8 +73,8 @@ export const ArticleMutations = {
 
   async archive(articleId: string): Promise<void> {
     await ArticleStore.remove(articleId);
-    await withOutboxOnRetryableError(articleId, 'delete', {}, () =>
-      ReadService.deleteUserContent(articleId),
+    await withOutboxOnRetryableError(articleId, 'status', { status: 'archived' }, () =>
+      ReadService.updateUserContent(articleId, { status: 'archived' }),
     );
   },
 };

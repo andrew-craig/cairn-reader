@@ -278,7 +278,7 @@ describe('ArticleStore', () => {
   // "server rows win" sync would otherwise clobber a value the user just
   // changed offline while its write is still queued. See scope clarification
   // decision 1 (guard in SQL) and pre-assignment review item B (pending
-  // delete).
+  // archive).
   describe('outbox guard on upsertMany (interleaving with a pending write)', () => {
     it('preserves a pending offline change when a list sync arrives before the drain', async () => {
       await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: false, title: 'Original' })]);
@@ -298,10 +298,10 @@ describe('ArticleStore', () => {
       expect(stored?.title).toBe('Refreshed'); // non-user-state columns still sync normally
     });
 
-    it('does not resurrect an article with a pending delete (item B)', async () => {
+    it('does not resurrect an article with a pending archive (item B)', async () => {
       await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);
       await ArticleStore.remove('a1');
-      await Outbox.enqueue('a1', 'delete', {});
+      await Outbox.enqueue('a1', 'status', { status: 'archived' });
 
       // The next list sync still sees the article server-side.
       await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);

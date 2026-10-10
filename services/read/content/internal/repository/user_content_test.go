@@ -470,7 +470,7 @@ func TestUserContentRepository_CountByUser_NoFilters(t *testing.T) {
 
 	userID := uuid.New()
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND status != 'archived'`).
 		WithArgs(userID).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 
@@ -491,7 +491,7 @@ func TestUserContentRepository_CountByUser_WithFavoriteFilter(t *testing.T) {
 	userID := uuid.New()
 	isFavorite := true
 
-	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND is_favorite = \$2`).
+	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM user_contents WHERE user_id = \$1 AND status != 'archived' AND is_favorite = \$2`).
 		WithArgs(userID, isFavorite).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 
@@ -500,3 +500,57 @@ func TestUserContentRepository_CountByUser_WithFavoriteFilter(t *testing.T) {
 	assert.Equal(t, 2, count)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestUserContentRepository_ListByUserWithCursor_ExcludesArchivedByDefault(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	userID := uuid.New()
+
+	mock.ExpectQuery(`FROM user_contents\s+WHERE user_id = \$1 AND status != 'archived' ORDER BY`).
+		WithArgs(userID, 10).
+		WillReturnRows(sqlmock.NewRows(userContentColumns))
+
+	_, err = repo.ListByUserWithCursor(context.Background(), userID, nil, nil, nil, 10, nil, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserContentRepository_ListByUserWithCursor_ExplicitArchivedStatus(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	userID := uuid.New()
+	status := "archived"
+
+	mock.ExpectQuery(`WHERE user_id = \$1 AND status = \$2 ORDER BY`).
+		WithArgs(userID, status, 10).
+		WillReturnRows(sqlmock.NewRows(userContentColumns))
+
+	_, err = repo.ListByUserWithCursor(context.Background(), userID, &status, nil, nil, 10, nil, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUserContentRepository_SearchWithCursor_ExcludesArchived(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	repo := NewUserContentRepository(db)
+	userID := uuid.New()
+
+	mock.ExpectQuery(`AND uc.status != 'archived' ORDER BY`).
+		WithArgs(userID, "go", 10).
+		WillReturnRows(sqlmock.NewRows(userContentColumns))
+
+	_, err = repo.SearchWithCursor(context.Background(), userID, "go", nil, 10, nil, nil)
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+var userContentColumns = []string{"id", "user_id", "content_id", "status", "list", "scroll_position", "is_favorite", "added_at", "updated_at"}
