@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { Article } from '../types';
 import { ReadService } from '../services/read';
-import { UserContentsListResponse } from '@cairn/shared';
+import { ContentList, UserContentsListResponse } from '@cairn/shared';
 
 /** Reading-list / bookmarks page size. */
 export const PAGE_SIZE = 20;
@@ -17,11 +17,13 @@ interface CursorArticleListSource {
    * from a load-more failure. When omitted, the error is only logged.
    */
   onLoadError?: (reset: boolean) => void;
+  /** Scopes search to one list. `fetchPage` stays responsible for scoping the page fetch. */
+  list?: ContentList;
 }
 
 /**
- * The cursor-paginated article-list state machine shared by ReadScreen and
- * BookmarksScreen: items + cursor + hasMore + loading/loadingMore/refreshing,
+ * The cursor-paginated article-list state machine shared by the Reads, Feed and
+ * Bookmarks screens: items + cursor + hasMore + loading/loadingMore/refreshing,
  * reset-vs-append, and the search overlay (both screens search via
  * ReadService.searchUserContents). Screen-specific concerns — cache priming,
  * stale banners, focus-refetch TTL, archive mutation — stay in the screens and
@@ -35,6 +37,7 @@ export function useCursorArticleList({
   fetchPage,
   onResetLoaded,
   onLoadError,
+  list,
 }: CursorArticleListSource) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,7 @@ export function useCursorArticleList({
     setHasMore(false);
 
     try {
-      const response = await ReadService.searchUserContents({ q: query, limit: PAGE_SIZE });
+      const response = await ReadService.searchUserContents({ q: query, limit: PAGE_SIZE, list });
       setArticles(response.contents.map((c) => ReadService.transformToArticle(c)));
       cursorRef.current = '';
       setHasMore(false);
@@ -95,7 +98,7 @@ export function useCursorArticleList({
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [list]);
 
   const clearSearch = useCallback(() => {
     setSearchQuery(null);

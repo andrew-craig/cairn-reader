@@ -12,6 +12,6 @@ export type RootStackParamList = {
 };
 
 export type MainTabParamList = {
-  Read: undefined;
+  Reads: undefined;
   You: undefined;
 };

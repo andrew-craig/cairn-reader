@@ -9,7 +9,7 @@ import { ProfileIcon } from '../icons/ProfileIcon';
 
 const getTabIcon = (routeName: string) => {
   switch (routeName) {
-    case 'Read':
+    case 'Reads':
       return ReadIcon;
     case 'You':
       return ProfileIcon;

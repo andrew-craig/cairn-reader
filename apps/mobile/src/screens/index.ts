@@ -1,4 +1,4 @@
-export * from './ReadScreen';
+export * from './ReadsScreen';
 export * from './YouScreen';
 export * from './AddArticleScreen';
 export * from './ReadArticleDetailScreen';
