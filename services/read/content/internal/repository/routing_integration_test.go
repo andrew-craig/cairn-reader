@@ -216,6 +216,45 @@ func TestUserContentRepository_UpdateMetadata_MovesList_Integration(t *testing.T
 	require.Equal(t, models.StatusUnread, moved.Status, "moving lists must not touch other fields")
 }
 
+func TestUserContentRepository_UpdateMetadata_MoveToReadsLandsOnTop_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+	f := newRoutingFixture(t)
+	ctx := context.Background()
+	userID, feedID, senderID := uuid.New(), uuid.New(), uuid.New()
+
+	f.route(t, userID, models.SourceTypeRSS, feedID, models.ListFeed)
+	feedItem := f.rssContent(t, feedID)
+	require.Equal(t, models.ListFeed, f.deliver(t, userID, feedItem))
+	// Delivered after the feed item, so it sorts above it in Reads until the move.
+	readsItem := f.emailContent(t, senderID)
+	require.Equal(t, models.ListReads, f.deliver(t, userID, readsItem))
+
+	feedUC, err := f.ucRepo.GetByUserAndContent(ctx, userID, feedItem.ID)
+	require.NoError(t, err)
+	readsUC, err := f.ucRepo.GetByUserAndContent(ctx, userID, readsItem.ID)
+	require.NoError(t, err)
+
+	reads := models.ListReads
+	require.NoError(t, f.ucRepo.UpdateMetadata(ctx, feedUC.ID, nil, nil, nil, &reads))
+
+	got, err := f.ucRepo.ListByUserWithCursor(ctx, userID, nil, nil, &reads, 10, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	require.Equal(t, feedItem.ID, got[0].ContentID, "an item moved to Reads lands at the top")
+	require.True(t, got[0].AddedAt.After(feedUC.AddedAt))
+
+	// Re-asserting the list an item is already in must not bump it.
+	require.NoError(t, f.ucRepo.UpdateMetadata(ctx, readsUC.ID, nil, nil, nil, &reads))
+	got, err = f.ucRepo.ListByUserWithCursor(ctx, userID, nil, nil, &reads, 10, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, feedItem.ID, got[0].ContentID)
+	unchanged, err := f.ucRepo.GetByID(ctx, readsUC.ID)
+	require.NoError(t, err)
+	require.True(t, readsUC.AddedAt.Equal(unchanged.AddedAt))
+}
+
 func TestUserContentRepository_Create_DefaultsToReads_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")

@@ -1697,7 +1697,7 @@ components:
         list:
           type: string
           enum: [feed, reads]
-          description: Move the item to this list (e.g. "Save to Reads")
+          description: Move the item to this list (e.g. "Save to Reads"). Moving an item into `reads` re-stamps its `added_at`, so it appears at the top of Reads.
 
     UserContentResponse:
       type: object
