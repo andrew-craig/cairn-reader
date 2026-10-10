@@ -2,7 +2,6 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types';
 import {
-  ExploreScreen,
   ReadScreen,
   YouScreen,
 } from '../screens';
@@ -19,7 +18,6 @@ export const TabNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen name="Read" component={ReadScreen} />
-      <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="You" component={YouScreen} />
     </Tab.Navigator>
   );

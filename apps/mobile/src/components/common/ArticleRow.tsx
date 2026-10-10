@@ -9,22 +9,14 @@ import {
 } from 'react-native';
 import { Article } from '../../types';
 import { Colors, FontFamily } from '../../constants';
-import { ThumbsUpIcon, ThumbsDownIcon } from '../icons';
 import { formatDate } from '../../utils';
-
-// Vote indicator colors
-const VOTE_COLORS = {
-  upvote: '#219653', // Green
-  downvote: '#E67E22', // Orange
-};
 
 interface ArticleRowProps {
   article: Article;
   onPress: () => void;
-  voteType?: 'upvote' | 'downvote';
 }
 
-export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteType }) => {
+export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
@@ -32,19 +24,6 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, voteTy
   const publishedDateLabel = Number.isNaN(publishedTimestamp) ? null : formatDate(publishedTimestamp);
 
   const renderRightContent = () => {
-    if (voteType) {
-      const iconColor = VOTE_COLORS[voteType];
-      return (
-        <View style={styles.voteIndicator}>
-          {voteType === 'upvote' ? (
-            <ThumbsUpIcon size={24} color={iconColor} />
-          ) : (
-            <ThumbsDownIcon size={24} color={iconColor} />
-          )}
-        </View>
-      );
-    }
-
     if (article.imageUrl) {
       return (
         <View style={styles.imageFrame}>
@@ -125,10 +104,5 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  voteIndicator: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingLeft: 8,
   },
 });

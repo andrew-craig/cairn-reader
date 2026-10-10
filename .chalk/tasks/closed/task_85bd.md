@@ -2,14 +2,14 @@
 id: task_85bd
 title: Remove Explore from mobile and web clients
 type: task
-status: open
+status: closed
 priority: 1
 labels: [mobile,web]
 blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-08T11:32:05Z
+updated_at: 2026-10-10T03:11:10Z
 ---
 Owner decision 2026-10-08: remove Explore completely for now.
 - [ ] Mobile: drop Explore tab, ExploreScreen, ExploreArticleDetailScreen, VotesScreen, ExploreService, explore AsyncStorage cache, You→Votes link, nav types

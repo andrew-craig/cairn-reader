@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [mobile]
-blocked_by: [task_85bd,task_47d5,task_179f,task_317b]
+blocked_by: [task_47d5,task_179f,task_317b]
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-09T11:00:47Z
+updated_at: 2026-10-10T03:11:10Z
 ---
 - [ ] Shared types: list on UserContentResponse + UnifiedSubscription; ReadService.listUserContents({list}), setSourceList, moveToReads
 - [ ] Tabs: Feed | Reads | You
