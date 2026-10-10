@@ -84,6 +84,9 @@ type EmailContentPayload struct {
 	Title      string `json:"title"`
 	Author     string `json:"author"`
 	SourceType string `json:"source_type"`
+	// SenderID lets the Content Service look up the user's Feed/Reads route
+	// for this sender.
+	SenderID uuid.UUID `json:"sender_id"`
 }
 
 // ContentOutbox represents a content item ready to be delivered to the Content Service

@@ -61,13 +61,14 @@ func (h *BulkHandler) BulkCreateContent(w http.ResponseWriter, r *http.Request) 
 		}
 
 		serviceItems[i] = service.BulkContentItem{
-			URL:          item.URL,
-			HTML:         item.HTML,
-			SourceType:   item.SourceType,
-			SourceFeedID: item.SourceFeedID,
-			PublishedAt:  item.PublishedAt,
-			Title:        item.Title,
-			Author:       item.Author,
+			URL:            item.URL,
+			HTML:           item.HTML,
+			SourceType:     item.SourceType,
+			SourceFeedID:   item.SourceFeedID,
+			SourceSenderID: item.SourceSenderID,
+			PublishedAt:    item.PublishedAt,
+			Title:          item.Title,
+			Author:         item.Author,
 		}
 	}
 

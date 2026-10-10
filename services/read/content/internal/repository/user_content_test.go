@@ -41,6 +41,7 @@ func TestUserContentRepository_Create_Success(t *testing.T) {
 			uc.UserID,
 			uc.ContentID,
 			uc.Status,
+			models.ListReads,
 			uc.ScrollPosition,
 			uc.IsFavorite,
 			sqlmock.AnyArg(), // added_at
@@ -72,9 +73,9 @@ func TestUserContentRepository_GetByID_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM user_contents WHERE id = \$1`).
 		WithArgs(ucID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
+			"id", "user_id", "content_id", "status", "list", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).AddRow(
-			ucID, userID, contentID, models.StatusUnread, 0, false, now, now,
+			ucID, userID, contentID, models.StatusUnread, models.ListReads, 0, false, now, now,
 		))
 
 	result, err := repo.GetByID(ctx, ucID)
@@ -124,9 +125,9 @@ func TestUserContentRepository_GetByUserAndContent_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM user_contents WHERE user_id = \$1 AND content_id = \$2`).
 		WithArgs(userID, contentID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "user_id", "content_id", "status", "scroll_position", "is_favorite", "added_at", "updated_at",
+			"id", "user_id", "content_id", "status", "list", "scroll_position", "is_favorite", "added_at", "updated_at",
 		}).AddRow(
-			ucID, userID, contentID, models.StatusCompleted, 0.5, true, now, now,
+			ucID, userID, contentID, models.StatusCompleted, models.ListReads, 0.5, true, now, now,
 		))
 
 	result, err := repo.GetByUserAndContent(ctx, userID, contentID)
@@ -210,7 +211,7 @@ func TestUserContentRepository_UpdateMetadata_AllFields(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), status, scrollPosition, isFavorite, ucID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err = repo.UpdateMetadata(ctx, ucID, &status, &scrollPosition, &isFavorite)
+	err = repo.UpdateMetadata(ctx, ucID, &status, &scrollPosition, &isFavorite, nil)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -230,7 +231,7 @@ func TestUserContentRepository_UpdateMetadata_StatusOnly(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), status, ucID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err = repo.UpdateMetadata(ctx, ucID, &status, nil, nil)
+	err = repo.UpdateMetadata(ctx, ucID, &status, nil, nil, nil)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -249,7 +250,7 @@ func TestUserContentRepository_UpdateMetadata_NotFound(t *testing.T) {
 	mock.ExpectExec(`UPDATE user_contents SET`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	err = repo.UpdateMetadata(ctx, ucID, &status, nil, nil)
+	err = repo.UpdateMetadata(ctx, ucID, &status, nil, nil, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -324,8 +325,8 @@ func TestUserContentRepository_BulkCreate_Success(t *testing.T) {
 	stmt := mock.ExpectPrepare(`INSERT INTO user_contents`)
 	for range userContents {
 		stmt.ExpectQuery().
-			WillReturnRows(sqlmock.NewRows([]string{"id", "added_at", "updated_at"}).
-				AddRow(uuid.New(), now, now))
+			WillReturnRows(sqlmock.NewRows([]string{"id", "list", "added_at", "updated_at"}).
+				AddRow(uuid.New(), models.ListReads, now, now))
 	}
 	mock.ExpectCommit()
 
@@ -361,8 +362,8 @@ func TestUserContentRepository_BulkCreate_ConflictHandling(t *testing.T) {
 	stmt := mock.ExpectPrepare(`INSERT INTO user_contents`)
 	// ON CONFLICT DO NOTHING returns no rows
 	stmt.ExpectQuery().
-		WillReturnRows(sqlmock.NewRows([]string{"id", "added_at", "updated_at"}).
-			AddRow(uuid.New(), now, now))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "list", "added_at", "updated_at"}).
+			AddRow(uuid.New(), models.ListReads, now, now))
 	mock.ExpectCommit()
 
 	err = repo.BulkCreate(ctx, userContents)
@@ -473,7 +474,7 @@ func TestUserContentRepository_CountByUser_NoFilters(t *testing.T) {
 		WithArgs(userID).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 
-	count, err := repo.CountByUser(ctx, userID, nil, nil)
+	count, err := repo.CountByUser(ctx, userID, nil, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 5, count)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -494,7 +495,7 @@ func TestUserContentRepository_CountByUser_WithFavoriteFilter(t *testing.T) {
 		WithArgs(userID, isFavorite).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 
-	count, err := repo.CountByUser(ctx, userID, nil, &isFavorite)
+	count, err := repo.CountByUser(ctx, userID, nil, &isFavorite, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, count)
 	assert.NoError(t, mock.ExpectationsWereMet())

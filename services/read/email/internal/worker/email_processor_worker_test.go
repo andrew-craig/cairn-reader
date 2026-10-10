@@ -158,7 +158,12 @@ func TestEmailProcessorWorker_ProcessEmail_Success(t *testing.T) {
 			return nil
 		},
 	}
-	sender := &mockSenderService{}
+	senderID := uuid.New()
+	sender := &mockSenderService{
+		upsertFunc: func(_ context.Context, userID uuid.UUID, senderEmail, senderName string, _ time.Time) (*models.EmailSender, error) {
+			return &models.EmailSender{ID: senderID, UserID: userID, SenderEmail: senderEmail, SenderName: &senderName}, nil
+		},
+	}
 
 	w := makeWorker(rawRepo, outRepo, sender)
 	err := w.processEmail(context.Background(), email)
@@ -178,6 +183,7 @@ func TestEmailProcessorWorker_ProcessEmail_Success(t *testing.T) {
 	assert.Equal(t, "email://"+email.ID.String(), outboxCreated.ContentPayload.URL)
 	assert.Equal(t, "Test Newsletter", outboxCreated.ContentPayload.Title)
 	assert.Equal(t, "email", outboxCreated.ContentPayload.SourceType)
+	assert.Equal(t, senderID, outboxCreated.ContentPayload.SenderID)
 
 	// Producer -> JSONB round trip -> consumer: every consumed field arrives.
 	raw, err := json.Marshal(outboxCreated.ContentPayload)
@@ -195,6 +201,7 @@ func TestEmailProcessorWorker_ProcessEmail_Success(t *testing.T) {
 	assert.Equal(t, outboxCreated.ContentPayload.Author, item.Author)
 	assert.NotEmpty(t, item.Author)
 	assert.Equal(t, "email", item.SourceType)
+	assert.Equal(t, senderID, item.SenderID)
 	assert.Equal(t, outboxCreated.UserID, item.UserID)
 }
 

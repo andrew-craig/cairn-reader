@@ -16,6 +16,7 @@ type UnifiedSubscription struct {
 	Title        string           `json:"title"`
 	Description  string           `json:"description,omitempty"`
 	SubscribedAt string           `json:"subscribed_at"`
+	List         string           `json:"list"` // "feed" or "reads": where this source's new items land
 
 	// Type-specific data (only one will be populated based on Type)
 	RSSData    *RSSSubscriptionData    `json:"rss_data,omitempty"`

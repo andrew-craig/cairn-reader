@@ -91,6 +91,33 @@ func TestContentServiceClient_DeliverContent_Success(t *testing.T) {
 	assert.Equal(t, contentID, id)
 }
 
+func TestContentServiceClient_DeliverContent_SendsSourceSenderID(t *testing.T) {
+	payload := newTestPayload()
+	payload[0].SenderID = uuid.New()
+
+	var got struct {
+		Contents []struct {
+			SourceSenderID *uuid.UUID `json:"source_sender_id"`
+		} `json:"contents"`
+	}
+	srv := twoStepServer(t,
+		func(w http.ResponseWriter, r *http.Request) {
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+			writeCreateResponse(w, uuid.New())
+		},
+		func(w http.ResponseWriter, _ *http.Request) { writeAddResponse(w) },
+	)
+	defer srv.Close()
+
+	c := NewContentServiceClient(ContentServiceConfig{BaseURL: srv.URL, InternalAPIKey: "test-key"})
+	_, err := c.DeliverContent(context.Background(), payload)
+	require.NoError(t, err)
+
+	require.Len(t, got.Contents, 1)
+	require.NotNil(t, got.Contents[0].SourceSenderID)
+	assert.Equal(t, payload[0].SenderID, *got.Contents[0].SourceSenderID)
+}
+
 func TestContentServiceClient_DeliverContent_ExistingItem(t *testing.T) {
 	existingID := uuid.New()
 

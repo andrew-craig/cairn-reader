@@ -32,6 +32,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	// Initialize repositories
 	contentRepo := repository.NewContentRepository(db.DB)
 	userContentRepo := repository.NewUserContentRepository(db.DB)
+	sourceRouteRepo := repository.NewSourceRouteRepository(db.DB)
 
 	// Initialize services
 	contentService := service.NewContentService(contentRepo, db.DB)
@@ -41,10 +42,10 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 
 	// Initialize handlers
 	contentHandler := handlers.NewContentHandler(contentService)
-	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, contentService, urlDetector, ingestRSSClient)
+	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, sourceRouteRepo, contentService, urlDetector, ingestRSSClient)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 	detectionHandler := handlers.NewDetectionHandler(urlDetector)
-	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient, emailIngestClient)
+	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient, emailIngestClient, sourceRouteRepo)
 
 	// Health check endpoints (Kubernetes-compatible)
 	// Liveness probe - indicates if the process is running
@@ -117,6 +118,8 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 			r.Get("/subscriptions", subscriptionAggregator.ListAllSubscriptions)
 			// Unsubscribe from an RSS feed (proxies to Ingest RSS service)
 			r.Delete("/subscriptions/rss/{feed_id}", subscriptionAggregator.UnsubscribeRSS)
+			// Choose where a source's future items land: Feed or Reads
+			r.Put("/subscriptions/{type}/{key}/list", subscriptionAggregator.SetSourceList)
 		})
 
 		// Protected bulk user-content route

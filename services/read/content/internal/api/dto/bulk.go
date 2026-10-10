@@ -32,9 +32,12 @@ type BulkContentItem struct {
 	HTML         string     `json:"html"`
 	SourceType   string     `json:"source_type"`
 	SourceFeedID *uuid.UUID `json:"source_feed_id,omitempty"`
-	PublishedAt  *time.Time `json:"published_at,omitempty"`
-	Title        *string    `json:"title,omitempty"`
-	Author       *string    `json:"author,omitempty"`
+	// SourceSenderID is the email sender ID; the user's route for that sender
+	// decides which list the item lands in.
+	SourceSenderID *uuid.UUID `json:"source_sender_id,omitempty"`
+	PublishedAt    *time.Time `json:"published_at,omitempty"`
+	Title          *string    `json:"title,omitempty"`
+	Author         *string    `json:"author,omitempty"`
 }
 
 // Validate validates the BulkContentItem

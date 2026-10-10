@@ -63,7 +63,7 @@ func NewContentRepository(db *sql.DB) ContentRepository {
 // (this one or a concurrent one) actually won the insert.
 const contentColumns = `id, content_hash, cleaned_html, original_url, canonical_url,
 	title, author, published_at, description, image_urls,
-	source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at`
+	source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at, orphaned_at`
 
 // rssConflictTarget/nonRSSConflictTarget name the two partial UNIQUE indexes
 // (idx_contents_rss_dedup, idx_contents_nonrss_dedup) content dedup relies
@@ -116,6 +116,7 @@ func scanContent(s rowScanner) (*models.Content, error) {
 		&c.ImageURLs,
 		&c.SourceType,
 		&c.SourceFeedID,
+		&c.SourceSenderID,
 		&c.Metadata,
 		&c.CreatedAt,
 		&c.UpdatedAt,
@@ -143,9 +144,9 @@ func (r *contentRepository) Create(ctx context.Context, content *models.Content)
 		INSERT INTO contents (
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 		)
 		ON CONFLICT ` + conflictTargetFor(content.SourceType) + `
 		DO UPDATE SET updated_at = contents.updated_at
@@ -165,6 +166,7 @@ func (r *contentRepository) Create(ctx context.Context, content *models.Content)
 		content.ImageURLs,
 		content.SourceType,
 		content.SourceFeedID,
+		content.SourceSenderID,
 		content.Metadata,
 		content.CreatedAt,
 		content.UpdatedAt,
@@ -191,9 +193,9 @@ func (r *contentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, conten
 		INSERT INTO contents (
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 		)
 		ON CONFLICT ` + conflictTargetFor(content.SourceType) + `
 		DO UPDATE SET updated_at = contents.updated_at
@@ -213,6 +215,7 @@ func (r *contentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, conten
 		content.ImageURLs,
 		content.SourceType,
 		content.SourceFeedID,
+		content.SourceSenderID,
 		content.Metadata,
 		content.CreatedAt,
 		content.UpdatedAt,
@@ -231,7 +234,7 @@ func (r *contentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.
 		SELECT
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at, orphaned_at
 		FROM contents
 		WHERE id = $1
 	`
@@ -250,6 +253,7 @@ func (r *contentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.
 		&content.ImageURLs,
 		&content.SourceType,
 		&content.SourceFeedID,
+		&content.SourceSenderID,
 		&content.Metadata,
 		&content.CreatedAt,
 		&content.UpdatedAt,
@@ -272,7 +276,7 @@ func (r *contentRepository) GetByContentHashAndFeedID(ctx context.Context, conte
 		SELECT
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at, orphaned_at
 		FROM contents
 		WHERE content_hash = $1 AND source_feed_id = $2 AND source_type = 'rss'
 	`
@@ -291,6 +295,7 @@ func (r *contentRepository) GetByContentHashAndFeedID(ctx context.Context, conte
 		&content.ImageURLs,
 		&content.SourceType,
 		&content.SourceFeedID,
+		&content.SourceSenderID,
 		&content.Metadata,
 		&content.CreatedAt,
 		&content.UpdatedAt,
@@ -460,7 +465,7 @@ func (r *contentRepository) GetByContentHashesAndFeedID(ctx context.Context, con
 		SELECT
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at, orphaned_at
 		FROM contents
 		WHERE content_hash = ANY($1) AND source_feed_id = $2 AND source_type = 'rss'
 	`
@@ -487,6 +492,7 @@ func (r *contentRepository) GetByContentHashesAndFeedID(ctx context.Context, con
 			&content.ImageURLs,
 			&content.SourceType,
 			&content.SourceFeedID,
+			&content.SourceSenderID,
 			&content.Metadata,
 			&content.CreatedAt,
 			&content.UpdatedAt,
@@ -522,7 +528,7 @@ func (r *contentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[
 		SELECT
 			id, content_hash, cleaned_html, original_url, canonical_url,
 			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, metadata, created_at, updated_at, orphaned_at
+			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at, orphaned_at
 		FROM contents
 		WHERE id IN (%s)
 	`, strings.Join(placeholders, ", "))
@@ -549,6 +555,7 @@ func (r *contentRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) (map[
 			&content.ImageURLs,
 			&content.SourceType,
 			&content.SourceFeedID,
+			&content.SourceSenderID,
 			&content.Metadata,
 			&content.CreatedAt,
 			&content.UpdatedAt,
@@ -610,7 +617,7 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models.Content, conflict string) error {
 	now := time.Now()
 
-	const colsPerRow = 15
+	const colsPerRow = 16
 	keys := make([]string, len(group))
 	seen := make(map[string]bool, len(group))
 	var toInsert []*models.Content
@@ -635,10 +642,10 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 	for i, content := range toInsert {
 		base := i * colsPerRow
 		placeholders[i] = fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
 			base+1, base+2, base+3, base+4, base+5,
 			base+6, base+7, base+8, base+9, base+10,
-			base+11, base+12, base+13, base+14, base+15,
+			base+11, base+12, base+13, base+14, base+15, base+16,
 		)
 		args = append(args,
 			content.ID,
@@ -653,6 +660,7 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 			content.ImageURLs,
 			content.SourceType,
 			content.SourceFeedID,
+			content.SourceSenderID,
 			content.Metadata,
 			content.CreatedAt,
 			content.UpdatedAt,
@@ -662,7 +670,7 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 	query := `INSERT INTO contents (
 		id, content_hash, cleaned_html, original_url, canonical_url,
 		title, author, published_at, description, image_urls,
-		source_type, source_feed_id, metadata, created_at, updated_at
+		source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at
 	) VALUES ` + strings.Join(placeholders, ", ") + `
 	ON CONFLICT ` + conflict + `
 	DO UPDATE SET updated_at = contents.updated_at

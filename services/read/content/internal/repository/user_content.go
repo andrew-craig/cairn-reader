@@ -27,11 +27,11 @@ type UserContentRepository interface {
 	// ListByUserWithCursor retrieves content for a user with optional filtering and keyset (cursor) pagination.
 	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
 	// Callers should request limit+1 rows to determine whether a next page exists.
-	ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
+	ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
-	// CountByUser returns the count of a user's content matching the optional status/favorite filters.
+	// CountByUser returns the count of a user's content matching the optional status/favorite/list filters.
 	// A single COUNT(*) query — not for use on the hot cursor-pagination path, only for summary counts.
-	CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error)
+	CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string) (int, error)
 
 	// Update updates an existing user-content record
 	Update(ctx context.Context, userContent *models.UserContent) error
@@ -39,8 +39,8 @@ type UserContentRepository interface {
 	// UpdateWithTx updates an existing user-content record within a transaction
 	UpdateWithTx(ctx context.Context, tx *sql.Tx, userContent *models.UserContent) error
 
-	// UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite)
-	UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error
+	// UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite, list)
+	UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool, list *string) error
 
 	// Delete deletes a user-content relationship
 	Delete(ctx context.Context, userID, contentID uuid.UUID) error
@@ -51,9 +51,13 @@ type UserContentRepository interface {
 	// SearchWithCursor searches user's content using full-text search with keyset (cursor) pagination.
 	// cursorTime and cursorID, when non-nil, restrict results to items strictly before that position.
 	// Callers should request limit+1 rows to determine whether a next page exists.
-	SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
+	SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error)
 
-	// BulkCreate creates multiple user-content relationships in a transaction
+	// BulkCreate creates multiple user-content relationships in a transaction.
+	// Each row's list is resolved from the user's source_routes for the
+	// content's source (feed ID for rss, sender ID for email); with no route it
+	// is Reads. Any List set on the input is ignored and overwritten with the
+	// resolved value.
 	BulkCreate(ctx context.Context, userContents []*models.UserContent) error
 }
 
@@ -71,9 +75,9 @@ func NewUserContentRepository(db *sql.DB) UserContentRepository {
 func (r *userContentRepository) Create(ctx context.Context, userContent *models.UserContent) error {
 	query := `
 		INSERT INTO user_contents (
-			id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+			id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 		RETURNING id, added_at, updated_at
 	`
@@ -81,6 +85,11 @@ func (r *userContentRepository) Create(ctx context.Context, userContent *models.
 	// Generate UUID if not provided
 	if userContent.ID == uuid.Nil {
 		userContent.ID = uuid.New()
+	}
+
+	// Direct saves land in Reads unless the caller says otherwise
+	if userContent.List == "" {
+		userContent.List = models.ListReads
 	}
 
 	// Set timestamps
@@ -94,6 +103,7 @@ func (r *userContentRepository) Create(ctx context.Context, userContent *models.
 		userContent.UserID,
 		userContent.ContentID,
 		userContent.Status,
+		userContent.List,
 		userContent.ScrollPosition,
 		userContent.IsFavorite,
 		userContent.AddedAt,
@@ -111,9 +121,9 @@ func (r *userContentRepository) Create(ctx context.Context, userContent *models.
 func (r *userContentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, userContent *models.UserContent) error {
 	query := `
 		INSERT INTO user_contents (
-			id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+			id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 		RETURNING id, added_at, updated_at
 	`
@@ -121,6 +131,11 @@ func (r *userContentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, us
 	// Generate UUID if not provided
 	if userContent.ID == uuid.Nil {
 		userContent.ID = uuid.New()
+	}
+
+	// Direct saves land in Reads unless the caller says otherwise
+	if userContent.List == "" {
+		userContent.List = models.ListReads
 	}
 
 	// Set timestamps
@@ -134,6 +149,7 @@ func (r *userContentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, us
 		userContent.UserID,
 		userContent.ContentID,
 		userContent.Status,
+		userContent.List,
 		userContent.ScrollPosition,
 		userContent.IsFavorite,
 		userContent.AddedAt,
@@ -150,7 +166,7 @@ func (r *userContentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, us
 // GetByID retrieves a user-content record by ID
 func (r *userContentRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.UserContent, error) {
 	query := `
-		SELECT id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+		SELECT id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		FROM user_contents
 		WHERE id = $1
 	`
@@ -161,6 +177,7 @@ func (r *userContentRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 		&userContent.UserID,
 		&userContent.ContentID,
 		&userContent.Status,
+		&userContent.List,
 		&userContent.ScrollPosition,
 		&userContent.IsFavorite,
 		&userContent.AddedAt,
@@ -180,7 +197,7 @@ func (r *userContentRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 // GetByUserAndContent retrieves a user-content record by user ID and content ID
 func (r *userContentRepository) GetByUserAndContent(ctx context.Context, userID, contentID uuid.UUID) (*models.UserContent, error) {
 	query := `
-		SELECT id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+		SELECT id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		FROM user_contents
 		WHERE user_id = $1 AND content_id = $2
 	`
@@ -191,6 +208,7 @@ func (r *userContentRepository) GetByUserAndContent(ctx context.Context, userID,
 		&userContent.UserID,
 		&userContent.ContentID,
 		&userContent.Status,
+		&userContent.List,
 		&userContent.ScrollPosition,
 		&userContent.IsFavorite,
 		&userContent.AddedAt,
@@ -208,9 +226,9 @@ func (r *userContentRepository) GetByUserAndContent(ctx context.Context, userID,
 }
 
 // ListByUserWithCursor retrieves content for a user with optional filters and keyset pagination.
-func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	query := `
-		SELECT id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
+		SELECT id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		FROM user_contents
 		WHERE user_id = $1
 	`
@@ -227,6 +245,12 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 	if isFavorite != nil {
 		query += fmt.Sprintf(" AND is_favorite = $%d", argPos)
 		args = append(args, *isFavorite)
+		argPos++
+	}
+
+	if list != nil {
+		query += fmt.Sprintf(" AND list = $%d", argPos)
+		args = append(args, *list)
 		argPos++
 	}
 
@@ -253,6 +277,7 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 			&userContent.UserID,
 			&userContent.ContentID,
 			&userContent.Status,
+			&userContent.List,
 			&userContent.ScrollPosition,
 			&userContent.IsFavorite,
 			&userContent.AddedAt,
@@ -272,7 +297,7 @@ func (r *userContentRepository) ListByUserWithCursor(ctx context.Context, userID
 }
 
 // CountByUser returns the count of a user's content matching the optional status/favorite filters.
-func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool) (int, error) {
+func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUID, status *string, isFavorite *bool, list *string) (int, error) {
 	query := `SELECT COUNT(*) FROM user_contents WHERE user_id = $1`
 
 	args := []interface{}{userID}
@@ -287,6 +312,12 @@ func (r *userContentRepository) CountByUser(ctx context.Context, userID uuid.UUI
 	if isFavorite != nil {
 		query += fmt.Sprintf(" AND is_favorite = $%d", argPos)
 		args = append(args, *isFavorite)
+		argPos++
+	}
+
+	if list != nil {
+		query += fmt.Sprintf(" AND list = $%d", argPos)
+		args = append(args, *list)
 	}
 
 	var count int
@@ -368,7 +399,7 @@ func (r *userContentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, us
 }
 
 // UpdateMetadata updates only the metadata fields (status, scroll_position, is_favorite)
-func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool) error {
+func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID, status *string, scrollPosition *float64, isFavorite *bool, list *string) error {
 	// Build dynamic update query based on which fields are provided
 	query := "UPDATE user_contents SET updated_at = $1"
 	args := []interface{}{time.Now()}
@@ -389,6 +420,12 @@ func (r *userContentRepository) UpdateMetadata(ctx context.Context, id uuid.UUID
 	if isFavorite != nil {
 		query += fmt.Sprintf(", is_favorite = $%d", argPos)
 		args = append(args, *isFavorite)
+		argPos++
+	}
+
+	if list != nil {
+		query += fmt.Sprintf(", list = $%d", argPos)
+		args = append(args, *list)
 		argPos++
 	}
 
@@ -461,9 +498,9 @@ func (r *userContentRepository) DeleteWithTx(ctx context.Context, tx *sql.Tx, us
 }
 
 // SearchWithCursor searches user's content using full-text search with keyset pagination.
-func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
+func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uuid.UUID, query string, list *string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]*models.UserContent, error) {
 	sqlQuery := `
-		SELECT uc.id, uc.user_id, uc.content_id, uc.status, uc.scroll_position, uc.is_favorite, uc.added_at, uc.updated_at
+		SELECT uc.id, uc.user_id, uc.content_id, uc.status, uc.list, uc.scroll_position, uc.is_favorite, uc.added_at, uc.updated_at
 		FROM user_contents uc
 		JOIN contents c ON uc.content_id = c.id
 		WHERE uc.user_id = $1
@@ -472,6 +509,12 @@ func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uui
 
 	args := []interface{}{userID, query}
 	argPos := 3
+
+	if list != nil {
+		sqlQuery += fmt.Sprintf(" AND uc.list = $%d", argPos)
+		args = append(args, *list)
+		argPos++
+	}
 
 	if cursorTime != nil && cursorID != nil {
 		sqlQuery += fmt.Sprintf(" AND (uc.added_at, uc.id) < ($%d, $%d)", argPos, argPos+1)
@@ -496,6 +539,7 @@ func (r *userContentRepository) SearchWithCursor(ctx context.Context, userID uui
 			&userContent.UserID,
 			&userContent.ContentID,
 			&userContent.Status,
+			&userContent.List,
 			&userContent.ScrollPosition,
 			&userContent.IsFavorite,
 			&userContent.AddedAt,
@@ -527,15 +571,21 @@ func (r *userContentRepository) BulkCreate(ctx context.Context, userContents []*
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Prepare the insert statement
+	// The list is resolved in the INSERT itself so a route change racing with
+	// delivery can't be half-applied. No matching route means Reads.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO user_contents (
-			id, user_id, content_id, status, scroll_position, is_favorite, added_at, updated_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
+			id, user_id, content_id, status, list, scroll_position, is_favorite, added_at, updated_at
 		)
+		VALUES ($1, $2, $8, $3, COALESCE((
+			SELECT sr.list FROM source_routes sr
+			JOIN contents c ON c.id = $8
+			WHERE sr.user_id = $2
+			  AND ((c.source_type = 'rss'   AND sr.source_type = 'rss'   AND sr.source_key = c.source_feed_id)
+			    OR (c.source_type = 'email' AND sr.source_type = 'email' AND sr.source_key = c.source_sender_id))
+		), 'reads'), $4, $5, $6, $7)
 		ON CONFLICT (user_id, content_id) DO NOTHING
-		RETURNING id, added_at, updated_at
+		RETURNING id, list, added_at, updated_at
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -564,13 +614,13 @@ func (r *userContentRepository) BulkCreate(ctx context.Context, userContents []*
 			ctx,
 			uc.ID,
 			uc.UserID,
-			uc.ContentID,
 			uc.Status,
 			uc.ScrollPosition,
 			uc.IsFavorite,
 			uc.AddedAt,
 			uc.UpdatedAt,
-		).Scan(&uc.ID, &uc.AddedAt, &uc.UpdatedAt)
+			uc.ContentID,
+		).Scan(&uc.ID, &uc.List, &uc.AddedAt, &uc.UpdatedAt)
 
 		// ON CONFLICT DO NOTHING returns no rows, which is fine
 		if err != nil && err != sql.ErrNoRows {

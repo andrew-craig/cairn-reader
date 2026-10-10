@@ -55,10 +55,25 @@ func decodeCursor(cursor string) (time.Time, uuid.UUID, error) {
 	return t, id, nil
 }
 
+// parseListFilter reads the optional ?list= query parameter. When the value is
+// invalid it writes a 400 and returns ok=false.
+func parseListFilter(w http.ResponseWriter, r *http.Request) (list *string, ok bool) {
+	listStr := r.URL.Query().Get("list")
+	if listStr == "" {
+		return nil, true
+	}
+	if !models.ValidateList(listStr) {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "Invalid list. Must be 'feed' or 'reads'", nil, "v1")
+		return nil, false
+	}
+	return &listStr, true
+}
+
 // UserContentHandler handles user-content-related HTTP requests
 type UserContentHandler struct {
 	userContentRepo repository.UserContentRepository
 	contentRepo     repository.ContentRepository
+	routeRepo       repository.SourceRouteRepository
 	contentService  service.ContentService
 	urlDetector     service.URLDetector
 	ingestRSSClient *service.IngestRSSClient
@@ -68,6 +83,7 @@ type UserContentHandler struct {
 func NewUserContentHandler(
 	userContentRepo repository.UserContentRepository,
 	contentRepo repository.ContentRepository,
+	routeRepo repository.SourceRouteRepository,
 	contentService service.ContentService,
 	urlDetector service.URLDetector,
 	ingestRSSClient *service.IngestRSSClient,
@@ -75,6 +91,7 @@ func NewUserContentHandler(
 	return &UserContentHandler{
 		userContentRepo: userContentRepo,
 		contentRepo:     contentRepo,
+		routeRepo:       routeRepo,
 		contentService:  contentService,
 		urlDetector:     urlDetector,
 		ingestRSSClient: ingestRSSClient,
@@ -143,8 +160,13 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	list, ok := parseListFilter(w, r)
+	if !ok {
+		return
+	}
+
 	// Fetch limit+1 to determine whether a next page exists.
-	userContents, err := h.userContentRepo.ListByUserWithCursor(r.Context(), userID, status, isFavorite, limit+1, cursorTime, cursorID)
+	userContents, err := h.userContentRepo.ListByUserWithCursor(r.Context(), userID, status, isFavorite, list, limit+1, cursorTime, cursorID)
 	if err != nil {
 		slog.Error("failed to list user contents", slog.Any("error", err))
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to fetch user contents", nil, "v1")
@@ -179,6 +201,7 @@ func (h *UserContentHandler) ListUserContents(w http.ResponseWriter, r *http.Req
 			UserID:         uc.UserID,
 			ContentID:      uc.ContentID,
 			Status:         uc.Status,
+			List:           uc.List,
 			ScrollPosition: uc.ScrollPosition,
 			IsFavorite:     uc.IsFavorite,
 			AddedAt:        uc.AddedAt,
@@ -248,7 +271,12 @@ func (h *UserContentHandler) CountUserContents(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	count, err := h.userContentRepo.CountByUser(r.Context(), userID, status, isFavorite)
+	list, ok := parseListFilter(w, r)
+	if !ok {
+		return
+	}
+
+	count, err := h.userContentRepo.CountByUser(r.Context(), userID, status, isFavorite, list)
 	if err != nil {
 		slog.Error("failed to count user contents", slog.Any("error", err))
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to count user contents", nil, "v1")
@@ -308,6 +336,7 @@ func (h *UserContentHandler) GetUserContent(w http.ResponseWriter, r *http.Reque
 		UserID:         userContent.UserID,
 		ContentID:      userContent.ContentID,
 		Status:         userContent.Status,
+		List:           userContent.List,
 		ScrollPosition: userContent.ScrollPosition,
 		IsFavorite:     userContent.IsFavorite,
 		AddedAt:        userContent.AddedAt,
@@ -401,7 +430,7 @@ func (h *UserContentHandler) handleURLBasedSubmission(w http.ResponseWriter, r *
 	// Route based on detected type
 	switch urlType {
 	case service.URLTypeFeed:
-		h.handleFeedSubmission(w, r, userID, url)
+		h.handleFeedSubmission(w, r, userID, url, req.List)
 	case service.URLTypePage, service.URLTypeUnknown:
 		h.handlePageSubmission(w, r, userID, url, req)
 	default:
@@ -410,7 +439,12 @@ func (h *UserContentHandler) handleURLBasedSubmission(w http.ResponseWriter, r *
 }
 
 // handleFeedSubmission subscribes the user to an RSS feed
-func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, feedURL string) {
+func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, feedURL, list string) {
+	routed := list != ""
+	if !routed {
+		list = models.ListReads
+	}
+
 	// Call Ingest RSS service to subscribe user to feed
 	subscription, err := h.ingestRSSClient.SubscribeUserToFeed(r.Context(), userID.String(), feedURL)
 	if err != nil {
@@ -427,6 +461,28 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Record where this feed's future items should land. Reads is the
+	// default, so with no explicit list no route is written (and any existing
+	// route is left alone). The subscription already exists at this point, so a
+	// failure here leaves it routed to Reads; the client can correct it via the
+	// list endpoint after re-fetching subscriptions.
+	if routed {
+		feedID, err := uuid.Parse(subscription.FeedID)
+		if err == nil {
+			err = h.routeRepo.Upsert(r.Context(), &models.SourceRoute{
+				UserID:     userID,
+				SourceType: models.SourceTypeRSS,
+				SourceKey:  feedID,
+				List:       list,
+			})
+		}
+		if err != nil {
+			slog.Error("Failed to set route for new subscription", "error", err)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
+			return
+		}
+	}
+
 	// Build feed response
 	response := &dto.AddFeedResponse{
 		Type:   "feed",
@@ -437,6 +493,7 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 			FeedID:       subscription.FeedID,
 			FeedURL:      subscription.FeedURL,
 			Title:        subscription.FeedTitle,
+			List:         list,
 			SubscribedAt: subscription.SubscribedAt,
 		},
 	}
@@ -446,6 +503,11 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 
 // handlePageSubmission extracts content from a web page and adds to reading list
 func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, url string, req *dto.AddContentToUserRequest) {
+	if req.List != "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "list only applies to feed subscriptions; saved pages always go to Reads", nil, "v1")
+		return
+	}
+
 	// Create content from URL using ContentService
 	content, err := h.contentService.CreateFromURL(r.Context(), url, "manual", nil, nil)
 	if err != nil {
@@ -492,6 +554,7 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 			UserID:         userContent.UserID,
 			ContentID:      userContent.ContentID,
 			Status:         userContent.Status,
+			List:           userContent.List,
 			ScrollPosition: userContent.ScrollPosition,
 			IsFavorite:     userContent.IsFavorite,
 			AddedAt:        userContent.AddedAt,
@@ -505,6 +568,11 @@ func (h *UserContentHandler) handlePageSubmission(w http.ResponseWriter, r *http
 
 // handleContentIDBasedSubmission handles legacy content-ID-based submission
 func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, req *dto.AddContentToUserRequest) {
+	if req.List != "" {
+		api.WriteError(w, http.StatusBadRequest, api.ErrCodeValidation, "list only applies to feed subscriptions; saved pages always go to Reads", nil, "v1")
+		return
+	}
+
 	contentID := *req.ContentID
 
 	// Validate content ID exists
@@ -563,6 +631,7 @@ func (h *UserContentHandler) handleContentIDBasedSubmission(w http.ResponseWrite
 		UserID:         userContent.UserID,
 		ContentID:      userContent.ContentID,
 		Status:         userContent.Status,
+		List:           userContent.List,
 		ScrollPosition: userContent.ScrollPosition,
 		IsFavorite:     userContent.IsFavorite,
 		AddedAt:        userContent.AddedAt,
@@ -635,7 +704,7 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 	}
 
 	// Update metadata
-	err = h.userContentRepo.UpdateMetadata(r.Context(), userContent.ID, req.Status, req.ScrollPosition, req.IsFavorite)
+	err = h.userContentRepo.UpdateMetadata(r.Context(), userContent.ID, req.Status, req.ScrollPosition, req.IsFavorite, req.List)
 	if err != nil {
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to update user-content: "+err.Error(), nil, "v1")
 		return
@@ -656,6 +725,7 @@ func (h *UserContentHandler) UpdateUserContent(w http.ResponseWriter, r *http.Re
 		UserID:         userContent.UserID,
 		ContentID:      userContent.ContentID,
 		Status:         userContent.Status,
+		List:           userContent.List,
 		ScrollPosition: userContent.ScrollPosition,
 		IsFavorite:     userContent.IsFavorite,
 		AddedAt:        userContent.AddedAt,
@@ -753,8 +823,13 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 		cursorID = &id
 	}
 
+	list, ok := parseListFilter(w, r)
+	if !ok {
+		return
+	}
+
 	// Fetch limit+1 to determine whether a next page exists.
-	userContents, err := h.userContentRepo.SearchWithCursor(r.Context(), userID, query, limit+1, cursorTime, cursorID)
+	userContents, err := h.userContentRepo.SearchWithCursor(r.Context(), userID, query, list, limit+1, cursorTime, cursorID)
 	if err != nil {
 		slog.Error("failed to search user contents", slog.Any("error", err))
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Failed to search user contents", nil, "v1")
@@ -789,6 +864,7 @@ func (h *UserContentHandler) SearchUserContents(w http.ResponseWriter, r *http.R
 			UserID:         uc.UserID,
 			ContentID:      uc.ContentID,
 			Status:         uc.Status,
+			List:           uc.List,
 			ScrollPosition: uc.ScrollPosition,
 			IsFavorite:     uc.IsFavorite,
 			AddedAt:        uc.AddedAt,

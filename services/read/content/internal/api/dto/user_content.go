@@ -27,6 +27,10 @@ type AddContentToUserRequest struct {
 	Status         string  `json:"status,omitempty"`
 	ScrollPosition float64 `json:"scroll_position,omitempty"` // Reading progress as a fraction in [0,1]
 	IsFavorite     bool    `json:"is_favorite,omitempty"`
+
+	// List is the destination for a feed subscription: "feed" or "reads"
+	// (default "reads"). Pages and content-ID saves always land in Reads.
+	List string `json:"list,omitempty"`
 }
 
 // Validate validates the AddContentToUserRequest
@@ -51,8 +55,16 @@ func (a AddContentToUserRequest) Validate() error {
 			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
 			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
+		validation.Field(&a.List,
+			validation.When(a.List != "",
+				validation.In(models.ListFeed, models.ListReads).Error(listError),
+			),
+		),
 	)
 }
+
+// listError is the validation message for an invalid list value.
+const listError = "Invalid list. Must be 'feed' or 'reads'"
 
 // AddFeedResponse represents a successful feed subscription
 type AddFeedResponse struct {
@@ -74,6 +86,7 @@ type FeedSubscriptionDTO struct {
 	FeedID       string    `json:"feed_id"`
 	FeedURL      string    `json:"feed_url"`
 	Title        string    `json:"title"`
+	List         string    `json:"list"`
 	SubscribedAt time.Time `json:"subscribed_at"`
 }
 
@@ -82,6 +95,7 @@ type UpdateUserContentRequest struct {
 	Status         *string  `json:"status,omitempty"`
 	ScrollPosition *float64 `json:"scroll_position,omitempty"` // Reading progress as a fraction in [0,1]
 	IsFavorite     *bool    `json:"is_favorite,omitempty"`
+	List           *string  `json:"list,omitempty"` // Move the item between lists (e.g. "Save to Reads")
 }
 
 // Validate validates the UpdateUserContentRequest
@@ -97,6 +111,26 @@ func (u UpdateUserContentRequest) Validate() error {
 			validation.Min(0.0).Error("scroll_position must be a fraction between 0 and 1"),
 			validation.Max(1.0).Error("scroll_position must be a fraction between 0 and 1"),
 		),
+		validation.Field(&u.List,
+			validation.When(u.List != nil,
+				validation.In(models.ListFeed, models.ListReads).Error(listError),
+			),
+		),
+	)
+}
+
+// SetSourceListRequest represents the request body for changing a source's destination list
+type SetSourceListRequest struct {
+	List string `json:"list"`
+}
+
+// Validate validates the SetSourceListRequest
+func (s SetSourceListRequest) Validate() error {
+	return validation.ValidateStruct(&s,
+		validation.Field(&s.List,
+			validation.Required.Error("list is required"),
+			validation.In(models.ListFeed, models.ListReads).Error(listError),
+		),
 	)
 }
 
@@ -108,6 +142,7 @@ type UserContentResponse struct {
 	UserID         uuid.UUID               `json:"user_id"`
 	ContentID      uuid.UUID               `json:"content_id"`
 	Status         string                  `json:"status"`
+	List           string                  `json:"list"`
 	ScrollPosition float64                 `json:"scroll_position"`
 	IsFavorite     bool                    `json:"is_favorite"`
 	AddedAt        time.Time               `json:"added_at"`
@@ -122,6 +157,7 @@ type UserContentDetailResponse struct {
 	UserID         uuid.UUID        `json:"user_id"`
 	ContentID      uuid.UUID        `json:"content_id"`
 	Status         string           `json:"status"`
+	List           string           `json:"list"`
 	ScrollPosition float64          `json:"scroll_position"`
 	IsFavorite     bool             `json:"is_favorite"`
 	AddedAt        time.Time        `json:"added_at"`

@@ -177,6 +177,7 @@ func (w *EmailProcessorWorker) processEmail(ctx context.Context, email *models.R
 		Title:      subject,
 		Author:     author,
 		SourceType: "email",
+		SenderID:   sender.ID,
 	}
 
 	outbox := &models.ContentOutbox{

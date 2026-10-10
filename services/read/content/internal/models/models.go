@@ -23,10 +23,12 @@ type Content struct {
 	ImageURLs    pq.StringArray `json:"image_urls,omitempty"`
 	SourceType   string         `json:"source_type"`
 	SourceFeedID *uuid.UUID     `json:"source_feed_id,omitempty"`
-	Metadata     JSONB          `json:"metadata,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	OrphanedAt   *time.Time     `json:"orphaned_at,omitempty"`
+	// SourceSenderID is the email sender that produced the content (email only).
+	SourceSenderID *uuid.UUID `json:"source_sender_id,omitempty"`
+	Metadata       JSONB      `json:"metadata,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	OrphanedAt     *time.Time `json:"orphaned_at,omitempty"`
 }
 
 // UserContent represents the junction table mapping users to content with user-specific metadata
@@ -35,6 +37,7 @@ type UserContent struct {
 	UserID         uuid.UUID `json:"user_id"`
 	ContentID      uuid.UUID `json:"content_id"`
 	Status         string    `json:"status"`
+	List           string    `json:"list"`
 	ScrollPosition float64   `json:"scroll_position"`
 	IsFavorite     bool      `json:"is_favorite"`
 	AddedAt        time.Time `json:"added_at"`
@@ -84,6 +87,26 @@ const (
 	SourceTypeWeb   = "web"
 	SourceTypeEmail = "email"
 )
+
+// List constants: the two destinations a user_contents row can live in.
+const (
+	ListFeed  = "feed"
+	ListReads = "reads"
+)
+
+// SourceRoute is a user's chosen destination list for one source
+// (SourceKey is the feed ID for rss, the sender ID for email).
+type SourceRoute struct {
+	UserID     uuid.UUID `json:"user_id"`
+	SourceType string    `json:"source_type"`
+	SourceKey  uuid.UUID `json:"source_key"`
+	List       string    `json:"list"`
+}
+
+// ValidateList checks if the given list is valid
+func ValidateList(list string) bool {
+	return list == ListFeed || list == ListReads
+}
 
 // ValidateStatus checks if the given status is valid
 func ValidateStatus(status string) bool {

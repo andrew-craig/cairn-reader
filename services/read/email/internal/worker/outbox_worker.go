@@ -175,5 +175,6 @@ func outboxToContentItem(entry *models.ContentOutbox) (client.EmailContentItem, 
 		Title:      p.Title,
 		Author:     p.Author,
 		SourceType: p.SourceType,
+		SenderID:   p.SenderID,
 	}, nil
 }
