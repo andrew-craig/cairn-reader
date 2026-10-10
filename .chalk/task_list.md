@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_66b2** · P1 · in_progress · Content service: moving an item to Reads bumps added_at (lands at top of Reads)  (parent: epic_6e4d)
 - **task_f9ad** · P1 · in_progress · Mobile: Feed and Reads tabs  (parent: epic_6e4d)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
