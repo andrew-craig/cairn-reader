@@ -4,16 +4,15 @@ This file provides guidance to Claude Code when working with the Cairn mobile ap
 
 ## Service Overview
 
-The Cairn mobile app is a React Native application built with Expo that provides a read-it-later experience for iOS and Android. It integrates with the Cairn backend services (User, Explore, and Read services) to provide personalized content recommendations and article management.
+The Cairn mobile app is a React Native application built with Expo that provides a read-it-later experience for iOS and Android. It integrates with the Cairn backend services (User and Read services) for article management.
 
 **Key Features:**
 - 📱 Cross-platform (iOS, Android, Web via Expo)
 - 🔐 Authentication with device ID or email/password
 - 📖 Article reading and management (Read Later list)
-- 🔍 Personalized content discovery (Explore feed)
 - ⭐ Favorites and archive functionality
 - 🌓 Dark mode support (follows system preference)
-- 💾 Local persistence with SQLite (read-list articles) and AsyncStorage (explore cache, auth)
+- 💾 Local persistence with SQLite (read-list articles) and AsyncStorage (auth)
 - 📡 Offline reading: saved articles readable with no connection; edits queue in a mutation outbox and sync when it returns
 - 🔄 Backend integration with JWT authentication
 
@@ -61,7 +60,7 @@ apps/mobile/
     ├── contexts/                    # React contexts
     │   └── AuthContext.tsx          # Authentication state
     ├── hooks/                       # Custom hooks
-    │   ├── useCursorArticleList.ts  # Cursor-paginated list state (Read/Explore/Bookmarks/Votes)
+    │   ├── useCursorArticleList.ts  # Cursor-paginated list state (Read/Bookmarks)
     │   ├── useNetworkStatus.ts      # Connectivity boolean (expo-network), for the banner + screens
     │   └── useSyncTrigger.ts        # Fires SyncTrigger.run() on reconnect / app-foreground
     ├── navigation/                  # Navigation setup
@@ -72,14 +71,11 @@ apps/mobile/
     │   ├── AccountScreen.tsx        # Account settings (logout, upgrade, password)
     │   ├── AddArticleScreen.tsx     # Add new article/URL
     │   ├── BookmarksScreen.tsx      # Favorited articles
-    │   ├── ExploreArticleDetailScreen.tsx  # Explore article view
-    │   ├── ExploreScreen.tsx        # Content discovery feed
     │   ├── FeedsScreen.tsx          # RSS/social feed subscriptions
     │   ├── LoginScreen.tsx          # Authentication
     │   ├── NewslettersScreen.tsx    # Email newsletter subscriptions
     │   ├── ReadArticleDetailScreen.tsx  # Read article details
     │   ├── ReadScreen.tsx           # Reading list (main)
-    │   ├── VotesScreen.tsx          # Upvoted/downvoted articles
     │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/Feeds/etc.)
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
@@ -90,9 +86,7 @@ apps/mobile/
     │   ├── outbox.ts                # Offline mutation queue (SQLite), drained on reconnect
     │   ├── syncTrigger.ts           # Runs Outbox.drain() then ArticlePrefetchService.run()
     │   ├── auth.ts                  # Authentication service
-    │   ├── explore.ts               # Explore/recommendations API
     │   ├── read.ts                  # Read service API
-    │   ├── storage.ts               # Local storage (AsyncStorage, explore cache)
     │   ├── system.ts                # Backend metadata not tied to a user session
     │   └── index.ts                 # Exports
     ├── types/                       # TypeScript type definitions
@@ -114,13 +108,10 @@ The app uses React Navigation with a stack + tabs pattern:
 RootNavigator (Stack)
 ├── MainTabs (Bottom Tabs)
 │   ├── Read Tab → ReadScreen
-│   ├── Explore Tab → ExploreScreen
 │   └── You Tab → YouScreen
 ├── ArticleDetail → ReadArticleDetailScreen
-├── ExploreArticleDetail (Modal)
 ├── AddArticle (Modal)
 ├── Bookmarks
-├── Votes
 ├── Account
 ├── About
 ├── Feeds
@@ -147,15 +138,13 @@ The app uses React hooks and Context API for state management:
 3. **Local Persistence**:
    - Read-list articles: `ArticleStore` (SQLite via `expo-sqlite`)
    - Offline mutation queue: `Outbox` (same SQLite database as `ArticleStore`, see `db.ts`)
-   - Explore cache, tokens, and user data: AsyncStorage via `StorageService`/`AuthService`
+   - Tokens and user data: AsyncStorage via `AuthService`
 
 ### Service Layer Pattern
 All backend communication goes through service classes:
 
 - **AuthService** (`src/services/auth.ts`): Authentication and token management
-- **ExploreService** (`src/services/explore.ts`): Content recommendations and voting
 - **ReadService** (`src/services/read.ts`): Article storage and management
-- **StorageService** (`src/services/storage.ts`): Explore cache persistence (AsyncStorage)
 - **ArticleStore** (`src/services/articleStore.ts`): Local read-list article store (SQLite)
 - **ArticlePrefetchService** (`src/services/articlePrefetch.ts`): Background body prefetch into the local store
 - **Outbox** (`src/services/outbox.ts`): Offline mutation queue, drained on reconnect
@@ -193,7 +182,6 @@ interface ArticleContentProps {
 interface ArticleRowProps {
   article: Article;
   onPress: () => void;
-  voteType?: 'upvote' | 'downvote';
 }
 ```
 
@@ -209,12 +197,6 @@ interface ButtonProps {
 ```
 
 ### Main Screens
-
-**ExploreScreen.tsx** - Content discovery feed
-- Fetches recommendations from Explore service
-- Displays articles in card format
-- Supports upvote/downvote actions
-- Pull-to-refresh functionality
 
 **ReadScreen.tsx** - Reading list (main screen)
 - Displays user's saved articles
@@ -236,8 +218,8 @@ interface ButtonProps {
 - Account upgrade (device → email/password)
 
 **YouScreen.tsx** - Profile hub
-- User profile summary and reading stats (feeds, newsletters, bookmarks, votes)
-- Links to Bookmarks, Votes, Account, About, Feeds, and Newsletters screens
+- User profile summary and reading stats (feeds, newsletters, bookmarks)
+- Links to Bookmarks, Account, About, Feeds, and Newsletters screens
 
 **AccountScreen.tsx** - Account settings
 - Logout functionality
@@ -278,10 +260,8 @@ Located in `src/types/navigation.ts`:
 type RootStackParamList = {
   MainTabs: undefined;
   ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number; onArchived?: (articleId: string) => void };
-  ExploreArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number };
   AddArticle: undefined;
   Bookmarks: undefined;
-  Votes: undefined;
   Account: undefined;
   About: undefined;
   Feeds: undefined;
@@ -289,7 +269,6 @@ type RootStackParamList = {
 };
 
 type MainTabParamList = {
-  Explore: undefined;
   Read: undefined;
   You: undefined;
 };
@@ -324,19 +303,6 @@ interface LoginResponse {
 
 ## Services
 
-### StorageService (`src/services/storage.ts`)
-AsyncStorage-backed stale-while-revalidate cache for the Explore feed only.
-Read-list articles live in `ArticleStore` (SQLite) instead — see below.
-
-**Methods:**
-```typescript
-StorageService.getExploreCache(): Promise<{ articles: Article[]; cachedAt: number } | null>
-StorageService.saveExploreCache(articles: Article[]): Promise<void>
-```
-
-**Storage Key:**
-- Explore cache: `@cairnreader:explore_cache`
-
 ### ArticleStore (`src/services/articleStore.ts`)
 SQLite-backed (`expo-sqlite`) local store for read-list articles: metadata,
 user state (`isRead`/`isFavorite`/scroll position) and an opportunistically
@@ -347,7 +313,7 @@ not a paginated query engine — `useCursorArticleList` still drives pagination
 against the network. Sync is upsert-only; rows are only removed via the
 explicit archive path or `clear()` (called on logout, which also empties
 `Outbox` — a queued write must never replay against a different account).
-Explore articles are never written here. Schema changes since the original table apply via a
+Schema changes since the original table apply via a
 `PRAGMA user_version`-driven migration inside `getDb()` — see the migration
 comment in the source before widening the table further.
 
@@ -411,7 +377,7 @@ writes the local store first, then attempts the backend call, and queues
 the write in `Outbox` on the same retryable set `Outbox`'s drain uses
 (`NetworkError`, `HttpError(401)`, `HttpError(5xx)` — see `outbox.ts`'s
 exported `isRetryable`) — a definitive 4xx other than 401 still rethrows to
-the caller. Add-URL and Explore are untouched; they stay online-only.
+the caller. Add-URL is untouched; it stays online-only.
 
 **Methods:**
 ```typescript
@@ -488,24 +454,6 @@ AuthService.getUserId(): Promise<string | null>
 **Device ID:**
 - iOS: Uses `expo-application.getIosIdForVendorAsync()`
 - Android: Uses `expo-application.getAndroidId()`
-
-### ExploreService (`src/services/explore.ts`)
-Content discovery and recommendations.
-
-**Methods:**
-```typescript
-ExploreService.getRecommendations(): Promise<Article[]>
-ExploreService.markAsRead(articleId: string): Promise<void>
-ExploreService.upvoteArticle(articleId: string): Promise<void>
-ExploreService.downvoteArticle(articleId: string): Promise<void>
-ExploreService.removeVote(articleId: string): Promise<void>
-ExploreService.getVoteCounts(articleId: string): Promise<{upvotes, downvotes, user_vote?}>
-```
-
-**Backend Integration:**
-- Endpoint: `${getServerUrl()}/api/v1/explore/...` (from `@cairn/shared`)
-- Requires JWT authentication
-- Transforms `BackendArticle` → `Article` interface
 
 ### ReadService (`src/services/read.ts`)
 Article storage and reading list management.
@@ -698,7 +646,7 @@ Layout.headerHeight           // 64 - Standard header height
 
 | Screen Type | Top Handling | Bottom Handling |
 |-------------|--------------|-----------------|
-| **Tab screens** (Explore, Read, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
+| **Tab screens** (Read, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
 | **Detail screens** (ArticleContent) | Content with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.bottomActionMenuHeight + insets.bottom + Spacing.md` |
 | **Modal screens** (AddArticle, Login) | Content with `paddingTop: insets.top` | Content with `paddingBottom: insets.bottom` |
 | **Floating UI** (TabBar, ActionMenu) | N/A | Position absolutely, add `insets.bottom + Spacing.sm` to paddingBottom |
@@ -1021,7 +969,7 @@ export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 ```
 
 All service calls (`getServerUrl()`) resolve to `<server URL>/api/v1/auth/...`,
-`/api/v1/explore/...`, `/api/v1/content/...`, etc. against that single origin.
+`/api/v1/content/...`, etc. against that single origin.
 
 **For Local Development:**
 Point the app at a single local backend origin — either edit
@@ -1104,20 +1052,6 @@ private static async fetchWithAuth(
 
 ### Data Transformation
 Backend models are transformed to mobile `Article` interface:
-
-**Explore Service:**
-```typescript
-BackendArticle → Article
-- id (same)
-- link → url
-- title (same)
-- description → description
-- content → content
-- author || feed_title → author
-- published → publishedDate
-- categories → tags
-- Extract image from content/description → imageUrl
-```
 
 **Read Service:**
 ```typescript
@@ -1206,7 +1140,6 @@ open "rndebugger://set-debugger-loc?host=localhost&port=8081"
 - **Root CLAUDE.md**: `/CLAUDE.md` - Project-wide guidance
 - **Engineering Principles**: `/docs/ENGINEERING_PRINCIPLES.md` - Coding standards and architecture
 - **User Service**: `/services/users/CLAUDE.md` - Authentication backend
-- **Explore Service**: `/services/explore/CLAUDE.md` - Recommendations backend
 - **Read Service**: `/services/read/CLAUDE.md` - Content storage backend
 - **Expo Documentation**: https://docs.expo.dev/
 - **React Navigation**: https://reactnavigation.org/docs/getting-started

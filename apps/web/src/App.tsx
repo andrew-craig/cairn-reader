@@ -5,14 +5,11 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Login from './routes/Login';
 import Read from './routes/Read';
 import ReadArticle from './routes/ReadArticle';
-import Explore from './routes/Explore';
-import ExploreArticle from './routes/ExploreArticle';
 import You from './routes/You';
 import Account from './routes/Account';
 import Feeds from './routes/Feeds';
 import Newsletters from './routes/Newsletters';
 import Bookmarks from './routes/Bookmarks';
-import Votes from './routes/Votes';
 import About from './routes/About';
 
 // Landing redirect: authenticated users go to their reading list, everyone else
@@ -50,14 +47,11 @@ export default function App() {
               <Route element={<AppLayout />}>
                 <Route path="/read" element={<Read />} />
                 <Route path="/read/:id" element={<ReadArticle />} />
-                <Route path="/explore" element={<Explore />} />
-                <Route path="/explore/:id" element={<ExploreArticle />} />
                 <Route path="/you" element={<You />} />
                 <Route path="/you/account" element={<Account />} />
                 <Route path="/you/feeds" element={<Feeds />} />
                 <Route path="/you/newsletters" element={<Newsletters />} />
                 <Route path="/you/bookmarks" element={<Bookmarks />} />
-                <Route path="/you/votes" element={<Votes />} />
                 <Route path="/you/about" element={<About />} />
               </Route>
             </Route>

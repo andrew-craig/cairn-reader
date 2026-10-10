@@ -8,7 +8,6 @@ import { Colors, Spacing, FontSizes, FontFamily, Layout } from '../constants/the
 import { GlobalStyles } from '../constants/globalStyles';
 import { ChevronRightIcon } from '../components/icons';
 import { RootStackParamList } from '../types';
-import { ExploreService } from '../services/explore';
 import { ReadService } from '../services/read';
 import { pluralize } from '../utils/helpers';
 
@@ -72,8 +71,6 @@ export const YouScreen: React.FC = () => {
   const [feedsCount, setFeedsCount] = useState(0);
   const [newslettersCount, setNewslettersCount] = useState(0);
   const [bookmarksCount, setBookmarksCount] = useState(0);
-  const [upVotesCount, setUpVotesCount] = useState(0);
-  const [downVotesCount, setDownVotesCount] = useState(0);
 
   const accountName = user?.email || 'Anonymous user';
 
@@ -96,23 +93,14 @@ export const YouScreen: React.FC = () => {
         setError(null);
 
         // Fetch all stats in parallel, tolerating individual failures so that
-        // a broken votes endpoint doesn't hide feed/bookmark counts.
-        const [voteResult, subscriptionsResult, bookmarksResult] = await Promise.allSettled([
-          ExploreService.getUserVoteStats(),
+        // a broken endpoint doesn't hide the other counts.
+        const [subscriptionsResult, bookmarksResult] = await Promise.allSettled([
           ReadService.listAllSubscriptions(),
           ReadService.countUserContents({ is_favorite: true }),
         ]);
 
         // Show the first error encountered so the user knows something failed.
         let errorMsg: string | null = null;
-
-        if (voteResult.status === 'fulfilled') {
-          setUpVotesCount(voteResult.value.upvotes);
-          setDownVotesCount(voteResult.value.downvotes);
-        } else {
-          console.error('Error fetching vote stats:', voteResult.reason);
-          errorMsg = voteResult.reason instanceof Error ? voteResult.reason.message : 'Failed to load vote statistics';
-        }
 
         if (subscriptionsResult.status === 'fulfilled') {
           const subs = subscriptionsResult.value.subscriptions;
@@ -156,10 +144,6 @@ export const YouScreen: React.FC = () => {
 
   const handleBookmarksPress = () => {
     navigation.navigate('Bookmarks');
-  };
-
-  const handleVotesPress = () => {
-    navigation.navigate('Votes');
   };
 
   const handleAboutPress = () => {
@@ -225,16 +209,6 @@ export const YouScreen: React.FC = () => {
             title="Bookmarks"
             subtitle={loading ? 'Loading...' : `${bookmarksCount} saved`}
             onPress={handleBookmarksPress}
-            isDark={isDark}
-          />
-          <MenuItem
-            title="Votes"
-            subtitle={
-              loading
-                ? 'Loading...'
-                : `${upVotesCount} up ${pluralize(upVotesCount, 'vote')}, ${downVotesCount} down ${pluralize(downVotesCount, 'vote')}`
-            }
-            onPress={handleVotesPress}
             isDark={isDark}
           />
           <Spacer isDark={isDark} />

@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [explore,infra]
-blocked_by: [task_85bd]
+blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-08T11:32:05Z
+updated_at: 2026-10-10T03:11:10Z
 ---
 Follows client removal so no shipped client calls a removed API.
 - [ ] Remove explore services from dev/prod/selfhost docker-compose, selfhost single binary and Makefiles, CI workflows

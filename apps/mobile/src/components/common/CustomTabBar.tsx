@@ -4,20 +4,17 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Colors, Spacing } from '../../constants';
-import { ExploreIcon } from '../icons/ExploreIcon';
 import { ReadIcon } from '../icons/ReadIcon';
 import { ProfileIcon } from '../icons/ProfileIcon';
 
 const getTabIcon = (routeName: string) => {
   switch (routeName) {
-    case 'Explore':
-      return ExploreIcon;
     case 'Read':
       return ReadIcon;
     case 'You':
       return ProfileIcon;
     default:
-      return ExploreIcon;
+      return ReadIcon;
   }
 };
 

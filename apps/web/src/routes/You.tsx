@@ -9,7 +9,6 @@ const YOU_ITEMS = [
   { to: '/you/feeds', label: 'Feeds' },
   { to: '/you/newsletters', label: 'Newsletters' },
   { to: '/you/bookmarks', label: 'Bookmarks' },
-  { to: '/you/votes', label: 'Votes' },
   { to: '/you/about', label: 'About' },
 ];
 

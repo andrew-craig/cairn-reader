@@ -3,7 +3,7 @@ export const pluralize = (count: number, singular: string, plural?: string): str
   return count === 1 ? singular : (plural ?? `${singular}s`);
 };
 
-// Matches the format used by the article reader (ReadArticle/ExploreArticle).
+// Matches the format used by the article reader (ReadArticle).
 export const formatPublishedDate = (value?: string): string | null => {
   if (!value) return null;
   const date = new Date(value);
