@@ -713,6 +713,45 @@ func TestAddContentToUser_ContentNotFound(t *testing.T) {
 	mockContentRepo.AssertExpectations(t)
 }
 
+// TestAddContentToUser_ArchivedIsRestored: archiving is a status change, so the
+// (user, content) row survives it; re-saving must restore that row, not 409.
+func TestAddContentToUser_ArchivedIsRestored(t *testing.T) {
+	mockUserContentRepo := new(MockUserContentRepository)
+	mockContentRepo := new(MockContentRepository)
+	handler := NewUserContentHandler(mockUserContentRepo, mockContentRepo, nil, nil, nil, nil)
+
+	userID := uuid.New()
+	contentID := uuid.New()
+	content := &models.Content{ID: contentID}
+	archived := &models.UserContent{
+		ID:        uuid.New(),
+		UserID:    userID,
+		ContentID: contentID,
+		Status:    models.StatusArchived,
+	}
+
+	mockContentRepo.On("GetByID", mock.Anything, contentID).Return(content, nil)
+	mockUserContentRepo.On("GetByUserAndContent", mock.Anything, userID, contentID).Return(archived, nil)
+	mockUserContentRepo.On("UpdateMetadata", mock.Anything, archived.ID,
+		mock.MatchedBy(func(s *string) bool { return s != nil && *s == models.StatusUnread }),
+		(*float64)(nil), (*bool)(nil), (*string)(nil)).Return(nil)
+
+	body, _ := json.Marshal(map[string]interface{}{"content_id": contentID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/"+userID.String()+"/contents", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("user_id", userID.String())
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = addAuthContextToRequest(req, userID)
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	mockUserContentRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	mockUserContentRepo.AssertExpectations(t)
+}
+
 // TestAddContentToUser_FeedAlreadySubscribed reproduces the 409->500
 // mistranslation end-to-end: a real Ingest RSS subscribe handler response for
 // "already subscribed" must surface to the app as 409, not 500. Points the
