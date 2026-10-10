@@ -5,7 +5,7 @@ type: task
 status: in_progress
 priority: 1
 labels: [mobile]
-blocked_by: [task_66b2]
+blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
