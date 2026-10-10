@@ -39,17 +39,18 @@ apps/mobile/
     │   │   ├── CustomTabBar.tsx     # Custom tab bar
     │   │   ├── HeaderPopover.tsx    # Popover menu anchored to a header
     │   │   ├── IconButton.tsx       # Icon-only button
+    │   │   ├── ListToggle.tsx       # Feed | Reads picker (subscription rows, AddLinkModal)
     │   │   ├── OfflineBanner.tsx    # "You're offline" overlay banner
     │   │   ├── QuickAccessButton.tsx # Icon button used in BottomActionMenu
     │   │   ├── ScreenHeader.tsx     # Shared screen header
     │   │   ├── SyncTriggerEffect.tsx # Mounts useSyncTrigger() inside the authenticated tree
     │   │   └── TopBlurGradient.tsx  # Top-of-screen blur/gradient overlay
     │   ├── icons/                   # SVG icon components
-    │   ├── AddLinkModal.tsx         # Modal for adding URLs
+    │   ├── AddLinkModal.tsx         # Modal for adding URLs (asks Feed or Reads when subscribing to a feed)
     │   ├── ArticleListScreen.tsx    # Reusable article list
     │   ├── LogoMark.tsx             # App logo mark
     │   ├── SearchModal.tsx          # Modal for searching content
-    │   └── SubscriptionListScreen.tsx  # Reusable feed/newsletter subscription list
+    │   └── SubscriptionListScreen.tsx  # Reusable RSS/newsletter subscription list, with a per-source Feed/Reads toggle
     ├── config/                      # App configuration
     │   ├── init.ts                  # Wires shared API config layer at startup (imported first, from index.js)
     │   └── storage.ts               # AsyncStorage adapter + DEFAULT_SERVER_URL
@@ -71,17 +72,20 @@ apps/mobile/
     │   ├── AccountScreen.tsx        # Account settings (logout, upgrade, password)
     │   ├── AddArticleScreen.tsx     # Add new article/URL
     │   ├── BookmarksScreen.tsx      # Favorited articles
-    │   ├── FeedsScreen.tsx          # RSS/social feed subscriptions
+    │   ├── FeedScreen.tsx           # Feed list (online-only skim list, list=feed)
     │   ├── LoginScreen.tsx          # Authentication
     │   ├── NewslettersScreen.tsx    # Email newsletter subscriptions
     │   ├── ReadArticleDetailScreen.tsx  # Read article details
-    │   ├── ReadScreen.tsx           # Reading list (main)
-    │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/Feeds/etc.)
+    │   ├── ReadsScreen.tsx          # Reads list (offline-first, list=reads)
+    │   ├── RssScreen.tsx            # RSS subscriptions
+    │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/RSS/etc.)
     │   └── index.ts                 # Exports
     ├── services/                    # Service layer (API clients)
     │   ├── db.ts                    # Shared SQLite connection + migration ladder (ArticleStore, Outbox)
     │   ├── articleStore.ts          # Local read-list article store (SQLite)
     │   ├── articlePrefetch.ts       # Background body prefetch for the local store
+    │   ├── feedCache.ts             # AsyncStorage snapshot of the last Feed page (stale render only; cleared on logout)
+    │   ├── readsInvalidation.ts     # Marks Reads stale after Save to Reads so the item shows immediately
     │   ├── articleMutations.ts      # Store-first write facade; queues to Outbox on a retryable error (NetworkError/401/5xx)
     │   ├── outbox.ts                # Offline mutation queue (SQLite), drained on reconnect
     │   ├── syncTrigger.ts           # Runs Outbox.drain() then ArticlePrefetchService.run()
@@ -107,14 +111,15 @@ The app uses React Navigation with a stack + tabs pattern:
 ```
 RootNavigator (Stack)
 ├── MainTabs (Bottom Tabs)
-│   ├── Read Tab → ReadScreen
+│   ├── Feed Tab → FeedScreen
+│   ├── Reads Tab → ReadsScreen
 │   └── You Tab → YouScreen
 ├── ArticleDetail → ReadArticleDetailScreen
 ├── AddArticle (Modal)
 ├── Bookmarks
 ├── Account
 ├── About
-├── Feeds
+├── RSS
 └── Newsletters
 ```
 
@@ -198,8 +203,13 @@ interface ButtonProps {
 
 ### Main Screens
 
-**ReadScreen.tsx** - Reading list (main screen)
-- Displays user's saved articles
+**FeedScreen.tsx** - Feed list (skim)
+- Items from sources routed to Feed (`list=feed`); online-only — never written to `ArticleStore`, prefetch or the outbox
+- Keeps the last page in `FeedCache` so a failed refresh shows a stale banner instead of a blank tab
+- Opens items in the shared reader, where "Save to Reads" replaces Archive
+
+**ReadsScreen.tsx** - Reads list (main screen)
+- Displays articles in `list=reads`
 - Search functionality
 - Integrates with Read service
 - Store-first render (`ArticleStore.listRecent`), with a "Showing cached data" banner if the background refetch then fails rather than an alert; every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`
@@ -218,8 +228,8 @@ interface ButtonProps {
 - Account upgrade (device → email/password)
 
 **YouScreen.tsx** - Profile hub
-- User profile summary and reading stats (feeds, newsletters, bookmarks)
-- Links to Bookmarks, Account, About, Feeds, and Newsletters screens
+- User profile summary and reading stats (RSS, newsletters, bookmarks)
+- Links to Bookmarks, Account, About, RSS, and Newsletters screens
 
 **AccountScreen.tsx** - Account settings
 - Logout functionality
@@ -245,6 +255,7 @@ interface Article {
   tags: string[];
   isRead: boolean;
   isFavorite: boolean;
+  list: ContentList;       // 'feed' | 'reads' — the reader's actions differ for Feed items
   addedAt: number;         // Unix timestamp (ms)
   readAt?: number;         // Unix timestamp (ms)
   notes?: string;
@@ -264,12 +275,13 @@ type RootStackParamList = {
   Bookmarks: undefined;
   Account: undefined;
   About: undefined;
-  Feeds: undefined;
+  RSS: undefined;
   Newsletters: undefined;
 };
 
 type MainTabParamList = {
-  Read: undefined;
+  Feed: undefined;
+  Reads: undefined;
   You: undefined;
 };
 ```
@@ -308,7 +320,7 @@ SQLite-backed (`expo-sqlite`) local store for read-list articles: metadata,
 user state (`isRead`/`isFavorite`/scroll position) and an opportunistically
 cached `body` (cleaned HTML), diffed against the server by `content_hash` so
 an unchanged body is never re-downloaded. It is a read-through cache for the
-initial render of `ReadScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`,
+initial render of `ReadsScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`,
 not a paginated query engine — `useCursorArticleList` still drives pagination
 against the network. Sync is upsert-only; rows are only removed via the
 explicit archive path or `clear()` (called on logout, which also empties
@@ -338,7 +350,7 @@ most recent Read-list articles, then evicts cached bodies outside that cap.
 Never runs while offline; aborts the remaining batch on the first
 `NetworkError` (a non-network error skips just that article). Single-flight —
 a run already in progress is not restarted by a second call. Triggered by
-`ReadScreen`'s sync callback after `ArticleStore.upsertMany`, not by any
+`ReadsScreen`'s sync callback after `ArticleStore.upsertMany`, not by any
 screen directly; no other screen calls it.
 
 **Methods:**
@@ -394,7 +406,7 @@ order, isolating each consumer's rejection from the next so one failing
 doesn't stop the other from running. Single-flight, like
 `ArticlePrefetchService`. Fired by `useSyncTrigger` (below) on a transition
 from offline to online or from background to foreground, and by
-`ReadScreen` after every list sync — including pull-to-refresh — so the
+`ReadsScreen` after every list sync — including pull-to-refresh — so the
 outbox gets a drain on every path, not only reconnect/foreground.
 
 **Methods:**
@@ -462,6 +474,9 @@ Article storage and reading list management.
 ```typescript
 ReadService.listUserContents(params?: ListContentsParams): Promise<UserContentsListResponse>
 ReadService.searchUserContents(params: SearchParams): Promise<UserContentsListResponse>
+ReadService.countUserContents(params?: CountContentsParams): Promise<number>
+ReadService.moveToReads(contentId: string): Promise<UserContentResponse>   // Save to Reads (re-stamps added_at server-side)
+ReadService.setSourceList(type: 'rss' | 'email', key: string, list: ContentList): Promise<SetSourceListResponse>   // new items only
 ReadService.addContentToUser(request: AddContentToUserRequest): Promise<UserContentResponse>
 ReadService.updateUserContent(contentId: string, updates: UpdateUserContentRequest): Promise<UserContentResponse>
 ReadService.deleteUserContent(contentId: string): Promise<void>

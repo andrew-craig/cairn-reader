@@ -14,21 +14,32 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { ScreenHeader } from './common/ScreenHeader';
+import { ListToggle } from './common/ListToggle';
 import { Colors, Layout, Spacing, FontSizes, FontFamily, BorderRadius } from '../constants/theme';
 import { GlobalStyles } from '../constants/globalStyles';
-import { UnifiedSubscription } from '@cairn/shared';
+import { ContentList, SourceRouteType, UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
 
 const AVATAR_SIZE = 48;
 const SLIDE_AMOUNT = AVATAR_SIZE + Spacing.lg; // 72px — avatar + gap, so avatar slides off left
 
+/** The `{type}`/`{key}` the list endpoint routes by, or null if the source can't be routed. */
+const getRoute = (s: UnifiedSubscription): { type: SourceRouteType; key: string } | null => {
+  if (s.type === 'rss' && s.rss_data?.feed_id) return { type: 'rss', key: s.rss_data.feed_id };
+  if (s.type === 'email') return { type: 'email', key: s.id };
+  return null;
+};
+
 interface SourceRowProps {
   title: string;
   subtitle?: string;
+  list: ContentList;
+  /** Omitted for sources that can't be routed. */
+  onListChange?: (list: ContentList) => void;
   onDeletePress?: () => void;
 }
 
-const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle, onDeletePress }) => {
+const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle, list, onListChange, onDeletePress }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -71,6 +82,11 @@ const SourceRow: React.FC<SourceRowProps> = ({ title, subtitle, onDeletePress })
               <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
                 {subtitle}
               </Text>
+            )}
+            {onListChange && (
+              <View style={styles.toggleWrapper}>
+                <ListToggle subject={title} list={list} onChange={onListChange} />
+              </View>
             )}
           </View>
         </TouchableOpacity>
@@ -165,13 +181,33 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
     );
   }, []);
 
+  // Optimistic: flip the toggle now, put it back if the server says no.
+  const handleListChange = useCallback(async (subscription: UnifiedSubscription, list: ContentList) => {
+    const route = getRoute(subscription);
+    if (!route) return;
+    const previous = subscription.list;
+    const setList = (next: ContentList) =>
+      setSubscriptions(prev => prev.map(s => (s.id === subscription.id ? { ...s, list: next } : s)));
+
+    setList(list);
+    try {
+      await ReadService.setSourceList(route.type, route.key, list);
+    } catch (error) {
+      console.error('Failed to update source list:', error);
+      setList(previous);
+      Alert.alert('Error', 'Failed to update. Please try again.');
+    }
+  }, []);
+
   const renderItem = useCallback(({ item }: { item: UnifiedSubscription }) => (
     <SourceRow
       title={item.title}
       subtitle={getSubtitle ? getSubtitle(item) : item.description}
+      list={item.list}
+      onListChange={getRoute(item) ? (list) => handleListChange(item, list) : undefined}
       onDeletePress={() => handleUnsubscribe(item)}
     />
-  ), [getSubtitle, handleUnsubscribe]);
+  ), [getSubtitle, handleUnsubscribe, handleListChange]);
 
   const keyExtractor = useCallback((item: UnifiedSubscription) => item.id, []);
 
@@ -184,7 +220,14 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
         onRefresh={handleRefresh}
         refreshing={refreshing}
         ListHeaderComponent={
-          <ScreenHeader title={title} onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} rightActions={headerActions} />
+          <>
+            <ScreenHeader title={title} onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} rightActions={headerActions} />
+            {subscriptions.some(s => getRoute(s)) && (
+              <Text style={[styles.caption, { color: colors.textSecondary }]}>
+                Choose where each source's new items land. This applies to new items only; items already delivered stay where they are.
+              </Text>
+            )}
+          </>
         }
         ListEmptyComponent={
           loading ? (
@@ -254,6 +297,15 @@ const styles = StyleSheet.create({
   rowText: {
     flex: 1,
     gap: Spacing.xs,
+  },
+  toggleWrapper: {
+    marginTop: Spacing.xs,
+  },
+  caption: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
   },
   rowTitle: {
     fontSize: FontSizes.md,

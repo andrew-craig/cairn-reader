@@ -7,5 +7,5 @@ export * from './LoginScreen';
 export * from './BookmarksScreen';
 export * from './AccountScreen';
 export * from './AboutScreen';
-export * from './FeedsScreen';
+export * from './RssScreen';
 export * from './NewslettersScreen';

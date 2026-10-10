@@ -68,7 +68,7 @@ export const YouScreen: React.FC = () => {
   // State for user statistics
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [feedsCount, setFeedsCount] = useState(0);
+  const [rssCount, setRssCount] = useState(0);
   const [newslettersCount, setNewslettersCount] = useState(0);
   const [bookmarksCount, setBookmarksCount] = useState(0);
 
@@ -104,7 +104,7 @@ export const YouScreen: React.FC = () => {
 
         if (subscriptionsResult.status === 'fulfilled') {
           const subs = subscriptionsResult.value.subscriptions;
-          setFeedsCount(subs.filter(s => s.type !== 'email').length);
+          setRssCount(subs.filter(s => s.type !== 'email').length);
           setNewslettersCount(subs.filter(s => s.type === 'email').length);
         } else {
           console.error('Error fetching subscriptions:', subscriptionsResult.reason);
@@ -134,8 +134,8 @@ export const YouScreen: React.FC = () => {
     navigation.navigate('Account');
   };
 
-  const handleFeedsPress = () => {
-    navigation.navigate('Feeds');
+  const handleRssPress = () => {
+    navigation.navigate('RSS');
   };
 
   const handleNewslettersPress = () => {
@@ -194,9 +194,9 @@ export const YouScreen: React.FC = () => {
           />
           <Spacer isDark={isDark} />
           <MenuItem
-            title="Feeds"
-            subtitle={loading ? 'Loading...' : `${feedsCount} ${pluralize(feedsCount, 'subscription')}`}
-            onPress={handleFeedsPress}
+            title="RSS"
+            subtitle={loading ? 'Loading...' : `${rssCount} ${pluralize(rssCount, 'subscription')}`}
+            onPress={handleRssPress}
             isDark={isDark}
           />
           <MenuItem
