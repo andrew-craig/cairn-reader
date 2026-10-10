@@ -29,8 +29,8 @@ func TestUserContentRepository_DeleteExpiredFeed_Integration(t *testing.T) {
 		contentID := uuid.New()
 		_, err := testDB.DB.ExecContext(ctx, `
 			INSERT INTO contents (id, content_hash, cleaned_html, original_url, title, source_type)
-			VALUES ($1, $2, '<p>x</p>', $3, $2, 'web')
-		`, contentID, name, "https://example.com/"+name)
+			VALUES ($1, $2, '<p>x</p>', $3, $4, 'web')
+		`, contentID, name, "https://example.com/"+name, name)
 		require.NoError(t, err)
 		_, err = testDB.DB.ExecContext(ctx, `
 			INSERT INTO user_contents (id, user_id, content_id, status, list, is_favorite, added_at)
