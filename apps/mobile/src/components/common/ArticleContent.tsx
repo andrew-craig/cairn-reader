@@ -277,7 +277,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
                 {article.author || extractDomain(article.url)}
               </Text>
             )}
-            {article.addedAt && ` | ${formatDate(article.addedAt)}`}
+            {article.publishedDate && ` | ${formatDate(new Date(article.publishedDate).getTime())}`}
           </Text>
         </View>
 
