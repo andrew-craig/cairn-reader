@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
+import SourceListToggle from '../components/SourceListToggle';
 import { decodeEntities } from '../utils/decodeEntities';
 import './Read.css';
 import './Newsletters.css';
@@ -90,6 +91,14 @@ export default function Rss() {
                   <span className="feeds__url">{sub.rss_data.feed_url}</span>
                 )}
               </div>
+              {sub.rss_data?.feed_id && (
+                <SourceListToggle
+                  type="rss"
+                  sourceKey={sub.rss_data.feed_id}
+                  list={sub.list}
+                  label={decodeEntities(sub.title)}
+                />
+              )}
               <button
                 type="button"
                 className="feeds__unsubscribe"
@@ -101,6 +110,9 @@ export default function Rss() {
             </li>
           ))}
         </ul>
+      )}
+      {subscriptions.length > 0 && (
+        <p className="read__status">Feed or Reads applies to new items only.</p>
       )}
     </div>
   );

@@ -112,3 +112,67 @@ describe('AddLinkModal dismissal during Find-feed', () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 });
+
+// task_f4ac: a detected feed asks where new items should land; pages never send a list.
+describe('AddLinkModal Feed/Reads choice', () => {
+  const feedDetection = { url: 'https://example.com/rss', type: 'feed' as const, title: 'Example' };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function typeUrl(value: string) {
+    await userEvent.type(screen.getByLabelText('URL to add'), value);
+  }
+
+  it('defaults a detected feed to Reads and sends the chosen list', async () => {
+    vi.spyOn(ReadService, 'detectURL').mockResolvedValue(feedDetection);
+    const addSpy = vi.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'feed' } as never);
+    render(<AddLinkModal onClose={vi.fn()} />);
+    await typeUrl('https://example.com/rss');
+
+    const reads = (await screen.findByLabelText('Reads')) as HTMLInputElement;
+    expect(reads.checked).toBe(true);
+    await userEvent.click(screen.getByLabelText('Feed'));
+    await userEvent.click(screen.getByRole('button', { name: 'Add Feed' }));
+
+    await waitFor(() =>
+      expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'feed', list: 'feed' })),
+    );
+  });
+
+  it('does not offer the choice or send a list for a page', async () => {
+    vi.spyOn(ReadService, 'detectURL').mockResolvedValue({
+      url: 'https://example.com/post',
+      type: 'page',
+      title: null,
+    });
+    const addSpy = vi.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
+    render(<AddLinkModal onClose={vi.fn()} />);
+    await typeUrl('https://example.com/post');
+
+    await screen.findByRole('button', { name: 'Add' });
+    expect(screen.queryByLabelText('Feed')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy.mock.calls[0][0].list).toBeUndefined();
+  });
+
+  it('drops the feed choice when the URL changes to a page', async () => {
+    vi.spyOn(ReadService, 'detectURL').mockImplementation(async (u) =>
+      u.endsWith('/rss') ? feedDetection : { url: u, type: 'page', title: null },
+    );
+    const addSpy = vi.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
+    render(<AddLinkModal onClose={vi.fn()} />);
+    await typeUrl('https://example.com/rss');
+    await userEvent.click(await screen.findByLabelText('Feed'));
+
+    await userEvent.type(screen.getByLabelText('URL to add'), '2');
+    await waitFor(() => expect(screen.queryByLabelText('Feed')).toBeNull());
+    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy.mock.calls[0][0].list).toBeUndefined();
+  });
+});
