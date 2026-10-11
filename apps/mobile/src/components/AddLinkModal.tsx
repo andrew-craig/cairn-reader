@@ -125,6 +125,9 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   const handleAddPress = async () => {
+    // Wait for the current URL's detection: submitting without it would drop
+    // the feed type and the Feed/Reads choice (the backend then defaults to Reads).
+    if (detecting) return;
     if (!isValidUrl(url)) {
       setError('Please enter a valid URL');
       return;
@@ -313,11 +316,11 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                     styles.primaryButton,
                     {
                       backgroundColor: colors.primary,
-                      opacity: loading || !url.trim() ? 0.5 : 1,
+                      opacity: loading || detecting || !url.trim() ? 0.5 : 1,
                     }
                   ]}
                   onPress={handleAddPress}
-                  disabled={loading || !url.trim()}
+                  disabled={loading || detecting || !url.trim()}
                   activeOpacity={0.7}
                 >
                   {loading || detecting ? (

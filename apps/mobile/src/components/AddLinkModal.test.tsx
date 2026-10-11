@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Modal } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { AddLinkModal } from './AddLinkModal';
 import { ReadService } from '../services/read';
 
@@ -147,11 +147,14 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     );
   });
 
-  it('drops a stale feed detection when the URL changes, so a page URL never carries list', async () => {
+  it('drops a stale feed detection when the URL changes, and holds submit until the new URL is detected', async () => {
+    let resolvePage: (value: { url: string; type: 'page'; title: null }) => void;
     jest.spyOn(ReadService, 'detectURL').mockImplementation((url: string) =>
       url.includes('/rss')
         ? Promise.resolve(feedDetection)
-        : new Promise(() => {}), // the new URL's detection never resolves
+        : new Promise((resolve) => {
+            resolvePage = resolve as typeof resolvePage;
+          }),
     );
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
@@ -161,16 +164,23 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     fireEvent.changeText(input, 'https://example.com/rss');
     await screen.findByText('Add Feed');
 
-    // Edit to a different URL and submit before re-detection resolves.
+    // Edit to a different URL: the feed result and its Feed/Reads choice go away.
     fireEvent.changeText(input, 'https://example.com/post');
     await waitFor(() => expect(screen.queryByText('Add Feed')).toBeNull());
     expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
-    fireEvent(input, 'submitEditing');
 
+    // Submitting now would drop type/list for lack of a detection, so it waits.
+    fireEvent(input, 'submitEditing');
+    expect(addSpy).not.toHaveBeenCalled();
+
+    // Once the new URL is detected (as a page), submit goes out without a list.
+    await act(async () => {
+      resolvePage!({ url: 'https://example.com/post', type: 'page', title: null });
+    });
+    fireEvent(input, 'submitEditing');
     await waitFor(() => expect(addSpy).toHaveBeenCalled());
-    const request = addSpy.mock.calls[0][0];
-    expect(request).not.toHaveProperty('list');
-    expect(request.type).toBeUndefined();
+    expect(addSpy.mock.calls[0][0]).toMatchObject({ type: 'page' });
+    expect(addSpy.mock.calls[0][0]).not.toHaveProperty('list');
   });
 
   it('does not offer the choice for a page, and sends no list', async () => {
