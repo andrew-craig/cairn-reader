@@ -53,4 +53,7 @@ Shape: bottom-up like mobile (service → shared list plumbing → screens → n
 ## Progress (2026-10-11)
 - Steps 1-5 implemented on `claude/eager-davinci-teaqo1` (the session branch, instead of `feat/web-feed-reads-routes`). Automated checks green (see step 6).
 - Notes: `Read.tsx` became `routes/ArticleList.tsx` (one component, `list` prop); reader behaviour keys off `article.list`; Feed has no Add link (Reads-only, like mobile); Bookmarks opens `/{article.list}/{id}`; AddLinkModal clears detection and the Feed/Reads choice on every URL change.
-- Not done: browser run against staging (needs staging with #421).
+- Staging run (cairn.seatrain.net, 2026-10-11): DB had been reset, so the test account `cairn.web.test@seatrain.net` was re-registered and re-seeded (HN as Feed, The Verge as Reads, example.com page).
+  - Verified in headless Chromium: login lands on /reads; Feed|Reads|You nav (sidebar and bottom bar); Add Link asks Feed or Reads for feeds and the choice persisted on the subscriptions; page save lands in Reads; RSS Feed/Reads toggle persists across reload and reverts; /feed and /reads fetch their own list.
+  - Not verified: items routed to Feed (no items were delivered to either feed in ~15 min; subscribing does not backfill), so Feed reader, Save to Reads and the Reads-top ordering (#421) are covered by unit tests only. `GET/POST /api/v1/source/email/user/{id}/address` returns 500 on staging, so the Newsletters toggle was not exercised in the browser (unit-tested).
+  - To finish: once a feed delivers new items, open one from /feed, Save to Reads, confirm it tops /reads.
