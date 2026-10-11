@@ -63,7 +63,7 @@ Shape: build bottom-up (types → service → shared list plumbing → screens �
 - [ ] Manual run against a remote backend: subscribe to an RSS feed as Feed → new items appear in Feed, not Reads; toggle to Reads → only new items move; Save to Reads moves an item; offline Reads still opens; Feed offline shows the stale/offline state.
 
 ### Decisions (owner, 2026-10-10)
-1. **Feed offline:** show the last loaded Feed page from an AsyncStorage snapshot (separate from `ArticleStore`) with the "Showing cached data" banner; opening an item offline shows the reader's "Not available offline" state. (Recommended option A, pending owner confirmation after explanation.)
+1. **Feed offline:** show the last loaded Feed page from an AsyncStorage snapshot (separate from `ArticleStore`) with the "Showing cached data" banner; opening an item offline shows the reader's "Not available offline" state. Implemented as option A (my recommendation, explained to the owner, who then asked to start implementation). Say so if you would rather have the empty "Feed needs a connection" screen instead.
 2. **Save to Reads:** newly saved content lands at the top of Reads. Needs a backend change, tracked as `task_66b2` (moving to reads re-stamps `added_at`). The 'Save to Reads' action depends on it.
 3. **Favorites:** kept in the Feed reader; favorited items are exempt from retention (`task_d0f5`).
 
@@ -77,3 +77,4 @@ Shape: build bottom-up (types → service → shared list plumbing → screens �
   - Email sender route key is the unified subscription `id`; RSS uses `rss_data.feed_id` (no extra backend change needed, resolves the open question).
   - Web needed type-only fixture/transform updates because `list` is now required on shared types; web UI is task_f4ac.
 - Not done: step 7 manual run (needs an Expo/device build against a backend; not possible in this sandbox). The Save to Reads ordering depends on task_66b2 (PR #421) being deployed.
+- Review follow-up (Magpie): Feed items no longer track reading progress (no markReading/markCompleted/scroll writes), so nothing but Favorite can reach the outbox for a Feed item; AddLinkModal clears the previous URL's detection on URL change so a stale feed `list` can't be sent for a page.
