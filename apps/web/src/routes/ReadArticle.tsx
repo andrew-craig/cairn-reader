@@ -16,7 +16,7 @@ const COMPLETED_THRESHOLD = 0.95;
 // saved on navigation.
 const SCROLL_SAVE_THROTTLE_MS = 1000;
 
-// Navigation state passed from the reading list (Read.tsx): the list and the
+// Navigation state passed from a list (ArticleList.tsx): the list and the
 // position of the opened article, so the reader can offer prev/next without a
 // refetch. Absent on direct URL load / hard refresh.
 interface ReaderNavState {
@@ -24,8 +24,9 @@ interface ReaderNavState {
   index?: number;
 }
 
-// The article reader (/read/:id): full sanitized content, scroll-progress
-// persistence and reader actions. Mirrors mobile's ReadArticleDetailScreen,
+// The article reader (/feed/:id, /reads/:id): full sanitized content and reader
+// actions. Reads items persist scroll progress and status; Feed items are
+// skim-only (no progress writes) and offer Save to Reads instead of Archive. Mirrors mobile's ReadArticleDetailScreen,
 // adapted to DOM scroll events and react-router navigation.
 export default function ReadArticle() {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +37,10 @@ export default function ReadArticle() {
   const articles = navState?.articles;
   const index = navState?.index ?? -1;
   const hasList = Array.isArray(articles) && index >= 0;
+  // The list we came from, per the URL — used for Back before the article has
+  // loaded. Once it has, the article's own `list` decides behaviour, so a Feed
+  // favorite opened from Bookmarks still behaves as Feed.
+  const urlList = location.pathname.startsWith('/feed') ? 'feed' : 'reads';
 
   // The article from nav state seeds an instant placeholder (title/metadata),
   // but it is a list *summary* that omits the article body — so we always fetch
@@ -51,6 +56,8 @@ export default function ReadArticle() {
   // is tracked via hasMarkedCompletedRef rather than state because nothing
   // renders it — only the favorite toggle is reflected in the toolbar.
   const [isFavorite, setIsFavorite] = useState(initialArticle?.isFavorite ?? false);
+  const list = article?.list ?? urlList;
+  const isFeed = list === 'feed';
 
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll fraction in [0,1] — offsetY / contentHeight, matching mobile and the
@@ -119,11 +126,11 @@ export default function ReadArticle() {
   const articleId = article?.id;
   const articleIsRead = article?.isRead ?? false;
   useEffect(() => {
-    if (!articleId || articleIsRead) return;
+    if (!articleId || articleIsRead || isFeed) return;
     ReadService.updateUserContent(articleId, { status: 'reading' }).catch((err) =>
       console.error('Failed to mark article reading:', err),
     );
-  }, [articleId, articleIsRead]);
+  }, [articleId, articleIsRead, isFeed]);
 
   const sanitizedHtml = useMemo(
     () => (article?.content ? sanitizeArticleHtml(article.content) : ''),
@@ -152,7 +159,7 @@ export default function ReadArticle() {
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
-    if (!el || !articleId) return;
+    if (!el || !articleId || isFeed) return;
     const scrollable = el.scrollHeight - el.clientHeight;
     const fraction = scrollable > 0 ? el.scrollTop / scrollable : 0;
     scrollFractionRef.current = fraction;
@@ -165,7 +172,7 @@ export default function ReadArticle() {
     // Throttled persistence so we PATCH at most once per second during a
     // scroll, guaranteeing progress is saved even if the app closes mid-read.
     throttledSaveRef.current(articleId, fraction);
-  }, [articleId, markCompleted]);
+  }, [articleId, isFeed, markCompleted]);
 
   // On unmount (or article change), flush the final scroll position if the user
   // scrolled, cancelling any pending throttled save. Mirrors mobile's cleanup.
@@ -184,7 +191,7 @@ export default function ReadArticle() {
     (targetIndex: number) => {
       if (!articles) return;
       const target = articles[targetIndex];
-      navigate(`/read/${target.id}`, {
+      navigate(`/${target.list}/${target.id}`, {
         state: { articles, index: targetIndex },
         replace: true,
       });
@@ -217,10 +224,21 @@ export default function ReadArticle() {
     if (!window.confirm('Archive this article?')) return;
     try {
       await ReadService.updateUserContent(article.id, { status: 'archived' });
-      navigate('/read');
+      navigate(`/${list}`);
     } catch (err) {
       console.error('Failed to archive article:', err);
       window.alert('Failed to archive article. Please try again.');
+    }
+  }, [article, list, navigate]);
+
+  const handleSaveToReads = useCallback(async () => {
+    if (!article) return;
+    try {
+      await ReadService.moveToReads(article.id);
+      navigate('/feed');
+    } catch (err) {
+      console.error('Failed to save article to Reads:', err);
+      window.alert('Failed to save to Reads. Please try again.');
     }
   }, [article, navigate]);
 
@@ -229,12 +247,12 @@ export default function ReadArticle() {
     if (!window.confirm('Delete this article? This cannot be undone.')) return;
     try {
       await ReadService.deleteUserContent(article.id);
-      navigate('/read');
+      navigate(`/${list}`);
     } catch (err) {
       console.error('Failed to delete article:', err);
       window.alert('Failed to delete article. Please try again.');
     }
-  }, [article, navigate]);
+  }, [article, list, navigate]);
 
   const handleOpenOriginal = useCallback(() => {
     if (article?.url) {
@@ -252,8 +270,8 @@ export default function ReadArticle() {
     return (
       <div className="reader__status">
         <p className="reader__error">{error ?? 'Article not found.'}</p>
-        <button type="button" className="reader__action" onClick={() => navigate('/read')}>
-          Back to reading list
+        <button type="button" className="reader__action" onClick={() => navigate(`/${list}`)}>
+          Back to list
         </button>
       </div>
     );
@@ -286,9 +304,11 @@ export default function ReadArticle() {
       </article>
       <FloatingActionBar
         actions={[
-          { icon: 'return', label: 'Back', onClick: () => navigate('/read') },
+          { icon: 'return', label: 'Back', onClick: () => navigate(`/${list}`) },
           { icon: 'bookmark', label: 'Favorite', active: isFavorite, onClick: handleToggleFavorite },
-          { icon: 'archive', label: 'Archive', onClick: handleArchive },
+          isFeed
+            ? { icon: 'save', label: 'Save to Reads', onClick: handleSaveToReads }
+            : { icon: 'archive', label: 'Archive', onClick: handleArchive },
           { icon: 'next-article', label: 'Next', disabled: !hasNext, onClick: () => goToAdjacent(nextIndex) },
           { icon: 'delete', label: 'Delete', onClick: handleDelete },
           { icon: 'open-original', label: 'Open original', onClick: handleOpenOriginal },

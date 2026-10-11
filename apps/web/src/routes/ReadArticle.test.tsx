@@ -30,9 +30,9 @@ const updateResponse = {} as UserContentResponse;
 
 function renderReader() {
   return render(
-    <MemoryRouter initialEntries={['/read/article-1']}>
+    <MemoryRouter initialEntries={['/reads/article-1']}>
       <Routes>
-        <Route path="/read/:id" element={<ReadArticle />} />
+        <Route path="/reads/:id" element={<ReadArticle />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -110,5 +110,78 @@ describe('ReadArticle destructive actions', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+  });
+});
+
+// task_f4ac: Feed items are skim-only — Save to Reads replaces Archive and no
+// reading progress is written.
+describe('ReadArticle for Feed items', () => {
+  function renderFeedReader() {
+    return render(
+      <MemoryRouter initialEntries={['/feed/article-1']}>
+        <Routes>
+          <Route path="/feed/:id" element={<ReadArticle />} />
+          <Route path="/feed" element={<p>feed list</p>} />
+          <Route path="/reads" element={<p>reads list</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(ReadService, 'getUserContent').mockResolvedValue(makeArticle({ list: 'feed' }));
+  });
+
+  it('offers Save to Reads instead of Archive', async () => {
+    renderFeedReader();
+
+    expect(await screen.findByRole('button', { name: 'Save to Reads' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull();
+  });
+
+  it('moves the item to Reads and returns to the feed', async () => {
+    const moveSpy = vi.spyOn(ReadService, 'moveToReads').mockResolvedValue(updateResponse);
+    renderFeedReader();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save to Reads' }));
+
+    await waitFor(() => expect(moveSpy).toHaveBeenCalledWith('article-1'));
+    expect(await screen.findByText('feed list')).toBeTruthy();
+  });
+
+  it('shows a visible error when saving to Reads fails', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(ReadService, 'moveToReads').mockRejectedValue(new Error('network down'));
+    renderFeedReader();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Save to Reads' }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+  });
+
+  it('does not mark a Feed item as reading', async () => {
+    const updateSpy = vi.spyOn(ReadService, 'updateUserContent').mockResolvedValue(updateResponse);
+    renderFeedReader();
+    await screen.findByRole('button', { name: 'Save to Reads' });
+
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('still marks a Reads item as reading', async () => {
+    vi.spyOn(ReadService, 'getUserContent').mockResolvedValue(makeArticle());
+    const updateSpy = vi.spyOn(ReadService, 'updateUserContent').mockResolvedValue(updateResponse);
+    render(
+      <MemoryRouter initialEntries={['/reads/article-1']}>
+        <Routes>
+          <Route path="/reads/:id" element={<ReadArticle />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith('article-1', { status: 'reading' }),
+    );
   });
 });

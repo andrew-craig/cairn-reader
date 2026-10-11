@@ -1,17 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Article } from '@cairn/shared';
+import type { Article, ContentList } from '@cairn/shared';
 import { PAGE_SIZE, ReadService } from '../services/read';
 import ArticleRow from '../components/ArticleRow';
 import AddLinkModal from '../components/AddLinkModal';
 import SearchModal from '../components/SearchModal';
 import './Read.css';
 
-// The reading list (/read): the user's saved content, cursor-paginated from the
-// Read Service with infinite scroll. Mirrors mobile's ReadScreen — it reloads
-// from the first page on (re)mount, so archive/favorite changes made in the
-// reader are reflected on return (mobile uses useFocusEffect for the same).
-export default function Read() {
+const COPY: Record<ContentList, { search: string; loading: string; empty: string; error: string }> = {
+  reads: {
+    search: 'Search your reads',
+    loading: 'Loading your reads…',
+    empty: 'No saved articles yet.',
+    error: 'Failed to load your reads.',
+  },
+  feed: {
+    search: 'Search your feed',
+    loading: 'Loading your feed…',
+    empty: 'Your feed is empty. Choose Feed for an RSS source in You → RSS.',
+    error: 'Failed to load your feed.',
+  },
+};
+
+// One of the two lists (/feed, /reads): the user's content for that list,
+// cursor-paginated from the Read Service with infinite scroll. Mirrors mobile's
+// FeedScreen/ReadsScreen — it reloads from the first page on (re)mount, so
+// archive/favorite changes made in the reader are reflected on return (mobile
+// uses useFocusEffect for the same). Add link is Reads-only: pages always save
+// to Reads, and the modal asks Feed or Reads when it detects an RSS feed.
+// Callers key this component by `list` so switching lists remounts it.
+export default function ArticleList({ list }: { list: ContentList }) {
+  const copy = COPY[list];
   const navigate = useNavigate();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true); // first page
@@ -54,6 +73,7 @@ export default function Read() {
     setError(null);
     try {
       const response = await ReadService.listUserContents({
+        list,
         limit: PAGE_SIZE,
         cursor: reset ? undefined : cursorRef.current || undefined,
       });
@@ -63,11 +83,11 @@ export default function Read() {
       hasMoreRef.current = response.has_more;
       setHasMore(response.has_more);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load your reading list.');
+      setError(e instanceof Error ? e.message : copy.error);
     } finally {
       inFlightRef.current = false;
     }
-  }, []);
+  }, [list, copy.error]);
 
   // Initial load on mount (and remount when returning from the reader).
   useEffect(() => {
@@ -121,9 +141,9 @@ export default function Read() {
     (article: Article) => {
       const index = articles.findIndex((a) => a.id === article.id);
       // Pass the list + index so the reader can offer prev/next without a refetch.
-      navigate(`/read/${article.id}`, { state: { articles, index } });
+      navigate(`/${list}/${article.id}`, { state: { articles, index } });
     },
-    [articles, navigate],
+    [articles, list, navigate],
   );
 
   return (
@@ -133,19 +153,21 @@ export default function Read() {
           type="button"
           className="read__search-bar"
           onClick={() => setShowSearch(true)}
-          aria-label="Search your reading list"
+          aria-label={copy.search}
         >
-          Search your reading list
+          {copy.search}
         </button>
-        <div className="read__actions">
-          <button
-            type="button"
-            className="read__add-link"
-            onClick={() => setShowAddLink(true)}
-          >
-            Add link
-          </button>
-        </div>
+        {list === 'reads' && (
+          <div className="read__actions">
+            <button
+              type="button"
+              className="read__add-link"
+              onClick={() => setShowAddLink(true)}
+            >
+              Add link
+            </button>
+          </div>
+        )}
       </header>
 
       {showAddLink && (
@@ -156,10 +178,10 @@ export default function Read() {
         />
       )}
 
-      {showSearch && <SearchModal onClose={handleCloseSearch} closing={closingSearch} />}
+      {showSearch && <SearchModal list={list} onClose={handleCloseSearch} closing={closingSearch} />}
 
       {loading ? (
-        <p className="read__status">Loading your reading list…</p>
+        <p className="read__status">{copy.loading}</p>
       ) : error ? (
         <div className="read__status">
           <p className="read__error">{error}</p>
@@ -168,7 +190,7 @@ export default function Read() {
           </button>
         </div>
       ) : articles.length === 0 ? (
-        <p className="read__status">No saved articles yet.</p>
+        <p className="read__status">{copy.empty}</p>
       ) : (
         <>
           <ul className="read__list">
