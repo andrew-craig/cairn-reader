@@ -50,14 +50,18 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
   // Trigger URL detection when URL changes
   useEffect(() => {
+    // Nothing to detect: the previous URL's run was just cancelled by the
+    // cleanup below, and a cancelled run never resets `detecting` itself.
     if (!url.trim()) {
       setDetectionResult(null);
+      setDetecting(false);
       return;
     }
 
     // Only detect if URL is valid
     if (!isValidUrl(url)) {
       setDetectionResult(null);
+      setDetecting(false);
       return;
     }
 
@@ -125,8 +129,9 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   const handleAddPress = async () => {
-    // Wait for the current URL's detection: submitting without it would drop
-    // the feed type and the Feed/Reads choice (the backend then defaults to Reads).
+    // Presses are ignored (not queued) while the current URL is being detected:
+    // submitting without a result would drop the feed type and the Feed/Reads
+    // choice (the backend then defaults to Reads). The button shows "Detecting...".
     if (detecting) return;
     if (!isValidUrl(url)) {
       setError('Please enter a valid URL');

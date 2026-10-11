@@ -147,7 +147,7 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     );
   });
 
-  it('drops a stale feed detection when the URL changes, and holds submit until the new URL is detected', async () => {
+  it('drops a stale feed detection when the URL changes, and ignores submit presses until the new URL is detected', async () => {
     let resolvePage: (value: { url: string; type: 'page'; title: null }) => void;
     jest.spyOn(ReadService, 'detectURL').mockImplementation((url: string) =>
       url.includes('/rss')
@@ -169,7 +169,7 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     await waitFor(() => expect(screen.queryByText('Add Feed')).toBeNull());
     expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
 
-    // Submitting now would drop type/list for lack of a detection, so it waits.
+    // Submitting now would drop type/list for lack of a detection, so the press is ignored.
     fireEvent(input, 'submitEditing');
     expect(addSpy).not.toHaveBeenCalled();
 
@@ -181,6 +181,23 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     await waitFor(() => expect(addSpy).toHaveBeenCalled());
     expect(addSpy.mock.calls[0][0]).toMatchObject({ type: 'page' });
     expect(addSpy.mock.calls[0][0]).not.toHaveProperty('list');
+  });
+
+  it('does not stay stuck on Detecting when the URL becomes invalid mid-detection', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockReturnValue(new Promise(() => {}));
+    const addSpy = jest.spyOn(ReadService, 'addURL');
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Add link');
+    fireEvent.changeText(input, 'https://example.com/post');
+    await waitFor(() => expect(ReadService.detectURL).toHaveBeenCalled());
+
+    // The URL becomes invalid while that detection is still in flight.
+    fireEvent.changeText(input, 'not a url');
+    fireEvent(input, 'submitEditing');
+
+    expect(await screen.findByText('Please enter a valid URL')).toBeTruthy();
+    expect(addSpy).not.toHaveBeenCalled();
   });
 
   it('does not offer the choice for a page, and sends no list', async () => {
