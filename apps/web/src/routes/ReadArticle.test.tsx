@@ -185,3 +185,23 @@ describe('ReadArticle for Feed items', () => {
     );
   });
 });
+
+describe('ReadArticle Save to Reads double click', () => {
+  it('sends the move once', async () => {
+    vi.restoreAllMocks();
+    vi.spyOn(ReadService, 'getUserContent').mockResolvedValue(makeArticle({ list: 'feed' }));
+    const moveSpy = vi.spyOn(ReadService, 'moveToReads').mockReturnValue(new Promise(() => {}));
+    render(
+      <MemoryRouter initialEntries={['/feed/article-1']}>
+        <Routes>
+          <Route path="/feed/:id" element={<ReadArticle />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole('button', { name: 'Save to Reads' });
+    await userEvent.dblClick(button);
+
+    expect(moveSpy).toHaveBeenCalledTimes(1);
+  });
+});

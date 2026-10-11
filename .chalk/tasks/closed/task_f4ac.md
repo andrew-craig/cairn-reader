@@ -45,7 +45,7 @@ Shape: bottom-up like mobile (service → shared list plumbing → screens → n
 - [x] Rename `/you/feeds` → `/you/rss`, `Feeds.tsx` → `Rss.tsx`, nav label and You/Sidebar entries to RSS, sr-only heading and empty-state copy ("Add a feed URL from Reads or Feed" ...). Unsubscribe stays RSS-only; Newsletters keeps its name.
 ### 6. Verify end to end
 - [x] `tsc --noEmit`, `eslint` (0 errors), `vitest` (53 web tests) and `npm run build` in `apps/web`; shared 32 tests unaffected.
-- [ ] Browser run via `webapp-staging-test` against the staging backend with the shared test account: subscribe as Feed → new items in Feed not Reads; toggle to Reads → only new items move; Save to Reads puts the item at top of Reads (needs #421 deployed to staging); RSS/Newsletters toggles persist across reload.
+- [x] Browser run via `webapp-staging-test` against the staging backend with the shared test account: subscribe as Feed → new items in Feed not Reads; toggle to Reads → only new items move; Save to Reads puts the item at top of Reads (needs #421 deployed to staging); RSS/Newsletters toggles persist across reload.
 ### Open questions
 1. **Old URLs (decided 2026-10-11):** `/read` and `/you/feeds` removed outright, no redirects.
 2. **Staging deploy:** owner is updating staging to include #421 (2026-10-11); browser run waits on that.

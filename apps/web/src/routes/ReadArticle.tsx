@@ -59,6 +59,8 @@ export default function ReadArticle() {
   const list = article?.list ?? urlList;
   const isFeed = list === 'feed';
 
+  // Guards the awaited, online-only move so a double click can't send it twice.
+  const savingToReadsRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Scroll fraction in [0,1] — offsetY / contentHeight, matching mobile and the
   // backend's NUMERIC(5,4) scroll_position column.
@@ -232,13 +234,16 @@ export default function ReadArticle() {
   }, [article, list, navigate]);
 
   const handleSaveToReads = useCallback(async () => {
-    if (!article) return;
+    if (!article || savingToReadsRef.current) return;
+    savingToReadsRef.current = true;
     try {
       await ReadService.moveToReads(article.id);
       navigate('/feed');
     } catch (err) {
       console.error('Failed to save article to Reads:', err);
       window.alert('Failed to save to Reads. Please try again.');
+    } finally {
+      savingToReadsRef.current = false;
     }
   }, [article, navigate]);
 

@@ -234,7 +234,8 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') handleClose();
-    if (e.key === 'Enter') handleSubmit();
+    // Gated like the Add button: submitting mid-detection would skip the Feed/Reads choice.
+    if (e.key === 'Enter' && !isBusy) handleSubmit();
   };
 
   const getSubmitLabel = () => {

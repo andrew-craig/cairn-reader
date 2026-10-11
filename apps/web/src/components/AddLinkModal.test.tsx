@@ -176,3 +176,18 @@ describe('AddLinkModal Feed/Reads choice', () => {
     expect(addSpy.mock.calls[0][0].list).toBeUndefined();
   });
 });
+
+describe('AddLinkModal Enter key', () => {
+  it('does not submit while detection is pending', async () => {
+    vi.restoreAllMocks();
+    vi.spyOn(ReadService, 'detectURL').mockReturnValue(new Promise(() => {}));
+    const addSpy = vi.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'feed' } as never);
+    render(<AddLinkModal onClose={vi.fn()} />);
+    await userEvent.type(screen.getByLabelText('URL to add'), 'https://example.com/rss');
+    await screen.findByText('Detecting…');
+
+    await userEvent.keyboard('{Enter}');
+
+    expect(addSpy).not.toHaveBeenCalled();
+  });
+});
