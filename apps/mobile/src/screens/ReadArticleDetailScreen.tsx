@@ -169,7 +169,15 @@ export const ReadArticleDetailScreen: React.FC = () => {
     );
   }, []);
 
+  // Reading progress (status, completion, scroll position) is a Reads concern:
+  // Feed items are skimmed and triaged by Save to Reads, and writing progress
+  // for them would also queue outbox rows (e.g. while offline). Favorite is the
+  // one Feed write that stays. Not setting hasScrolledRef also skips the
+  // unmount flush below.
+  const tracksProgress = article.list === 'reads';
+
   const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
+    if (!tracksProgress) return;
     // Emits fired before the saved position has been restored report a stale
     // offsetY of 0. Skip updating the refs so the unmount-flush safety net
     // can't send that stale value either — not just the throttled save.
@@ -190,14 +198,14 @@ export const ReadArticleDetailScreen: React.FC = () => {
     if (!info.isRestoring) {
       throttledSaveRef.current(article.id, info.fraction);
     }
-  }, [article.id, markCompleted]);
+  }, [article.id, markCompleted, tracksProgress]);
 
   useEffect(() => {
-    if (article.isRead) return;
+    if (!tracksProgress || article.isRead) return;
     ArticleMutations.markReading(article.id).catch(
       (err) => console.error('Failed to mark article reading:', err)
     );
-  }, [article.id, article.isRead]);
+  }, [article.id, article.isRead, tracksProgress]);
 
   useEffect(() => {
     const articleId = article.id;

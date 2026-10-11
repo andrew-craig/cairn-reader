@@ -147,6 +147,32 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     );
   });
 
+  it('drops a stale feed detection when the URL changes, so a page URL never carries list', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockImplementation((url: string) =>
+      url.includes('/rss')
+        ? Promise.resolve(feedDetection)
+        : new Promise(() => {}), // the new URL's detection never resolves
+    );
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Add link');
+    fireEvent.changeText(input, 'https://example.com/rss');
+    await screen.findByText('Add Feed');
+
+    // Edit to a different URL and submit before re-detection resolves.
+    fireEvent.changeText(input, 'https://example.com/post');
+    await waitFor(() => expect(screen.queryByText('Add Feed')).toBeNull());
+    expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    const request = addSpy.mock.calls[0][0];
+    expect(request).not.toHaveProperty('list');
+    expect(request.type).toBeUndefined();
+  });
+
   it('does not offer the choice for a page, and sends no list', async () => {
     jest.spyOn(ReadService, 'detectURL').mockResolvedValue({
       url: 'https://example.com/post',

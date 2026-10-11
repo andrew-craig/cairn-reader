@@ -204,9 +204,9 @@ interface ButtonProps {
 ### Main Screens
 
 **FeedScreen.tsx** - Feed list (skim)
-- Items from sources routed to Feed (`list=feed`); online-only — never written to `ArticleStore`, prefetch or the outbox
+- Items from sources routed to Feed (`list=feed`); online-only — never written to `ArticleStore` or prefetch
 - Keeps the last page in `FeedCache` so a failed refresh shows a stale banner instead of a blank tab
-- Opens items in the shared reader, where "Save to Reads" replaces Archive
+- Opens items in the shared reader, where "Save to Reads" replaces Archive and reading progress (status, completion, scroll position) is not tracked, so nothing but Favorite can reach the outbox for a Feed item
 
 **ReadsScreen.tsx** - Reads list (main screen)
 - Displays articles in `list=reads`

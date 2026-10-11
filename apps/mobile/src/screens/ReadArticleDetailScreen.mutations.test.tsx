@@ -49,14 +49,25 @@ jest.mock('../hooks/useNetworkStatus');
 // Unlike ReadArticleDetailScreen.test.tsx, BottomActionMenu renders real
 // pressable text nodes here (keyed by label) so these tests can fire the
 // Favorite/Archive actions directly.
+// Captured from the mocked ArticleContent so tests can drive reading progress.
+let mockOnScrollProgress: ((info: Record<string, unknown>) => void) | undefined;
+
 jest.mock('../components/common', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Text } = require('react-native');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ReactModule = require('react');
   return {
-    ArticleContent: ({ article }: { article: { content?: string } }) =>
-      ReactModule.createElement(Text, null, article.content ?? 'NO CONTENT'),
+    ArticleContent: ({
+      article,
+      onScrollProgress,
+    }: {
+      article: { content?: string };
+      onScrollProgress?: (info: Record<string, unknown>) => void;
+    }) => {
+      mockOnScrollProgress = onScrollProgress;
+      return ReactModule.createElement(Text, null, article.content ?? 'NO CONTENT');
+    },
     BottomActionMenu: ({ actions }: { actions: { label: string; onPress: () => void; active?: boolean }[] }) =>
       ReactModule.createElement(
         ReactModule.Fragment,
@@ -247,6 +258,48 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
 
       alertSpy.mockRestore();
       consoleErrorSpy.mockRestore();
+    });
+
+    it('does not track reading progress: no status or scroll writes, so nothing reaches the outbox', async () => {
+      mockRouteParams = { article: { ...feedArticle, isRead: false }, onArchived: jest.fn() };
+
+      const { unmount } = render(<ReadArticleDetailScreen />);
+      act(() => {
+        mockOnScrollProgress?.({
+          fraction: 1,
+          offsetY: 900,
+          layoutHeight: 100,
+          contentHeight: 1000,
+          isRestoring: false,
+        });
+      });
+      unmount();
+
+      expect(mockedArticleMutations.markReading).not.toHaveBeenCalled();
+      expect(mockedArticleMutations.markCompleted).not.toHaveBeenCalled();
+      expect(mockedArticleMutations.saveScrollPosition).not.toHaveBeenCalled();
+    });
+
+    it('still tracks reading progress for Reads items', async () => {
+      mockedArticleMutations.markReading.mockResolvedValue(undefined);
+      mockedArticleMutations.markCompleted.mockResolvedValue(undefined);
+      mockedArticleMutations.saveScrollPosition.mockResolvedValue(undefined);
+      mockRouteParams = { article: { ...baseArticle, isRead: false }, onArchived: jest.fn() };
+
+      const { unmount } = render(<ReadArticleDetailScreen />);
+      await waitFor(() => expect(mockedArticleMutations.markReading).toHaveBeenCalledWith('a1'));
+      act(() => {
+        mockOnScrollProgress?.({
+          fraction: 1,
+          offsetY: 900,
+          layoutHeight: 100,
+          contentHeight: 1000,
+          isRestoring: false,
+        });
+      });
+      expect(mockedArticleMutations.markCompleted).toHaveBeenCalledWith('a1', expect.any(Number));
+      unmount();
+      expect(mockedArticleMutations.saveScrollPosition).toHaveBeenCalled();
     });
 
     it('ignores a second tap while the move is in flight', async () => {

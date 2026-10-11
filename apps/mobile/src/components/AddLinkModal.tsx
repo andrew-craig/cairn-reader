@@ -64,6 +64,10 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     const normalizedUrl = normalizeUrl(url);
     const run = { cancelled: false };
     detectRunRef.current = run;
+    // The previous URL's result must not describe this one: submitting before
+    // re-detection resolves would send a stale type/list (a feed's list on a
+    // page is a 400).
+    setDetectionResult(null);
 
     const detectURL = async () => {
       setDetecting(true);
