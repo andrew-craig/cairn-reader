@@ -6,7 +6,7 @@ import './You.css';
 // YOU_ITEMS mirrors Sidebar.tsx so both surfaces stay in sync.
 const YOU_ITEMS = [
   { to: '/you/account', label: 'Account' },
-  { to: '/you/feeds', label: 'Feeds' },
+  { to: '/you/rss', label: 'RSS' },
   { to: '/you/newsletters', label: 'Newsletters' },
   { to: '/you/bookmarks', label: 'Bookmarks' },
   { to: '/you/about', label: 'About' },

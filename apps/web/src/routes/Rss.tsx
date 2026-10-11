@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
+import SourceListToggle from '../components/SourceListToggle';
 import { decodeEntities } from '../utils/decodeEntities';
 import './Read.css';
 import './Newsletters.css';
 
-// Feeds screen (/you/feeds): the user's RSS feed subscriptions.
-// Mirrors mobile's FeedsScreen + SubscriptionListScreen — filters to non-email
+// RSS screen (/you/rss): the user's RSS feed subscriptions.
+// Mirrors mobile's RssScreen + SubscriptionListScreen — filters to non-email
 // types, shows title/URL, and offers per-row unsubscribe (optimistic removal).
-export default function Feeds() {
+export default function Rss() {
   const [subscriptions, setSubscriptions] = useState<UnifiedSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function Feeds() {
       const response = await ReadService.listAllSubscriptions();
       setSubscriptions(response.subscriptions.filter((s) => s.type !== 'email'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load feeds.');
+      setError(e instanceof Error ? e.message : 'Failed to load RSS feeds.');
     }
   }, []);
 
@@ -59,11 +60,11 @@ export default function Feeds() {
   return (
     <div className="read">
       <header className="read__header">
-        <h1 className="sr-only">Feeds</h1>
+        <h1 className="sr-only">RSS</h1>
       </header>
 
       {loading ? (
-        <p className="read__status">Loading feeds…</p>
+        <p className="read__status">Loading RSS feeds…</p>
       ) : error ? (
         <div className="read__status">
           <p className="read__error">{error}</p>
@@ -79,7 +80,7 @@ export default function Feeds() {
           </button>
         </div>
       ) : subscriptions.length === 0 ? (
-        <p className="read__status">No feed subscriptions yet. Add a feed URL from the reading list to get started.</p>
+        <p className="read__status">No RSS subscriptions yet. Add a feed URL from Reads to get started.</p>
       ) : (
         <ul className="read__list feeds__list">
           {subscriptions.map((sub) => (
@@ -90,6 +91,14 @@ export default function Feeds() {
                   <span className="feeds__url">{sub.rss_data.feed_url}</span>
                 )}
               </div>
+              {sub.rss_data?.feed_id && (
+                <SourceListToggle
+                  type="rss"
+                  sourceKey={sub.rss_data.feed_id}
+                  list={sub.list}
+                  label={decodeEntities(sub.title)}
+                />
+              )}
               <button
                 type="button"
                 className="feeds__unsubscribe"
@@ -101,6 +110,9 @@ export default function Feeds() {
             </li>
           ))}
         </ul>
+      )}
+      {subscriptions.length > 0 && (
+        <p className="read__status">Feed or Reads applies to new items only.</p>
       )}
     </div>
   );

@@ -214,3 +214,26 @@
     flex-direction: column;
   }
 }
+
+/* Feed / Reads destination for a detected feed */
+.add-link-modal__list-choice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+}
+
+.add-link-modal__list-choice legend {
+  float: left;
+  margin-right: 16px;
+  padding: 0;
+}
+
+.add-link-modal__list-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

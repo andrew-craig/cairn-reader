@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { UnifiedSubscription } from '@cairn/shared';
 import { ReadService } from '../services/read';
+import SourceListToggle from '../components/SourceListToggle';
 import { decodeEntities } from '../utils/decodeEntities';
 import './Read.css';
 import './Newsletters.css';
@@ -79,7 +80,7 @@ export default function Newsletters() {
               </button>
             </div>
             <p className="newsletters__hint">
-              New subscriptions will be automatically added to your reading list.
+              New senders are added to Reads. Change a sender below to send it to Feed.
             </p>
           </div>
 
@@ -95,9 +96,18 @@ export default function Newsletters() {
                       <span className="feeds__url">{sub.email_data.email_address}</span>
                     )}
                   </div>
+                  <SourceListToggle
+                    type="email"
+                    sourceKey={sub.id}
+                    list={sub.list}
+                    label={decodeEntities(sub.title)}
+                  />
                 </li>
               ))}
             </ul>
+          )}
+          {subscriptions.length > 0 && (
+            <p className="read__status">Feed or Reads applies to new items only.</p>
           )}
         </>
       )}

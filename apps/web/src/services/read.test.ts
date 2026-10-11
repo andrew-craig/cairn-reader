@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthService } from '@cairn/shared';
 import type {
   UserContentDetailResponse,
   UserContentResponse,
@@ -89,5 +90,66 @@ describe('ReadService.transformDetailToArticle', () => {
     });
     expect(full.content).toBeUndefined();
     expect(full.title).toBe('Unknown Article');
+  });
+});
+
+// Feed/Reads routing (task_f4ac): list filter on read calls, moveToReads, setSourceList.
+describe('ReadService list routing', () => {
+  const fetchWithAuth = vi.fn();
+
+  beforeEach(() => {
+    fetchWithAuth.mockReset();
+    vi.spyOn(AuthService, 'getUserId').mockResolvedValue('user-1');
+    vi.spyOn(AuthService, 'fetchWithAuth').mockImplementation(fetchWithAuth);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const ok = (data: unknown, extra: object = {}) => ({
+    ok: true,
+    json: async () => ({ data, ...extra }),
+  });
+
+  it('sends list when listing, counting and searching', async () => {
+    fetchWithAuth.mockResolvedValue(ok([], { pagination: {} }));
+    await ReadService.listUserContents({ list: 'feed' });
+    await ReadService.searchUserContents({ q: 'x', list: 'feed' });
+    fetchWithAuth.mockResolvedValue(ok({ count: 3 }));
+    await ReadService.countUserContents({ list: 'reads' });
+
+    const urls = fetchWithAuth.mock.calls.map((c) => c[0] as string);
+    expect(urls[0]).toContain('?list=feed');
+    expect(urls[1]).toContain('/search?q=x&list=feed');
+    expect(urls[2]).toContain('/count?list=reads');
+  });
+
+  it('omits list when not given', async () => {
+    fetchWithAuth.mockResolvedValue(ok([], { pagination: {} }));
+    await ReadService.listUserContents();
+    expect(fetchWithAuth.mock.calls[0][0]).not.toContain('list=');
+  });
+
+  it('moveToReads patches the item to the reads list', async () => {
+    fetchWithAuth.mockResolvedValue(ok({ id: 'uc-1' }));
+    await ReadService.moveToReads('uc-1');
+    const [url, init] = fetchWithAuth.mock.calls[0];
+    expect(url).toContain('/content/user/user-1/uc-1');
+    expect(init).toMatchObject({ method: 'PATCH', body: JSON.stringify({ list: 'reads' }) });
+  });
+
+  it('setSourceList PUTs the list to the source route', async () => {
+    fetchWithAuth.mockResolvedValue(ok({ type: 'rss', key: 'feed-1', list: 'feed' }));
+    const result = await ReadService.setSourceList('rss', 'feed-1', 'feed');
+    const [url, init] = fetchWithAuth.mock.calls[0];
+    expect(url).toContain('/content/user/user-1/subscriptions/rss/feed-1/list');
+    expect(init).toMatchObject({ method: 'PUT', body: JSON.stringify({ list: 'feed' }) });
+    expect(result.list).toBe('feed');
+  });
+
+  it('setSourceList surfaces the backend error message', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: false, json: async () => ({ message: 'nope' }) });
+    await expect(ReadService.setSourceList('email', 's-1', 'reads')).rejects.toThrow('nope');
   });
 });

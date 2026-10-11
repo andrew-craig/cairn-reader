@@ -43,7 +43,7 @@ export default function Bookmarks() {
     (article: Article) => {
       const index = articles.findIndex((a) => a.id === article.id);
       // Pass the list + index so the reader can offer prev/next without a refetch.
-      navigate(`/read/${article.id}`, { state: { articles, index } });
+      navigate(`/${article.list}/${article.id}`, { state: { articles, index } });
     },
     [articles, navigate],
   );

@@ -10,7 +10,10 @@ import {
   type DetectURLResponse,
   type DiscoverFeedResponse,
   type ListContentsParams,
+  type ContentList,
   type CountContentsParams,
+  type SetSourceListResponse,
+  type SourceRouteType,
   type SearchParams,
   type UpdateUserContentRequest,
   type UserContentResponse,
@@ -100,6 +103,7 @@ export class ReadService {
 
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
+    if (params?.list) queryParams.append('list', params.list);
     if (params?.is_favorite !== undefined) {
       queryParams.append('is_favorite', params.is_favorite.toString());
     }
@@ -142,6 +146,7 @@ export class ReadService {
 
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
+    if (params?.list) queryParams.append('list', params.list);
     if (params?.is_favorite !== undefined) {
       queryParams.append('is_favorite', params.is_favorite.toString());
     }
@@ -170,6 +175,7 @@ export class ReadService {
 
     const queryParams = new URLSearchParams();
     queryParams.append('q', params.q);
+    if (params.list) queryParams.append('list', params.list);
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.cursor) queryParams.append('cursor', params.cursor);
 
@@ -233,6 +239,43 @@ export class ReadService {
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Failed to update content');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Move a Feed item to Reads. Mirrors mobile's moveToReads.
+   */
+  static async moveToReads(contentId: string): Promise<UserContentResponse> {
+    return ReadService.updateUserContent(contentId, { list: 'reads' });
+  }
+
+  /**
+   * Choose where a source's new items land. `key` is the feed ID for 'rss' and
+   * the subscription ID (the sender ID) for 'email'. Only items delivered
+   * afterwards follow the new choice; existing items stay where they are.
+   * Mirrors mobile's setSourceList.
+   */
+  static async setSourceList(
+    type: SourceRouteType,
+    key: string,
+    list: ContentList,
+  ): Promise<SetSourceListResponse> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/subscriptions/${type}/${key}/list`;
+    const response = await AuthService.fetchWithAuth(url, {
+      method: 'PUT',
+      body: JSON.stringify({ list }),
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to update source list');
     }
 
     return result.data;

@@ -39,7 +39,7 @@ export default function Login() {
       }
       // Refresh context state from the freshly stored session, then enter the app.
       await login();
-      navigate('/read', { replace: true });
+      navigate('/reads', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.');
     } finally {

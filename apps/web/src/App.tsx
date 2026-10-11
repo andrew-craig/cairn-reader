@@ -3,11 +3,11 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppLayout from './components/AppLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './routes/Login';
-import Read from './routes/Read';
+import ArticleList from './routes/ArticleList';
 import ReadArticle from './routes/ReadArticle';
 import You from './routes/You';
 import Account from './routes/Account';
-import Feeds from './routes/Feeds';
+import Rss from './routes/Rss';
 import Newsletters from './routes/Newsletters';
 import Bookmarks from './routes/Bookmarks';
 import About from './routes/About';
@@ -22,7 +22,7 @@ function RootRedirect() {
   if (isLoading) {
     return null;
   }
-  return <Navigate to={isAuthenticated ? '/read' : '/login'} replace />;
+  return <Navigate to={isAuthenticated ? '/reads' : '/login'} replace />;
 }
 
 // Auth guard: holds rendering until the session check resolves, then redirects
@@ -45,11 +45,13 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
-                <Route path="/read" element={<Read />} />
-                <Route path="/read/:id" element={<ReadArticle />} />
+                <Route path="/feed" element={<ArticleList key="feed" list="feed" />} />
+                <Route path="/feed/:id" element={<ReadArticle />} />
+                <Route path="/reads" element={<ArticleList key="reads" list="reads" />} />
+                <Route path="/reads/:id" element={<ReadArticle />} />
                 <Route path="/you" element={<You />} />
                 <Route path="/you/account" element={<Account />} />
-                <Route path="/you/feeds" element={<Feeds />} />
+                <Route path="/you/rss" element={<Rss />} />
                 <Route path="/you/newsletters" element={<Newsletters />} />
                 <Route path="/you/bookmarks" element={<Bookmarks />} />
                 <Route path="/you/about" element={<About />} />

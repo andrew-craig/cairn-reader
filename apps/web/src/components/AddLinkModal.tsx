@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DetectURLResponse, DiscoverFeedResponse } from '@cairn/shared';
+import type { ContentList, DetectURLResponse, DiscoverFeedResponse } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import { decodeEntities } from '../utils/decodeEntities';
 import './AddLinkModal.css';
@@ -66,6 +66,8 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
+  // Where a subscribed feed's new items land. Defaults to Reads, matching the backend default.
+  const [feedList, setFeedList] = useState<ContentList>('reads');
   // Multiple feeds discovered: show inline picker
   const [feedChoices, setFeedChoices] = useState<DiscoverFeedResponse['feeds']>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -99,8 +101,11 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
 
   // Debounced URL detection when the URL changes
   useEffect(() => {
+    // Drop the previous URL's result and choice immediately so a stale feed
+    // detection can't route (or label) a different URL while this one is pending.
+    setDetectionResult(null);
+    setFeedList('reads');
     if (!url.trim() || !isValidUrl(url)) {
-      setDetectionResult(null);
       return;
     }
     const normalizedUrl = normalizeUrl(url);
@@ -141,18 +146,15 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
     setLoading(true);
     try {
       const normalizedUrl = normalizeUrl(url);
-      const response = await ReadService.addURL({
+      await ReadService.addURL({
         url: normalizedUrl,
         type: detectionResult?.type,
         title: detectionResult?.title ?? undefined,
+        list: detectionResult?.type === 'feed' ? feedList : undefined,
       });
       // Close and refresh
       onClose();
       if (onSuccess) onSuccess();
-      // Brief success: the list will refresh, which is the key behavior
-      if (response.type === 'feed') {
-        // Feed subscription confirmed by the refreshed /you/feeds count
-      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('already subscribed')) {
@@ -232,7 +234,8 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') handleClose();
-    if (e.key === 'Enter') handleSubmit();
+    // Gated like the Add button: submitting mid-detection would skip the Feed/Reads choice.
+    if (e.key === 'Enter' && !isBusy) handleSubmit();
   };
 
   const getSubmitLabel = () => {
@@ -263,6 +266,24 @@ export default function AddLinkModal({ onClose, onSuccess, closing = false }: Ad
             spellCheck={false}
           />
           {error && <p className="add-link-modal__error">{error}</p>}
+
+          {detectionResult?.type === 'feed' && (
+            <fieldset className="add-link-modal__list-choice" disabled={loading}>
+              <legend>New items go to</legend>
+              {(['reads', 'feed'] as const).map((choice) => (
+                <label key={choice}>
+                  <input
+                    type="radio"
+                    name="feed-list"
+                    value={choice}
+                    checked={feedList === choice}
+                    onChange={() => setFeedList(choice)}
+                  />
+                  {choice === 'feed' ? 'Feed' : 'Reads'}
+                </label>
+              ))}
+            </fieldset>
+          )}
 
           {feedChoices.length > 0 && (
             <ul className="add-link-modal__feed-list">

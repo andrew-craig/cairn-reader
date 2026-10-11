@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Article } from '@cairn/shared';
+import type { Article, ContentList } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import ArticleRow from './ArticleRow';
 import './SearchModal.css';
 
 interface SearchModalProps {
+  list: ContentList;
   onClose: () => void;
   closing?: boolean;
 }
@@ -41,10 +42,10 @@ function useFocusTrap(containerRef: React.RefObject<HTMLElement | null>) {
   }, [containerRef]);
 }
 
-// Search overlay for the reading list. Debounces the query and calls
+// Search overlay for one list (Feed or Reads). Debounces the query and calls
 // ReadService.searchUserContents. Results render in the same ArticleRow
-// layout as the main reading list.
-export default function SearchModal({ onClose, closing = false }: SearchModalProps) {
+// layout as the list itself.
+export default function SearchModal({ list, onClose, closing = false }: SearchModalProps) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -94,7 +95,7 @@ export default function SearchModal({ onClose, closing = false }: SearchModalPro
       setLoading(true);
       setError(null);
       try {
-        const response = await ReadService.searchUserContents({ q: trimmed });
+        const response = await ReadService.searchUserContents({ q: trimmed, list });
         if (!cancelled) {
           setResults(response.contents.map(ReadService.transformToArticle));
           setSearched(true);
@@ -113,15 +114,15 @@ export default function SearchModal({ onClose, closing = false }: SearchModalPro
       cancelled = true;
       clearTimeout(timerId);
     };
-  }, [query]);
+  }, [query, list]);
 
   const handleSelect = useCallback(
     (article: Article) => {
       const index = results.findIndex((a) => a.id === article.id);
-      navigate(`/read/${article.id}`, { state: { articles: results, index } });
+      navigate(`/${list}/${article.id}`, { state: { articles: results, index } });
       onClose();
     },
-    [results, navigate, onClose],
+    [results, list, navigate, onClose],
   );
 
   const handleClear = () => {
@@ -133,7 +134,7 @@ export default function SearchModal({ onClose, closing = false }: SearchModalPro
   };
 
   return (
-    <div className={`search-overlay${closing ? ' search-overlay--closing' : ''}`} role="dialog" aria-modal="true" aria-label="Search your reading list">
+    <div className={`search-overlay${closing ? ' search-overlay--closing' : ''}`} role="dialog" aria-modal="true" aria-label={`Search your ${list}`}>
       <div className="search-modal" ref={modalRef}>
         <div className="search-modal__header">
           <div className="search-modal__input-wrap">
@@ -141,8 +142,8 @@ export default function SearchModal({ onClose, closing = false }: SearchModalPro
               ref={inputRef}
               type="search"
               className="search-modal__input"
-              placeholder="Search your reading list"
-              aria-label="Search your reading list"
+              placeholder={`Search your ${list}`}
+              aria-label={`Search your ${list}`}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoComplete="off"

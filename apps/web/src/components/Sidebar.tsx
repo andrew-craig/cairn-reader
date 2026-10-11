@@ -6,13 +6,13 @@ import { ReadService } from '../services/read';
 // Counts shown beside the You sub-items. `null` means "not loaded yet" so the
 // badge can stay hidden until the first successful fetch.
 interface YouCounts {
-  feeds: number | null;
+  rss: number | null;
   newsletters: number | null;
   bookmarks: number | null;
 }
 
 const EMPTY_COUNTS: YouCounts = {
-  feeds: null,
+  rss: null,
   newsletters: null,
   bookmarks: null,
 };
@@ -21,7 +21,7 @@ const EMPTY_COUNTS: YouCounts = {
 // which fetched count (if any) renders as a badge beside the item.
 const YOU_ITEMS: Array<{ to: string; label: string; countKey?: keyof YouCounts }> = [
   { to: '/you/account', label: 'Account' },
-  { to: '/you/feeds', label: 'Feeds', countKey: 'feeds' },
+  { to: '/you/rss', label: 'RSS', countKey: 'rss' },
   { to: '/you/newsletters', label: 'Newsletters', countKey: 'newsletters' },
   { to: '/you/bookmarks', label: 'Bookmarks', countKey: 'bookmarks' },
   { to: '/you/about', label: 'About' },
@@ -44,6 +44,25 @@ function ReadIcon() {
       strokeLinejoin="round"
     >
       <path d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+    </svg>
+  );
+}
+
+function FeedIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+      <circle cx="5" cy="19" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -88,7 +107,7 @@ export default function Sidebar() {
       const next = { ...prev };
       if (subscriptionsResult.status === 'fulfilled') {
         const subs = subscriptionsResult.value?.subscriptions ?? [];
-        next.feeds = subs.filter((s) => s.type !== 'email').length;
+        next.rss = subs.filter((s) => s.type !== 'email').length;
         next.newsletters = subs.filter((s) => s.type === 'email').length;
       } else {
         console.error('Error fetching subscriptions:', subscriptionsResult.reason);
@@ -124,10 +143,18 @@ export default function Sidebar() {
 
       <ul className="sidebar__nav">
         <li>
-          <NavLink to="/read" className="sidebar__item" aria-label="Read">
+          <NavLink to="/feed" className="sidebar__item" aria-label="Feed">
+            <span className="sidebar__item-leading">
+              <span className="sidebar__icon"><FeedIcon /></span>
+              <span>Feed</span>
+            </span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to="/reads" className="sidebar__item" aria-label="Reads">
             <span className="sidebar__item-leading">
               <span className="sidebar__icon"><ReadIcon /></span>
-              <span>Read</span>
+              <span>Reads</span>
             </span>
           </NavLink>
         </li>
