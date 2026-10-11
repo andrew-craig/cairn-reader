@@ -41,7 +41,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
 - **task_082f** · P3 · open · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
-- **task_21bd** · P3 · open · Align date formatting between mobile and web (use mobile relative format)
 - **task_3216** · P3 · open · Optimize N+1 query in recommendation recording
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
