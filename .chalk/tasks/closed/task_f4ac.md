@@ -2,14 +2,14 @@
 id: task_f4ac
 title: Web: Feed and Reads routes
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [web]
 blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-11T03:11:56Z
+updated_at: 2026-10-11T11:59:52Z
 ---
 Mirror of the mobile task: /feed and /reads routes (Read.tsx → Reads with list filter, new Feed.tsx), Save to Reads action, Feed/Reads choice in AddLinkModal, per-source Feed/Reads toggle on both /you/feeds and /you/newsletters (they stay separate routes). Rename /you/feeds to /you/rss and its nav label to RSS so "Feed" only means the list; unsubscribe stays RSS-only.
 - Done when: tests pass; verified in browser against staging (webapp-staging-test skill)
@@ -57,3 +57,5 @@ Shape: bottom-up like mobile (service → shared list plumbing → screens → n
   - Verified in headless Chromium: login lands on /reads; Feed|Reads|You nav (sidebar and bottom bar); Add Link asks Feed or Reads for feeds and the choice persisted on the subscriptions; page save lands in Reads; RSS Feed/Reads toggle persists across reload and reverts; /feed and /reads fetch their own list.
   - Not verified: items routed to Feed (no items were delivered to either feed in ~15 min; subscribing does not backfill), so Feed reader, Save to Reads and the Reads-top ordering (#421) are covered by unit tests only. `GET/POST /api/v1/source/email/user/{id}/address` returns 500 on staging, so the Newsletters toggle was not exercised in the browser (unit-tested).
   - To finish: once a feed delivers new items, open one from /feed, Save to Reads, confirm it tops /reads.
+- Staging re-run (2026-10-11, after Hacker News delivered 8 items): /feed lists them; the reader shows Back/Favorite/Save to Reads/Next/Delete/Open original (no Archive) and makes no write requests while reading and scrolling; Save to Reads sent `PATCH {list:'reads'}`, removed the item from /feed and put it at the top of /reads (#421 confirmed on staging).
+- Newsletters toggle not exercised in the browser: the email-address endpoint works again but the account has no senders (needs an inbound email). It uses the same `SourceListToggle` as RSS (browser-verified) and has unit tests.
