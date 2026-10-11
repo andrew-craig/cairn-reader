@@ -1,9 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
-import { BookmarkIcon, ArchiveIcon, ReturnIcon, ArrowDownIcon } from '../icons';
+import { BookmarkIcon, ArchiveIcon, ReadIcon, ReturnIcon, ArrowDownIcon } from '../icons';
 import { Colors } from '../../constants';
 
-export type QuickAccessButtonIcon = 'bookmark' | 'archive' | 'return' | 'next-article';
+export type QuickAccessButtonIcon = 'bookmark' | 'archive' | 'save-to-reads' | 'return' | 'next-article';
 
 interface QuickAccessButtonProps {
   icon: QuickAccessButtonIcon;
@@ -32,6 +32,8 @@ export const QuickAccessButton: React.FC<QuickAccessButtonProps> = ({
         return <BookmarkIcon size={size} color={iconColor} filled={active} />;
       case 'archive':
         return <ArchiveIcon size={size} color={iconColor} />;
+      case 'save-to-reads':
+        return <ReadIcon size={size} color={iconColor} />;
       case 'return':
         return <ReturnIcon size={size} color={iconColor} />;
       case 'next-article':

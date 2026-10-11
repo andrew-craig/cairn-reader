@@ -1,3 +1,5 @@
+import type { ContentList } from './read';
+
 export interface Article {
   id: string;
   url: string;
@@ -12,6 +14,8 @@ export interface Article {
   tags: string[];
   isRead: boolean;
   isFavorite: boolean;
+  /** Which list the item lives in; the reader's actions differ for Feed items. */
+  list: ContentList;
   addedAt: number;
   readAt?: number;
   notes?: string;

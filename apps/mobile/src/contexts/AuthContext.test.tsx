@@ -2,7 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { render, renderHook, screen, waitFor, act } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from './AuthContext';
-import { AuthService, ArticleStore } from '../services';
+import { AuthService, ArticleStore, FeedCache } from '../services';
 import { NetworkError } from '@cairn/shared';
 import { User } from '../types';
 
@@ -24,6 +24,9 @@ jest.mock('../services', () => ({
   ArticleStore: {
     clear: jest.fn(),
   },
+  FeedCache: {
+    clear: jest.fn(),
+  },
 }));
 
 // Only loadServerUrl is stubbed; the rest of @cairn/shared is real, since the
@@ -36,6 +39,7 @@ jest.mock('@cairn/shared', () => ({
 
 const mockedAuthService = AuthService as jest.Mocked<typeof AuthService>;
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
+const mockedFeedCache = FeedCache as jest.Mocked<typeof FeedCache>;
 
 const STORED_USER: User = {
   id: 'user-1',
@@ -114,6 +118,7 @@ describe('AuthProvider.logout', () => {
     mockedAuthService.isAuthenticated.mockResolvedValue(false);
     mockedAuthService.logout.mockResolvedValue(undefined);
     mockedArticleStore.clear.mockResolvedValue(undefined);
+    mockedFeedCache.clear.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -130,6 +135,21 @@ describe('AuthProvider.logout', () => {
     });
 
     expect(mockedArticleStore.clear).toHaveBeenCalled();
+    expect(mockedFeedCache.clear).toHaveBeenCalled();
+  });
+
+  it('still logs the user out when FeedCache.clear rejects', async () => {
+    mockedFeedCache.clear.mockRejectedValue(new Error('disk full'));
+
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(result.current.user).toBeNull();
   });
 
   it('still logs the user out when ArticleStore.clear rejects', async () => {

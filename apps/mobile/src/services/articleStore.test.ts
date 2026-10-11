@@ -15,6 +15,7 @@ const makeArticle = (overrides: Partial<Article> = {}): Article => ({
   tags: [],
   isRead: false,
   isFavorite: false,
+  list: 'reads' as const,
   addedAt: 1000,
   ...overrides,
 });

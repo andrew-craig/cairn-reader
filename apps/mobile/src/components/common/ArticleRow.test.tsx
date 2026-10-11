@@ -13,6 +13,7 @@ const baseArticle: Article = {
   tags: [],
   isRead: false,
   isFavorite: false,
+  list: 'reads' as const,
   addedAt: Date.now(),
 };
 

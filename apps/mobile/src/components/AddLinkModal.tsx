@@ -11,8 +11,9 @@ import {
 } from 'react-native';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { HeaderPopover } from './common/HeaderPopover';
+import { ListToggle } from './common/ListToggle';
 import { ReadService } from '../services/read';
-import { DetectURLResponse } from '@cairn/shared';
+import { ContentList, DetectURLResponse } from '@cairn/shared';
 
 interface AddLinkModalProps {
   visible: boolean;
@@ -34,6 +35,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   const [discovering, setDiscovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detectionResult, setDetectionResult] = useState<DetectURLResponse | null>(null);
+  // Where a subscribed feed's new items land. Reads is the backend default.
+  const [feedList, setFeedList] = useState<ContentList>('reads');
 
   // Handle to the in-flight detection so a dismiss can abandon it (detection is
   // not user-initiated — it fires on every URL change — so it must never block
@@ -47,20 +50,28 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
   // Trigger URL detection when URL changes
   useEffect(() => {
+    // Nothing to detect: the previous URL's run was just cancelled by the
+    // cleanup below, and a cancelled run never resets `detecting` itself.
     if (!url.trim()) {
       setDetectionResult(null);
+      setDetecting(false);
       return;
     }
 
     // Only detect if URL is valid
     if (!isValidUrl(url)) {
       setDetectionResult(null);
+      setDetecting(false);
       return;
     }
 
     const normalizedUrl = normalizeUrl(url);
     const run = { cancelled: false };
     detectRunRef.current = run;
+    // The previous URL's result must not describe this one: submitting before
+    // re-detection resolves would send a stale type/list (a feed's list on a
+    // page is a 400).
+    setDetectionResult(null);
 
     const detectURL = async () => {
       setDetecting(true);
@@ -118,6 +129,10 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   const handleAddPress = async () => {
+    // Presses are ignored (not queued) while the current URL is being detected:
+    // submitting without a result would drop the feed type and the Feed/Reads
+    // choice (the backend then defaults to Reads). The button shows "Detecting...".
+    if (detecting) return;
     if (!isValidUrl(url)) {
       setError('Please enter a valid URL');
       return;
@@ -132,13 +147,17 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
         url: normalizedUrl,
         type: detectionResult?.type,
         title: detectionResult?.title ?? undefined,
+        // Only feeds have a destination to choose; pages always land in Reads.
+        ...(detectionResult?.type === 'feed' && { list: feedList }),
       });
 
       // Show success message based on response type
       if (response.type === 'feed') {
         Alert.alert(
           'Success',
-          `Subscribed to ${response.subscription.title}`,
+          `Subscribed to ${response.subscription.title}. New items will appear in ${
+            response.subscription.list === 'feed' ? 'Feed' : 'Reads'
+          }.`,
           [{ text: 'OK' }]
         );
       } else {
@@ -151,6 +170,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
 
       setUrl('');
       setDetectionResult(null);
+      setFeedList('reads');
       onClose();
 
       // Call success callback if provided
@@ -239,6 +259,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     setUrl('');
     setError(null);
     setDetectionResult(null);
+    setFeedList('reads');
     onClose();
   };
 
@@ -284,6 +305,15 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
               )}
             </View>
 
+            {detectionResult?.type === 'feed' && (
+              <View style={styles.listChoice}>
+                <Text style={[styles.listChoiceLabel, { color: colors.textSecondary }]}>
+                  New items go to
+                </Text>
+                <ListToggle subject="this feed" list={feedList} onChange={setFeedList} disabled={loading} />
+              </View>
+            )}
+
             <View style={styles.buttonContainer}>
               <View style={styles.buttonWrapper}>
                 <TouchableOpacity
@@ -291,11 +321,11 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                     styles.primaryButton,
                     {
                       backgroundColor: colors.primary,
-                      opacity: loading || !url.trim() ? 0.5 : 1,
+                      opacity: loading || detecting || !url.trim() ? 0.5 : 1,
                     }
                   ]}
                   onPress={handleAddPress}
-                  disabled={loading || !url.trim()}
+                  disabled={loading || detecting || !url.trim()}
                   activeOpacity={0.7}
                 >
                   {loading || detecting ? (
@@ -354,6 +384,16 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.default,
     marginTop: Spacing.sm,
     marginLeft: Spacing.xs,
+  },
+  listChoice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  listChoiceLabel: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
   },
   buttonContainer: {
     flexDirection: 'row',

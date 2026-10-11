@@ -135,6 +135,7 @@ function rowToArticle(row: ArticleRow): Article {
     tags: JSON.parse(row.tags) as string[],
     isRead: row.is_read === 1,
     isFavorite: row.is_favorite === 1,
+    list: 'reads', // the offline store only ever holds Reads
     addedAt: row.added_at,
     readAt: row.read_at ?? undefined,
     scrollPosition: row.scroll_position ?? undefined,

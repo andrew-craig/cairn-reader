@@ -38,12 +38,16 @@ export interface ContentDetailResponse {
 
 type ContentStatus = 'unread' | 'reading' | 'completed' | 'archived';
 
+// Which list an item lives in: the skimmable Feed, or Reads (read or triage).
+export type ContentList = 'feed' | 'reads';
+
 // List/search response — content is a summary (no cleaned_html)
 export interface UserContentResponse {
   id: string;
   user_id: string;
   content_id: string;
   status: ContentStatus;
+  list: ContentList;
   scroll_position: number;
   is_favorite: boolean;
   added_at: string;
@@ -57,6 +61,7 @@ export interface UserContentDetailResponse {
   user_id: string;
   content_id: string;
   status: ContentStatus;
+  list: ContentList;
   scroll_position: number;
   is_favorite: boolean;
   added_at: string;
@@ -95,6 +100,8 @@ export interface AddURLRequest {
   url: string;
   type?: URLType;
   title?: string;
+  /** Feeds only: where the feed's new items land (backend default: reads). */
+  list?: ContentList;
 }
 
 interface AddFeedResponse {
@@ -106,6 +113,7 @@ interface AddFeedResponse {
     feed_id: string;
     feed_url: string;
     title: string;
+    list: ContentList;
     subscribed_at: string;
   };
 }
@@ -129,16 +137,20 @@ export interface UpdateUserContentRequest {
   scroll_position?: number;
   is_favorite?: boolean;
   notes?: string;
+  /** Move the item to this list (e.g. 'reads' for Save to Reads). */
+  list?: ContentList;
 }
 
 export interface SearchParams {
   q: string;
+  list?: ContentList;
   limit?: number;
   cursor?: string;
 }
 
 export interface ListContentsParams {
   status?: ContentStatus;
+  list?: ContentList;
   is_favorite?: boolean;
   limit?: number;
   cursor?: string;
@@ -146,7 +158,7 @@ export interface ListContentsParams {
 
 // Params for the count-only endpoint (GET .../count) — no pagination fields,
 // since it returns a single number rather than a page of results.
-export type CountContentsParams = Pick<ListContentsParams, 'status' | 'is_favorite'>;
+export type CountContentsParams = Pick<ListContentsParams, 'status' | 'is_favorite' | 'list'>;
 
 // Feed Subscription Types (Legacy - kept for backward compatibility)
 interface FeedSubscriptionResponse {
@@ -192,6 +204,8 @@ export interface UnifiedSubscription {
   title: string;
   description?: string;
   subscribed_at: string;
+  /** Where this source's new items are delivered. */
+  list: ContentList;
 
   // Type-specific data (only one will be populated based on type)
   rss_data?: RSSSubscriptionData;
@@ -204,4 +218,13 @@ export interface UnifiedSubscriptionsResponse {
   total_count: number;
   /** Sources that failed to load; their subscriptions are missing from the list. */
   failed_sources: Array<'rss' | 'email'>;
+}
+
+/** Source types that can be routed to a list (the `{type}` in the list endpoint). */
+export type SourceRouteType = 'rss' | 'email';
+
+export interface SetSourceListResponse {
+  type: SourceRouteType;
+  key: string;
+  list: ContentList;
 }

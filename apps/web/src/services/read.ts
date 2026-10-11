@@ -46,6 +46,7 @@ export class ReadService {
         tags: [],
         isRead: userContent.status === 'completed',
         isFavorite: userContent.is_favorite,
+        list: userContent.list,
         addedAt: new Date(userContent.added_at).getTime(),
         scrollPosition: userContent.scroll_position || undefined,
       };
@@ -65,6 +66,7 @@ export class ReadService {
       tags: [],
       isRead: userContent.status === 'completed',
       isFavorite: userContent.is_favorite,
+      list: userContent.list,
       addedAt: new Date(userContent.added_at).getTime(),
       readAt:
         userContent.status === 'completed'

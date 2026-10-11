@@ -15,6 +15,7 @@ const summary: UserContentResponse = {
   user_id: 'user-1',
   content_id: 'content-1',
   status: 'completed',
+  list: 'reads',
   scroll_position: 12,
   is_favorite: true,
   added_at: '2025-01-15T10:00:00Z',

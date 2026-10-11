@@ -71,6 +71,7 @@ export const AddArticleScreen: React.FC = () => {
           tags: [],
           isRead: false,
           isFavorite: false,
+          list: 'reads',
           addedAt: Date.now(),
         };
       }

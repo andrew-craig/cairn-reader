@@ -23,7 +23,9 @@ export const BookmarksScreen: React.FC = () => {
   );
 
   const onResetLoaded = useCallback((next: Article[]) => {
-    void ArticleStore.upsertMany(next);
+    // Favorited Feed items are online-only: keep them out of the offline
+    // Reads store (they'd show up in Reads and get prefetched).
+    void ArticleStore.upsertMany(next.filter((a) => a.list === 'reads'));
     setError(null);
   }, []);
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Modal } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { AddLinkModal } from './AddLinkModal';
 import { ReadService } from '../services/read';
 
@@ -90,5 +90,131 @@ describe('AddLinkModal dismissal during Find-feed', () => {
     // Flush the resolved promise; the Alert must not fire post-close.
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+});
+
+// Epic 6e4d: subscribing to a feed asks where its new items should land.
+
+describe('AddLinkModal Feed/Reads choice for feeds', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const feedDetection = { url: 'https://example.com/rss', type: 'feed' as const, title: 'Example' };
+  const feedResponse = (list: 'feed' | 'reads') =>
+    ({
+      type: 'feed',
+      feed_id: 'f1',
+      subscription: {
+        id: 's1',
+        user_id: 'u',
+        feed_id: 'f1',
+        feed_url: 'https://example.com/rss',
+        title: 'Example',
+        list,
+        subscribed_at: '2025-01-01T00:00:00Z',
+      },
+    }) as never;
+
+  it('defaults a new feed subscription to Reads', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockResolvedValue(feedDetection);
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue(feedResponse('reads'));
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByPlaceholderText('Add link'), 'https://example.com/rss');
+    fireEvent.press(await screen.findByText('Add Feed'));
+
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'feed', list: 'reads' }));
+  });
+
+  it('subscribes to Feed when the user picks Feed, and says where items will land', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockResolvedValue(feedDetection);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue(feedResponse('feed'));
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByPlaceholderText('Add link'), 'https://example.com/rss');
+    await screen.findByText('Add Feed');
+    fireEvent.press(screen.getByLabelText('Send this feed to Feed'));
+    fireEvent.press(screen.getByText('Add Feed'));
+
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'feed', list: 'feed' }));
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('Success', 'Subscribed to Example. New items will appear in Feed.', [
+        { text: 'OK' },
+      ]),
+    );
+  });
+
+  it('drops a stale feed detection when the URL changes, and ignores submit presses until the new URL is detected', async () => {
+    let resolvePage: (value: { url: string; type: 'page'; title: null }) => void;
+    jest.spyOn(ReadService, 'detectURL').mockImplementation((url: string) =>
+      url.includes('/rss')
+        ? Promise.resolve(feedDetection)
+        : new Promise((resolve) => {
+            resolvePage = resolve as typeof resolvePage;
+          }),
+    );
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Add link');
+    fireEvent.changeText(input, 'https://example.com/rss');
+    await screen.findByText('Add Feed');
+
+    // Edit to a different URL: the feed result and its Feed/Reads choice go away.
+    fireEvent.changeText(input, 'https://example.com/post');
+    await waitFor(() => expect(screen.queryByText('Add Feed')).toBeNull());
+    expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
+
+    // Submitting now would drop type/list for lack of a detection, so the press is ignored.
+    fireEvent(input, 'submitEditing');
+    expect(addSpy).not.toHaveBeenCalled();
+
+    // Once the new URL is detected (as a page), submit goes out without a list.
+    await act(async () => {
+      resolvePage!({ url: 'https://example.com/post', type: 'page', title: null });
+    });
+    fireEvent(input, 'submitEditing');
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy.mock.calls[0][0]).toMatchObject({ type: 'page' });
+    expect(addSpy.mock.calls[0][0]).not.toHaveProperty('list');
+  });
+
+  it('does not stay stuck on Detecting when the URL becomes invalid mid-detection', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockReturnValue(new Promise(() => {}));
+    const addSpy = jest.spyOn(ReadService, 'addURL');
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Add link');
+    fireEvent.changeText(input, 'https://example.com/post');
+    await waitFor(() => expect(ReadService.detectURL).toHaveBeenCalled());
+
+    // The URL becomes invalid while that detection is still in flight.
+    fireEvent.changeText(input, 'not a url');
+    fireEvent(input, 'submitEditing');
+
+    expect(await screen.findByText('Please enter a valid URL')).toBeTruthy();
+    expect(addSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not offer the choice for a page, and sends no list', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockResolvedValue({
+      url: 'https://example.com/post',
+      type: 'page',
+      title: null,
+    });
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const addSpy = jest.spyOn(ReadService, 'addURL').mockResolvedValue({ type: 'page' } as never);
+
+    render(<AddLinkModal visible onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByPlaceholderText('Add link'), 'https://example.com/post');
+    fireEvent.press(await screen.findByText('Add'));
+
+    expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
+    await waitFor(() => expect(addSpy).toHaveBeenCalled());
+    expect(addSpy.mock.calls[0][0]).not.toHaveProperty('list');
   });
 });

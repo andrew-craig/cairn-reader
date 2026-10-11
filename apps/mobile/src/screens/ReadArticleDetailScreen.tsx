@@ -11,7 +11,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
-import { ArticleStore, ReadService, ArticleMutations } from '../services';
+import { ArticleStore, ReadService, ArticleMutations, invalidateReads } from '../services';
 import { Colors, GlobalStyles } from '../constants';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { ArticleContent, BottomActionMenu } from '../components/common';
@@ -169,7 +169,15 @@ export const ReadArticleDetailScreen: React.FC = () => {
     );
   }, []);
 
+  // Reading progress (status, completion, scroll position) is a Reads concern:
+  // Feed items are skimmed and triaged by Save to Reads, and writing progress
+  // for them would also queue outbox rows (e.g. while offline). Favorite is the
+  // one Feed write that stays. Not setting hasScrolledRef also skips the
+  // unmount flush below.
+  const tracksProgress = article.list === 'reads';
+
   const handleScrollProgress = useCallback((info: ScrollProgressInfo) => {
+    if (!tracksProgress) return;
     // Emits fired before the saved position has been restored report a stale
     // offsetY of 0. Skip updating the refs so the unmount-flush safety net
     // can't send that stale value either — not just the throttled save.
@@ -190,14 +198,14 @@ export const ReadArticleDetailScreen: React.FC = () => {
     if (!info.isRestoring) {
       throttledSaveRef.current(article.id, info.fraction);
     }
-  }, [article.id, markCompleted]);
+  }, [article.id, markCompleted, tracksProgress]);
 
   useEffect(() => {
-    if (article.isRead) return;
+    if (!tracksProgress || article.isRead) return;
     ArticleMutations.markReading(article.id).catch(
       (err) => console.error('Failed to mark article reading:', err)
     );
-  }, [article.id, article.isRead]);
+  }, [article.id, article.isRead, tracksProgress]);
 
   useEffect(() => {
     const articleId = article.id;
@@ -266,6 +274,28 @@ export const ReadArticleDetailScreen: React.FC = () => {
     });
   };
 
+  // Feed items are triaged by saving them to Reads, not by archiving. Awaited
+  // (unlike archive): it's online-only, and the item should only leave the
+  // Feed once the server has actually moved it.
+  const savingToReadsRef = useRef(false);
+  const handleSaveToReads = async () => {
+    if (savingToReadsRef.current) return;
+    savingToReadsRef.current = true;
+    const targetId = article.id;
+    try {
+      await ReadService.moveToReads(targetId);
+    } catch (error) {
+      console.error('Failed to save article to Reads:', error);
+      Alert.alert('Error', 'Failed to save to Reads');
+      savingToReadsRef.current = false;
+      return;
+    }
+    invalidateReads();
+    // The list screen's "item left this list" callback (named for archive).
+    onArchived?.(targetId);
+    navigation.goBack();
+  };
+
   if (contentLoading) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
@@ -316,11 +346,9 @@ export const ReadArticleDetailScreen: React.FC = () => {
             onPress: handleToggleFavorite,
             active: isFavorite,
           },
-          {
-            icon: 'archive',
-            label: 'Archive',
-            onPress: handleArchive,
-          },
+          article.list === 'feed'
+            ? { icon: 'save-to-reads', label: 'Save to Reads', onPress: handleSaveToReads }
+            : { icon: 'archive', label: 'Archive', onPress: handleArchive },
         ]}
       />
     </View>

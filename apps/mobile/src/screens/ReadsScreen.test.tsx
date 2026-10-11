@@ -1,12 +1,12 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react-native';
-import { ReadScreen } from './ReadScreen';
+import { ReadsScreen } from './ReadsScreen';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
 import { SyncTrigger } from '../services/syncTrigger';
 import { Article } from '../types';
 
-// task_a8a4: ReadScreen must render articles already in the local SQLite
+// task_a8a4: ReadsScreen must render articles already in the local SQLite
 // store immediately on focus, before the network page for the same list has
 // resolved — the store is the read-through cache for the initial render.
 // task_c55c: prefetch is triggered from this screen's sync callback only —
@@ -54,10 +54,11 @@ const article = (id: string): Article => ({
   tags: [],
   isRead: false,
   isFavorite: false,
+  list: 'reads' as const,
   addedAt: Date.now(),
 });
 
-describe('ReadScreen offline-first render', () => {
+describe('ReadsScreen offline-first render', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedArticleStore.upsertMany.mockResolvedValue(undefined);
@@ -70,10 +71,12 @@ describe('ReadScreen offline-first render', () => {
     // Never resolves during this test.
     mockedReadService.listUserContents.mockReturnValue(new Promise(() => {}));
 
-    render(<ReadScreen />);
+    render(<ReadsScreen />);
 
     expect(await screen.findByText('Stored Article stored-1')).toBeTruthy();
-    expect(mockedReadService.listUserContents).toHaveBeenCalled();
+    expect(mockedReadService.listUserContents).toHaveBeenCalledWith(
+      expect.objectContaining({ list: 'reads' }),
+    );
   });
 
   it('triggers SyncTrigger.run() (outbox drain, then prefetch) after a successful sync upserts the new page', async () => {
@@ -86,7 +89,7 @@ describe('ReadScreen offline-first render', () => {
       has_more: false,
     });
 
-    render(<ReadScreen />);
+    render(<ReadsScreen />);
     await screen.findByText('No saved articles yet');
 
     // SyncTrigger.run() must run only after upsertMany's write has resolved,
