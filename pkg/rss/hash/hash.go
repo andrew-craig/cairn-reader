@@ -1,6 +1,6 @@
 // Package hash provides the canonical content-hash function for Cairn RSS
-// ingestion. Both the Read and Explore services must use ContentHash so that
-// deduplication keys are consistent across the pipeline.
+// ingestion. All RSS ingestion must use ContentHash so that deduplication
+// keys are consistent across the pipeline.
 package hash
 
 import (

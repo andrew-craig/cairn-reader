@@ -21,3 +21,6 @@ Follow the users pattern from task_8efb: replace `slog.X(` with `logging.FromCon
 
 ## Done when
 - A router-level test per service (see `services/users/internal/handlers/router_test.go` `TestRouter_HandlerErrorLogCarriesRequestID`) shows a handler error log carrying the request's `X-Request-ID`.
+
+## Update (2026-10-12, task_30e3)
+services/explore was deleted in task_30e3, so the explore/recommender and explore/fetcher parts of this task are obsolete. Remaining scope: read/content and read/fetcher.

@@ -27,8 +27,6 @@ This directory contains GitHub Actions workflows for building and testing Docker
 
 **Images built:**
 - `ghcr.io/<org>/cairn-user-service`
-- `ghcr.io/<org>/cairn-explore-recommender`
-- `ghcr.io/<org>/cairn-explore-fetcher`
 - `ghcr.io/<org>/cairn-content-service`
 - `ghcr.io/<org>/cairn-content-worker`
 - `ghcr.io/<org>/cairn-ingest-rss`

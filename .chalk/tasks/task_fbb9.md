@@ -38,3 +38,6 @@ Several migrations create indexes that duplicate an index PostgreSQL already pro
 
 ## Priority note
 No live defect — pure write-path overhead. Tier 5; do not preempt earlier tiers. If any pair turns out **not** to be redundant on inspection, leave it and record why.
+
+## Update (2026-10-12, task_30e3)
+services/explore was deleted in task_30e3, so the explore/recommender part of this task is obsolete. Remaining scope: users migrations.

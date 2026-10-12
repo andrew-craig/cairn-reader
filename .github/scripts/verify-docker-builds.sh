@@ -53,8 +53,6 @@ echo ""
 
 # Build all services
 build_service "user-service" "services/users/Dockerfile"
-build_service "explore-recommender" "services/explore/recommender/Dockerfile"
-build_service "explore-fetcher" "services/explore/fetcher/Dockerfile"
 build_service "content-service" "services/read/content/Dockerfile"
 build_service "content-worker" "services/read/content/Dockerfile.worker"
 build_service "ingest-rss" "services/read/fetcher/Dockerfile"

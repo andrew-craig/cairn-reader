@@ -55,12 +55,6 @@ services:
       POSTGRES_USER_USERS: ${POSTGRES_USER_USERS}
       POSTGRES_PASSWORD_USERS: ${POSTGRES_PASSWORD_USERS}
       POSTGRES_DB_USERS: ${POSTGRES_DB_USERS}
-      POSTGRES_USER_RECOMMENDER: ${POSTGRES_USER_RECOMMENDER}
-      POSTGRES_PASSWORD_RECOMMENDER: ${POSTGRES_PASSWORD_RECOMMENDER}
-      POSTGRES_DB_RECOMMENDER: ${POSTGRES_DB_RECOMMENDER}
-      POSTGRES_USER_FETCHER: ${POSTGRES_USER_FETCHER}
-      POSTGRES_PASSWORD_FETCHER: ${POSTGRES_PASSWORD_FETCHER}
-      POSTGRES_DB_FETCHER: ${POSTGRES_DB_FETCHER}
       POSTGRES_USER_CONTENT: ${POSTGRES_USER_CONTENT}
       POSTGRES_PASSWORD_CONTENT: ${POSTGRES_PASSWORD_CONTENT}
       POSTGRES_DB_CONTENT: ${POSTGRES_DB_CONTENT}
@@ -109,82 +103,6 @@ services:
         condition: service_healthy
       vault-init:
         condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - cairn-network
-
-  # Explore Recommender Service - Article storage and recommendations
-  explore-recommender:
-    build:
-      context: ../../..
-      dockerfile: services/explore/recommender/Dockerfile
-    ports:
-      - "8087:8081"
-    environment:
-      - PORT=8081
-      - DB_HOST=cairn-db
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER_RECOMMENDER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}
-      - DB_NAME=${POSTGRES_DB_RECOMMENDER}
-      - DB_SSLMODE=disable
-      - ARTICLE_RETENTION_DAYS=90
-      - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
-      - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-    depends_on:
-      cairn-db:
-        condition: service_healthy
-      vault-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - cairn-network
-
-  # Explore Fetcher Service - RSS feed fetching for discovery
-  explore-fetcher:
-    build:
-      context: ../../..
-      dockerfile: services/explore/fetcher/Dockerfile
-    ports:
-      - "8088:8080"
-    environment:
-      - PORT=8080
-      - RECOMMENDER_URL=http://explore-recommender:8081
-      - FETCH_INTERVAL=60
-      - FETCH_TIMEOUT=30
-      - MAX_FETCH_ERRORS=10
-      - DB_HOST=cairn-db
-      - DB_PORT=5432
-      - DB_USER=${POSTGRES_USER_FETCHER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}
-      - DB_NAME=${POSTGRES_DB_FETCHER}
-      - DB_SSLMODE=disable
-      # Feed list source: if a file is mounted at FEED_LIST_PATH it takes
-      # precedence; otherwise the service downloads FEED_LIST_URL (the
-      # repository's default curated list) at startup.
-      - FEED_LIST_PATH=/app/feeds/feeds.txt
-      - FEED_LIST_URL=https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt
-      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-    # To override with a local feed list, add a volumes: entry such as:
-    #   volumes:
-    #     - ../../../services/explore/feeds/default-feeds.txt:/app/feeds/feeds.txt:ro
-    depends_on:
-      cairn-db:
-        condition: service_healthy
-      explore-recommender:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s

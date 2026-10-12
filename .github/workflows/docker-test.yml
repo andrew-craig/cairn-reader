@@ -23,7 +23,6 @@ jobs:
       pull-requests: read
     outputs:
       users: ${{ steps.filter.outputs.users == 'true' || steps.filter.outputs.infra == 'true' }}
-      explore: ${{ steps.filter.outputs.explore == 'true' || steps.filter.outputs.infra == 'true' }}
       read-content: ${{ steps.filter.outputs.read-content == 'true' || steps.filter.outputs.infra == 'true' }}
       read-fetcher: ${{ steps.filter.outputs.read-fetcher == 'true' || steps.filter.outputs.infra == 'true' }}
       web: ${{ steps.filter.outputs.web == 'true' || steps.filter.outputs.infra == 'true' }}
@@ -36,8 +35,6 @@ jobs:
           filters: |
             users:
               - 'services/users/**'
-            explore:
-              - 'services/explore/**'
             read-content:
               - 'services/read/content/**'
               - 'services/read/internal/**'
@@ -91,60 +88,6 @@ jobs:
         run: |
           docker run --rm cairn-user-service:test --help || \
           docker run --rm cairn-user-service:test --version || \
-          echo "Image built successfully"
-
-  # ── Explore Services ──────────────────────────────────────────────────
-
-  build-explore-recommender:
-    name: Docker build (explore-recommender)
-    needs: [changes]
-    if: needs.changes.outputs.explore == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v4
-      - name: Build Docker image (test only)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/explore/recommender/Dockerfile
-          push: false
-          load: true
-          tags: cairn-explore-recommender:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Test image can run
-        run: |
-          docker run --rm cairn-explore-recommender:test --help || \
-          docker run --rm cairn-explore-recommender:test --version || \
-          echo "Image built successfully"
-
-  build-explore-fetcher:
-    name: Docker build (explore-fetcher)
-    needs: [changes]
-    if: needs.changes.outputs.explore == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v4
-      - name: Build Docker image (test only)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: services/explore/fetcher/Dockerfile
-          push: false
-          load: true
-          tags: cairn-explore-fetcher:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Test image can run
-        run: |
-          docker run --rm cairn-explore-fetcher:test --help || \
-          docker run --rm cairn-explore-fetcher:test --version || \
           echo "Image built successfully"
 
   # ── Content Services ──────────────────────────────────────────────────

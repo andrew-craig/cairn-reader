@@ -9,13 +9,11 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	// Clear all relevant env vars so we exercise the default branch
 	envKeys := []string{
 		"PORT", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_SSLMODE",
-		"DB_NAME_USERS", "DB_NAME_RECOMMENDER", "DB_NAME_FETCHER",
-		"DB_NAME_CONTENT", "DB_NAME_RSS", "DB_NAME_EMAIL",
+		"DB_NAME_USERS", "DB_NAME_CONTENT", "DB_NAME_RSS", "DB_NAME_EMAIL",
 		"JWT_PRIVATE_KEY_FILE", "JWT_PUBLIC_KEY_FILE", "JWT_AUTO_GENERATE",
 		"JWT_ACCESS_EXPIRY", "JWT_REFRESH_EXPIRY",
 		"INTERNAL_API_KEY", "BCRYPT_COST",
-		"FEED_LIST_PATH", "FEED_LIST_URL", "FETCH_INTERVAL",
-		"ARTICLE_RETENTION_DAYS", "EMAIL_DOMAIN",
+		"EMAIL_DOMAIN",
 		"LOG_LEVEL", "LOG_FORMAT",
 	}
 	for _, k := range envKeys {
@@ -54,9 +52,6 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	if cfg.BcryptCost != 12 {
 		t.Errorf("BcryptCost = %d, want 12", cfg.BcryptCost)
 	}
-	if cfg.ArticleRetentionDays != 90 {
-		t.Errorf("ArticleRetentionDays = %d, want 90", cfg.ArticleRetentionDays)
-	}
 	if cfg.InternalAPIKey == "" {
 		t.Error("InternalAPIKey should be auto-generated when unset")
 	}
@@ -78,7 +73,6 @@ func TestLoadConfig_Overrides(t *testing.T) {
 	t.Setenv("JWT_REFRESH_EXPIRY", "240h")
 	t.Setenv("INTERNAL_API_KEY", "fixed-key-value")
 	t.Setenv("BCRYPT_COST", "14")
-	t.Setenv("ARTICLE_RETENTION_DAYS", "30")
 	t.Setenv("EMAIL_DOMAIN", "example.net")
 	t.Setenv("LOG_LEVEL", "debug")
 
@@ -116,9 +110,6 @@ func TestLoadConfig_Overrides(t *testing.T) {
 	}
 	if cfg.BcryptCost != 14 {
 		t.Errorf("BcryptCost = %d", cfg.BcryptCost)
-	}
-	if cfg.ArticleRetentionDays != 30 {
-		t.Errorf("ArticleRetentionDays = %d", cfg.ArticleRetentionDays)
 	}
 	if cfg.EmailDomain != "example.net" {
 		t.Errorf("EmailDomain = %q", cfg.EmailDomain)

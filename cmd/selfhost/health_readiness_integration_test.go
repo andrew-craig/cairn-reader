@@ -21,8 +21,7 @@ import (
 // finding (task_fd42): before the fix, the users database was never
 // registered with the selfhost health checker's addDB/addPinger, so
 // /health/ready kept reporting "healthy" even after the users DB became
-// unreachable — the same lie the finding calls out for explore-recommender
-// and explore-fetcher.
+// unreachable.
 //
 // The users DB must be reachable at Mount time (userDB.New pings eagerly on
 // connect, so pointing at a dead address up front just fails Mount itself,
