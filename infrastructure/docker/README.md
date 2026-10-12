@@ -58,8 +58,6 @@ The Docker Compose configuration includes:
 In production, all services are internal-only (no host ports). Traffic is routed through Caddy.
 
 - **User Service**: Authentication and account management (dev port 8082)
-- **Explore Recommender**: Article storage and recommendations (dev port 8087)
-- **Explore Fetcher**: RSS feed fetching for Explore (dev port 8088)
 - **Content Service**: Article content storage for Read (dev port 8083)
 - **Ingest RSS**: Feed subscription management (dev port 8085)
 
@@ -80,11 +78,11 @@ In production, all services are internal-only (no host ports). Traffic is routed
        │
        ├───────────────────────────────────────────┐
        │                                           │
-┌──────▼────────┐  ┌────────────────┐  ┌──────────▼─────────┐
-│ User Service  │  │ Explore Fetcher│  │ Explore Recommender│
-│   :8082       │  │     :8088      │─▶│      :8087         │
-└───────┬───────┘  └────────┬───────┘  └──────────┬─────────┘
-        │                   │                     │
+┌──────▼────────┐
+│ User Service  │
+│   :8082       │
+└───────┬───────┘
+        │
 ┌──────────────────┐           ┌────────────────────┐
 │ Ingest RSS       │──────────▶│  Content Service   │
 │   :8085          │           │      :8083         │
@@ -93,7 +91,7 @@ In production, all services are internal-only (no host ports). Traffic is routed
          └───────────┬────────────────────┘
                      │
               ┌──────▼──────┐
-              │  cairn-db   │  (5 logical databases)
+              │  cairn-db   │  (4 logical databases)
               │   :5432     │
               └─────────────┘
 
@@ -142,14 +140,6 @@ Once running, services are available at:
   - Health: http://localhost:8082/health
   - API: http://localhost:8082/auth/* and http://localhost:8082/users/*
 
-- **Explore Recommender**: http://localhost:8087
-  - Health: http://localhost:8087/health
-  - API: http://localhost:8087/explore/*
-
-- **Explore Fetcher**: http://localhost:8088
-  - Health: http://localhost:8088/health
-  - Manual fetch: http://localhost:8088/fetch
-
 - **Content Service**: http://localhost:8083
   - Health: http://localhost:8083/health/live
   - API: http://localhost:8083/api/v1/users/{userID}/contents
@@ -183,7 +173,7 @@ No manual initialization is required!
 JWT keys are automatically generated and stored in Vault on first startup:
 
 - **Private Key**: Used by User Service to sign tokens
-- **Public Key**: Used by Recommender Service to validate tokens
+- **Public Key**: Used by the other services to validate tokens
 
 Keys are stored at:
 - `secret/jwt/private-key`
@@ -196,10 +186,9 @@ All services share a single PostgreSQL container (`cairn-db` on port 5432) but e
 | Logical Database | User | Service |
 |---|---|---|
 | `cairn_users` | `cairn_user` | User Service |
-| `cairn_recommender` | `cairn_recommender` | Explore Recommender |
-| `cairn_fetcher` | `cairn_fetcher` | Explore Fetcher |
 | `content_service` | `cairn_content` | Content Service |
 | `rss_fetcher_service` | `cairn_rss` | Ingest RSS |
+| `ingest_email` | `cairn_email` | Email Ingest |
 
 Each service connects to the same host (`cairn-db:5432`) but authenticates with its own user and targets its own database. Schema isolation is fully maintained.
 
@@ -243,34 +232,6 @@ Key configurations:
 - `JWT_ACCESS_LIFETIME=15m`
 - `JWT_REFRESH_LIFETIME=7d`
 - `SERVER_ENVIRONMENT=development`
-
-### Explore Recommender (explore-recommender)
-- `PORT=8081` (internal), exposed as 8087
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_NAME=${POSTGRES_DB_RECOMMENDER}`
-- `DB_USER=${POSTGRES_USER_RECOMMENDER}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_RECOMMENDER}`
-- `DB_SSLMODE=disable`
-- `VAULT_ADDR=http://vault:8200`
-- `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
-- `JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key`
-- `ARTICLE_RETENTION_DAYS=90`
-
-### Explore Fetcher (explore-fetcher)
-- `PORT=8080` (internal), exposed as 8088
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_NAME=${POSTGRES_DB_FETCHER}`
-- `DB_USER=${POSTGRES_USER_FETCHER}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_FETCHER}`
-- `DB_SSLMODE=disable`
-- `RECOMMENDER_URL=http://explore-recommender:8081`
-- `FETCH_INTERVAL=60` (seconds)
-- `FETCH_TIMEOUT=30` (seconds)
-- `MAX_FETCH_ERRORS=10`
-- `FEED_LIST_PATH=/app/feeds/feeds.txt` — mount your own list here to override the default
-- `FEED_LIST_URL=https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt` — used when `FEED_LIST_PATH` is absent
 
 ### Content Service (content-service)
 - `PORT=8080` (internal), exposed as 8083
@@ -322,8 +283,6 @@ docker compose logs -f
 View logs for a specific service:
 ```bash
 docker compose logs -f user-service
-docker compose logs -f explore-recommender
-docker compose logs -f explore-fetcher
 docker compose logs -f vault
 ```
 
@@ -335,12 +294,6 @@ docker compose logs -f vault
 # User Service
 curl http://localhost:8082/health
 
-# Explore Recommender
-curl http://localhost:8087/health
-
-# Explore Fetcher
-curl http://localhost:8088/health
-
 # Content Service
 curl http://localhost:8083/health/live
 
@@ -348,22 +301,7 @@ curl http://localhost:8083/health/live
 curl http://localhost:8085/health/live
 ```
 
-### 2. Trigger Manual Feed Fetch
-
-```bash
-curl -X POST http://localhost:8088/fetch
-```
-
-### 3. Get Recommendations
-
-```bash
-# Note: This endpoint requires JWT authentication
-# You'll need to register a user and get a token first
-curl http://localhost:8087/api/v1/recommendations/ \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-### 4. Register a Test User
+### 2. Register a Test User
 
 ```bash
 curl -X POST http://localhost:8082/auth/register \
@@ -455,8 +393,10 @@ docker compose exec vault cat /vault-keys/approle-credentials.env
 # 5. Update .env with the AppRole credentials
 # USER_SERVICE_ROLE_ID=<from step 4>
 # USER_SERVICE_SECRET_ID=<from step 4>
-# EXPLORE_RECOMMENDER_ROLE_ID=<from step 4>
-# EXPLORE_RECOMMENDER_SECRET_ID=<from step 4>
+# CONTENT_SERVICE_ROLE_ID=<from step 4>
+# CONTENT_SERVICE_SECRET_ID=<from step 4>
+# EMAIL_INGEST_ROLE_ID=<from step 4>
+# EMAIL_INGEST_SECRET_ID=<from step 4>
 
 # 6. Restart services to use AppRole auth
 docker compose up -d
@@ -478,7 +418,8 @@ docker compose exec vault rm /vault-keys/UNSEAL_KEYS.txt
 │  │  user-service   │───▶│  secret/data/jwt/public-key         │ │
 │  │  (read priv+pub)│    │                                     │ │
 │  │                 │    │                                     │ │
-│  │  explore-recomm │───▶│  (read public key only)             │ │
+│  │  content-service│───▶│  (read public key only)             │ │
+│  │  email-ingest   │    │                                     │ │
 │  │  (read pub only)│    │                                     │ │
 │  └─────────────────┘    └─────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
@@ -486,7 +427,7 @@ docker compose exec vault rm /vault-keys/UNSEAL_KEYS.txt
 
 **Service Permissions:**
 - **user-service**: Can read both private and public JWT keys (signs tokens)
-- **explore-recommender**: Can only read the public JWT key (verifies tokens)
+- **content-service**, **email-ingest**: Can only read the public JWT key (verify tokens)
 
 ### Vault Unseal After Restart
 
@@ -605,8 +546,6 @@ Internal service communication uses service names as hostnames:
 - `vault:8200`
 - `cairn-db:5432` (all services connect here, each to its own logical database)
 - `user-service:8080`
-- `explore-recommender:8081`
-- `explore-fetcher:8080`
 - `content-service:8080`
 - `ingest-rss:8081`
 

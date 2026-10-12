@@ -8,7 +8,6 @@ This document provides a detailed overview of Cairn's architecture, design decis
 - [Mobile App](#mobile-app)
 - [Web App](#web-app)
 - [User Service](#user-service)
-- [Explore Service](#explore-service)
 - [Read Service](#read-service)
 - [Email Ingest Service](#email-ingest-service)
 - [Security Considerations](#security-considerations)
@@ -30,7 +29,6 @@ flowchart TB
 
     subgraph Backend["Backend Services"]
         UserSvc["User Service<br/>Auth · Users · JWT"]
-        ExploreSvc["Explore Service<br/>RSS Feeds · Recommendations"]
         ReadSvc["Read Service<br/>Content · Articles · RSS Subscriptions"]
         EmailSvc["Email Ingest Service<br/>Newsletter Ingestion"]
     end
@@ -38,15 +36,12 @@ flowchart TB
     DB[("PostgreSQL<br/>one consolidated instance,<br/>separate logical DB per service")]
 
     Mobile -->|REST| UserSvc
-    Mobile -->|REST| ExploreSvc
     Mobile -->|REST| ReadSvc
     Web -->|REST| UserSvc
-    Web -->|REST| ExploreSvc
     Web -->|REST| ReadSvc
     EmailSvc -->|"internal bulk delivery"| ReadSvc
 
     UserSvc --> DB
-    ExploreSvc --> DB
     ReadSvc --> DB
     EmailSvc --> DB
 ```
@@ -58,8 +53,6 @@ Ports differ between what a service listens on inside its container and where th
 | Service | Container Port | Dev Host Port |
 |---|---|---|
 | User Service | 8080 | 8082 |
-| Explore Fetcher | 8080 | 8088 |
-| Explore Recommender | 8081 | 8087 |
 | Read: Content Service | 8080 | 8083 |
 | Read: Content Worker (health only) | 8084 | 8084 |
 | Read: RSS Fetcher Service | 8081 | 8085 |
@@ -84,15 +77,15 @@ The selfhost single-container build (`infrastructure/docker/selfhost/`) runs eve
 
 ## Mobile App
 
-The Mobile App is a React Native (Expo) client for iOS, Android, and web that lets users discover, save, and read articles from RSS feeds, newsletters, and manually added links. It contains no business logic of its own — auth, storage, and recommendations all live in the backend services — and acts as a thin REST client with local persistence for tokens and an offline-friendly article cache.
+The Mobile App is a React Native (Expo) client for iOS, Android, and web that lets users save and read articles from RSS feeds, newsletters, and manually added links. It contains no business logic of its own — auth and storage both live in the backend services — and acts as a thin REST client with local persistence for tokens and an offline-friendly article cache.
 
 ### Service Purpose and Responsibilities
 
 **Core Responsibilities**:
-- Tab-based navigation across Read (saved articles), Explore (recommendations), and You (profile/settings), plus modal/stack screens for article detail, adding links, and search
+- Tab-based navigation across Feed (skim list), Reads (articles to read or triage), and You (profile/settings), plus modal/stack screens for article detail, adding links, and search
 - Device-ID and email/password authentication, with proactive access-token refresh before each API call
-- A service layer (`AuthService`, `ReadService`, `ExploreService`) that attaches `Authorization: Bearer` headers and retries on 401/5xx
-- Local persistence via AsyncStorage (auth tokens, the chosen backend server URL, and a stale-while-revalidate cache for the Explore list) and SQLite (the offline-capable Read-list article store — see "Offline Reading" below)
+- A service layer (`AuthService`, `ReadService`) that attaches `Authorization: Bearer` headers and retries on 401/5xx
+- Local persistence via AsyncStorage (auth tokens, the chosen backend server URL, and a stale-render snapshot of the last Feed page) and SQLite (the offline-capable Reads article store — see "Offline Reading" below)
 - Runtime backend switching (a server URL field on the login screen) for pointing the app at a self-hosted or local backend without a rebuild
 
 **Technology Stack**:
@@ -100,7 +93,7 @@ The Mobile App is a React Native (Expo) client for iOS, Android, and web that le
 - TypeScript, React Navigation (stack + bottom tabs)
 - React Context (`AuthContext`) for auth state
 - `@cairn/shared` workspace package for the API config layer and data types (shared with the web app)
-- AsyncStorage for the Explore cache and auth/session state; `expo-sqlite` for the offline Read-list store; `expo-network` for connectivity detection
+- AsyncStorage for the Feed snapshot and auth/session state; `expo-sqlite` for the offline Reads store; `expo-network` for connectivity detection
 - `react-native-render-html` for rendering saved article content
 
 ### App Architecture
@@ -112,22 +105,21 @@ flowchart LR
         Login["LoginScreen<br/>device ID or email/password"]
         AddArticle["AddArticleScreen<br/>(global modal, + header button)"]
 
-        subgraph ReadTab["Read tab"]
-            Read["ReadScreen"]
-            Bookmarks["BookmarksScreen"]
-            Detail["ReadArticleDetailScreen"]
+        subgraph FeedTab["Feed tab"]
+            Feed["FeedScreen"]
         end
 
-        subgraph ExploreTab["Explore tab"]
-            Explore["ExploreScreen"]
-            Votes["VotesScreen"]
-            ExploreDetail["ExploreArticleDetailScreen"]
+        subgraph ReadsTab["Reads tab"]
+            Reads["ReadsScreen"]
+            Bookmarks["BookmarksScreen"]
         end
+
+        Detail["ReadArticleDetailScreen<br/>(shared reader)"]
 
         subgraph YouTab["You tab"]
             You["YouScreen"]
             Account["AccountScreen"]
-            Feeds["FeedsScreen"]
+            Rss["RssScreen"]
             Newsletters["NewslettersScreen"]
             About["AboutScreen"]
         end
@@ -135,7 +127,6 @@ flowchart LR
         subgraph Services["Service layer (src/services/)"]
             AuthSvc["AuthService"]
             ReadSvc["ReadService"]
-            ExploreSvc["ExploreService"]
         end
 
         AuthCtx["AuthContext (React Context)"]
@@ -144,7 +135,6 @@ flowchart LR
 
     subgraph Backend["Backend services (single server URL, path-routed)"]
         UserSvc["User Service<br/>:8082"]
-        Recommender["Explore Recommender<br/>:8087"]
         Content["Content Service<br/>:8083"]
         IngestRSS["Ingest RSS Service<br/>:8085"]
         EmailIngest["Email Ingest Service<br/>:8089"]
@@ -155,43 +145,40 @@ flowchart LR
     AuthSvc -->|"persist access + refresh tokens"| Storage
     AuthSvc -->|"POST /api/v1/auth/..."| UserSvc
 
-    Read --> ReadSvc
+    Feed --> ReadSvc
+    Reads --> ReadSvc
     Bookmarks --> ReadSvc
     Detail --> ReadSvc
     AddArticle --> ReadSvc
-    Feeds --> ReadSvc
+    Rss --> ReadSvc
     Newsletters --> ReadSvc
 
-    Explore --> ExploreSvc
-    Votes --> ExploreSvc
-    ExploreDetail --> ExploreSvc
+    Feed --> Detail
+    Reads --> Detail
 
     ReadSvc -->|"getAccessToken()"| AuthSvc
-    ExploreSvc -->|"getAccessToken()"| AuthSvc
 
     ReadSvc -->|"Bearer token · /api/v1/content/..."| Content
     ReadSvc -->|"Bearer token · /api/v1/source/rss/..."| IngestRSS
     ReadSvc -->|"Bearer token · /api/v1/source/email/..."| EmailIngest
-    ExploreSvc -->|"Bearer token · /api/v1/explore/..."| Recommender
 
     You --> Account
-    You --> Feeds
+    You --> Rss
     You --> Newsletters
     You --> About
     You --> Bookmarks
-    You --> Votes
 ```
 
-The app talks to a single backend server URL (defaulting to `https://cairn.seatrain.net`, overridable per-device) rather than per-service hosts; the ports above are the underlying services that URL's `/api/v1/...` paths route to in the dev `docker-compose` environment. The Explore Fetcher service (dev port `:8088`) is internal-only and never called directly by the app.
+The app talks to a single backend server URL (defaulting to `https://cairn.seatrain.net`, overridable per-device) rather than per-service hosts; the ports above are the underlying services that URL's `/api/v1/...` paths route to in the dev `docker-compose` environment.
 
 ### Offline Reading
 
-Saved (Read-list) articles are readable with no network connection, and edits made offline sync once the connection returns. Explore content is never cached and stays online-only.
+Reads articles are readable with no network connection, and edits made offline sync once the connection returns. Feed items are never written to the local store or prefetched and stay online-only (only the last Feed page is kept as a stale-render snapshot).
 
-- **Local store**: a single on-device SQLite database (`expo-sqlite`, `apps/mobile/src/services/db.ts`) holds an `articles` table (metadata, user state, and an opportunistically cached `body`) and an `outbox` table, migrated via `PRAGMA user_version`. `ArticleStore` is a read-through cache for the initial render of the Read, Bookmarks, and article-detail screens — pagination against the network is unaffected.
-- **Body prefetch**: after every list sync, `ArticlePrefetchService` downloads `cleaned_html` in the background for unread/reading articles with no cached body — newest first, 3 concurrent workers, capped at the 100 most recently added Read-list articles, then evicts cached bodies outside that cap. A body is diffed against the server's `content_hash` from the list page, so an unchanged body is never re-downloaded; a changed hash clears the stale cached body until it's refetched.
+- **Local store**: a single on-device SQLite database (`expo-sqlite`, `apps/mobile/src/services/db.ts`) holds an `articles` table (metadata, user state, and an opportunistically cached `body`) and an `outbox` table, migrated via `PRAGMA user_version`. `ArticleStore` is a read-through cache for the initial render of the Reads, Bookmarks, and article-detail screens — pagination against the network is unaffected.
+- **Body prefetch**: after every list sync, `ArticlePrefetchService` downloads `cleaned_html` in the background for unread/reading articles with no cached body — newest first, 3 concurrent workers, capped at the 100 most recently added Reads articles, then evicts cached bodies outside that cap. A body is diffed against the server's `content_hash` from the list page, so an unchanged body is never re-downloaded; a changed hash clears the stale cached body until it's refetched.
 - **Mutation outbox**: status, favorite, scroll-position, and archive edits write to the local store first, then attempt the backend call; a `NetworkError` (server unreachable) queues the write in the `outbox` table instead of losing it. The outbox drains in FIFO order on reconnect, replaying each row until one comes back retryable (network/401/5xx), which halts the batch to preserve ordering — a definitive 4xx drops the row instead of retrying it forever.
-- **Connectivity and sync triggers**: `expo-network` backs a global offline banner and gates the prefetch pass and the article-detail network fetch (both skip outright while offline; mutations instead just attempt the call and let a thrown `NetworkError` route them to the outbox). A sync (outbox drain, then prefetch) fires on reconnect, on the app returning to the foreground, and on every Read-list sync (including pull-to-refresh) — never merely because the app happens to be online or active.
+- **Connectivity and sync triggers**: `expo-network` backs a global offline banner and gates the prefetch pass and the article-detail network fetch (both skip outright while offline; mutations instead just attempt the call and let a thrown `NetworkError` route them to the outbox). A sync (outbox drain, then prefetch) fires on reconnect, on the app returning to the foreground, and on every Reads sync (including pull-to-refresh) — never merely because the app happens to be online or active.
 - **Conflict resolution**: last-write-wins, no client timestamps or server versioning — acceptable for a single-device-dominant read-it-later app, but a replayed offline write can clobber a newer value written from another device in the meantime.
 - **Out of scope**: the web app (no service worker/IndexedDB — an explicit non-goal per `docs/detailed_requirements/web_app_requirements.md`), image caching (remote `<img>` URLs still fail silently offline; tracked separately), backend delta-sync/ETag support, and manual per-article download (prefetch is automatic, not user-triggered).
 
@@ -199,14 +186,14 @@ Saved (Read-list) articles are readable with no network connection, and edits ma
 
 ## Web App
 
-The Web App is a React (Vite) browser client offering the same core reading experience as the mobile app — saved articles, RSS/newsletter discovery, and recommendations — served as a single-page application, typically same-origin with the backend it talks to.
+The Web App is a React (Vite) browser client offering the same core reading experience as the mobile app — a Feed and a Reads list, RSS/newsletter subscriptions, and saved links — served as a single-page application, typically same-origin with the backend it talks to.
 
 ### Service Purpose and Responsibilities
 
 **Core Responsibilities**:
-- Route-based navigation across Read, Explore, and You (account/feeds/newsletters/bookmarks/votes/about), guarded by a `RequireAuth` route wrapper
+- Route-based navigation across Feed, Reads, and You (account/rss/newsletters/bookmarks/about), guarded by a `RequireAuth` route wrapper
 - Email/password authentication only — browsers have no Expo device identifier, so device-ID login (mobile-only) isn't offered
-- A service layer (`AuthService`, `ReadService`, `ExploreService`, `SystemService`) ported from the mobile app's equivalents and adapted to browser storage
+- A service layer (`AuthService`, `ReadService`, `SystemService`) ported from the mobile app's equivalents and adapted to browser storage
 - Session persistence via `localStorage`, with proactive token refresh and a single 401-retry choke point (`fetchWithAuth`)
 - Same-origin backend resolution by default (`window.location.origin`), overridable via `VITE_API_URL` in development — this is what lets the selfhost single-container build (port `8099`) serve the SPA and all APIs behind one origin
 
@@ -228,9 +215,9 @@ flowchart TB
             Login["/login (Login.tsx)"]
             RequireAuth{"RequireAuth<br/>(isAuthenticated?)"}
             AppLayout["AppLayout<br/>(Sidebar / BottomNav)"]
-            Read["/read, /read/:id"]
-            Explore["/explore, /explore/:id"]
-            You["/you, /you/account, /you/feeds,<br/>/you/newsletters, /you/bookmarks,<br/>/you/votes, /you/about"]
+            Feed["/feed, /feed/:id"]
+            Reads["/reads, /reads/:id"]
+            You["/you, /you/account, /you/rss,<br/>/you/newsletters, /you/bookmarks,<br/>/you/about"]
         end
 
         AuthCtx["AuthContext<br/>(user, isAuthenticated, login, logout)"]
@@ -238,7 +225,6 @@ flowchart TB
         subgraph Services["Service layer (src/services)"]
             AuthSvc["AuthService (auth.ts)"]
             ReadSvc["ReadService (read.ts)"]
-            ExploreSvc["ExploreService (explore.ts)"]
             SystemSvc["SystemService (system.ts)"]
         end
 
@@ -252,12 +238,12 @@ flowchart TB
         Login -->|"loginWithEmail()"| AuthSvc
         RequireAuth -->|unauthenticated| Login
         RequireAuth -->|authenticated| AppLayout
-        AppLayout --> Read & Explore & You
+        AppLayout --> Feed & Reads & You
 
-        Read --> ReadSvc
+        Feed --> ReadSvc
+        Reads --> ReadSvc
         You --> ReadSvc
         You --> SystemSvc
-        Explore --> ExploreSvc
 
         Login --> AuthCtx
         AppLayout --> AuthCtx
@@ -266,10 +252,8 @@ flowchart TB
         AuthSvc --> ServerUrl
 
         ReadSvc --> FetchAuth
-        ExploreSvc --> FetchAuth
         FetchAuth --> AuthSvc
         ReadSvc --> ServerUrl
-        ExploreSvc --> ServerUrl
         SystemSvc --> ServerUrl
     end
 
@@ -278,13 +262,11 @@ flowchart TB
         ContentSvc["Content Service (Read)<br/>host :8083 → container :8080<br/>/api/v1/content/*"]
         RssSvc["Ingest RSS Service (Read)<br/>host :8085 → container :8081"]
         EmailSvc["Email Ingest Service<br/>host :8089 → container :8087<br/>/api/v1/source/email/*"]
-        ExploreRec["Explore Recommender<br/>host :8087 → container :8081<br/>/api/v1/explore/*"]
     end
 
     AuthSvc -->|"login / register / refresh / logout"| UserSvc
     ReadSvc -->|"content CRUD, search,<br/>detect-url, discover-feed,<br/>unified subscriptions"| ContentSvc
     ReadSvc -->|"get/create newsletter<br/>ingest address"| EmailSvc
-    ExploreSvc -->|"recommendations, vote,<br/>mark-read, mark-shown"| ExploreRec
     SystemSvc -->|"GET /health/live<br/>(configured backend origin)"| ContentSvc
     ContentSvc -.->|"server-to-server<br/>(feed polling proxy,<br/>not called from the browser)"| RssSvc
 ```
@@ -299,9 +281,8 @@ flowchart TB
 
 ### API Client Layer
 
-- `ReadService`, `ExploreService`, and `SystemService` are thin, per-domain wrappers around `fetch`/`AuthService.fetchWithAuth`, each ported from the equivalent mobile service and adapted to `@cairn/shared`'s `getServerUrl()`.
-- `ReadService` talks to the Content Service for everything under `/api/v1/content/*` — the reading list, search, saving/removing articles, URL/feed detection, and the unified subscriptions list — and to the Email Ingest Service for the user's newsletter ingest address. The Content Service, not the browser, is what talks to the Ingest RSS Service server-to-server.
-- `ExploreService` talks only to the Explore Recommender for recommendations, voting, and read/shown tracking.
+- `ReadService` and `SystemService` are thin, per-domain wrappers around `fetch`/`AuthService.fetchWithAuth`, each ported from the equivalent mobile service and adapted to `@cairn/shared`'s `getServerUrl()`.
+- `ReadService` talks to the Content Service for everything under `/api/v1/content/*` — the Feed and Reads lists (`?list=feed|reads`), search, saving/removing articles, URL/feed detection, the unified subscriptions list, and choosing Feed or Reads per source — and to the Email Ingest Service for the user's newsletter ingest address. The Content Service, not the browser, is what talks to the Ingest RSS Service server-to-server.
 - All response envelopes (`{ data, pagination? }` / `{ message | error }`) are parsed consistently, and backend DTOs are mapped into the shared `Article` UI shape before components ever see them.
 
 ---
@@ -355,7 +336,7 @@ flowchart TD
 
     VaultStore[("HashiCorp Vault :8200<br/>RSA key pair (KV secrets)")]
     DB[("PostgreSQL: cairn_users<br/>users, refresh_tokens,<br/>email_verification_tokens")]
-    OtherSvcs["Explore / Read services<br/>(validate JWTs independently)"]
+    OtherSvcs["Read services<br/>(validate JWTs independently)"]
 
     MobileApp -- HTTPS --> Router
     WebApp -- HTTPS --> Router
@@ -690,408 +671,6 @@ A `password_reset_tokens` table existed briefly (migration `000006`) but was dro
 
 ---
 
-## Explore Service
-
-The Explore Service is a dual-microservice system for discovering and recommending RSS content to users. It consists of two independent services (Fetcher and Recommender) with separate logical databases that communicate exclusively via REST APIs.
-
-### Service Architecture
-
-```mermaid
-flowchart LR
-    subgraph external["External"]
-        kagi["Kagi Small Web<br/>(feed list source)"]
-        client["Client<br/>(Mobile / Web App)"]
-    end
-
-    subgraph explore["Explore Service"]
-        fetcher["Fetcher Service<br/>:8080"]
-        recommender["Recommender Service<br/>:8081"]
-        fetcherDB[("Fetcher DB<br/>feeds, fetch_history")]
-        recDB[("Recommender DB<br/>articles, users,<br/>votes, recommendations")]
-    end
-
-    kagi -. "daily sync" .-> fetcher
-    fetcher -- "HTTP POST<br/>/api/v1/explore/article" --> recommender
-    fetcher --- fetcherDB
-    recommender --- recDB
-    client -- "GET recommendation / search<br/>POST shown / vote / read" --> recommender
-```
-
-Dev host ports differ from the container-internal ports shown above: the centralized dev Docker Compose (`infrastructure/docker/dev`) maps the recommender to host port **8087** and the fetcher to host port **8088**, so services running elsewhere reach them at `localhost:8087`/`localhost:8088` rather than `:8081`/`:8080`.
-
-**Key Architectural Principle**: Each service owns its own database. Services communicate only via HTTP APIs, never direct database access.
-
-### Fetcher Service
-
-**Purpose**: Manage RSS feed sources and fetch content for users
-
-**Core Responsibilities**:
-- Maintain feed sources in a dedicated PostgreSQL database
-- Fetch RSS/Atom feeds at a controlled rate (1 feed per minute)
-- Parse feed items and extract metadata
-- Forward every item from a successful fetch to the Recommender via HTTP POST — the Recommender deduplicates by link (`ON CONFLICT (link)`), so the Fetcher does not filter by publish date before sending
-- Auto-disable feeds after 10 consecutive failures
-- Daily sync from the Kagi Small Web collection
-- Track fetch history for monitoring
-- Support conditional GET (ETag / Last-Modified) so unchanged feeds are skipped cheaply
-
-**Technology Stack**:
-- Go 1.23+
-- PostgreSQL (fetcher_db)
-- gofeed for RSS/Atom parsing
-- 30-second HTTP timeout for both feed fetches and article submission to the Recommender
-
-**Feed Management**:
-- Daily sync from [Kagi Small Web Text collection](https://github.com/kagisearch/smallweb/blob/main/smallweb.txt)
-- Prioritizes never-fetched feeds, then oldest
-- Fetches 1 feed every 60 seconds (configurable via `FETCH_INTERVAL`)
-- Auto-disables feeds after 10 consecutive failures (hardcoded threshold, not currently env-configurable)
-
-**Endpoints**:
-```
-GET  /health/live                    # Liveness check
-GET  /health/ready                   # Readiness check (DB connectivity)
-POST /api/v1/explore/feed/fetch      # Manually trigger a single feed fetch (X-Internal-API-Key)
-POST /api/v1/explore/feed/sync       # Manually trigger a Kagi feed-list sync (X-Internal-API-Key)
-GET  /api/v1/explore/feed/stats      # Feed counts (total/enabled/disabled/never-fetched) (X-Internal-API-Key)
-```
-
-### Recommender Service
-
-**Purpose**: Store articles and provide personalized recommendations
-
-**Core Responsibilities**:
-- Receive articles from Fetcher via HTTP POST
-- Store articles with content-hash IDs (deduplicated by `link`)
-- Manage user engagement (upvotes/downvotes)
-- Serve a ranked, paginated feed of recommendations
-- Track articles read per user
-- Track which articles have been shown to a user, to avoid repeats
-- Auto-create users on first interaction
-
-**Technology Stack**:
-- Go 1.23+
-- PostgreSQL (cairn_db)
-- JWT authentication (validates tokens from User Service, via the shared `pkg/auth` package)
-- Quality-based recommendation ranking
-
-**Endpoints**:
-```
-GET    /health/live                                  # Liveness check
-GET    /health/ready                                 # Readiness check
-POST   /api/v1/explore/article                       # Submit articles (from fetcher; batch, requires X-Internal-API-Key)
-GET    /api/v1/explore/recommendation?offset=N        # Get a ranked page of recommendations (requires auth)
-GET    /api/v1/explore/search?q=...                   # Full-text search over articles (requires auth)
-POST   /api/v1/explore/shown                          # Record articles shown to the user (requires auth)
-POST   /api/v1/explore/article/{article_id}/read       # Mark article as read (requires auth)
-POST   /api/v1/explore/article/{article_id}/vote       # Vote on article (requires auth)
-DELETE /api/v1/explore/article/{article_id}/vote       # Remove vote (requires auth)
-GET    /api/v1/explore/article/{article_id}/vote       # Get vote counts (requires auth)
-GET    /api/v1/explore/user/votes                      # List articles the user voted on (requires auth)
-GET    /api/v1/explore/user/vote-stats                 # Aggregate vote counts for the user (requires auth)
-```
-
-### Recommendation Algorithm
-
-**Algorithm**: quality-ranked, offset-paginated feed (`recommender/internal/recommend/engine.go`)
-
-`GetRecommendations` is a pure read: it never mutates vote/exposure counters or
-writes tracking rows.
-
-**Quality Score Formula**:
-```
-quality_score = (upvotes - (downvotes × 3)) / recommends
-
-Where:
-- upvotes: Number of positive votes
-- downvotes: Number of negative votes (weighted 3x)
-- recommends: Number of times the article has been recorded as shown to any user
-```
-Articles with `recommends == 0` score `+Inf` if they have any upvotes, otherwise a high default of `1000.0` — this is what surfaces new/low-exposure content, rather than a separate reserved "discovery" slot.
-
-**Selection Process**:
-1. Fetch up to 100 eligible articles (not deleted, not already recommended to this user)
-2. Calculate quality score for each
-3. Sort the pool by quality score descending (ties broken by article ID, for stable pagination)
-4. Return a page of 10, starting at the caller's `offset` query parameter (default 0)
-
-**Tracking is separate from ranking**: `POST /api/v1/explore/shown` is the sole writer of `recommendations` rows and the sole driver of the `articles.recommends` counter. Clients call it once articles have actually scrolled into view, decoupling "what we'd show" from "what the user actually saw."
-
-**Benefits**:
-- Balances quality (user votes) with freshness (low exposure)
-- Downvotes heavily penalize quality (3x multiplier)
-- New articles get surfaced quickly
-- Prevents recommendation repetition per user
-
-### Database Schema
-
-#### Fetcher Database (fetcher_db)
-
-**Feeds Table**:
-```sql
-CREATE TABLE feeds (
-    id SERIAL PRIMARY KEY,
-    url TEXT UNIQUE NOT NULL,
-    title TEXT,
-    description TEXT,
-    last_fetched_at TIMESTAMP,
-    consecutive_failures INT DEFAULT 0,
-    enabled BOOLEAN DEFAULT true,
-    etag TEXT,                        -- HTTP ETag from the last fetch (conditional GET)
-    last_modified TEXT,               -- HTTP Last-Modified from the last fetch
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_feeds_last_fetched ON feeds(last_fetched_at NULLS FIRST) WHERE enabled = true;
-CREATE INDEX idx_feeds_enabled ON feeds(enabled);
-```
-
-**Fetch History Table**:
-```sql
-CREATE TABLE fetch_history (
-    id SERIAL PRIMARY KEY,
-    feed_id INT REFERENCES feeds(id) ON DELETE CASCADE,
-    fetch_started_at TIMESTAMP NOT NULL,
-    fetch_completed_at TIMESTAMP,
-    success BOOLEAN,
-    articles_found INT DEFAULT 0,
-    articles_sent INT DEFAULT 0,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_fetch_history_feed_id ON fetch_history(feed_id);
-CREATE INDEX idx_fetch_history_created_at ON fetch_history(created_at DESC);
-```
-
-#### Recommender Database (cairn_db)
-
-**Users Table**:
-```sql
-CREATE TABLE users (
-    id TEXT PRIMARY KEY,   -- External user ID from User Service, used directly (no internal ID mapping)
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-**Articles Table**:
-```sql
-CREATE TABLE articles (
-    id VARCHAR(255) PRIMARY KEY,      -- SHA256 hash of the cleaned article content (not the link)
-    title TEXT NOT NULL,
-    link TEXT UNIQUE NOT NULL,
-    description TEXT,
-    content TEXT,
-    author VARCHAR(255),
-    published TIMESTAMP NOT NULL,
-    feed_url TEXT NOT NULL,
-    feed_title VARCHAR(255),
-    categories TEXT[],                -- Array of category tags
-    feed_id INT,                      -- Reference to fetcher DB (no FK constraint)
-    upvotes INT DEFAULT 0,
-    downvotes INT DEFAULT 0,
-    recommends INT DEFAULT 0,         -- Counter for recommendation-exposure tracking
-    deleted BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP
-);
-
-CREATE INDEX idx_articles_published ON articles(published DESC);
-CREATE INDEX idx_articles_feed_url ON articles(feed_url);
-CREATE INDEX idx_articles_categories ON articles USING GIN(categories);
-CREATE INDEX idx_articles_recommends ON articles(recommends);
-CREATE INDEX idx_articles_quality_score ON articles(upvotes, downvotes, recommends) WHERE deleted = false;
-```
-
-**User Articles Table** (tracks read status):
-```sql
-CREATE TABLE user_articles (
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
-    read BOOLEAN DEFAULT FALSE,
-    read_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (user_id, article_id)
-);
-
-CREATE INDEX idx_user_articles_user_id ON user_articles(user_id);
-CREATE INDEX idx_user_articles_read ON user_articles(read);
-```
-
-**Votes Table**:
-```sql
-CREATE TABLE votes (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
-    vote_type TEXT CHECK (vote_type IN ('upvote', 'downvote')),
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(user_id, article_id)
-);
-
-CREATE INDEX idx_votes_article ON votes(article_id);
-CREATE INDEX idx_votes_user ON votes(user_id);
-CREATE INDEX idx_votes_vote_type ON votes(vote_type);
-```
-
-**Recommendations Table** (tracks per-user shown history, written by `POST /shown`):
-```sql
-CREATE TABLE recommendations (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
-    recommended_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(user_id, article_id)
-);
-
-CREATE INDEX idx_recommendations_user_article ON recommendations(user_id, article_id);
-CREATE INDEX idx_recommendations_article ON recommendations(article_id);
-```
-
-**Article Categories Table**: also present in the schema (`article_categories`, a junction table keyed on `article_id, category`) but not currently read from or written to by application code — categories are carried on the `articles.categories` array column instead.
-
-### Communication Patterns
-
-#### Fetcher → Recommender Communication
-
-**Pattern**: HTTP POST with JSON payload
-
-**Flow**:
-```
-Fetcher Service                 Recommender Service
-      │                                │
-      ├──1. Fetch RSS feed─────────────┤
-      ├──2. Parse feed items───────────┤
-      ├──3. Forward every item─────────┤   (no publish-date filtering;
-      │                                │    Recommender dedups by link)
-      ├──POST /api/v1/explore/article──>│
-      │  {articles: [...]}             │
-      │                                ├──4. Store/update articles (upsert)
-      │                                ├──5. Deduplicate by link
-      │<───{status: "success"}─────────┤
-      │                                │
-      ├──6. Record fetch history───────┤
-      └──7. Update last_fetched_at─────┘
-```
-
-**Request Format**:
-```json
-{
-  "articles": [
-    {
-      "id": "sha256-hash-of-cleaned-content",
-      "title": "Article Title",
-      "link": "https://example.com/article",
-      "description": "Article description",
-      "content": "Full article content",
-      "author": "Author Name",
-      "published": "2024-01-01T00:00:00Z",
-      "feed_url": "https://example.com/feed.xml",
-      "feed_title": "Feed Title",
-      "categories": ["tech", "programming"]
-    }
-  ]
-}
-```
-
-**Error Handling**:
-- 30-second timeout for both feed fetches and article submission to the Recommender
-- Failed submissions marked in fetch history
-- Consecutive failures tracked per feed
-- Auto-disable after 10 consecutive failures
-
-### Article ID Generation
-
-**Method**: SHA256 hash of the cleaned article content (not the link) — `pkg/rss/hash.ContentHash`, shared with the Read service so both ingestion pipelines derive consistent content-hash IDs. An earlier version hashed the link instead; the fetcher's `000002_add_etag_columns` migration documents the switch and resets `last_fetched_at` so feeds are re-processed under the new scheme.
-
-**Benefits**:
-- Deterministic ID generation
-- Consistent IDs across the Explore and Read ingestion pipelines
-- No need for centralized ID allocation
-
-**Note**: deduplication in the Recommender is a separate mechanism, still keyed on `link` (`ON CONFLICT (link) DO UPDATE`) — the content-hash ID and the link-based dedup key are independent.
-
-**Implementation**:
-```go
-// pkg/rss/hash/hash.go
-func ContentHash(html []byte) string {
-    normalized := bytes.TrimSpace(html)
-    sum := sha256.Sum256(normalized)
-    return hex.EncodeToString(sum[:])
-}
-```
-
-### Feed Polling Strategy
-
-**Objective**: Gentle polling to avoid overwhelming feed sources
-
-**Strategy**:
-- Fetch 1 feed every 60 seconds (configurable via `FETCH_INTERVAL`)
-- Prioritize never-fetched feeds first
-- Then fetch oldest by `last_fetched_at`
-- Only fetch from enabled feeds
-- Forward every item from a successful fetch on every cycle — the Recommender's `ON CONFLICT (link)` upsert makes re-sending safe, and avoids silently dropping items when an upstream CDN serves a stale/cached feed
-- Conditional GET (ETag / Last-Modified) short-circuits unchanged feeds with a 304 before any parsing happens
-
-**Failure Handling**:
-- Track consecutive failures per feed
-- Auto-disable after 10 consecutive failures (hardcoded threshold)
-- Failed feeds can be manually re-enabled
-- Each successful fetch resets the consecutive-failure counter
-
-**Feed Sources**:
-- Daily sync from the Kagi Small Web collection
-- Runs on startup and every 24 hours
-- New feeds automatically added (existing feeds unchanged)
-
-### Voting System
-
-**Supported Actions**:
-- `upvote`: Positive vote (increases quality score)
-- `downvote`: Negative vote (decreases quality score 3x)
-- Remove vote: Delete existing vote
-
-**Vote Mechanics**:
-- One vote per user per article (enforced by unique constraint)
-- Changing vote type replaces the previous vote
-- Vote counts materialized on the `articles` table for fast reads
-- Votes tracked in a separate `votes` table for audit trail
-
-**Vote Impact on Recommendations**:
-- Upvotes increase article quality score
-- Downvotes heavily penalize quality (3x multiplier)
-- Quality score drives the entire ranked page — there is no separate exploration-only slot exempt from voting
-
-### Security Considerations
-
-**Authentication**:
-- All user-facing endpoints require JWT authentication (shared `pkg/auth` middleware, not local to the recommender)
-- JWT tokens validated using the User Service's public key (via Vault)
-- User ID extracted from validated JWT claims
-- No query parameter authentication (prevents tampering)
-
-**Input Validation**:
-- Article batch submission limited to 10MB
-- Simple request bodies (vote) limited to 1KB
-- Shown-batch requests limited to 16KB (up to ~100 article IDs)
-- Vote type must be `upvote` or `downvote`
-- Article IDs validated before database operations
-
-**Database Security**:
-- No raw SQL queries (parameterized queries only)
-- Prepared statements prevent SQL injection
-- Foreign key constraints enforce referential integrity
-- Check constraints enforce valid enum values
-
-**Rate Limiting**:
-- Fetcher: 1 feed per minute (protects feed sources)
-- Recommender: no rate limiting (relies on User Service auth)
-
-**Status**: Fully operational. See [services/explore/README.md](../services/explore/README.md) for deployment details.
-
----
-
 ## Read Service
 
 The Read Service is a microservices-based read-it-later backend system designed for scalability, reliability, and maintainability. Under `services/read/` it actually comprises **three** sub-services that communicate exclusively via REST APIs: Content Service, RSS Fetcher Service, and Email Ingest Service. This section covers Content Service and RSS Fetcher Service in depth; Email Ingest Service is covered in its own section but is shown here at the boundary, since it delivers into Content Service through the same internal endpoint RSS Fetcher uses.
@@ -1106,7 +685,7 @@ flowchart TB
     subgraph ReadService["Read Service"]
         CS["Content Service<br/>host :8083 → container :8080"]
         RSS["RSS Fetcher Service<br/>host :8085 → container :8081"]
-        CSDB[("PostgreSQL: content_service<br/>contents, user_contents")]
+        CSDB[("PostgreSQL: content_service<br/>contents, user_contents,<br/>source_routes")]
         RSSDB[("PostgreSQL: rss_fetcher_service<br/>feeds, feed_subscriptions,<br/>feed_items, content_outbox")]
 
         CS --- CSDB
@@ -1138,6 +717,8 @@ Ingest uses, so Content Service treats both producers identically.
 - Implement full-text search across user's content
 - Support bulk operations for RSS Fetcher and Email Ingest integration
 - Handle content deduplication (RSS-sourced content only)
+- Own Feed vs Reads routing: each user chooses, per source, which list new items land in (see "Feed vs Reads routing" below)
+- Expire old Feed items (daily cleanup job)
 
 **Technology Stack**:
 - Go 1.21+
@@ -1156,14 +737,16 @@ POST   /api/v1/content/check-duplicate                     # Check for duplicate
 POST   /api/v1/content/detect                               # Detect if a URL is a feed or a page
 POST   /api/v1/content/discover-feed                         # Discover an RSS/Atom feed for a page URL
 
-GET    /api/v1/content/user/{user_id}                      # List user's contents        (JWT)
+GET    /api/v1/content/user/{user_id}                      # List user's contents (?list=feed|reads) (JWT)
 POST   /api/v1/content/user/{user_id}                       # Add URL to user's list      (JWT)
-GET    /api/v1/content/user/{user_id}/search                 # Full-text search            (JWT)
+GET    /api/v1/content/user/{user_id}/count                  # Count contents (?list=...)  (JWT)
+GET    /api/v1/content/user/{user_id}/search                 # Full-text search (?list=...) (JWT)
 GET    /api/v1/content/user/{user_id}/{content_id}            # Get single item (full HTML) (JWT)
-PATCH  /api/v1/content/user/{user_id}/{content_id}            # Update status/favorite/scroll (JWT)
+PATCH  /api/v1/content/user/{user_id}/{content_id}            # Update status/favorite/scroll/list (JWT)
 DELETE /api/v1/content/user/{user_id}/{content_id}            # Remove from user's list      (JWT)
 GET    /api/v1/content/user/{user_id}/subscriptions             # List RSS + email subscriptions (JWT)
 DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id} # Unsubscribe from RSS feed  (JWT)
+PUT    /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list # Choose Feed or Reads for a source (JWT)
 POST   /api/v1/content/user/bulk                             # Bulk add for authenticated user (JWT)
 
 POST   /api/v1/internal/content/user/bulk                    # Bulk add (X-Internal-API-Key; used
@@ -1173,6 +756,20 @@ POST   /api/v1/internal/content/user/bulk                    # Bulk add (X-Inter
 JWT-protected routes require `Authorization: Bearer <token>` (RS256, public key fetched from
 Vault). The internal route requires an `X-Internal-API-Key` header instead — it is not
 unauthenticated, contrary to what some drifted docs claim.
+
+**Feed vs Reads routing**: the app has two lists, Feed (skim) and Reads (read or triage), and every
+`user_contents` row lives in exactly one (`user_contents.list`, `'feed'|'reads'`). The user picks the
+list per source: an RSS subscription goes to Feed or Reads (chosen at subscribe time, changeable later),
+an email sender goes to Feed or Reads (new senders default to Reads), and directly saved links always go
+to Reads. The Content Service owns this in its `source_routes(user_id, source_type, source_key, list)`
+table, where `source_key` is the feed ID (RSS) or sender ID (email), rather than the producers, so the
+fetcher and email outboxes stay unchanged apart from the email payload carrying `sender_id`
+(delivered to Content as `source_sender_id`). Ingest stamps `list` from the route in the same INSERT
+that links the content to the user; no route means Reads. Re-routing a source only updates
+`source_routes`, so it affects new items only; existing items stay where they are. A single item can be
+moved with `PATCH` `list`; moving into Reads re-stamps `added_at`. Unsubscribing from a feed deletes its
+route. Feed items that are not favorited are deleted 30 days after `added_at` by the Content Service's
+daily cleanup job (before it reclaims content orphaned for 90+ days).
 
 ### RSS Fetcher Service
 
@@ -1263,6 +860,7 @@ CREATE TABLE user_contents (
     user_id UUID NOT NULL,
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'reading', 'completed', 'archived')),
+    list VARCHAR(10) NOT NULL DEFAULT 'reads' CHECK (list IN ('feed', 'reads')),
     scroll_position NUMERIC(5,4) NOT NULL DEFAULT 0.0 CHECK (scroll_position >= 0 AND scroll_position <= 1),
     is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
     added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -1274,6 +872,8 @@ CREATE TABLE user_contents (
 CREATE INDEX idx_user_contents_user_status ON user_contents(user_id, status);
 CREATE INDEX idx_user_contents_user_favorite ON user_contents(user_id, is_favorite) WHERE is_favorite = TRUE;
 CREATE INDEX idx_user_contents_added_at ON user_contents(user_id, added_at DESC);
+CREATE INDEX idx_user_contents_user_list_added ON user_contents(user_id, list, added_at DESC);
+CREATE INDEX idx_user_contents_feed_expiry ON user_contents(added_at) WHERE list = 'feed' AND is_favorite = false;
 ```
 
 Note: the primary key is a surrogate `id`, not a composite `(user_id, content_id)` key (that pair
@@ -1284,6 +884,22 @@ absolute-pixel `INTEGER` column to this fraction to match what the mobile/web re
 **Triggers**:
 - **After INSERT**: Clear `orphaned_at` on `contents` when a user adds it
 - **After DELETE**: Set `orphaned_at` on `contents` when the last user removes it
+
+#### Source Routes Table
+
+```sql
+CREATE TABLE source_routes (
+    user_id UUID NOT NULL,
+    source_type VARCHAR(50) NOT NULL CHECK (source_type IN ('rss', 'email')),
+    source_key UUID NOT NULL,           -- feed ID (rss) or sender ID (email)
+    list VARCHAR(10) NOT NULL CHECK (list IN ('feed', 'reads')),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, source_type, source_key)
+);
+```
+
+`contents.source_sender_id` (nullable UUID) records the email sender so ingest can look up the route.
 
 #### Feeds Table
 
@@ -1561,6 +1177,7 @@ The Email Ingest Service turns forwarded newsletters and articles into read-it-l
 - Sanitize email HTML with bluemonday and strip tracking pixels, unsubscribe footers, and hidden preheader text — no readability extraction, sanitize only
 - Track distinct senders per user so the mobile/web apps can group/filter newsletters
 - Reliably deliver processed content to the Content Service via an outbox pattern with retries and a circuit breaker
+- Tag each delivered item with its sender (`source_sender_id`) so the Content Service can route it to Feed or Reads (new senders default to Reads)
 - Clean up completed raw emails and delivered outbox entries after a 7-day retention window
 
 **Technology Stack**:
@@ -1769,24 +1386,7 @@ CREATE TABLE content_outbox (
 **Security Headers** (applied globally):
 - `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `HSTS`
 
-### Explore Service Security
-
-**JWT Authentication** (Recommender service only):
-- Retrieves JWT public key from HashiCorp Vault on startup
-- Validates RS256-signed tokens on every protected request
-- Extracts `user_id` from JWT claims for authorization
-
-**Endpoint Access Control**:
-
-| Endpoint | Auth Required |
-|---|---|
-| `GET /health/live`, `GET /health/ready` | No |
-| `POST /api/v1/explore/article` | Internal API key |
-| `POST /api/v1/explore/feed/fetch`, `/sync`, `GET /stats` (fetcher) | Internal API key |
-| `GET /api/v1/explore/recommendation` | Yes |
-| `GET /api/v1/explore/user/votes` | Yes |
-| `POST/DELETE /api/v1/explore/article/:id/vote` | Yes |
-| `POST /api/v1/explore/article/:id/read` | Yes |
+### RSS Ingest Security
 
 **Input Validation**:
 - Feed URL format validated before storage
@@ -1885,7 +1485,6 @@ See [docs/DEPLOYMENT.md](DEPLOYMENT.md#single-instance-topology) for operational
 ### Horizontal Scaling
 
 **Services that can be scaled horizontally today** (no in-memory state that affects correctness):
-- Explore Service APIs (stateless)
 - Read Service - Content Service API (stateless)
 - Read Service - RSS Fetcher Service API (stateless)
 - Email Ingest Service API (stateless)

@@ -298,38 +298,38 @@ The package expects JWT tokens in the following format:
 Authorization: Bearer <token>
 ```
 
-## Complete Example: Explore Service Integration
+## Complete Example: Content Service Integration
 
-Here's how to integrate this package into the Explore/Recommender service:
+Here's how the Content Service (`services/read/content`) wires this package into a chi router. Public-key
+refresh and the service-to-service internal API key are included:
 
 ```go
-// File: services/explore/recommender/internal/api/server.go
-package api
+// Based on services/read/content/cmd/content/main.go and internal/api/router.go
+package main
 
 import (
-    "log"
+    "context"
     "net/http"
 
     "github.com/andrew-craig/cairn-reader/pkg/auth"
+    "github.com/go-chi/chi/v5"
 )
 
-type Server struct {
-    authMiddleware *auth.Middleware
-    // ... other dependencies
-}
-
-func NewServer(vaultAddr, vaultToken string) (*Server, error) {
-    // Setup Vault client
+func newRouter(ctx context.Context, cfg *Config) (http.Handler, error) {
+    // Setup Vault client (AppRole in production, token in development)
     vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
-        Address: vaultAddr,
-        Token:   vaultToken,
+        Address:  cfg.Vault.Address,
+        Token:    cfg.Vault.Token,
+        RoleID:   cfg.Vault.RoleID,
+        SecretID: cfg.Vault.SecretID,
+        AuthPath: cfg.Vault.AuthPath,
     })
     if err != nil {
         return nil, err
     }
 
     // Fetch JWT public key
-    publicKey, err := vaultClient.GetPublicKey("secret/jwt/public-key")
+    publicKey, err := vaultClient.GetPublicKey(cfg.Vault.PublicKeyPath)
     if err != nil {
         return nil, err
     }
@@ -338,44 +338,44 @@ func NewServer(vaultAddr, vaultToken string) (*Server, error) {
     validator := auth.NewValidator(publicKey)
     authMiddleware := auth.NewMiddleware(validator)
 
-    return &Server{
-        authMiddleware: authMiddleware,
-    }, nil
-}
+    // Pick up key rotations performed by the User Service
+    keyRefresher := auth.NewKeyRefresher(vaultClient, cfg.Vault.PublicKeyPath, validator)
+    keyRefresher.Start(ctx, cfg.Vault.PublicKeyRefreshInterval)
 
-func (s *Server) Routes() http.Handler {
-    mux := http.NewServeMux()
+    // Service-to-service endpoints use a shared API key instead of a JWT
+    internalAuth := auth.NewInternalAuthMiddleware(cfg.InternalAPIKey)
 
-    // Protected endpoints - require authentication
-    mux.Handle("/api/v1/recommendations/", s.authMiddleware.RequireAuth(
-        http.HandlerFunc(s.handleGetRecommendations),
-    ))
-
-    mux.Handle("/api/v1/articles/read", s.authMiddleware.RequireAuth(
-        http.HandlerFunc(s.handleMarkArticleRead),
-    ))
-
-    mux.Handle("/api/v1/articles/vote", s.authMiddleware.RequireAuth(
-        http.HandlerFunc(s.handleVote),
-    ))
+    r := chi.NewRouter()
 
     // Public endpoints
-    mux.HandleFunc("/health", s.handleHealth)
+    r.Get("/health/live", handleLive)
 
-    return mux
+    // Protected endpoints - require a valid JWT
+    r.Route("/api/v1/content/user/{user_id}", func(r chi.Router) {
+        r.Use(authMiddleware.RequireAuth)
+        r.Get("/", handleListUserContents)
+    })
+
+    // Internal endpoints - require the X-Internal-API-Key header
+    r.With(internalAuth.RequireInternalAPIKey).Post("/api/v1/internal/content/user/bulk", handleBulkAdd)
+
+    return r, nil
 }
 
-func (s *Server) handleGetRecommendations(w http.ResponseWriter, r *http.Request) {
+func handleListUserContents(w http.ResponseWriter, r *http.Request) {
     // Extract authenticated user ID from context
     // RECOMMENDED: Use GetUserIDOrError to prevent service crashes
-    userID, err := auth.GetUserIDOrError(r.Context())
+    authenticatedUserID, err := auth.GetUserIDOrError(r.Context())
     if err != nil {
         http.Error(w, "Authentication context error", http.StatusInternalServerError)
         return
     }
 
-    // Use userID for recommendations logic
-    log.Printf("Getting recommendations for user: %s", userID)
+    // The user ID in the URL must match the token's user, so a user can only read their own data
+    if chi.URLParam(r, "user_id") != authenticatedUserID.String() {
+        http.Error(w, "Forbidden", http.StatusForbidden)
+        return
+    }
 
     // ... rest of handler
 }

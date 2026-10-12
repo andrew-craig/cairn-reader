@@ -1208,7 +1208,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchUserContentsResponse'
         '400':
-          description: Bad request - missing or invalid query
+          description: Bad request - missing or invalid query or list
           content:
             application/json:
               schema:

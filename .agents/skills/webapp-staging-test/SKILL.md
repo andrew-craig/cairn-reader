@@ -76,7 +76,7 @@ const browser = await chromium.launch({
 
 ### Expected noise
 
-Article thumbnails in the Explore/Read feeds are hotlinked from arbitrary
+Article thumbnails in the Feed and Reads lists are hotlinked from arbitrary
 third-party sites seeded by RSS content. Some of those fail through the proxy
 with `net::ERR_TUNNEL_CONNECTION_FAILED` — this is normal image-loading noise
 unrelated to the app or backend, not a bug to chase.

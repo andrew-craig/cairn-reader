@@ -3,11 +3,10 @@
 ## Cairn Reader Overview
 
 Cairn is a read-it-later application consisting of:
-- **Mobile App** (React Native/Expo): iOS and Android app for reading saved articles
-- **Web App** (React/Vite): browser client for reading saved articles
-- **Backend Services** (Go): Microservices for content discovery, storage, and user management
-  - **Explore Service**: RSS feed fetching and content recommendation
-  - **Read Service**: Article storage and user-specific metadata
+- **Mobile App** (React Native/Expo): iOS and Android app with Feed, Reads and You tabs
+- **Web App** (React/Vite): browser client with the same Feed, Reads and You structure
+- **Backend Services** (Go): Microservices for content storage, ingestion, and user management
+  - **Read Service**: Article storage, RSS subscriptions, and Feed/Reads routing
   - **User Service**: Authentication and account management
   - **Email Ingest Service**: Email-to-article ingestion pipeline
 
@@ -16,13 +15,13 @@ Cairn is a read-it-later application consisting of:
 ```
 Mobile App / Web App → REST APIs → Backend Services
                                    ├── User Service (Auth)
-                                   ├── Explore Service (RSS)
                                    ├── Read Service (Storage)
                                    └── Email Ingest Service
                                           ↓
                                    PostgreSQL
 ```
 
+- Two lists: **Feed** (skim) and **Reads** (read or triage). The user picks the list per source (RSS subscription or email sender; new senders default to Reads); saved links always go to Reads. The Content Service owns the routing (`source_routes`, `user_contents.list`); re-routing affects new items only, and non-favorited Feed items are deleted after 30 days
 - Each service owns its own logical database (single PostgreSQL instance)
 - Services communicate only via HTTP REST APIs — **never** access another service's database
 - JWT-based stateless authentication (RS256, keys managed by HashiCorp Vault)
@@ -38,8 +37,7 @@ Read the following documentation as necessary for each task. do not read a docum
 ### Service documentation
 - [Mobile App](/apps/mobile/CLAUDE.md) - React Native/Expo mobile application
 - [Web App](/apps/web/CLAUDE.md) - React/Vite browser client
-- [Explore Service](/services/explore/CLAUDE.md) - RSS feed fetching and content recommendation
-- [Read Service](/services/read/CLAUDE.md) - Article storage and RSS feed management
+- [Read Service](/services/read/CLAUDE.md) - Article storage, RSS feed management, and Feed/Reads routing
 - [User Service](/services/users/CLAUDE.md) - Authentication and user management
 - [Email Ingest Service](/services/read/email/CLAUDE.md) - Email-to-article ingestion
 
@@ -47,7 +45,6 @@ Read the following documentation as necessary for each task. do not read a docum
 ### API Documentation
 
 Each service has an OpenAPI spec and endpoint documentation in its CLAUDE.md:
-- [services/explore/api/openapi.yaml](/services/explore/api/openapi.yaml)
 - [services/users/api/openapi.yaml](/services/users/api/openapi.yaml)
 - [services/read/content/api/openapi.yaml](/services/read/content/api/openapi.yaml)
 - [services/read/fetcher/api/openapi.yaml](/services/read/fetcher/api/openapi.yaml)

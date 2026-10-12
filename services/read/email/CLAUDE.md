@@ -235,12 +235,12 @@ Both cleanup jobs are one type, `jobs.CleanupJob` (`internal/jobs/cleanup.go`), 
 2. Upsert sender record
 3. **EmailCleaner**: Remove tracking pixels, unsubscribe footers, preheader text
 4. **ContentExtractor**: Sanitise HTML with the canonical `pkg/rss/sanitize` policy, generate SHA-256 content hash
-5. Create `content_outbox` entry with payload `{url: "email://<uuid>", html, title, author, source_type: "email"}`
+5. Create `content_outbox` entry with payload `{url: "email://<uuid>", html, title, author, source_type: "email", sender_id}`
 6. Mark raw email as completed
 
 ### Outbox Delivery
 
-- Two-step delivery to Content Service: `POST /api/v1/content/bulk` to create/dedupe the content, then `POST /api/v1/internal/content/user/bulk` to link it to the user
+- Two-step delivery to Content Service: `POST /api/v1/content/bulk` to create/dedupe the content, then `POST /api/v1/internal/content/user/bulk` to link it to the user. The payload's `sender_id` is sent as `source_sender_id`; the Content Service uses it to look up the user's route for that sender and stamps the item into Feed or Reads (new senders have no route, so Reads)
 - Exponential backoff: 1m, 2m, 4m, 8m, 16m, 32m (max 6 retries)
 - Non-retryable on 4xx (400, 401, 403, 404, 422)
 - Circuit breaker: opens after 5 consecutive failures, half-open after 30s

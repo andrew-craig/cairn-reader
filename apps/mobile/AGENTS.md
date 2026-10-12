@@ -661,7 +661,7 @@ Layout.headerHeight           // 64 - Standard header height
 
 | Screen Type | Top Handling | Bottom Handling |
 |-------------|--------------|-----------------|
-| **Tab screens** (Read, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
+| **Tab screens** (Feed, Reads, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
 | **Detail screens** (ArticleContent) | Content with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.bottomActionMenuHeight + insets.bottom + Spacing.md` |
 | **Modal screens** (AddArticle, Login) | Content with `paddingTop: insets.top` | Content with `paddingBottom: insets.bottom` |
 | **Floating UI** (TabBar, ActionMenu) | N/A | Position absolutely, add `insets.bottom + Spacing.sm` to paddingBottom |

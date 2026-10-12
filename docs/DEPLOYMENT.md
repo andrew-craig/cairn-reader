@@ -51,8 +51,9 @@ After deployment, services are available at:
 | Service | URL | Purpose |
 |---------|-----|---------|
 | User Service | http://localhost:8082 | Authentication, user management |
-| Recommender | http://localhost:8081 | Article recommendations, voting |
-| Fetcher | http://localhost:8080 | RSS feed fetching |
+| Content Service | http://localhost:8083 | Article storage, Feed/Reads lists |
+| Ingest RSS | http://localhost:8085 | RSS subscriptions and polling |
+| Email Ingest | http://localhost:8089 | Newsletter ingestion |
 | Vault UI | http://localhost:8200/ui | Secrets management (dev token: `dev-token`) |
 | PostgreSQL | localhost:5432 | Database (user: `cairn`, password: `cairn_password`) |
 
@@ -87,13 +88,15 @@ docker compose up --build
 
 This starts:
 1. **Vault** (dev mode) - Manages JWT keys
-2. **PostgreSQL** - Single instance with 3 databases:
+2. **PostgreSQL** - Single instance with 4 databases:
    - `cairn_users` - User accounts
-   - `cairn_recommender` - Articles, votes
-   - `cairn_fetcher` - RSS feeds
+   - `content_service` - Articles, user content, Feed/Reads routes
+   - `rss_fetcher_service` - RSS feeds and subscriptions
+   - `ingest_email` - Email senders and raw emails
 3. **User Service** - Authentication and user management
-4. **Recommender Service** - Article recommendations
-5. **Fetcher Service** - RSS feed polling
+4. **Content Service** (and worker) - Article storage and cleanup
+5. **Ingest RSS** (and worker) - RSS feed polling and delivery
+6. **Email Ingest** (and worker) - Newsletter ingestion
 
 ### Testing the Deployment
 
@@ -105,40 +108,10 @@ docker compose ps
 
 # Individual health endpoints
 curl http://localhost:8082/health  # User Service
-curl http://localhost:8081/health  # Recommender
-curl http://localhost:8080/health  # Fetcher
+curl http://localhost:8083/health/live  # Content Service
+curl http://localhost:8085/health/live  # Ingest RSS
+curl http://localhost:8089/health/live  # Email Ingest
 ```
-
-#### 2. Trigger Manual Feed Fetch
-
-```bash
-curl -X POST http://localhost:8080/fetch
-```
-
-Expected response:
-```json
-{"status":"fetch triggered"}
-```
-
-#### 3. Check Feed Statistics
-
-```bash
-# Check how many feeds are loaded
-docker compose exec postgres psql -U cairn -d cairn_fetcher -c \
-  "SELECT COUNT(*) as total_feeds FROM feeds;"
-
-# Check how many articles have been fetched
-docker compose exec postgres psql -U cairn -d cairn_recommender -c \
-  "SELECT COUNT(*) as total_articles FROM articles;"
-```
-
-#### 4. Monitor Fetcher Logs
-
-```bash
-docker compose logs -f fetcher
-```
-
-You should see feeds being fetched every 60 seconds (1 feed per minute).
 
 ### Individual Service Deployment
 
@@ -149,7 +122,7 @@ Each service can be deployed independently using its own Dockerfile and Makefile
 Before deploying any individual service, ensure:
 
 1. **PostgreSQL** is running and accessible
-2. **HashiCorp Vault** is running with JWT RSA keys stored (required by User Service, Explore Recommender, Read Content, and Email Ingest)
+2. **HashiCorp Vault** is running with JWT RSA keys stored (required by User Service, Read Content, and Email Ingest)
 
 ```bash
 # Verify Vault has JWT keys
@@ -181,37 +154,6 @@ make docker-run
 - **Database**: `cairn_users`
 - **Vault**: Required (reads RSA private + public keys for JWT signing/verification)
 - **Health check**: `curl http://localhost:8082/health`
-
-#### Explore Service (Fetcher + Recommender)
-
-The Explore service consists of two microservices that should be deployed together:
-
-```bash
-cd services/explore
-
-# Configure environment
-cp .env.example .env
-cp fetcher/.env.example fetcher/.env
-cp recommender/.env.example recommender/.env
-# Edit each .env: set database credentials, Vault config, and service URLs
-
-# Option A: Run locally
-make run-recommender  # Terminal 1 (port 8081)
-make run-fetcher      # Terminal 2 (port 8080)
-
-# Option B: Run with Docker
-make docker-build
-make docker-up
-```
-
-- **Fetcher**: Port 8080, database `fetcher_db`, no Vault required
-- **Recommender**: Port 8081, database `cairn_db`, Vault required (JWT public key)
-- **Inter-service**: Fetcher pushes articles to Recommender via HTTP
-- **Health checks**:
-  ```bash
-  curl http://localhost:8080/health  # Fetcher
-  curl http://localhost:8081/health  # Recommender
-  ```
 
 #### Read Service (Content + Ingest RSS + Email Ingest)
 
@@ -252,8 +194,8 @@ When deploying services individually, start them in this order:
 
 1. **PostgreSQL** and **Vault** (infrastructure)
 2. **User Service** (authentication provider, generates JWT tokens)
-3. **Explore Recommender** and **Read Content Service** (core APIs)
-4. **Explore Fetcher** and **Read Ingest RSS** (feed ingestion, depend on step 3)
+3. **Read Content Service** (core API)
+4. **Read Ingest RSS** (feed ingestion, depends on step 3)
 5. **Email Ingest Service** (depends on Content Service)
 
 ### Running Services Locally (Without Docker)
@@ -282,12 +224,8 @@ brew services start postgresql@15  # macOS
 # Create databases
 sudo -u postgres psql <<EOF
 CREATE DATABASE cairn_users;
-CREATE DATABASE cairn_recommender;
-CREATE DATABASE cairn_fetcher;
 CREATE USER cairn WITH PASSWORD 'cairn_dev';
 GRANT ALL PRIVILEGES ON DATABASE cairn_users TO cairn;
-GRANT ALL PRIVILEGES ON DATABASE cairn_recommender TO cairn;
-GRANT ALL PRIVILEGES ON DATABASE cairn_fetcher TO cairn;
 EOF
 ```
 
@@ -305,8 +243,7 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 cd services/users
 make migrate-up
 
-cd services/explore
-# (migrations run automatically via docker-compose)
+# Read services: see "Database migrations" in services/read/CLAUDE.md
 ```
 
 #### 4. Run Services
@@ -316,13 +253,9 @@ cd services/explore
 cd services/users
 make run
 
-# Terminal 2: Fetcher Service
-cd services/explore
-make run-fetcher
-
-# Terminal 3: Recommender Service
-cd services/explore
-make run-recommender
+# Terminal 2+: Read services (see "Read Service" above)
+cd services/read
+./bin/content-service
 ```
 
 ---
@@ -427,12 +360,11 @@ The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 |------|-----------|-------|
 | `/api/v1/auth/*` | User Service | Authentication |
 | `/api/v1/user/*` | User Service | Account management |
-| `/api/v1/explore/*` | Explore Recommender | Recommendations & voting |
 | `/api/v1/content/*` | Content Service | Article storage |
 | `/api/v1/source/email/*` | Email Ingest | Email ingestion |
 | `/health/*` | User Service | Health checks |
 
-Internal endpoints (`/api/v1/internal/*`, `/api/v1/explore/feed/*`, `/api/v1/source/rss/*`) are blocked from public access.
+Internal endpoints (`/api/v1/internal/*`, `/api/v1/source/rss/*`) are blocked from public access.
 
 For local testing without TLS, set `DOMAIN=localhost` in `.env`.
 
@@ -532,16 +464,19 @@ The `DB_SSLMODE` (or `DB_SSL_MODE` in the Email Ingest service) environment vari
 - users
 - refresh_tokens
 
-**cairn_recommender:**
-- users (activity tracking)
-- articles
-- user_articles (read status)
-- votes
-- recommendations
+**content_service:**
+- contents
+- user_contents (each row in the `feed` or `reads` list)
+- source_routes (per-user Feed/Reads choice per source)
 
-**cairn_fetcher:**
+**rss_fetcher_service:**
 - feeds
-- fetch_history
+- feed_subscriptions
+- feed_items
+- content_outbox
+
+**ingest_email:**
+- email senders, raw emails, content_outbox
 
 ### Automatic Migrations
 
@@ -606,11 +541,11 @@ All services provide health check endpoints for monitoring and orchestration.
 # User Service
 curl http://localhost:8082/health
 
-# Recommender Service
-curl http://localhost:8081/health
+# Content Service
+curl http://localhost:8083/health/live
 
-# Fetcher Service
-curl http://localhost:8080/health
+# Ingest RSS
+curl http://localhost:8085/health/live
 ```
 
 ### Kubernetes Liveness/Readiness Probes
@@ -644,8 +579,8 @@ docker compose logs -f
 
 # Specific service
 docker compose logs -f user-service
-docker compose logs -f recommender
-docker compose logs -f fetcher
+docker compose logs -f content-service
+docker compose logs -f ingest-rss
 
 # Last 100 lines
 docker compose logs --tail=100 user-service
@@ -695,11 +630,11 @@ docker compose exec -T postgres pg_dumpall -U cairn | \
 docker compose exec -T postgres pg_dump -U cairn cairn_users | \
   gzip > $BACKUP_DIR/cairn_users_$DATE.sql.gz
 
-docker compose exec -T postgres pg_dump -U cairn cairn_recommender | \
-  gzip > $BACKUP_DIR/cairn_recommender_$DATE.sql.gz
+docker compose exec -T postgres pg_dump -U cairn content_service | \
+  gzip > $BACKUP_DIR/content_service_$DATE.sql.gz
 
-docker compose exec -T postgres pg_dump -U cairn cairn_fetcher | \
-  gzip > $BACKUP_DIR/cairn_fetcher_$DATE.sql.gz
+docker compose exec -T postgres pg_dump -U cairn rss_fetcher_service | \
+  gzip > $BACKUP_DIR/rss_fetcher_service_$DATE.sql.gz
 
 # Keep only last 30 days of backups
 find $BACKUP_DIR -name "*.sql.gz" -mtime +30 -delete
@@ -761,7 +696,7 @@ The User Service (`pkg/middleware/rate_limit.go`) uses an in-memory token bucket
 | Service | Reason |
 |---------|--------|
 | User Service | In-memory rate limiter (auth endpoints) |
-| Fetcher Worker | In-memory job scheduler — multiple instances would cause duplicate feed fetches |
+| Ingest RSS Worker | In-memory job scheduler — multiple instances would cause duplicate feed fetches |
 | Email Ingest Worker | In-memory job scheduler — multiple instances would cause duplicate email processing |
 
 ### Future Multi-Instance Support
@@ -780,22 +715,20 @@ To run multiple instances of the User Service safely:
 > **Note**: See [Single-Instance Topology](#single-instance-topology) above. Horizontal scaling of the User Service requires replacing the in-memory rate limiter with a Redis-backed one first.
 
 **Services that can be scaled horizontally (stateless, no rate limiter)**:
-- Recommender Service API
-- Fetcher Service API
 - Content Service API
 - Ingest RSS Service API
 - Email Ingest Service API
 
 **Services that need coordination before scaling**:
 - User Service API (in-memory rate limiter — replace with Redis first)
-- Fetcher Worker (use distributed locks for multi-instance)
+- Ingest RSS Worker (use distributed locks for multi-instance)
 - Email Ingest Worker (use distributed locks for multi-instance)
 
 #### Scaling with Docker Compose
 
 ```bash
-# Scale Recommender Service to 3 instances (no rate limiter)
-docker compose up -d --scale recommender=3
+# Scale Content Service to 3 instances (no rate limiter)
+docker compose up -d --scale content-service=3
 
 # Requires load balancer (nginx, HAProxy, etc.)
 ```
@@ -861,8 +794,8 @@ docker compose ps
 
 # Check service logs
 docker compose logs user-service
-docker compose logs recommender
-docker compose logs fetcher
+docker compose logs content-service
+docker compose logs ingest-rss
 
 # Check database connectivity
 docker compose exec postgres psql -U cairn -c "SELECT 1;"
@@ -913,8 +846,8 @@ docker compose logs -f
 
 # Specific service
 docker compose logs -f user-service
-docker compose logs -f recommender
-docker compose logs -f fetcher
+docker compose logs -f content-service
+docker compose logs -f ingest-rss
 ```
 
 ### Restart Services
