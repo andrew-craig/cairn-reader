@@ -24,5 +24,6 @@ Branch: `chore/task_30e3-decommission-explore`.
 - cmd/selfhost: dropped the recommender/fetcher mounts and migrations, their config (DB_NAME_RECOMMENDER/FETCHER, FEED_LIST_*, FETCH_INTERVAL, ARTICLE_RETENTION_DAYS) and go.mod requirement.
 - Compose (dev/prod/selfhost), .env examples, init-databases.sh (both), init-vault-prod.sh, Caddyfile, go-checks.yml, docker-test.yml, verify-docker-builds.sh, .gitignore, selfhost README.
 - Verified: go build/vet/test pass for every remaining module (and `go vet -tags=integration` for cmd/selfhost). Built the selfhost image from source and ran it as an isolated compose project on a fresh volume: 4 DBs created, /health/ready healthy (users, content, rss, email), register, save link (Reads), list, subscriptions, RSS subscribe to Feed all OK, /api/v1/explore/* returns 404.
+- Deleted the unreferenced legacy infrastructure/docker/scripts/init-postgres.sh (it only created/migrated the explore DBs).
 - Existing deployments keep orphaned cairn_recommender / cairn_fetcher databases. Drop them by hand if wanted; nothing reads them.
 - Prose docs moved to task_082f. Explore parts of task_603e, task_fbb9, task_6f3a marked obsolete.
