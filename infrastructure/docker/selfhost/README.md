@@ -26,8 +26,6 @@ The single `cairn` container runs:
 - **Content Service** — article storage and management
 - **RSS Ingest** — feed subscriptions, polling, and content extraction
 - **Email Ingest** — email-to-article pipeline
-- **Explore Fetcher** — RSS feed discovery
-- **Explore Recommender** — article recommendations
 
 All background workers (feed polling, outbox delivery, cleanup jobs) run as goroutines within the same process.
 
@@ -59,7 +57,7 @@ the remote image.
 ┌─────────────────┐     ┌──────────────────┐
 │  cairn (:8099)  │────▶│  cairn-db (:5432) │
 │                 │     │  PostgreSQL       │
-│  All 6 services │     │  6 logical DBs    │
+│  All 4 services │     │  4 logical DBs    │
 │  All workers    │     └──────────────────┘
 │  Single binary  │
 └─────────────────┘
@@ -80,7 +78,6 @@ All settings go in `.env`. Only `DB_PASSWORD` is required. See `.env.example` fo
 | `EMAIL_DOMAIN` | `read.cairnapp.com` | Domain for email ingestion |
 | `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
-| `ARTICLE_RETENTION_DAYS` | `90` | Explore article retention |
 
 ### PostgreSQL tuning
 
@@ -101,8 +98,8 @@ host (e.g. a 1 GB VPS or Raspberry Pi). Override any of these via `.env`:
 | `DB_MAX_CONNS` | `3` | Per-service client pool cap |
 | `DB_MIN_CONNS` | `1` | Per-service idle pool floor |
 
-The six services share one Postgres instance, so the sum of `DB_MAX_CONNS`
-across services (default `6 × 3 = 18`) must stay under
+The four services share one Postgres instance, so the sum of `DB_MAX_CONNS`
+across services (default `4 × 3 = 12`) must stay under
 `POSTGRES_MAX_CONNECTIONS`. If you raise one, raise the other.
 
 ## Data & Backups
@@ -179,9 +176,6 @@ All services share port 8099:
 | `/api/v1/internal/content/*` | Content Service |
 | `/api/v1/source/rss/*` | RSS Ingest |
 | `/api/v1/source/email/*` | Email Ingest |
-| `/api/v1/explore/article*` | Explore Recommender |
-| `/api/v1/explore/user/*` | Explore Recommender |
-| `/api/v1/explore/feed/*` | Explore Fetcher |
 | `/health/live` | Liveness check |
 | `/health/ready` | Readiness check (includes DB) |
 

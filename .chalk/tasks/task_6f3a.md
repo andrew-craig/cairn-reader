@@ -26,3 +26,6 @@ Tooling status: Docker Compose test configs exist for users. Explore has a test 
 Runs standalone: NO - requires Docker and Postgres.
 
 Consider: run only on PRs with a specific label, or on pushes to main, to avoid slowing down every PR.
+
+## Update (2026-10-12, task_30e3)
+services/explore was deleted in task_30e3; drop the explore items from this task's scope.

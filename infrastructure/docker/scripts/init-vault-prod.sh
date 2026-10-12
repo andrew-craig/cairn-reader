@@ -212,25 +212,6 @@ path "auth/token/lookup-self" {
 EOF
 echo "  - user-service policy created"
 
-# Explore Recommender Policy (only needs public key)
-vault policy write explore-recommender - <<EOF
-# Explore Recommender Policy
-# Read-only access to JWT public key for verification
-
-path "secret/data/jwt/public-key" {
-  capabilities = ["read"]
-}
-
-path "auth/token/renew-self" {
-  capabilities = ["update"]
-}
-
-path "auth/token/lookup-self" {
-  capabilities = ["read"]
-}
-EOF
-echo "  - explore-recommender policy created"
-
 # Content Service Policy (only needs public key)
 vault policy write content-service - <<EOF
 # Content Service Policy
@@ -285,19 +266,6 @@ USER_SERVICE_SECRET_ID=$(vault write -format=json -f auth/approle/role/user-serv
 
 echo "  - user-service AppRole created"
 
-# Explore Recommender AppRole
-vault write auth/approle/role/explore-recommender \
-    token_policies="explore-recommender" \
-    token_ttl=1h \
-    token_max_ttl=4h \
-    secret_id_ttl=0 \
-    secret_id_num_uses=0
-
-EXPLORE_RECOMMENDER_ROLE_ID=$(vault read -format=json auth/approle/role/explore-recommender/role-id | grep -o '"role_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
-EXPLORE_RECOMMENDER_SECRET_ID=$(vault write -format=json -f auth/approle/role/explore-recommender/secret-id | grep -o '"secret_id":\s*"[^"]*"' | grep -o '"[^"]*"$' | tr -d '"')
-
-echo "  - explore-recommender AppRole created"
-
 # Content Service AppRole
 vault write auth/approle/role/content-service \
     token_policies="content-service" \
@@ -335,10 +303,6 @@ cat > /vault-keys/approle-credentials.env << EOF
 USER_SERVICE_ROLE_ID=$USER_SERVICE_ROLE_ID
 USER_SERVICE_SECRET_ID=$USER_SERVICE_SECRET_ID
 
-# Explore Recommender
-EXPLORE_RECOMMENDER_ROLE_ID=$EXPLORE_RECOMMENDER_ROLE_ID
-EXPLORE_RECOMMENDER_SECRET_ID=$EXPLORE_RECOMMENDER_SECRET_ID
-
 # Content Service
 CONTENT_SERVICE_ROLE_ID=$CONTENT_SERVICE_ROLE_ID
 CONTENT_SERVICE_SECRET_ID=$CONTENT_SERVICE_SECRET_ID
@@ -359,10 +323,6 @@ echo "Service Configuration:"
 echo "  User Service:"
 echo "    VAULT_ROLE_ID=$USER_SERVICE_ROLE_ID"
 echo "    VAULT_SECRET_ID=$USER_SERVICE_SECRET_ID"
-echo ""
-echo "  Explore Recommender:"
-echo "    VAULT_ROLE_ID=$EXPLORE_RECOMMENDER_ROLE_ID"
-echo "    VAULT_SECRET_ID=$EXPLORE_RECOMMENDER_SECRET_ID"
 echo ""
 echo "  Content Service:"
 echo "    VAULT_ROLE_ID=$CONTENT_SERVICE_ROLE_ID"

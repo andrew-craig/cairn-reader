@@ -11,8 +11,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_SSLMODE=disable
       - DB_NAME_USERS=cairn_users
-      - DB_NAME_RECOMMENDER=cairn_recommender
-      - DB_NAME_FETCHER=cairn_fetcher
       - DB_NAME_CONTENT=content_service
       - DB_NAME_RSS=rss_fetcher_service
       - DB_NAME_EMAIL=ingest_email
@@ -21,11 +19,6 @@ services:
       - JWT_AUTO_GENERATE=true
       - EMAIL_DOMAIN=${EMAIL_DOMAIN:-read.cairnapp.com}
       - INGEST_API_KEY=${INGEST_API_KEY:-}
-      # Feed list source. Defaults to /data/feeds/feeds.txt (inside the
-      # cairn_data volume). Drop your own feeds.txt there to override; if
-      # missing the service downloads FEED_LIST_URL at startup.
-      - FEED_LIST_PATH=${FEED_LIST_PATH:-/data/feeds/feeds.txt}
-      - FEED_LIST_URL=${FEED_LIST_URL:-https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt}
       # Per-service connection pool caps. Defaults chosen so the sum across all
       # services stays under POSTGRES_MAX_CONNECTIONS (default 20).
       - DB_MAX_CONNS=${DB_MAX_CONNS:-3}
@@ -34,7 +27,6 @@ services:
       - "${PORT:-8099}:8099"
     volumes:
       - cairn_data:/data
-      - ./feeds.txt:/data/feeds/feeds.txt:ro
     depends_on:
       cairn-db:
         condition: service_healthy

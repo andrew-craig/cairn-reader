@@ -80,10 +80,7 @@ services/*/bin/
 services/*/*-service
 services/*/user-service
 services/*/fetcher-service
-services/*/recommender-service
-services/explore/explore_cleanup
 services/users/migrate
-services/explore/recommender/explore_recommender
 services/read/email/email_ingest
 services/read/email/email_ingest_worker
 cmd/selfhost/selfhost

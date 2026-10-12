@@ -17,12 +17,10 @@ type Config struct {
 	DB DBConfig
 
 	// Per-service database names
-	DBNameUsers       string
-	DBNameRecommender string
-	DBNameFetcher     string
-	DBNameContent     string
-	DBNameRSS         string
-	DBNameEmail       string
+	DBNameUsers   string
+	DBNameContent string
+	DBNameRSS     string
+	DBNameEmail   string
 
 	// JWT
 	JWTPrivateKeyFile string
@@ -35,14 +33,6 @@ type Config struct {
 	InternalAPIKey    string
 	EmailIngestAPIKey string
 	BcryptCost        int
-
-	// Explore fetcher
-	FeedListPath  string
-	FeedListURL   string
-	FetchInterval time.Duration
-
-	// Explore recommender
-	ArticleRetentionDays int
 
 	// Email
 	EmailDomain string
@@ -93,12 +83,10 @@ func loadConfig() *Config {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 
-		DBNameUsers:       getEnv("DB_NAME_USERS", "cairn_users"),
-		DBNameRecommender: getEnv("DB_NAME_RECOMMENDER", "cairn_recommender"),
-		DBNameFetcher:     getEnv("DB_NAME_FETCHER", "cairn_fetcher"),
-		DBNameContent:     getEnv("DB_NAME_CONTENT", "content_service"),
-		DBNameRSS:         getEnv("DB_NAME_RSS", "rss_fetcher_service"),
-		DBNameEmail:       getEnv("DB_NAME_EMAIL", "ingest_email"),
+		DBNameUsers:   getEnv("DB_NAME_USERS", "cairn_users"),
+		DBNameContent: getEnv("DB_NAME_CONTENT", "content_service"),
+		DBNameRSS:     getEnv("DB_NAME_RSS", "rss_fetcher_service"),
+		DBNameEmail:   getEnv("DB_NAME_EMAIL", "ingest_email"),
 
 		JWTPrivateKeyFile: getEnv("JWT_PRIVATE_KEY_FILE", "/data/keys/private.pem"),
 		JWTPublicKeyFile:  getEnv("JWT_PUBLIC_KEY_FILE", "/data/keys/public.pem"),
@@ -109,12 +97,6 @@ func loadConfig() *Config {
 		InternalAPIKey:    internalKey,
 		EmailIngestAPIKey: emailIngestKey,
 		BcryptCost:        getEnvInt("BCRYPT_COST", 12),
-
-		FeedListPath:  getEnv("FEED_LIST_PATH", "/data/feeds/feeds.txt"),
-		FeedListURL:   getEnv("FEED_LIST_URL", "https://raw.githubusercontent.com/andrew-craig/cairn-reader/main/services/explore/feeds/default-feeds.txt"),
-		FetchInterval: getEnvDuration("FETCH_INTERVAL", 60*time.Second),
-
-		ArticleRetentionDays: getEnvInt("ARTICLE_RETENTION_DAYS", 90),
 
 		EmailDomain: getEnv("EMAIL_DOMAIN", "read.cairnapp.com"),
 

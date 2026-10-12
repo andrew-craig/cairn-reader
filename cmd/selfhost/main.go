@@ -82,22 +82,6 @@ func main() {
 	}
 	closers = append(closers, userCloser)
 
-	slog.Info("initializing explore recommender")
-	recCloser, err := mountExploreRecommender(ctx, cfg, r, authMiddleware, internalAuthMiddleware, health, logger)
-	if err != nil {
-		slog.Error("failed to initialize explore recommender", slog.Any("error", err))
-		os.Exit(1)
-	}
-	closers = append(closers, recCloser)
-
-	slog.Info("initializing explore fetcher")
-	fetchCloser, err := mountExploreFetcher(ctx, cfg, r, internalAuthMiddleware, health, logger)
-	if err != nil {
-		slog.Error("failed to initialize explore fetcher", slog.Any("error", err))
-		os.Exit(1)
-	}
-	closers = append(closers, fetchCloser)
-
 	slog.Info("initializing content service")
 	contentCloser, err := mountContentService(ctx, cfg, r, authMiddleware, internalAuthMiddleware, health, logger)
 	if err != nil {
@@ -211,15 +195,9 @@ func newMasterRouter(logger *slog.Logger) *chi.Mux {
 	return r
 }
 
-// runAllMigrations runs embedded migrations for all 6 databases.
+// runAllMigrations runs embedded migrations for all 4 databases.
 func runAllMigrations(cfg *Config) error {
 	if err := runUsersMigrations(cfg); err != nil {
-		return err
-	}
-	if err := runRecommenderMigrations(cfg); err != nil {
-		return err
-	}
-	if err := runFetcherMigrations(cfg); err != nil {
 		return err
 	}
 	if err := runContentMigrations(cfg); err != nil {

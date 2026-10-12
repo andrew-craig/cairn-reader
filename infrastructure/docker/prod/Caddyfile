@@ -19,11 +19,6 @@ http://:8080 {
 		respond "Not Found" 404
 	}
 
-	# Explore Fetcher admin endpoints are internal-only
-	handle /api/v1/explore/feed/* {
-		respond "Not Found" 404
-	}
-
 	# RSS ingest is service-to-service only
 	handle /api/v1/source/rss/* {
 		respond "Not Found" 404
@@ -40,15 +35,6 @@ http://:8080 {
 
 	handle /api/v1/user/* {
 		reverse_proxy user-service:8080 {
-			header_up X-Forwarded-Proto https
-		}
-	}
-
-	# ──────────────────────────────────────────────
-	# Explore Recommender — Recommendations & voting
-	# ──────────────────────────────────────────────
-	handle /api/v1/explore/* {
-		reverse_proxy explore-recommender:8081 {
 			header_up X-Forwarded-Proto https
 		}
 	}

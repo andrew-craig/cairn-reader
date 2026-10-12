@@ -6,7 +6,6 @@ require (
 	github.com/andrew-craig/cairn-reader/pkg/auth v0.0.0
 	github.com/andrew-craig/cairn-reader/pkg/logging v0.0.0
 	github.com/andrew-craig/cairn-reader/pkg/middleware v0.0.0
-	github.com/andrew-craig/cairn-reader/services/explore v0.0.0
 	github.com/andrew-craig/cairn-reader/services/read v0.0.0
 	github.com/andrew-craig/cairn-reader/services/read/email v0.0.0
 	github.com/andrew-craig/cairn-reader/services/users v0.0.0
@@ -19,7 +18,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.1 // indirect
 	github.com/andrew-craig/cairn-reader v0.0.0 // indirect
 	github.com/andrew-craig/cairn-reader/pkg/api v0.0.0 // indirect
-	github.com/andrew-craig/cairn-reader/pkg/models v0.0.0 // indirect
 	github.com/andrew-craig/cairn-reader/pkg/rss v0.0.0-00010101000000-000000000000 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
@@ -83,8 +81,6 @@ replace github.com/andrew-craig/cairn-reader/pkg/middleware => ../../pkg/middlew
 replace github.com/andrew-craig/cairn-reader/pkg/models => ../../pkg/models
 
 replace github.com/andrew-craig/cairn-reader/services/users => ../../services/users
-
-replace github.com/andrew-craig/cairn-reader/services/explore => ../../services/explore
 
 replace github.com/andrew-craig/cairn-reader/services/read => ../../services/read
 

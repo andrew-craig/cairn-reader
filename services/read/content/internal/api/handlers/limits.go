@@ -1,7 +1,6 @@
 package handlers
 
-// Request body size limits, mirroring the pattern in
-// explore/recommender/internal/api/handlers.go. Content-carrying endpoints
+// Request body size limits. Content-carrying endpoints
 // get a generous cap; simple JSON endpoints (URL strings, IDs, statuses)
 // get a tight one.
 const (

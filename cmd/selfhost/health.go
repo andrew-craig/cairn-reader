@@ -11,8 +11,7 @@ import (
 // pinger is satisfied by both *sql.DB (via sqlPinger below) and
 // *pgxpool.Pool, which already implements Ping(ctx context.Context) error
 // natively. This lets the same health checker cover services built on
-// database/sql (content, email, rss) and services built on pgx (users,
-// explore-recommender, explore-fetcher).
+// database/sql (content, email, rss) and services built on pgx (users).
 type pinger interface {
 	Ping(ctx context.Context) error
 }
