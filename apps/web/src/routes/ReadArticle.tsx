@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { throttle, type Article } from '@cairn/shared';
+import { formatPublishedDate, throttle, type Article } from '@cairn/shared';
 import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import { decodeEntities } from '../utils/decodeEntities';
-import { formatPublishedDate } from '../utils/helpers';
 import FloatingActionBar from '../components/FloatingActionBar';
 import './ReadArticle.css';
 

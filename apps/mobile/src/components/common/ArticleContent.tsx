@@ -18,7 +18,8 @@ import RenderHTML from 'react-native-render-html';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../../types';
-import { formatDate, extractDomain } from '../../utils';
+import { formatPublishedDate } from '@cairn/shared';
+import { extractDomain } from '../../utils';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily, Layout } from '../../constants';
 import { ReadService } from '../../services/read';
 
@@ -58,6 +59,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   initialScrollFraction,
 }) => {
   const { width } = useWindowDimensions();
+  const publishedDateLabel = formatPublishedDate(article.publishedDate);
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
   const hasRestoredPosition = useRef(false);
@@ -277,7 +279,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
                 {article.author || extractDomain(article.url)}
               </Text>
             )}
-            {article.addedAt && ` | ${formatDate(article.addedAt)}`}
+            {publishedDateLabel && ` | ${publishedDateLabel}`}
           </Text>
         </View>
 

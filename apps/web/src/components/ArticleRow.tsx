@@ -1,6 +1,5 @@
-import type { Article } from '@cairn/shared';
+import { formatPublishedDate, type Article } from '@cairn/shared';
 import { decodeEntities } from '../utils/decodeEntities';
-import { formatPublishedDate } from '../utils/helpers';
 import './ArticleRow.css';
 
 interface ArticleRowProps {

@@ -9,7 +9,7 @@ import { GlobalStyles } from '../constants/globalStyles';
 import { ChevronRightIcon } from '../components/icons';
 import { RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
-import { pluralize } from '../utils/helpers';
+import { pluralize } from '@cairn/shared';
 
 type YouScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 

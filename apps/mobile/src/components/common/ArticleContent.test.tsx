@@ -1,4 +1,8 @@
-import { isScrollTargetReachable } from './ArticleContent';
+import React from 'react';
+import { render, screen } from '@testing-library/react-native';
+import { ArticleContent, isScrollTargetReachable } from './ArticleContent';
+import { Colors } from '../../constants';
+import { Article } from '../../types';
 
 describe('isScrollTargetReachable', () => {
   it('is false while the content is still shorter than the saved fraction target', () => {
@@ -24,5 +28,32 @@ describe('isScrollTargetReachable', () => {
 
   it('handles zero fraction', () => {
     expect(isScrollTargetReachable(2000, 600, 0)).toBe(true);
+  });
+});
+
+describe('ArticleContent byline date', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const baseArticle: Article = {
+    id: 'a1',
+    url: 'https://example.com/article',
+    title: 'September newsletter',
+    content: '<p>Body</p>',
+    tags: [],
+    isRead: false,
+    isFavorite: false,
+    list: 'reads',
+    addedAt: Date.now(),
+  };
+
+  it('shows the published date rather than the date the article was added', () => {
+    const publishedDate = new Date(Date.now() - 10 * DAY_MS).toISOString();
+    render(<ArticleContent article={{ ...baseArticle, publishedDate }} colors={Colors.light} />);
+    expect(screen.getByText(/1 week ago/)).toBeTruthy();
+    expect(screen.queryByText(/Today/)).toBeNull();
+  });
+
+  it('omits the date when the article has no published date', () => {
+    render(<ArticleContent article={baseArticle} colors={Colors.light} />);
+    expect(screen.queryByText(/Today/)).toBeNull();
   });
 });

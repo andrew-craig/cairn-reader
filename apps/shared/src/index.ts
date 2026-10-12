@@ -7,6 +7,7 @@
 export * from './types';
 export * from './config/api';
 export * from './services/auth';
+export * from './utils/date';
 export * from './utils/errors';
 export * from './utils/http';
 export * from './utils/throttle';

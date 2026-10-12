@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Article } from '../../types';
 import { Colors, FontFamily } from '../../constants';
-import { formatDate } from '../../utils';
+import { formatPublishedDate } from '@cairn/shared';
 
 interface ArticleRowProps {
   article: Article;
@@ -20,8 +20,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
-  const publishedTimestamp = article.publishedDate ? new Date(article.publishedDate).getTime() : NaN;
-  const publishedDateLabel = Number.isNaN(publishedTimestamp) ? null : formatDate(publishedTimestamp);
+  const publishedDateLabel = formatPublishedDate(article.publishedDate);
 
   const renderRightContent = () => {
     if (article.imageUrl) {
