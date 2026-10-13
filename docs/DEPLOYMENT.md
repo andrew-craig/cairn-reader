@@ -28,17 +28,19 @@ cd infrastructure/docker/selfhost
 cp .env.example .env
 # Edit .env and set DB_PASSWORD
 docker compose up -d --build
-curl http://localhost:8080/health/ready
+curl http://localhost:8099/health/ready
 ```
 
-All 6 API services and all background workers run in a single binary. JWT keys are auto-generated. See [infrastructure/docker/selfhost/README.md](../infrastructure/docker/selfhost/README.md) for full details.
+All four backend services (users, content, RSS ingest, email ingest) and all background workers run in a single binary. JWT keys are auto-generated. See [infrastructure/docker/selfhost/README.md](../infrastructure/docker/selfhost/README.md) for full details.
 
 ### Development Deployment (Recommended)
 
 Use the unified Docker Compose setup for all services:
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/dev
+cp .env.example .env
+# Edit .env and set the passwords and keys
 docker compose up --build
 ```
 
@@ -54,8 +56,8 @@ After deployment, services are available at:
 | Content Service | http://localhost:8083 | Article storage, Feed/Reads lists |
 | Ingest RSS | http://localhost:8085 | RSS subscriptions and polling |
 | Email Ingest | http://localhost:8089 | Newsletter ingestion |
-| Vault UI | http://localhost:8200/ui | Secrets management (dev token: `dev-token`) |
-| PostgreSQL | localhost:5432 | Database (user: `cairn`, password: `cairn_password`) |
+| Vault UI | http://localhost:8200/ui | Secrets management (token: `VAULT_DEV_ROOT_TOKEN_ID` from `.env`) |
+| PostgreSQL | localhost:5432 | Database (admin user `POSTGRES_ADMIN_USER`, default `cairn_admin`; per-service users and passwords from `.env`) |
 
 ---
 
@@ -82,13 +84,14 @@ After deployment, services are available at:
 The recommended approach for development is to use the unified Docker Compose setup:
 
 ```bash
-cd infrastructure/docker
+cd infrastructure/docker/dev
+cp .env.example .env
 docker compose up --build
 ```
 
 This starts:
 1. **Vault** (dev mode) - Manages JWT keys
-2. **PostgreSQL** - Single instance with 4 databases:
+2. **PostgreSQL** (`cairn-db`) - Single instance with 4 databases (names come from `POSTGRES_DB_*` in `.env`; these are the `.env.example` values):
    - `cairn_users` - User accounts
    - `content_service` - Articles, user content, Feed/Reads routes
    - `rss_fetcher_service` - RSS feeds and subscriptions
@@ -107,10 +110,10 @@ This starts:
 docker compose ps
 
 # Individual health endpoints
-curl http://localhost:8082/health  # User Service
-curl http://localhost:8083/health/live  # Content Service
-curl http://localhost:8085/health/live  # Ingest RSS
-curl http://localhost:8089/health/live  # Email Ingest
+curl http://localhost:8082/health/ready  # User Service
+curl http://localhost:8083/health/ready  # Content Service
+curl http://localhost:8085/health/ready  # Ingest RSS
+curl http://localhost:8089/health/ready  # Email Ingest
 ```
 
 ### Individual Service Deployment
@@ -135,9 +138,8 @@ vault kv get secret/jwt/private-key  # Only needed by User Service
 ```bash
 cd services/users
 
-# Configure environment
-cp .env.example .env
-# Edit .env: set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, VAULT_ADDR, VAULT_TOKEN
+# Configure environment (no .env.example ships; a .env file is loaded if present)
+# Set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, VAULT_ADDR, VAULT_TOKEN
 
 # Run database migrations
 make migrate-up
@@ -150,10 +152,10 @@ make docker-build
 make docker-run
 ```
 
-- **Port**: 8082
+- **Port**: `PORT` (default 8080; the dev compose maps host port 8082)
 - **Database**: `cairn_users`
 - **Vault**: Required (reads RSA private + public keys for JWT signing/verification)
-- **Health check**: `curl http://localhost:8082/health`
+- **Health check**: `curl http://localhost:8080/health/ready` (use the port you configured)
 
 #### Read Service (Content + Ingest RSS + Email Ingest)
 
@@ -167,24 +169,29 @@ cp .env.example .env
 cp content/.env.example content/.env
 cp fetcher/.env.example fetcher/.env
 # Edit each .env: set database credentials, Vault config, and service URLs
+# (the email service has no .env.example; see docs/CONFIGURATION.md)
 
-# Build all services
+# Build all services into services/read/bin/
 make build-all
 
 # Run services (each in a separate terminal)
-./bin/content-service        # Content API (port 8083)
+./bin/content                # Content API (default port 8080)
 ./bin/content-worker         # Content background worker
-./bin/ingest-rss             # RSS Ingest API (port 8085)
-./bin/ingest-rss-worker      # RSS Ingest background worker
+./bin/ingest_rss             # RSS Ingest API (default port 8081)
+./bin/ingest_rss_worker      # RSS Ingest background worker
+./bin/email_ingest           # Email Ingest API (default port 8087)
+./bin/email_ingest_worker    # Email Ingest background worker
 ```
 
-- **Content Service**: Port 8083, database `cairn_content`, Vault required (JWT public key)
-- **Ingest RSS**: Port 8085, database `ingest_rss`, communicates with Content Service via HTTP
-- **Email Ingest**: Port 8087, database `email_ingest`, Vault required (JWT public key)
+Ports below are the code defaults (`PORT`); the dev compose maps them to host ports 8083, 8085 and 8089. See [CONFIGURATION.md](CONFIGURATION.md) for every variable.
+
+- **Content Service**: Port 8080, Vault required (JWT public key)
+- **Ingest RSS**: Port 8081, communicates with the Content Service via HTTP
+- **Email Ingest**: Port 8087, Vault required (JWT public key)
 - **Health checks**:
   ```bash
-  curl http://localhost:8083/health/live  # Content Service
-  curl http://localhost:8085/health/live  # Ingest RSS
+  curl http://localhost:8080/health/live  # Content Service
+  curl http://localhost:8081/health/live  # Ingest RSS
   curl http://localhost:8087/health/live  # Email Ingest
   ```
 
@@ -223,15 +230,14 @@ brew services start postgresql@15  # macOS
 
 # Create databases
 sudo -u postgres psql <<EOF
-CREATE DATABASE cairn_users;
-CREATE USER cairn WITH PASSWORD 'cairn_dev';
-GRANT ALL PRIVILEGES ON DATABASE cairn_users TO cairn;
+CREATE USER cairn_user WITH PASSWORD 'cairn_dev';
+CREATE DATABASE cairn_users OWNER cairn_user;
 EOF
 ```
 
 #### 3. Run Database Migrations
 
-Migrations run automatically on service startup when `ENABLE_AUTO_MIGRATIONS=true`.
+Each API service (User, Content, Ingest RSS, Email Ingest) runs its migrations automatically on startup; there is no setting to turn this off.
 
 For manual migration management:
 
@@ -243,7 +249,8 @@ go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@lat
 cd services/users
 make migrate-up
 
-# Read services: see "Database migrations" in services/read/CLAUDE.md
+# Read services: make migrate-up-content / migrate-up-fetcher in services/read
+# (see "Database migrations" in services/read/CLAUDE.md)
 ```
 
 #### 4. Run Services
@@ -255,7 +262,7 @@ make run
 
 # Terminal 2+: Read services (see "Read Service" above)
 cd services/read
-./bin/content-service
+./bin/content
 ```
 
 ---
@@ -304,24 +311,36 @@ su - cairn
 ```bash
 # Clone repository
 git clone https://github.com/andrew-craig/cairn-reader.git
-cd cairn
+cd cairn-reader
 
 # Create production environment file
 cd infrastructure/docker/prod
 cp .env.example .env
 
 # Edit .env
-# - Change default passwords
-# - Set LOG_LEVEL=info
-# - Disable auto-migrations (run manually)
+# - Change all default passwords and API keys
+# - Set GITHUB_ORG and IMAGE_TAG for the published images
 nano .env
 
-# Start services
+# First start: vault-init initialises Vault, creates the JWT keys and writes the
+# per-service AppRole credentials to /vault-keys/approle-credentials.env in the
+# vault-keys volume. The services cannot authenticate to Vault until you add
+# them to .env, so expect them to be unhealthy on this first start.
+docker compose up -d
+
+# Copy the AppRole credentials into .env
+# (USER_SERVICE_ROLE_ID/SECRET_ID, CONTENT_SERVICE_*, EMAIL_INGEST_*)
+docker compose exec vault-unseal cat /vault-keys/approle-credentials.env
+
+# Restart so the services pick up the credentials
+nano .env
 docker compose up -d
 
 # Verify services are running
 docker compose ps
 ```
+
+The vault-init script also writes the Vault unseal keys to `/vault-keys/UNSEAL_KEYS.txt` on first run. Copy them to secure storage and remove the file (see [infrastructure/docker/README.md](../infrastructure/docker/README.md)).
 
 #### 4. Configure Firewall
 
@@ -330,29 +349,15 @@ docker compose ps
 sudo ufw allow 22/tcp    # SSH
 sudo ufw allow 80/tcp    # HTTP (redirects to HTTPS)
 sudo ufw allow 443/tcp   # HTTPS
-sudo ufw allow 443/udp   # HTTP/3 (QUIC)
 sudo ufw enable
 
-# Note: All backend services are internal-only (no host ports exposed).
-# Caddy reverse proxy handles TLS and routes traffic to services.
+# Note: All backend services are internal-only. The only published port is
+# Caddy on 127.0.0.1:8099 (loopback), which the host nginx proxies to.
 ```
 
 #### 5. Configure Domain and TLS
 
-The production Docker Compose includes a **Caddy** reverse proxy that automatically obtains and renews TLS certificates via Let's Encrypt. No separate nginx or certbot installation is needed.
-
-Set your domain in `.env`:
-
-```bash
-# Set to your production domain
-DOMAIN=api.yourdomain.com
-```
-
-Caddy will:
-- Automatically obtain a Let's Encrypt TLS certificate on first request
-- Redirect HTTP to HTTPS
-- Renew certificates automatically before expiry
-- Support HTTP/3 (QUIC) out of the box
+The production compose file runs a **Caddy** reverse proxy that routes API paths to the services and serves the web app. Caddy serves plain HTTP on container port 8080, published only on the host loopback as `127.0.0.1:8099`. **TLS is terminated by a reverse proxy on the host (for example nginx with Let's Encrypt/certbot)**, which must proxy your domain to `http://127.0.0.1:8099` and set `X-Forwarded-Proto: https`. The repository does not ship the host nginx configuration.
 
 The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 
@@ -363,61 +368,25 @@ The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 | `/api/v1/content/*` | Content Service | Article storage |
 | `/api/v1/source/email/*` | Email Ingest | Email ingestion |
 | `/health/*` | User Service | Health checks |
+| everything else | Web app | Static React SPA |
 
-Internal endpoints (`/api/v1/internal/*`, `/api/v1/source/rss/*`) are blocked from public access.
+Internal endpoints (`/api/v1/internal/*`, `/api/v1/source/rss/*`) return 404 from the public proxy.
 
-For local testing without TLS, set `DOMAIN=localhost` in `.env`.
+For local testing without a TLS proxy, call `http://127.0.0.1:8099` directly. (`DOMAIN` appears in `.env.example` but the Caddyfile does not read it.)
 
 ### Production Docker Compose Configuration
 
 Use the production compose file at `infrastructure/docker/prod/docker-compose.yml` or use environment variables to override defaults.
 
-**Key production settings**:
+**Key production settings** (already set in the compose file):
 
-```yaml
-services:
-  postgres:
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
+- Every long-running service has `restart: unless-stopped`, and the API and worker services have `/health/ready` healthchecks.
+- Services run with `ENVIRONMENT=production` (User Service, Email Ingest) and authenticate to Vault with AppRole credentials.
+- `JWT_ACCESS_TOKEN_EXPIRY=15m` and `JWT_REFRESH_TOKEN_EXPIRY=7d` for the User Service.
+- Per-process `DB_MAX_OPEN_CONNS` values follow the connection budget documented above `cairn-db` in the compose file.
+- The compose file sets no CPU or memory limits; add `deploy.resources.limits` to the services if you need them.
 
-  user-service:
-    restart: unless-stopped
-    environment:
-      LOG_LEVEL: info
-      ENABLE_AUTO_MIGRATIONS: false  # Run manually
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Similar for other services...
-```
-
-**Environment variables** (`.env.production`):
-
-```bash
-# Strong passwords (generate with: openssl rand -base64 32)
-POSTGRES_PASSWORD=<strong-random-password>
-VAULT_TOKEN=<strong-random-token>
-
-# Production settings
-LOG_LEVEL=info
-ENABLE_AUTO_MIGRATIONS=false
-
-# Service-specific
-JWT_ACCESS_LIFETIME=15m
-JWT_REFRESH_LIFETIME=7d
-```
+**Environment variables**: copy `infrastructure/docker/prod/.env.example` to `.env` and set strong values for the database passwords (`openssl rand -base64 32`), `INTERNAL_API_KEY`, `EMAIL_INGEST_API_KEY` and the AppRole credentials. See [CONFIGURATION.md](CONFIGURATION.md) for service variables.
 
 ---
 
@@ -427,18 +396,19 @@ JWT_REFRESH_LIFETIME=7d
 
 ```bash
 # Connect to PostgreSQL
-docker compose exec postgres psql -U cairn
+# (POSTGRES_ADMIN_USER from .env; cairn_admin in .env.example)
+docker compose exec cairn-db psql -U cairn_admin -d postgres
 
 # List databases
-docker compose exec postgres psql -U cairn -c '\l'
+docker compose exec cairn-db psql -U cairn_admin -d postgres -c '\l'
 
 # Connect to specific database
-docker compose exec postgres psql -U cairn -d cairn_users
+docker compose exec cairn-db psql -U cairn_admin -d cairn_users
 ```
 
 ### Database SSL Mode
 
-All services default to `sslmode=disable` for PostgreSQL connections. This is intentional and safe **within the Docker network** because:
+The compose files configure the services with `sslmode=disable` for PostgreSQL connections (the Content and Ingest RSS APIs would otherwise default to `require`). This is safe **within the Docker network** because:
 
 - All containers run on the same private Docker bridge network
 - Traffic never leaves the host machine
@@ -463,6 +433,7 @@ The `DB_SSLMODE` (or `DB_SSL_MODE` in the Email Ingest service) environment vari
 **cairn_users:**
 - users
 - refresh_tokens
+- email_verification_tokens
 
 **content_service:**
 - contents
@@ -476,11 +447,11 @@ The `DB_SSLMODE` (or `DB_SSL_MODE` in the Email Ingest service) environment vari
 - content_outbox
 
 **ingest_email:**
-- email senders, raw emails, content_outbox
+- email_addresses, email_senders, raw_emails, content_outbox, api_keys
 
 ### Automatic Migrations
 
-Migrations run automatically when services start (if `ENABLE_AUTO_MIGRATIONS=true`).
+Each API service runs its migrations when it starts. There is no setting to disable this.
 
 ### Manual Migration Management
 
@@ -491,7 +462,9 @@ make migrate-up              # Run migrations
 make migrate-down            # Rollback
 make migrate-version         # Check current version
 
-# For other services, migrations run via init scripts
+# Read services (from services/read)
+make migrate-up-content
+make migrate-up-fetcher
 ```
 
 ### Common Database Commands
@@ -524,7 +497,7 @@ All services provide health check endpoints for monitoring and orchestration.
 
 ### Endpoints
 
-**Liveness Check** (`/health/live` or `/health`):
+**Liveness Check** (`/health/live`):
 - Checks if the service process is running
 - Returns 200 OK if alive
 - Use for container/process restart policies
@@ -539,13 +512,13 @@ All services provide health check endpoints for monitoring and orchestration.
 
 ```bash
 # User Service
-curl http://localhost:8082/health
+curl http://localhost:8082/health/ready
 
 # Content Service
-curl http://localhost:8083/health/live
+curl http://localhost:8083/health/ready
 
 # Ingest RSS
-curl http://localhost:8085/health/live
+curl http://localhost:8085/health/ready
 ```
 
 ### Kubernetes Liveness/Readiness Probes
@@ -553,15 +526,15 @@ curl http://localhost:8085/health/live
 ```yaml
 livenessProbe:
   httpGet:
-    path: /health
-    port: 8082
+    path: /health/live
+    port: 8080
   initialDelaySeconds: 30
   periodSeconds: 10
 
 readinessProbe:
   httpGet:
-    path: /health
-    port: 8082
+    path: /health/ready
+    port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
 ```
@@ -613,7 +586,7 @@ Metrics to be collected:
 
 #### Automated Backup Script
 
-Create `scripts/backup.sh`:
+Create a backup script (for the self-hosted stack use the shipped `infrastructure/docker/selfhost/scripts/backup.sh`). Run it from `infrastructure/docker/prod`, with the admin credentials from `.env`:
 
 ```bash
 #!/bin/bash
@@ -623,18 +596,21 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p $BACKUP_DIR
 
 # Backup all databases
-docker compose exec -T postgres pg_dumpall -U cairn | \
+docker compose exec -T cairn-db pg_dumpall -U cairn_admin | \
   gzip > $BACKUP_DIR/cairn_all_$DATE.sql.gz
 
 # Or backup individually
-docker compose exec -T postgres pg_dump -U cairn cairn_users | \
+docker compose exec -T cairn-db pg_dump -U cairn_admin cairn_users | \
   gzip > $BACKUP_DIR/cairn_users_$DATE.sql.gz
 
-docker compose exec -T postgres pg_dump -U cairn content_service | \
+docker compose exec -T cairn-db pg_dump -U cairn_admin content_service | \
   gzip > $BACKUP_DIR/content_service_$DATE.sql.gz
 
-docker compose exec -T postgres pg_dump -U cairn rss_fetcher_service | \
+docker compose exec -T cairn-db pg_dump -U cairn_admin rss_fetcher_service | \
   gzip > $BACKUP_DIR/rss_fetcher_service_$DATE.sql.gz
+
+docker compose exec -T cairn-db pg_dump -U cairn_admin ingest_email | \
+  gzip > $BACKUP_DIR/ingest_email_$DATE.sql.gz
 
 # Keep only last 30 days of backups
 find $BACKUP_DIR -name "*.sql.gz" -mtime +30 -delete
@@ -649,7 +625,7 @@ echo "Backup completed: $DATE"
 crontab -e
 
 # Add line (run daily at 2 AM):
-0 2 * * * /home/cairn/cairn/scripts/backup.sh >> /var/log/cairn-backup.log 2>&1
+0 2 * * * /home/cairn/cairn-reader/scripts/backup.sh >> /var/log/cairn-backup.log 2>&1
 ```
 
 ### Restore from Backup
@@ -659,18 +635,18 @@ crontab -e
 docker compose down
 
 # Start only database
-docker compose up -d postgres
+docker compose up -d cairn-db
 
 # Wait for database to be ready
 sleep 10
 
 # Restore all databases
 gunzip -c /var/backups/cairn/cairn_all_20240115_020000.sql.gz | \
-  docker compose exec -T postgres psql -U cairn
+  docker compose exec -T cairn-db psql -U cairn_admin -d postgres
 
 # Or restore individual database
 gunzip -c /var/backups/cairn/cairn_users_20240115_020000.sql.gz | \
-  docker compose exec -T postgres psql -U cairn -d cairn_users
+  docker compose exec -T cairn-db psql -U cairn_admin -d cairn_users
 
 # Start all services
 docker compose up -d
@@ -738,9 +714,9 @@ docker compose up -d --scale content-service=3
 ```nginx
 upstream user_service {
     least_conn;
-    server user-service-1:8082;
-    server user-service-2:8082;
-    server user-service-3:8082;
+    server user-service-1:8080;
+    server user-service-2:8080;
+    server user-service-3:8080;
 }
 
 server {
@@ -798,7 +774,7 @@ docker compose logs content-service
 docker compose logs ingest-rss
 
 # Check database connectivity
-docker compose exec postgres psql -U cairn -c "SELECT 1;"
+docker compose exec cairn-db psql -U cairn_admin -d postgres -c "SELECT 1;"
 
 # Check disk space
 df -h
@@ -813,14 +789,14 @@ docker system df
 ### Common Issues
 
 **Services won't start**:
-- Port conflicts (change ports in docker-compose.yml)
+- Port conflicts (change the host ports in the compose file)
 - Docker not running
 - Insufficient memory (increase Docker memory limit)
 
 **Database connection errors**:
-- Verify database is healthy: `docker compose ps postgres`
-- Check migration logs: `docker compose logs postgres`
-- Verify databases exist: `docker compose exec postgres psql -U cairn -l`
+- Verify database is healthy: `docker compose ps cairn-db`
+- Check database logs: `docker compose logs cairn-db`; migration logs are in the service logs
+- Verify databases exist: `docker compose exec cairn-db psql -U cairn_admin -d postgres -l`
 
 **Vault errors**:
 - Check Vault logs: `docker compose logs vault`
@@ -942,6 +918,8 @@ The Email Ingest Service authenticates the Cloudflare Email Worker via an `X-API
 | `created_at` | When the key was created |
 | `expires_at` | Optional expiry (NULL = no expiry) |
 | `last_used_at` | Updated on each successful validation |
+| `revoked_at` | When the key was revoked |
+| `created_by`, `notes` | Provenance and purpose |
 
 ### Key Rotation Tool
 
@@ -965,24 +943,16 @@ go build -o bin/manage_keys ./cmd/manage_keys
 ./bin/manage_keys revoke --name cloudflare-worker-prod
 ```
 
-The tool requires the same `DB_*` environment variables as the service. You can run it locally or inside the container:
-
-```bash
-# In Docker
-docker compose exec email-ingest \
-  ./manage_keys rotate --name cloudflare-worker-prod
-```
+The tool requires the same `DB_*` environment variables as the service (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, optionally `DB_SSL_MODE`). It is not included in the service container image, so run it from a checkout on a host that can reach the database. The dev compose publishes PostgreSQL on `localhost:5432`; the prod compose does not (uncomment the `ports` line on `cairn-db` temporarily, or tunnel to it).
 
 ### Rotation Procedure
 
 1. **Run rotate**: `./bin/manage_keys rotate --name <key-name>`
 2. **Copy the new raw key** printed to stdout — it is not stored anywhere.
 3. **Update the Cloudflare Email Worker** with the new key.
-4. **Update `INGEST_API_KEY`** in the service's `.env` / Docker secret.
-5. **Restart the Email Ingest service** to pick up the new key.
-6. The old key is revoked in the same database transaction as step 1, so there is no window where both are valid simultaneously.
+4. The old key is revoked in the same database transaction as step 1, so there is no window where both are valid simultaneously. No service restart is needed; requests are validated against the `api_keys` table.
 
-> **Note**: The `INGEST_API_KEY` environment variable is used only for the initial key provisioning during `docker compose up`. After the first key is stored in the database, the service validates all requests against the `api_keys` table regardless of the environment variable.
+> **Note**: In the multi-container deployment the Email Ingest service validates requests only against the `api_keys` table. `INGEST_API_KEY` is still required at startup by the config loader, but is not used for validation. Only the self-hosted binary reads it, upserting it into `api_keys` under the name `selfhost-default`; rotate that key by changing `INGEST_API_KEY` and restarting.
 
 ---
 
@@ -1042,7 +1012,7 @@ docker compose logs -f
 After deployment:
 
 1. **Integrate Mobile App**: Configure app to use deployed APIs
-2. **Add Content**: RSS feeds will auto-sync from Kagi Small Web
+2. **Add Content**: Subscribe to RSS feeds, save articles, or forward newsletters to the email ingest address
 3. **Monitor**: Check logs and health endpoints
 4. **Customize**: Modify environment variables as needed
 5. **Set up monitoring**: Add Prometheus and Grafana
