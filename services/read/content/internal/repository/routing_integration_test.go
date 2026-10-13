@@ -297,6 +297,14 @@ func TestSourceRouteRepository_UpsertDeleteList_Integration(t *testing.T) {
 	require.Equal(t, models.ListReads, byKey[feedID])
 	require.Equal(t, models.ListFeed, byKey[senderID])
 
+	got, err := f.routeRepo.Get(ctx, userID, models.SourceTypeEmail, senderID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, models.ListFeed, got.List)
+	got, err = f.routeRepo.Get(ctx, userID, models.SourceTypeEmail, uuid.New())
+	require.NoError(t, err)
+	require.Nil(t, got, "no route yields nil, not an error")
+
 	require.NoError(t, f.routeRepo.Delete(ctx, userID, models.SourceTypeRSS, feedID))
 	require.NoError(t, f.routeRepo.Delete(ctx, userID, models.SourceTypeRSS, feedID), "deleting a missing route is not an error")
 

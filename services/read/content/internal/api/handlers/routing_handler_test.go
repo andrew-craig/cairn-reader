@@ -59,6 +59,7 @@ func fetcherSubscribeServer(t *testing.T, feedID uuid.UUID) *service.IngestRSSCl
 func TestAddContentToUser_FeedSubscription_OmittedListWritesNoRoute(t *testing.T) {
 	userID, feedID := uuid.New(), uuid.New()
 	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(nil, nil)
 	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
 		nil, nil, fetcherSubscribeServer(t, feedID))
 
@@ -79,6 +80,36 @@ func TestAddContentToUser_FeedSubscription_OmittedListWritesNoRoute(t *testing.T
 	}
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
 	assert.Equal(t, models.ListReads, resp.Data.Subscription.List)
+}
+
+// With no explicit list the response reports where the feed actually routes:
+// the user's existing route when there is one, and nothing is rewritten.
+func TestAddContentToUser_FeedSubscription_OmittedListReportsExistingRoute(t *testing.T) {
+	userID, feedID := uuid.New(), uuid.New()
+	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(&models.SourceRoute{
+		UserID: userID, SourceType: models.SourceTypeRSS, SourceKey: feedID, List: models.ListFeed,
+	}, nil)
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServer(t, feedID))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	routes.AssertNotCalled(t, "Upsert", mock.Anything, mock.Anything)
+
+	var resp struct {
+		Data struct {
+			Subscription struct {
+				List string `json:"list"`
+			} `json:"subscription"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, models.ListFeed, resp.Data.Subscription.List)
 }
 
 // list only means something for a feed; pages and content-ID saves always go to Reads.
@@ -168,6 +199,21 @@ func TestAddContentToUser_FeedSubscription_RouteWriteFails(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
 		map[string]any{"url": "https://example.com/feed.xml", "type": "feed", "list": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestAddContentToUser_FeedSubscription_RouteLookupFails(t *testing.T) {
+	userID, feedID := uuid.New(), uuid.New()
+	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(nil, errors.New("db down"))
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServer(t, feedID))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed"},
 		userID, map[string]string{"user_id": userID.String()}))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
