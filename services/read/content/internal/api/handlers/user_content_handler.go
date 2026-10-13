@@ -459,16 +459,25 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	// Resolve where this feed's future items land. An explicit list is written
 	// as the feed's route. With none, any existing route is left alone and
 	// reported as is; no route means Reads. The subscription already exists at
-	// this point, so a failure here leaves it routed as before; the client can
+	// this point, so a failure leaves it routed as before; the client can
 	// correct it via the list endpoint after re-fetching subscriptions.
 	feedID, err := uuid.Parse(subscription.FeedID)
-	if err == nil {
-		list, err = h.resolveFeedList(r.Context(), userID, feedID, list)
-	}
-	if err != nil {
-		slog.Error("Failed to resolve route for new subscription", "error", err)
+	switch {
+	case err != nil && list == "":
+		// Nothing to write and no route to look up; the subscription succeeded.
+		slog.Warn("Subscription has an unusable feed ID, reporting default list", "feed_id", subscription.FeedID, "error", err)
+		list = models.ListReads
+	case err != nil:
+		slog.Error("Cannot set route: subscription has an unusable feed ID", "feed_id", subscription.FeedID, "error", err)
 		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
 		return
+	default:
+		list, err = h.resolveFeedList(r.Context(), userID, feedID, list)
+		if err != nil {
+			slog.Error("Failed to set or look up route for new subscription", "error", err)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to resolve its list", nil, "v1")
+			return
+		}
 	}
 
 	// Build feed response
