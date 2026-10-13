@@ -167,12 +167,12 @@ bypass the limit by distributing requests across instances: each instance sees a
 network (`cairn-network`, driver: bridge).
 
 **Evidence:**
-- `infrastructure/docker/prod/docker-compose.yml:230` — `explore-recommender`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:270` — `explore-fetcher`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:302` — `content-service`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:338` — `content-worker`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:366` — `ingest-rss`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:394` — `ingest-rss-worker`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `explore-recommender`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `explore-fetcher`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `content-service`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `content-worker`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss-worker`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `email-ingest` service: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `email-ingest-worker` service: `DB_SSLMODE=disable`
 - `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set; users service uses pgx which defaults to `prefer` — effectively no enforced TLS).
