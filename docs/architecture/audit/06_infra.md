@@ -167,15 +167,13 @@ bypass the limit by distributing requests across instances: each instance sees a
 network (`cairn-network`, driver: bridge).
 
 **Evidence:**
-- `infrastructure/docker/prod/docker-compose.yml` — `explore-recommender`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml` — `explore-fetcher`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `content-service`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `content-worker`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss-worker`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `email-ingest` service: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml` — `email-ingest-worker` service: `DB_SSLMODE=disable`
-- `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set; users service uses pgx which defaults to `prefer` — effectively no enforced TLS).
+- `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set in compose; the users service config defaults `DB_SSLMODE` to `disable`).
 
 **Assessment.** Within a single-host Docker bridge network, inter-container traffic does not leave the kernel network stack; TLS in this context provides negligible security benefit (an attacker who can sniff kernel network traffic has already compromised the host). `sslmode=disable` is the conventional and correct setting here. Audit 2 (D-4) already noted this; the data matches.
 
