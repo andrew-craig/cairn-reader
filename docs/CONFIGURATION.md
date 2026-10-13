@@ -323,7 +323,7 @@ vault kv get -field=value secret/jwt/private-key | head -1
 
 ## Read Service Configuration
 
-The Read Service consists of three microservices, each with an API process and (except the Content API) a separate worker process: the Content Service (`services/read/content`), the RSS Fetcher Service (`services/read/fetcher`, `ingest-rss` in compose) and the Email Ingest Service (`services/read/email`). The code is the source of truth; defaults below are the values the code uses when a variable is unset.
+The Read Service consists of three microservices, each with an API process and a separate worker process: the Content Service (`services/read/content`), the RSS Fetcher Service (`services/read/fetcher`, `ingest-rss` in compose) and the Email Ingest Service (`services/read/email`). The code is the source of truth; defaults below are the values the code uses when a variable is unset.
 
 All three API processes (and the email worker) share the same database, server and logging variables where noted. The Content and Fetcher worker processes read their own, slightly different, variable set. Only the variables listed here are read; there is no `DATABASE_URL`, no `SERVER_PORT` and no `ENABLE_AUTO_MIGRATIONS` (the Content API always runs its migrations on startup).
 
@@ -569,7 +569,7 @@ curl http://localhost:8085/health/ready   # ingest-rss
 - Check `DB_SSLMODE` (API) / `DB_SSL_MODE` (workers and Email Ingest) matches the server
 - Verify the database is running and reachable
 
-**Worker setting ignored**: the Content and Fetcher workers read `DB_SSL_MODE`; setting `DB_SSLMODE` on them has no effect.
+**SSL setting ignored**: the variable name differs between processes (tracked in bug_b094). The Content and Fetcher workers read `DB_SSL_MODE`, so `DB_SSLMODE` has no effect on them (the prod compose sets `DB_SSLMODE` on them). The Content and Fetcher APIs read `DB_SSLMODE` (default `require`), so `DB_SSL_MODE` has no effect on them (the dev compose sets `DB_SSL_MODE` on them, so in dev they run with `sslmode=require`).
 
 ---
 

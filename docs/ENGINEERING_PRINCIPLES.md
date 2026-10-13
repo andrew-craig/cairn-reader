@@ -61,7 +61,7 @@ User Service (8080) → User DB (postgres:5432)
 
 **Files:**
 - `infrastructure/docker/dev/docker-compose.yml` (one Postgres instance, a logical database per service)
-- `infrastructure/docker/scripts/init-postgres.sh` (database initialization)
+- `infrastructure/docker/scripts/init-databases.sh` (database initialization)
 
 ---
 

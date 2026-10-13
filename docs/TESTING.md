@@ -64,28 +64,31 @@ For detailed testing principles, see [Engineering Principles - Testing Philosoph
 
 ### Database Requirements
 
-All integration and E2E tests require PostgreSQL databases. You have two options:
+All integration and E2E tests require PostgreSQL. Each test run creates its own uniquely named database (for example `cairn_content_test_<timestamp>`) by connecting to the `postgres` database, so the configured user needs permission to create databases.
 
-#### Option 1: Docker Compose (Recommended)
+The dev stack (`infrastructure/docker/dev`) runs a single `cairn-db` service published on port 5432. Its per-service users (created by `infrastructure/docker/scripts/init-databases.sh`) cannot create databases, and the test defaults below do not match it, so use a throwaway PostgreSQL container instead.
 
-Start all databases using the centralized Docker Compose setup:
+#### Option 1: Throwaway PostgreSQL container (Recommended)
+
+Each service's `internal/testutil/database.go` defaults to its own port, user and password (Content: 5433, Fetcher: 5434, Email: 5435). Start one container per service under test, using the defaults as the superuser credentials:
 
 ```bash
-cd infrastructure/docker
-docker compose up -d
+# Content Service (defaults: localhost:5433, cairn_content / cairn_content_pass)
+docker run -d --name cairn-test-content -p 5433:5432 \
+  -e POSTGRES_USER=cairn_content -e POSTGRES_PASSWORD=cairn_content_pass \
+  postgres:18-alpine
 
-# Or start specific databases
-docker compose up -d content-db rss-db users-db
+# RSS Fetcher Service (defaults: localhost:5434, cairn_rss / cairn_rss_pass)
+docker run -d --name cairn-test-rss -p 5434:5432 \
+  -e POSTGRES_USER=cairn_rss -e POSTGRES_PASSWORD=cairn_rss_pass \
+  postgres:18-alpine
 ```
 
-This starts:
-- Content Service database (port 5433)
-- RSS Fetcher Service database (port 5434)
-- User Service database (port 5436)
+Remove them with `docker rm -f cairn-test-content cairn-test-rss` when finished. The User Service integration tests read `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` (defaults: `localhost:5433`, `cairn_test` / `test_password`, `cairn_users_test`; see `services/users/test/integration/testutil/setup.go`).
 
 #### Option 2: Local PostgreSQL
 
-If you have PostgreSQL running locally, create test databases and set environment variables:
+If you have PostgreSQL running locally, use a role that can create databases and set environment variables:
 
 ```bash
 # For Content Service
@@ -101,14 +104,9 @@ export TEST_DB_PORT=5434
 export TEST_DB_USER=cairn_rss
 export TEST_DB_PASSWORD=cairn_rss_pass
 export TEST_DB_NAME=cairn_rss_test
-
-# For User Service
-export TEST_DB_HOST=localhost
-export TEST_DB_PORT=5436
-export TEST_DB_USER=cairn_users
-export TEST_DB_PASSWORD=cairn_users_pass
-export TEST_DB_NAME=cairn_users_test
 ```
+
+Alternatively, point the tests at the dev `cairn-db` (port 5432) with `TEST_DB_PORT=5432` and the `POSTGRES_ADMIN_USER` / `POSTGRES_ADMIN_PASSWORD` values from your dev `.env` as `TEST_DB_USER` / `TEST_DB_PASSWORD`.
 
 ### Additional Tools
 
@@ -160,9 +158,8 @@ make test
 Integration tests are marked with the `integration` build tag and require databases to be running.
 
 ```bash
-# Start databases
-cd infrastructure/docker
-docker compose up -d content-db rss-db users-db
+# Start databases (see Prerequisites > Database Requirements)
+docker start cairn-test-content cairn-test-rss
 
 # Run integration tests for a service
 cd services/{service-name}
@@ -546,8 +543,7 @@ jobs:
 
 2. Check database logs:
    ```bash
-   docker compose logs content-db
-   docker compose logs rss-db
+   docker compose logs cairn-db
    ```
 
 3. Verify connection parameters in test output
