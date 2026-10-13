@@ -2,14 +2,14 @@
 id: task_f9ad
 title: Mobile: Feed and Reads tabs
 type: task
-status: in_progress
+status: closed
 priority: 1
 labels: [mobile]
 blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-10T08:28:37Z
+updated_at: 2026-10-13T21:22:20Z
 ---
 - [x] Shared types: list on UserContentResponse + UnifiedSubscription; ReadService.listUserContents({list}), setSourceList, moveToReads
 - [x] Tabs: Feed | Reads | You

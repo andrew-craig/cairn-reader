@@ -3,13 +3,13 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_f9ad** · P1 · in_progress · Mobile: Feed and Reads tabs  (parent: epic_6e4d)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **bug_989c** · P2 · in_progress · Content: subscribe response list ignores existing route; openapi missing RSS unsubscribe  (parent: epic_6e4d)
 - **task_0849** · P2 · in_progress · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
+- **feature_bd13** · P2 · open · Mobile: Add feed option on the RSS (feeds) page  (parent: epic_6e4d)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
@@ -17,9 +17,11 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
+- **task_9188** · P2 · open · Mobile: Redesign Add Feed flow (Feed/Reads choice)  (parent: epic_6e4d)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_082f** · P3 · in_progress · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
+- **bug_2f87** · P3 · open · Dev compose: users service sets SERVER_ENVIRONMENT but config reads ENVIRONMENT  (parent: epic_6e4d)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch

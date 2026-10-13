@@ -5,11 +5,11 @@ type: task
 status: in_progress
 priority: 3
 labels: [docs]
-blocked_by: [task_f9ad]
+blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-08T11:32:05Z
-updated_at: 2026-10-12T21:20:42Z
+updated_at: 2026-10-13T21:22:20Z
 ---
 Update docs/ARCHITECTURE.md, root CLAUDE.md, service and app CLAUDE.md files, and openapi specs for the Feed/Reads model and the removed Explore service.
 

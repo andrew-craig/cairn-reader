@@ -231,7 +231,7 @@ Key configurations:
 - `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
 - `JWT_ACCESS_LIFETIME=15m`
 - `JWT_REFRESH_LIFETIME=7d`
-- `SERVER_ENVIRONMENT=development`
+- `ENVIRONMENT=development`
 
 ### Content Service (content-service)
 - `PORT=8080` (internal), exposed as 8083
