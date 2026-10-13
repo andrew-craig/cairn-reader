@@ -126,8 +126,9 @@ services:
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+      - EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
@@ -154,7 +155,7 @@ services:
       - DB_USER=${POSTGRES_USER_CONTENT}
       - DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}
       - DB_NAME=${POSTGRES_DB_CONTENT}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - CLEANUP_CRON=0 2 * * *
       - HEALTH_PORT=8084
     ports:
@@ -186,7 +187,7 @@ services:
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
@@ -211,7 +212,7 @@ services:
       - DB_USER=${POSTGRES_USER_RSS}
       - DB_PASSWORD=${POSTGRES_PASSWORD_RSS}
       - DB_NAME=${POSTGRES_DB_RSS}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       - HEALTH_PORT=8086
@@ -248,7 +249,7 @@ services:
       - DB_USER=${POSTGRES_USER_EMAIL}
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
@@ -279,7 +280,7 @@ services:
       - DB_USER=${POSTGRES_USER_EMAIL}
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - CONTENT_SERVICE_URL=http://content-service:8080
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - EMAIL_DOMAIN=read.cairnapp.com

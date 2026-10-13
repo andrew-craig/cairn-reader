@@ -199,7 +199,7 @@ DB_PORT=5432
 DB_USER=cairn_user_email
 DB_PASSWORD=your_secure_password_here
 DB_NAME=ingest_email
-DB_SSL_MODE=disable  # Use "require" or "verify-full" in production
+DB_SSLMODE=disable  # Use "require" or "verify-full" in production
 ```
 
 ## Migration Best Practices

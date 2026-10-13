@@ -48,7 +48,7 @@ func testDBConnInfo(t *testing.T) testDBConn {
 		port:     port,
 		user:     envOrDefault("TEST_DB_USER", "postgres"),
 		password: envOrDefault("TEST_DB_PASSWORD", "postgres"),
-		sslMode:  envOrDefault("TEST_DB_SSL_MODE", "disable"),
+		sslMode:  envOrDefault("TEST_DB_SSLMODE", "disable"),
 	}
 }
 

@@ -4,8 +4,6 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **task_f9ad** · P1 · in_progress · Mobile: Feed and Reads tabs  (parent: epic_6e4d)
-- **bug_b094** · P1 · open · DB SSL mode env var name differs between processes; prod and dev compose each set the wrong one  (parent: epic_6e4d)
-- **bug_d67e** · P1 · open · Prod compose: content service missing EMAIL_INGEST_SERVICE_URL  (parent: epic_6e4d)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **bug_989c** · P2 · in_progress · Content: subscribe response list ignores existing route; openapi missing RSS unsubscribe  (parent: epic_6e4d)

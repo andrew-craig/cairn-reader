@@ -374,7 +374,7 @@ In addition to the shared variables above:
 
 #### Worker (`cmd/worker`)
 
-The worker reads its own variables directly (not `pkg/config`). Note `DB_SSL_MODE` here, versus `DB_SSLMODE` on the API.
+The worker reads its own variables directly (not `pkg/config`). Unlike the API (default `require`), its `DB_SSLMODE` defaults to `disable`.
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -383,7 +383,7 @@ The worker reads its own variables directly (not `pkg/config`). Note `DB_SSL_MOD
 | `DB_USER` | string | No | `cairn_content` | Database user |
 | `DB_PASSWORD` | string | No | `cairn_content_pass` | Database password |
 | `DB_NAME` | string | No | `cairn_content` | Database name |
-| `DB_SSL_MODE` | string | No | `disable` | SSL mode |
+| `DB_SSLMODE` | string | No | `disable` | SSL mode |
 | `DB_MAX_OPEN_CONNS` | int | No | `5` | Maximum open connections |
 | `DB_MAX_IDLE_CONNS` | int | No | `2` | Maximum idle connections |
 | `DB_CONN_MAX_LIFETIME` | duration | No | `5m` | Maximum connection lifetime |
@@ -426,7 +426,7 @@ Uses only the shared variables above (default port `8081`); `INTERNAL_API_KEY` i
 
 #### Worker (`cmd/ingest_rss_worker`)
 
-The worker reads its own variables directly. Note `DB_SSL_MODE` here, versus `DB_SSLMODE` on the API. `INTERNAL_API_KEY` is not validated at startup, but outbox delivery to the Content Service is rejected without it.
+The worker reads its own variables directly. Unlike the API (default `require`), its `DB_SSLMODE` defaults to `disable`. `INTERNAL_API_KEY` is not validated at startup, but outbox delivery to the Content Service is rejected without it.
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
@@ -435,7 +435,7 @@ The worker reads its own variables directly. Note `DB_SSL_MODE` here, versus `DB
 | `DB_USER` | string | No | `cairn_rss` | Database user |
 | `DB_PASSWORD` | string | No | `cairn_rss_pass` | Database password |
 | `DB_NAME` | string | No | `cairn_rss_fetcher` | Database name |
-| `DB_SSL_MODE` | string | No | `disable` | SSL mode |
+| `DB_SSLMODE` | string | No | `disable` | SSL mode |
 | `DB_MAX_OPEN_CONNS` | int | No | `10` | Maximum open connections |
 | `DB_MAX_IDLE_CONNS` | int | No | `5` | Maximum idle connections |
 | `DB_CONN_MAX_LIFETIME` | duration | No | `5m` | Maximum connection lifetime |
@@ -472,7 +472,7 @@ Both the API (`cmd/email_ingest`) and the worker (`cmd/email_ingest_worker`) loa
 | `DB_USER` | string | No | `cairn_user_email` | Database user |
 | `DB_PASSWORD` | string | Yes** | - | Database password |
 | `DB_NAME` | string | No | `ingest_email` | Database name |
-| `DB_SSL_MODE` | string | No | `disable` | SSL mode |
+| `DB_SSLMODE` | string | No | `disable` | SSL mode |
 | `DB_STATEMENT_TIMEOUT` | duration | No | `30s` | Per-connection statement timeout |
 | `EMAIL_DOMAIN` | string | No | `read.cairnapp.com` | Domain for per-user ingest addresses |
 | `INGEST_API_KEY` | string | Yes | - | API key the Cloudflare email worker uses to authenticate |
@@ -566,10 +566,10 @@ curl http://localhost:8085/health/ready   # ingest-rss
 
 **Database connection failed**:
 - Check `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- Check `DB_SSLMODE` (API) / `DB_SSL_MODE` (workers and Email Ingest) matches the server
+- Check `DB_SSLMODE` matches the server
 - Verify the database is running and reachable
 
-**SSL setting ignored**: the variable name differs between processes (tracked in bug_b094). The Content and Fetcher workers read `DB_SSL_MODE`, so `DB_SSLMODE` has no effect on them (the prod compose sets `DB_SSLMODE` on them). The Content and Fetcher APIs read `DB_SSLMODE` (default `require`), so `DB_SSL_MODE` has no effect on them (the dev compose sets `DB_SSL_MODE` on them, so in dev they run with `sslmode=require`).
+**Database SSL errors in dev**: the bundled `cairn-db` has no TLS. Every service must set `DB_SSLMODE=disable`; the shared API loader defaults to `require`.
 
 ---
 

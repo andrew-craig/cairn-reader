@@ -408,7 +408,7 @@ docker compose exec cairn-db psql -U cairn_admin -d cairn_users
 
 ### Database SSL Mode
 
-The compose files intend to configure the services with `sslmode=disable` for PostgreSQL connections. The variable name is inconsistent between processes (bug_b094): the Content and Fetcher APIs read `DB_SSLMODE` (default `require`), while their workers and the Email Ingest service read `DB_SSL_MODE` (default `disable`). The prod compose sets `DB_SSLMODE` on the Content and Fetcher workers (ignored; they default to `disable` anyway), and the dev compose sets `DB_SSL_MODE` on the Content and Fetcher APIs (ignored, so they use `require`). Disabling SSL is safe **within the Docker network** because:
+The compose files set `DB_SSLMODE=disable` on every service that connects to PostgreSQL. All services read the same variable name. Defaults differ: the Content and Fetcher APIs (shared `pkg/config` loader) default to `require`, while the workers, the Email Ingest service and the User service default to `disable`. Disabling SSL is safe **within the Docker network** because:
 
 - All containers run on the same private Docker bridge network
 - Traffic never leaves the host machine
@@ -426,7 +426,7 @@ DB_SSLMODE=require    # Encrypt connection, trust server cert
 DB_SSLMODE=verify-full  # Encrypt and verify server certificate (recommended for production)
 ```
 
-The `DB_SSLMODE` environment variable controls this setting in the User, Content and Fetcher APIs. The Content and Fetcher workers and the Email Ingest service (API and worker) read `DB_SSL_MODE` instead.
+The `DB_SSLMODE` environment variable controls this setting in every service and worker.
 
 ### Database Contents
 
@@ -943,7 +943,7 @@ go build -o bin/manage_keys ./cmd/manage_keys
 ./bin/manage_keys revoke --name cloudflare-worker-prod
 ```
 
-The tool requires the same `DB_*` environment variables as the service (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, optionally `DB_SSL_MODE`). It is not included in the service container image, so run it from a checkout on a host that can reach the database. The dev compose publishes PostgreSQL on `localhost:5432`; the prod compose does not (uncomment the `ports` line on `cairn-db` temporarily, or tunnel to it).
+The tool requires the same `DB_*` environment variables as the service (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, optionally `DB_SSLMODE`). It is not included in the service container image, so run it from a checkout on a host that can reach the database. The dev compose publishes PostgreSQL on `localhost:5432`; the prod compose does not (uncomment the `ports` line on `cairn-db` temporarily, or tunnel to it).
 
 ### Rotation Procedure
 

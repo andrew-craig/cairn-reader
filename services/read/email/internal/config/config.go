@@ -89,7 +89,7 @@ func Load() (*Config, error) {
 			User:             getEnv("DB_USER", "cairn_user_email"),
 			Password:         getEnv("DB_PASSWORD", ""),
 			DBName:           getEnv("DB_NAME", "ingest_email"),
-			SSLMode:          getEnv("DB_SSL_MODE", "disable"),
+			SSLMode:          getEnv("DB_SSLMODE", "disable"),
 			StatementTimeout: getEnvDuration("DB_STATEMENT_TIMEOUT", 30*time.Second),
 		},
 		Email: EmailConfig{

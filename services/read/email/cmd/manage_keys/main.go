@@ -109,7 +109,7 @@ Required environment variables (same as the service):
   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 
 Optional:
-  DB_SSL_MODE  (default: disable)`)
+  DB_SSLMODE  (default: disable)`)
 }
 
 // openDB opens a database connection using the same env vars as the service.
@@ -119,7 +119,7 @@ func openDB() (*sql.DB, error) {
 	user := getEnv("DB_USER", "cairn_user_email")
 	password := getEnv("DB_PASSWORD", "")
 	dbname := getEnv("DB_NAME", "ingest_email")
-	sslmode := getEnv("DB_SSL_MODE", "disable")
+	sslmode := getEnv("DB_SSLMODE", "disable")
 
 	if password == "" {
 		return nil, fmt.Errorf("DB_PASSWORD environment variable is required")
