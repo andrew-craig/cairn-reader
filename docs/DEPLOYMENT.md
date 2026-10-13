@@ -408,7 +408,7 @@ docker compose exec cairn-db psql -U cairn_admin -d cairn_users
 
 ### Database SSL Mode
 
-The compose files set `DB_SSLMODE=disable` on every service that connects to PostgreSQL. All services read the same variable name. Defaults differ: the Content and Fetcher APIs (shared `pkg/config` loader) default to `require`, while the workers, the Email Ingest service and the User service default to `disable`. Disabling SSL is safe **within the Docker network** because:
+The compose files set `DB_SSLMODE=disable` on the Content, Fetcher and Email Ingest services and workers; the User service sets nothing and relies on its `disable` default. All services read the same variable name. Defaults differ: the Content and Fetcher APIs (shared `pkg/config` loader) default to `require`, while the workers, the Email Ingest service and the User service default to `disable`. Disabling SSL is safe **within the Docker network** because:
 
 - All containers run on the same private Docker bridge network
 - Traffic never leaves the host machine

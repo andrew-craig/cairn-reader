@@ -173,8 +173,8 @@ network (`cairn-network`, driver: bridge).
 - `infrastructure/docker/prod/docker-compose.yml:338` — `content-worker`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml:366` — `ingest-rss`: `DB_SSLMODE=disable`
 - `infrastructure/docker/prod/docker-compose.yml:394` — `ingest-rss-worker`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:424` — `email-ingest`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:458` — `email-ingest-worker`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `email-ingest` service: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `email-ingest-worker` service: `DB_SSLMODE=disable`
 - `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set; users service uses pgx which defaults to `prefer` — effectively no enforced TLS).
 
 **Assessment.** Within a single-host Docker bridge network, inter-container traffic does not leave the kernel network stack; TLS in this context provides negligible security benefit (an attacker who can sniff kernel network traffic has already compromised the host). `sslmode=disable` is the conventional and correct setting here. Audit 2 (D-4) already noted this; the data matches.
