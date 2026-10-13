@@ -235,69 +235,24 @@ See the [User Service README](services/users/README.md) for detailed documentati
 
 ## Mobile App Screens
 
-### Reading List (Home)
-- Displays all unread articles
-- Pull to refresh
-- Tap to view article details
-- Heart icon to toggle favorites
+Navigation lives in `apps/mobile/src/navigation`: a root stack (`RootNavigator`) wrapping a bottom tab navigator (`TabNavigator`) with three tabs, **Feed | Reads | You**. Screens are in `apps/mobile/src/screens`.
 
-### Feed
-- Skim list of items from sources routed to Feed
-- Online-only; non-favorited items expire after 30 days
-- "Save to Reads" moves an item to Reads
+### Tabs
+- **Feed** (`FeedScreen`): skim list of items from sources routed to Feed. Online-only; non-favorited items expire after 30 days.
+- **Reads** (`ReadsScreen`): items from sources routed to Reads, plus directly saved links. Offline-readable, with search and reading progress.
+- **You** (`YouScreen`): profile hub with subscription and bookmark counts and links to the screens below.
 
-### Reads
-- Items from sources routed to Reads, plus directly saved links
-- Offline-readable; track reading progress
-
-### Favorites
-- Shows all favorited articles
-- Same interactions as Reading List
-
-### Archive
-- Displays all read articles
-- Helps keep your reading list clean
-
-### Settings
-- App information
-- Account management
-- Clear all articles option
-
-### Add Article
-- Add new articles by URL
-- Paste from clipboard
-- Manual title entry
-
-### Article Detail
-- View article information
-- Open in browser
-- Mark as read/unread
-- Toggle favorite status
-- Share article
-- Delete article
+### Stack screens
+- **ArticleDetail** (`ReadArticleDetailScreen`): the reader, shared by Feed and Reads. Favorite and Next actions; "Save to Reads" for Feed items, Archive for Reads items.
+- **AddArticle** (`AddArticleScreen`): save an article by URL.
+- **Bookmarks** (`BookmarksScreen`): favorited articles.
+- **RSS** and **Newsletters** (`RssScreen`, `NewslettersScreen`): subscriptions, with a per-source Feed/Reads toggle.
+- **Account** (`AccountScreen`) and **About** (`AboutScreen`): account settings and app/server versions.
+- **Login** (`LoginScreen`): shown instead of the stack when signed out.
 
 ## Data Model
 
-### Article Interface
-
-```typescript
-interface Article {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  author?: string;
-  publishedDate?: string;
-  readingTime?: number;
-  tags: string[];
-  isRead: boolean;
-  isFavorite: boolean;
-  addedAt: number;
-  readAt?: number;
-  notes?: string;
-}
-```
+The `Article` type, along with the auth and Read service API types, is shared by the mobile and web clients and defined in `apps/shared/src/types` (`article.ts`, `auth.ts`, `read.ts`, exported from `@cairn/shared`).
 
 ## Theme
 
