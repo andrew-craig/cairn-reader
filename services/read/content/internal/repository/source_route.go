@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/andrew-craig/cairn-reader/services/read/content/internal/models"
@@ -14,6 +15,10 @@ import (
 type SourceRouteRepository interface {
 	// Upsert creates or replaces the route for (user, source type, source key).
 	Upsert(ctx context.Context, route *models.SourceRoute) error
+
+	// Get returns the route for (user, source type, source key), or nil when the
+	// user has none (the source then delivers to Reads).
+	Get(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) (*models.SourceRoute, error)
 
 	// Delete removes a route. Deleting a route that does not exist is not an error.
 	Delete(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) error
@@ -42,6 +47,22 @@ func (r *sourceRouteRepository) Upsert(ctx context.Context, route *models.Source
 		return fmt.Errorf("failed to upsert source route: %w", err)
 	}
 	return nil
+}
+
+func (r *sourceRouteRepository) Get(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) (*models.SourceRoute, error) {
+	route := &models.SourceRoute{}
+	err := r.db.QueryRowContext(ctx, `
+		SELECT user_id, source_type, source_key, list
+		FROM source_routes
+		WHERE user_id = $1 AND source_type = $2 AND source_key = $3
+	`, userID, sourceType, sourceKey).Scan(&route.UserID, &route.SourceType, &route.SourceKey, &route.List)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source route: %w", err)
+	}
+	return route, nil
 }
 
 func (r *sourceRouteRepository) Delete(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) error {

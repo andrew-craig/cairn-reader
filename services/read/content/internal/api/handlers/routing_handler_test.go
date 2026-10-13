@@ -39,10 +39,17 @@ func routedRequest(method, target string, body interface{}, authUserID uuid.UUID
 // fetcherSubscribeServer fakes the Ingest RSS subscribe endpoint.
 func fetcherSubscribeServer(t *testing.T, feedID uuid.UUID) *service.IngestRSSClient {
 	t.Helper()
+	return fetcherSubscribeServerWithFeedID(t, feedID.String())
+}
+
+// fetcherSubscribeServerWithFeedID is fetcherSubscribeServer with a raw feed_id,
+// for responses whose feed ID is not a UUID.
+func fetcherSubscribeServerWithFeedID(t *testing.T, feedID string) *service.IngestRSSClient {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.WriteSuccess(w, http.StatusCreated, map[string]any{
 			"subscription_id": uuid.NewString(),
-			"feed_id":         feedID.String(),
+			"feed_id":         feedID,
 			"feed_url":        "https://example.com/feed.xml",
 			"feed_title":      "Example",
 			"subscribed_at":   time.Now(),
@@ -59,6 +66,7 @@ func fetcherSubscribeServer(t *testing.T, feedID uuid.UUID) *service.IngestRSSCl
 func TestAddContentToUser_FeedSubscription_OmittedListWritesNoRoute(t *testing.T) {
 	userID, feedID := uuid.New(), uuid.New()
 	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(nil, nil)
 	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
 		nil, nil, fetcherSubscribeServer(t, feedID))
 
@@ -79,6 +87,36 @@ func TestAddContentToUser_FeedSubscription_OmittedListWritesNoRoute(t *testing.T
 	}
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
 	assert.Equal(t, models.ListReads, resp.Data.Subscription.List)
+}
+
+// With no explicit list the response reports where the feed actually routes:
+// the user's existing route when there is one, and nothing is rewritten.
+func TestAddContentToUser_FeedSubscription_OmittedListReportsExistingRoute(t *testing.T) {
+	userID, feedID := uuid.New(), uuid.New()
+	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(&models.SourceRoute{
+		UserID: userID, SourceType: models.SourceTypeRSS, SourceKey: feedID, List: models.ListFeed,
+	}, nil)
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServer(t, feedID))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	routes.AssertNotCalled(t, "Upsert", mock.Anything, mock.Anything)
+
+	var resp struct {
+		Data struct {
+			Subscription struct {
+				List string `json:"list"`
+			} `json:"subscription"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, models.ListFeed, resp.Data.Subscription.List)
 }
 
 // list only means something for a feed; pages and content-ID saves always go to Reads.
@@ -168,6 +206,65 @@ func TestAddContentToUser_FeedSubscription_RouteWriteFails(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
 		map[string]any{"url": "https://example.com/feed.xml", "type": "feed", "list": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+// The subscription succeeded, so an unusable feed ID only means no route can be
+// looked up: the response is still 201 and reports Reads.
+func TestAddContentToUser_FeedSubscription_OmittedListUnparseableFeedID(t *testing.T) {
+	userID := uuid.New()
+	routes := new(MockSourceRouteRepository)
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServerWithFeedID(t, "not-a-uuid"))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	routes.AssertNotCalled(t, "Get", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	routes.AssertNotCalled(t, "Upsert", mock.Anything, mock.Anything)
+
+	var resp struct {
+		Data struct {
+			Subscription struct {
+				List string `json:"list"`
+			} `json:"subscription"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, models.ListReads, resp.Data.Subscription.List)
+}
+
+// An explicit list cannot be written without a usable feed ID.
+func TestAddContentToUser_FeedSubscription_ExplicitListUnparseableFeedID(t *testing.T) {
+	userID := uuid.New()
+	routes := new(MockSourceRouteRepository)
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServerWithFeedID(t, "not-a-uuid"))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed", "list": "feed"},
+		userID, map[string]string{"user_id": userID.String()}))
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	routes.AssertNotCalled(t, "Upsert", mock.Anything, mock.Anything)
+}
+
+func TestAddContentToUser_FeedSubscription_RouteLookupFails(t *testing.T) {
+	userID, feedID := uuid.New(), uuid.New()
+	routes := new(MockSourceRouteRepository)
+	routes.On("Get", mock.Anything, userID, models.SourceTypeRSS, feedID).Return(nil, errors.New("db down"))
+	handler := NewUserContentHandler(new(MockUserContentRepository), new(MockContentRepository), routes,
+		nil, nil, fetcherSubscribeServer(t, feedID))
+
+	w := httptest.NewRecorder()
+	handler.AddContentToUser(w, routedRequest(http.MethodPost, "/",
+		map[string]any{"url": "https://example.com/feed.xml", "type": "feed"},
 		userID, map[string]string{"user_id": userID.String()}))
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

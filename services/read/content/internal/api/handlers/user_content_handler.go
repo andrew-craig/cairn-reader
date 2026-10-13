@@ -440,11 +440,6 @@ func (h *UserContentHandler) handleURLBasedSubmission(w http.ResponseWriter, r *
 
 // handleFeedSubmission subscribes the user to an RSS feed
 func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http.Request, userID uuid.UUID, feedURL, list string) {
-	routed := list != ""
-	if !routed {
-		list = models.ListReads
-	}
-
 	// Call Ingest RSS service to subscribe user to feed
 	subscription, err := h.ingestRSSClient.SubscribeUserToFeed(r.Context(), userID.String(), feedURL)
 	if err != nil {
@@ -461,24 +456,26 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Record where this feed's future items should land. Reads is the
-	// default, so with no explicit list no route is written (and any existing
-	// route is left alone). The subscription already exists at this point, so a
-	// failure here leaves it routed to Reads; the client can correct it via the
-	// list endpoint after re-fetching subscriptions.
-	if routed {
-		feedID, err := uuid.Parse(subscription.FeedID)
-		if err == nil {
-			err = h.routeRepo.Upsert(r.Context(), &models.SourceRoute{
-				UserID:     userID,
-				SourceType: models.SourceTypeRSS,
-				SourceKey:  feedID,
-				List:       list,
-			})
-		}
+	// Resolve where this feed's future items land. An explicit list is written
+	// as the feed's route. With none, any existing route is left alone and
+	// reported as is; no route means Reads. The subscription already exists at
+	// this point, so a failure leaves it routed as before; the client can
+	// correct it via the list endpoint after re-fetching subscriptions.
+	feedID, err := uuid.Parse(subscription.FeedID)
+	switch {
+	case err != nil && list == "":
+		// Nothing to write and no route to look up; the subscription succeeded.
+		slog.Warn("Subscription has an unusable feed ID, reporting default list", "feed_id", subscription.FeedID, "error", err)
+		list = models.ListReads
+	case err != nil:
+		slog.Error("Cannot set route: subscription has an unusable feed ID", "feed_id", subscription.FeedID, "error", err)
+		api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
+		return
+	default:
+		list, err = h.resolveFeedList(r.Context(), userID, feedID, list)
 		if err != nil {
-			slog.Error("Failed to set route for new subscription", "error", err)
-			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to set its list", nil, "v1")
+			slog.Error("Failed to set or look up route for new subscription", "error", err)
+			api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "Subscribed to feed but failed to resolve its list", nil, "v1")
 			return
 		}
 	}
@@ -499,6 +496,26 @@ func (h *UserContentHandler) handleFeedSubmission(w http.ResponseWriter, r *http
 	}
 
 	api.WriteSuccess(w, http.StatusCreated, response, "v1")
+}
+
+// resolveFeedList returns the list a subscribed feed routes to for the user.
+// A non-empty list is written as the feed's route; an empty one reports the
+// existing route (Reads when there is none) without writing anything.
+func (h *UserContentHandler) resolveFeedList(ctx context.Context, userID, feedID uuid.UUID, list string) (string, error) {
+	if list != "" {
+		err := h.routeRepo.Upsert(ctx, &models.SourceRoute{
+			UserID:     userID,
+			SourceType: models.SourceTypeRSS,
+			SourceKey:  feedID,
+			List:       list,
+		})
+		return list, err
+	}
+	route, err := h.routeRepo.Get(ctx, userID, models.SourceTypeRSS, feedID)
+	if err != nil || route == nil {
+		return models.ListReads, err
+	}
+	return route.List, nil
 }
 
 // createOrUnarchive adds fresh to the user's list, or, when the user already

@@ -865,6 +865,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}:
+    delete:
+      tags:
+        - Subscriptions
+      summary: Unsubscribe from an RSS feed
+      description: |
+        Removes the user's subscription to an RSS feed (proxied to the Ingest RSS service) and
+        also removes the feed's Feed/Reads route, so a later re-subscribe starts from the default
+        (`reads`). Articles already in the user's lists are preserved; only future deliveries stop.
+        If the subscription does not exist (404) the route is left untouched.
+      operationId: unsubscribeRSS
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: feed_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Unsubscribed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+        '400':
+          description: Bad request - invalid user ID or feed ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only modify their own subscriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: The user is not subscribed to that feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error (unsubscribe failed, or the subscription was removed but clearing its list failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list:
     put:
       tags:

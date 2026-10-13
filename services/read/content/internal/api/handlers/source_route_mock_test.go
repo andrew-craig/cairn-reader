@@ -30,3 +30,11 @@ func (m *MockSourceRouteRepository) ListByUser(ctx context.Context, userID uuid.
 	}
 	return args.Get(0).([]*models.SourceRoute), args.Error(1)
 }
+
+func (m *MockSourceRouteRepository) Get(ctx context.Context, userID uuid.UUID, sourceType string, sourceKey uuid.UUID) (*models.SourceRoute, error) {
+	args := m.Called(ctx, userID, sourceType, sourceKey)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.SourceRoute), args.Error(1)
+}
