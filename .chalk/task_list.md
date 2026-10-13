@@ -19,7 +19,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_9188** · P2 · open · Mobile: Redesign Add Feed flow (Feed/Reads choice)  (parent: epic_6e4d)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
-- **bug_2f87** · P3 · open · Dev compose: users service sets SERVER_ENVIRONMENT but config reads ENVIRONMENT  (parent: epic_6e4d)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
