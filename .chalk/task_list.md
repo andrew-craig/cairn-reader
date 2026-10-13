@@ -4,6 +4,8 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **task_f9ad** · P1 · in_progress · Mobile: Feed and Reads tabs  (parent: epic_6e4d)
+- **bug_b094** · P1 · open · DB SSL mode env var name differs between processes; prod and dev compose each set the wrong one  (parent: epic_6e4d)
+- **bug_d67e** · P1 · open · Prod compose: content service missing EMAIL_INGEST_SERVICE_URL  (parent: epic_6e4d)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **task_0849** · P2 · in_progress · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
@@ -18,6 +20,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_082f** · P3 · in_progress · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
+- **chore_13b3** · P3 · open · Users service: remove unused Redis config and VAULT_DB_CREDS_PATH  (parent: epic_6e4d)
+- **chore_35cf** · P3 · open · Users CLAUDE.md drift (refresh token lifetime etc.)  (parent: epic_6e4d)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
@@ -34,7 +39,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)
 - **feature_ec3e** · P3 · open · Add URL preview UI in AddLinkModal
-- **task_082f** · P3 · open · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
 - **task_48ea** · P3 · open · Add Docker resource constraints to production compose  (parent: epic_7c9e)
 - **task_4fd9** · P3 · open · [Audit/Tier 2] Delete the phantom transaction surface DB.WithTransaction (zero callers)  (parent: epic_fefa)
 - **task_603e** · P3 · open · [H10 follow-up] Repoint request-path error logs at the per-request logger in explore, read/content, read/fetcher, read/email  (parent: epic_fefa)

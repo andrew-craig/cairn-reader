@@ -19,7 +19,7 @@ The Read service is a microservices-based backend system that provides article s
 
 There is no `docker-compose.yml` under `services/read/`. The dev topology lives in
 `infrastructure/docker/dev/docker-compose.yml`, which starts every backend service
-(User, Explore, Read, Email Ingest) against one consolidated Postgres container.
+(User, Read, Email Ingest) against one consolidated Postgres container.
 
 ```bash
 cd /home/user/cairn-reader/infrastructure/docker/dev
@@ -136,7 +136,7 @@ services/read/
 │   │   ├── repository/       # Database layer
 │   │   ├── service/          # Business logic
 │   │   ├── processor/        # Content processing (readability, sanitization)
-│   │   ├── jobs/             # Background jobs (orphaned content cleanup)
+│   │   ├── jobs/             # Background jobs (feed expiry + orphaned content cleanup)
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
 │   ├── Dockerfile            # API server image
@@ -191,6 +191,7 @@ description       TEXT
 image_urls        TEXT[]                        -- Array of image URLs
 source_type       VARCHAR(50) NOT NULL          -- 'rss', 'web', 'email'
 source_feed_id    UUID                          -- Set for RSS-sourced content
+source_sender_id  UUID                          -- Set for email content; ingest looks up the sender's route with it
 metadata          JSONB                         -- Free-form, source-specific metadata
 created_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -214,6 +215,7 @@ id                UUID PRIMARY KEY DEFAULT gen_random_uuid()
 user_id           UUID NOT NULL                 -- External user ID, not validated here
 content_id        UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE
 status            VARCHAR(20) NOT NULL DEFAULT 'unread'   -- 'unread'|'reading'|'completed'|'archived'
+list              VARCHAR(10) NOT NULL DEFAULT 'reads'    -- 'feed'|'reads' (stamped at ingest from source_routes)
 scroll_position   NUMERIC(5,4) NOT NULL DEFAULT 0.0       -- Fraction [0,1] of article scrolled
 is_favorite       BOOLEAN NOT NULL DEFAULT false
 added_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -222,8 +224,11 @@ updated_at        TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 -- Constraints & Indexes
 UNIQUE(user_id, content_id)
 CHECK (status IN ('unread', 'reading', 'completed', 'archived'))
+CHECK (list IN ('feed', 'reads'))
 CHECK (scroll_position >= 0 AND scroll_position <= 1)
 INDEX(user_id, added_at DESC)
+INDEX(user_id, list, added_at DESC)
+INDEX(added_at) WHERE list = 'feed' AND is_favorite = false  -- feed retention delete
 INDEX(user_id, status)
 INDEX(user_id, is_favorite) WHERE is_favorite = true
 INDEX(content_id)  -- For CASCADE DELETE performance
@@ -232,6 +237,25 @@ INDEX(content_id)  -- For CASCADE DELETE performance
 Note: there is no `notes`, `read_at`, or `archived_at` column — only `status`/`added_at`/`updated_at` exist.
 `scroll_position` was originally an `INTEGER` pixel/character offset; migration `000003` converted it to a
 `NUMERIC(5,4)` fraction in `[0,1]` to match what the mobile/web readers actually persist.
+
+**source_routes** table (per-user destination list for a source; migration `000005`):
+```sql
+user_id           UUID NOT NULL
+source_type       VARCHAR(50) NOT NULL          -- 'rss'|'email'
+source_key        UUID NOT NULL                 -- feed ID (rss) or email sender ID (email)
+list              VARCHAR(10) NOT NULL          -- 'feed'|'reads'
+created_at, updated_at TIMESTAMP WITH TIME ZONE
+
+PRIMARY KEY (user_id, source_type, source_key)
+```
+
+**Feed vs Reads routing**: every `user_contents` row lives in exactly one list. The Content Service
+owns the routing: ingest (`BulkAddToUsersInternal` and the authenticated bulk route) stamps
+`user_contents.list` from the user's `source_routes` row for the content's source (feed ID for RSS,
+`source_sender_id` for email). No route means `reads`, and directly saved links are always `reads`.
+Changing a route only affects items delivered afterwards; existing items are never moved. Unsubscribing
+from an RSS feed deletes its route. Moving a single item (`PATCH` with `list`) into `reads` re-stamps its
+`added_at`, so it appears at the top of Reads.
 
 **Triggers**:
 - **trg_mark_orphaned**: Sets `contents.orphaned_at` when the last `user_contents` row for that content is deleted
@@ -393,18 +417,20 @@ POST   /api/v1/content/check-duplicate               → Check for duplicates
 POST   /api/v1/content/user/{user_id}                → Add URL to user's list
        Auth: Bearer <JWT token>
        Body (recommended): {"url": "...", "type": "feed|page", "title": "..."}
-       - If type=feed: Subscribes via Ingest RSS service
+       - If type=feed: Subscribes via Ingest RSS service. Optional "list": "feed|reads" sets the
+         feed's route (omitted = no route written, so new items default to reads)
        - If type=page: Extracts content and adds to reading list
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 GET    /api/v1/content/user/{user_id}                → List user's contents
        Auth: Bearer <JWT token>
-       Query: ?status=..., ?is_favorite=true, ?limit=20, ?offset=0
+       Query: ?status=..., ?is_favorite=true, ?list=feed|reads, ?limit=20, ?cursor=...
+       Note: omitting ?list returns both lists; clients showing only Reads must pass list=reads
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 GET    /api/v1/content/user/{user_id}/search         → Full-text search
        Auth: Bearer <JWT token>
-       Query: ?q=golang, ?limit=20, ?offset=0
+       Query: ?q=golang, ?list=feed|reads, ?limit=20, ?cursor=...
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 GET    /api/v1/content/user/{user_id}/{content_id}   → Get a single user-content item (full HTML body)
@@ -414,7 +440,7 @@ GET    /api/v1/content/user/{user_id}/{content_id}   → Get a single user-conte
 PATCH  /api/v1/content/user/{user_id}/{content_id}   → Update user metadata
        Auth: Bearer <JWT token>
        Body: {"status": "unread|reading|completed|archived", "is_favorite": true,
-              "scroll_position": 0.5}
+              "scroll_position": 0.5, "list": "feed|reads"}
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
 DELETE /api/v1/content/user/{user_id}/{content_id}   → Remove from user's list
@@ -423,7 +449,15 @@ DELETE /api/v1/content/user/{user_id}/{content_id}   → Remove from user's list
 
 GET    /api/v1/content/user/{user_id}/subscriptions  → List all subscriptions (RSS + email) for the user
        Auth: Bearer <JWT token>
-       Note: Aggregates results from Ingest RSS and Email Ingest services
+       Note: Aggregates results from Ingest RSS and Email Ingest services. Each entry carries its
+       "list"; sources that could not be reached are named in "failed_sources"
+
+PUT    /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list → Choose Feed or Reads for a source
+       Auth: Bearer <JWT token>
+       Path: type = rss|email, key = feed ID (rss) or sender ID (email)
+       Body: {"list": "feed|reads"}
+       Returns: 404 if the user is not subscribed to the source, 400 on invalid type/key/list
+       Note: affects items delivered afterwards only
 
 DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id} → Unsubscribe from an RSS feed
        Auth: Bearer <JWT token>
@@ -700,9 +734,10 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 
 ### Content Service
 
-**Orphaned Content Cleanup Job**:
-- **Schedule**: Daily at 2 AM
-- **Purpose**: Delete content orphaned for 90+ days
+**Cleanup Job**:
+- **Schedule**: Daily at 2 AM (`CLEANUP_CRON`)
+- **Purpose**: First delete Feed-list `user_contents` older than 30 days (by `added_at`) that are not
+  favorited, then delete content orphaned for 90+ days
 - **Location**: `content/internal/jobs/cleanup_job.go`
 
 ### Ingest RSS Service

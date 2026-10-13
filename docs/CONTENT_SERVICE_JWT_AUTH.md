@@ -359,7 +359,7 @@ The Ingest RSS Service currently makes requests to Content Service to add conten
 ## Related Documentation
 
 - [JWT Authentication in pkg/auth](ARCHITECTURE.md#jwt-authentication)
-- [Explore Recommender Service Auth Implementation](services/explore/CLAUDE.md)
+- [Shared auth package](../pkg/auth/README.md)
 - [Security Principles](ENGINEERING_PRINCIPLES.md#security)
 - [Vault Configuration](CONFIGURATION.md)
 

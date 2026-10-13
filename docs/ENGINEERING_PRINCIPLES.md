@@ -45,23 +45,23 @@ This document defines the engineering principles, architectural decisions, and c
 
 **Example:**
 ```
-Explore Service:
-  Fetcher Service (8080) → Fetcher DB (postgres:5433)
-  Recommender Service (8081) → Recommender DB (postgres:5432)
+Read Service:
+  Content Service (8080) → content_service
+  Ingest RSS (8081) → rss_fetcher_service
 
 User Service (8080) → User DB (postgres:5432)
 ```
 
 **Implementation:**
-- Fetcher manages RSS feed sources in `fetcher_db`
-- Recommender stores articles and user engagement in `cairn_db`
+- Ingest RSS manages RSS feeds and subscriptions in `rss_fetcher_service`
+- Content Service stores articles, user content and Feed/Reads routes in `content_service`
 - User Service manages authentication in `cairn_users`
 - Services never directly query other services' databases
 - Data sharing happens via REST APIs only
 
 **Files:**
-- `services/explore/docker-compose.yml:6-26` (separate database instances)
-- `infrastructure/docker/scripts/init-postgres.sh` (database initialization)
+- `infrastructure/docker/dev/docker-compose.yml` (one Postgres instance, a logical database per service)
+- `infrastructure/docker/scripts/init-databases.sh` (database initialization)
 
 ---
 
@@ -208,7 +208,7 @@ func GetUser(id string) (*User, error) {
 
 **Files:**
 - `services/users/cmd/user-service/main.go:80-140` (DI setup)
-- `services/explore/recommender/cmd/recommender/main.go:45-70`
+- `services/read/content/cmd/content/main.go` (DI setup)
 
 ---
 
@@ -335,7 +335,7 @@ func (r *UserRepository) GetByEmail(email string) (*User, int, error) {
 **Files:**
 - `services/users/internal/services/auth_service.go:15-20` (domain errors)
 - `services/users/internal/handlers/auth_handler.go` (error conversion)
-- `services/explore/fetcher/internal/db/feed_repository.go:70-75` (error wrapping)
+- `services/read/content/internal/repository/user_content.go` (error wrapping)
 
 ---
 
@@ -400,7 +400,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 
 **Files:**
 - `services/users/internal/auth/jwt.go` (JWT generation)
-- `services/explore/recommender/internal/middleware/auth.go` (JWT validation)
+- `pkg/auth/middleware.go` (JWT validation)
 - `infrastructure/docker/scripts/init-vault.sh` (RSA key generation)
 
 ---
@@ -418,7 +418,6 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 | `database/sql` | stdlib | Database abstraction | Standard library, no external deps |
 | `github.com/lib/pq` | v1.10.9 | PostgreSQL driver | Most mature Go postgres driver |
 | `github.com/jackc/pgx/v5` | v5.7.6 | PostgreSQL (User Service) | Better performance, native types |
-| `net/http` | stdlib | HTTP (Explore Service) | Simple services don't need framework overhead |
 | `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
 | `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (Read Service) | Lightweight, idiomatic, stdlib-compatible |
 | `log/slog` | stdlib | Structured logging | Standard library, structured, zero-config |
@@ -504,13 +503,13 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 
 **Database Design Patterns:**
 - Separate databases per service (see Architecture Principles)
-- Migrations managed via SQL files (Explore) or golang-migrate (Users)
+- Migrations managed via golang-migrate (Users, Read)
 - Connection pooling configured per service
 - Indexes on commonly queried columns
 
 **Files:**
-- `services/explore/fetcher/migrations/` (fetcher schema)
-- `services/explore/recommender/migrations/` (recommender schema)
+- `services/read/content/migrations/` (content schema)
+- `services/read/fetcher/migrations/` (RSS ingest schema)
 - `services/users/migrations/` (user schema)
 
 ---
@@ -533,7 +532,6 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 
 **Files:**
 - `infrastructure/docker/dev/docker-compose.yml` (multi-service orchestration)
-- `services/explore/docker-compose.yml` (service-specific development)
 
 ---
 
@@ -549,11 +547,11 @@ services/{service}/
 ├── cmd/{service}/main.go        # Application entry point
 ├── cmd/migrate/main.go          # Migration tool (User Service only)
 ├── internal/                    # Private application code
-│   ├── api/                     # HTTP handlers, middleware (Explore)
+│   ├── api/                     # HTTP handlers, middleware (Read Service)
 │   ├── handlers/                # HTTP handlers (User Service)
 │   ├── services/                # Business logic (User Service)
 │   ├── db/ or database/         # Repository layer
-│   ├── {domain}/                # Domain-specific logic (fetcher/, recommend/)
+│   ├── {domain}/                # Domain-specific logic (fetcher/, processor/)
 │   ├── config/                  # Configuration (User Service)
 │   ├── middleware/              # HTTP middleware (User Service)
 │   └── testutil/                # Test utilities
@@ -1064,7 +1062,7 @@ func TestUserRepository_Create(t *testing.T) {
 - Tests actual query performance
 - Validates constraints and indexes
 
-**Files:** `services/explore/recommender/internal/db/article_repository_integration_test.go`
+**Files:** `services/read/content/internal/repository/routing_integration_test.go`
 
 ---
 
@@ -1183,7 +1181,7 @@ func CleanupTestDB(t *testing.T, db *sql.DB) {
 // Mark functions with t.Helper() to exclude from error line numbers
 ```
 
-**Files:** `services/explore/fetcher/internal/testutil/helpers.go`
+**Files:** `services/read/content/internal/testutil/database.go`
 
 ---
 
@@ -1635,7 +1633,7 @@ router.Use(middleware.JWTAuth(jwtManager))
 ```
 
 **Files:**
-- `services/explore/recommender/internal/middleware/auth.go`
+- `pkg/auth/middleware.go`
 - `services/users/internal/middleware/jwt.go`
 
 ---

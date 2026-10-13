@@ -59,7 +59,7 @@ Shape: build bottom-up (types → service → shared list plumbing → screens �
 - [x] Update `apps/mobile/CLAUDE.md` project-structure listing only for the renamed/added files (full docs pass is `task_082f`).
 
 ### 7. Verify end to end
-- [ ] `npm run typecheck`, `npm run lint`, `npm test` in `apps/mobile` (and `apps/shared` if it has its own).
+- [x] `npm run type-check`, `npm run lint`, `npm test` in `apps/mobile` (and `apps/shared` if it has its own).
 - [ ] Manual run against a remote backend: subscribe to an RSS feed as Feed → new items appear in Feed, not Reads; toggle to Reads → only new items move; Save to Reads moves an item; offline Reads still opens; Feed offline shows the stale/offline state.
 
 ### Decisions (owner, 2026-10-10)
@@ -78,3 +78,9 @@ Shape: build bottom-up (types → service → shared list plumbing → screens �
   - Web needed type-only fixture/transform updates because `list` is now required on shared types; web UI is task_f4ac.
 - Not done: step 7 manual run (needs an Expo/device build against a backend; not possible in this sandbox). The Save to Reads ordering depends on task_66b2 (PR #421) being deployed.
 - Review follow-up (Magpie): Feed items no longer track reading progress (no markReading/markCompleted/scroll writes), so nothing but Favorite can reach the outbox for a Feed item; AddLinkModal clears the previous URL's detection on URL change so a stale feed `list` can't be sent for a page.
+## Step 7 automated verification (2026-10-13, on main after #425)
+- mobile: type-check ok; lint 0 errors / 12 warnings; jest 300 tests / 40 suites pass
+- shared: type-check ok; no lint script; vitest 48 pass
+- web: type-check ok; lint 0 errors / 1 warning; vitest 55 pass
+- No live client code calls the removed Explore API. LoginScreen's "Explore" button label is the device-login "get started" action (product wording call, not a code leftover).
+- Manual device run still outstanding: no simulator/emulator in the sandbox; owner to run on device.

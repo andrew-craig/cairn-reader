@@ -1,12 +1,12 @@
 # Cairn
 
-A modern read-it-later application with a React Native mobile app and Go-based backend services for content discovery, storage, and user management.
+A modern read-it-later application with a React Native mobile app and Go-based backend services for content ingestion, storage, and user management.
 
 ## Overview
 
 Cairn is a monorepo containing:
 - **Mobile App**: React Native application for iOS and Android
-- **Backend Services**: Go microservices for content management and discovery
+- **Backend Services**: Go microservices for content management and ingestion
 - **Infrastructure**: Docker configuration and deployment scripts
 
 ### Mobile App Features
@@ -22,8 +22,8 @@ Cairn is a monorepo containing:
 
 ### Backend Features
 
-- RSS feed discovery and automatic content delivery
-- Content recommendation engine
+- RSS feed subscriptions and automatic content delivery
+- Feed and Reads lists, with the destination chosen per source
 - User authentication with JWT
 - Article storage with cleaned HTML content
 - Multi-user content deduplication
@@ -64,12 +64,6 @@ cairn/
 │       └── package.json
 │
 ├── services/
-│   ├── explore/             # RSS Fetcher & Recommendation Engine
-│   │   ├── fetcher/         # Explore Fetcher (explore_fetcher) - RSS feed fetching
-│   │   ├── recommender/     # Explore Recommender (explore_recommender) - Content recommendations
-│   │   ├── pkg/             # Shared packages
-│   │   └── README.md        # Explore service documentation
-│   │
 │   ├── read/                # Content Storage & RSS Feed Management
 │   │   ├── content/         # Content Service (storage, search, user metadata)
 │   │   ├── fetcher/         # Ingest RSS (ingest_rss) - feed subscriptions, polling
@@ -108,21 +102,14 @@ Before running backend services with Docker, you need to configure environment v
 
 #### Setting Up Environment Files
 
-1. **Infrastructure Services** (User, Explore Fetcher, Explore Recommender):
+1. **Infrastructure Services**:
    ```bash
    cd infrastructure/docker/dev
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-2. **Explore Service** (when running standalone):
-   ```bash
-   cd services/explore
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Read Service** (when running standalone):
+2. **Read Service** (when running standalone):
    ```bash
    cd services/read
    cp .env.example .env
@@ -205,24 +192,10 @@ For comprehensive deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 #### Running Individual Services
 
 See the documentation for each service:
-- [Explore Service](services/explore/README.md) - RSS fetching and recommendations
 - [Read Service](services/read/README.md) - Content storage and RSS feed management
 - [User Service](services/users/README.md) - Authentication and user management
 
 ## Services Documentation
-
-### Explore Service
-The Explore service consists of two microservices:
-- **Explore Fetcher** (explore_fetcher): Discovers and fetches content from RSS feeds
-- **Explore Recommender** (explore_recommender): Stores content and implements recommendation algorithms
-
-Features:
-- Automatic RSS feed polling
-- Content deduplication
-- Recommendation engine for suggesting articles
-- PostgreSQL storage
-
-See the [Explore Service README](services/explore/README.md) for detailed documentation.
 
 ### Read Service
 The Read service is a comprehensive article storage and RSS feed management system consisting of two microservices:
@@ -234,7 +207,8 @@ The Read service is a comprehensive article storage and RSS feed management syst
 - User-specific metadata (read status, scroll position, favorites, notes)
 - Full-text search with PostgreSQL GIN index
 - Cursor-based pagination
-- Orphaned content cleanup (90-day retention)
+- Feed vs Reads routing: a per-source destination list (`source_routes`, `user_contents.list`); new items only
+- Feed retention (non-favorited Feed items deleted after 30 days) and orphaned content cleanup (90 days)
 
 **Ingest RSS Service** (ingest_rss, port 8081):
 - User feed subscriptions (100 feed limit per user)
@@ -261,69 +235,24 @@ See the [User Service README](services/users/README.md) for detailed documentati
 
 ## Mobile App Screens
 
-### Reading List (Home)
-- Displays all unread articles
-- Pull to refresh
-- Tap to view article details
-- Heart icon to toggle favorites
+Navigation lives in `apps/mobile/src/navigation`: a root stack (`RootNavigator`) wrapping a bottom tab navigator (`TabNavigator`) with three tabs, **Feed | Reads | You**. Screens are in `apps/mobile/src/screens`.
 
-### Explore
-- Discover new content from RSS feeds
-- Browse recommended articles
-- Subscribe to feeds
+### Tabs
+- **Feed** (`FeedScreen`): skim list of items from sources routed to Feed. Online-only; non-favorited items expire after 30 days.
+- **Reads** (`ReadsScreen`): items from sources routed to Reads, plus directly saved links. Offline-readable, with search and reading progress.
+- **You** (`YouScreen`): profile hub with subscription and bookmark counts and links to the screens below.
 
-### Read
-- Access saved articles
-- Track reading progress
-
-### Favorites
-- Shows all favorited articles
-- Same interactions as Reading List
-
-### Archive
-- Displays all read articles
-- Helps keep your reading list clean
-
-### Settings
-- App information
-- Account management
-- Clear all articles option
-
-### Add Article
-- Add new articles by URL
-- Paste from clipboard
-- Manual title entry
-
-### Article Detail
-- View article information
-- Open in browser
-- Mark as read/unread
-- Toggle favorite status
-- Share article
-- Delete article
+### Stack screens
+- **ArticleDetail** (`ReadArticleDetailScreen`): the reader, shared by Feed and Reads. Favorite and Next actions; "Save to Reads" for Feed items, Archive for Reads items.
+- **AddArticle** (`AddArticleScreen`): save an article by URL.
+- **Bookmarks** (`BookmarksScreen`): favorited articles.
+- **RSS** and **Newsletters** (`RssScreen`, `NewslettersScreen`): subscriptions, with a per-source Feed/Reads toggle.
+- **Account** (`AccountScreen`) and **About** (`AboutScreen`): account settings and app/server versions.
+- **Login** (`LoginScreen`): shown instead of the stack when signed out.
 
 ## Data Model
 
-### Article Interface
-
-```typescript
-interface Article {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  author?: string;
-  publishedDate?: string;
-  readingTime?: number;
-  tags: string[];
-  isRead: boolean;
-  isFavorite: boolean;
-  addedAt: number;
-  readAt?: number;
-  notes?: string;
-}
-```
+The `Article` type, along with the auth and Read service API types, is shared by the mobile and web clients and defined in `apps/shared/src/types` (`article.ts`, `auth.ts`, `read.ts`, exported from `@cairn/shared`).
 
 ## Theme
 
@@ -344,20 +273,19 @@ Cairn follows a microservices architecture:
     ┌────┴─────────────────────────────────┐
     │                                      │
     │                                      │
-┌───▼────────┐  ┌─────────────────────┐  ┌───────▼──────┐
-│   User     │  │   Explore Service   │  │  Read Service│
-│  Service   │  │                     │  │              │
-│            │  │  - explore_fetcher  │  │  - Content   │
-│  - Auth    │  │  - explore_recommender│ │  - ingest_rss│
-│  - JWT     │  │                     │  │              │
-└─────┬──────┘  └──────┬──────────────┘  └──────┬───────┘
-      │                │                  │
-      │                │                  │
-      └────────────────┼──────────────────┘
-                       │
-                  ┌────▼─────┐
-                  │PostgreSQL│
-                  └──────────┘
+┌───▼────────┐                          ┌───────▼──────┐
+│   User     │                          │  Read Service│
+│  Service   │                          │              │
+│            │                          │  - Content   │
+│  - Auth    │                          │  - ingest_rss│
+│  - JWT     │                          │              │
+└─────┬──────┘                          └──────┬───────┘
+      │                                        │
+      └────────────────────┬───────────────────┘
+                           │
+                      ┌────▼─────┐
+                      │PostgreSQL│
+                      └──────────┘
 ```
 
 ### Service Communication
@@ -405,10 +333,6 @@ expo build:android
 #### Running Tests
 
 ```bash
-# Explore service
-cd services/explore
-go test ./...
-
 # User service
 cd services/users
 go test ./...
@@ -435,7 +359,6 @@ air
 
 See individual service READMEs for migration instructions:
 - [User Service Migrations](services/users/README.md)
-- [Explore Service Setup](services/explore/README.md)
 - [Read Service Migrations](services/read/README.md)
 
 ## License

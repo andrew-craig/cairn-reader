@@ -148,7 +148,7 @@ make docker-run              # Run in Docker container
 
        ┌──────────────────────────────┐
        │   Other Services             │
-       │   (Content, Explore, Read)   │
+       │   (Content, Read)   │
        │                              │
        │   Validate JWT independently │
        │   using public key from Vault│
@@ -1150,7 +1150,7 @@ curl -H "X-Vault-Token: dev-root-token" \
 
 **What Vault is used for:**
 - Generates and stores RS256 JWT signing keys (2048-bit RSA)
-- Distributes JWT public key to other services (Content, Explore, Read)
+- Distributes JWT public key to other services (Content, Read)
 - Enables key rotation without service downtime
 - Secure secret storage in production
 
