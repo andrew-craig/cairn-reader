@@ -22,8 +22,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_082f** · P3 · in_progress · Docs: Feed/Reads model and Explore removal  (parent: epic_6e4d)
-- **chore_13b3** · P3 · open · Users service: remove unused Redis config and VAULT_DB_CREDS_PATH  (parent: epic_6e4d)
-- **chore_35cf** · P3 · open · Users CLAUDE.md drift (refresh token lifetime etc.)  (parent: epic_6e4d)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch

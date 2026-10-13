@@ -10,7 +10,7 @@ The User Service is responsible for user authentication, authorization, and acco
 
 **Location**: `/services/users/`
 
-**Port**: 8082
+**Port**: 8080 inside the container and for a locally run binary (`PORT` default); the dev docker-compose publishes it on host port 8082. Examples below use `localhost:8082` (the compose-published port).
 
 **Database**: `cairn_users` (PostgreSQL)
 
@@ -90,14 +90,14 @@ make dev
 
 ```bash
 # Build
-make build                   # Build user-service binary to bin/
+make build                   # Build user-service and migrate binaries to bin/
 
 # Run
-make run                     # Run user service (port 8082)
+make run                     # Run user service (default port 8080, set PORT to change)
 make dev                     # Run with live reload (requires air)
 
 # Testing
-make test                    # Run all tests
+make test                    # Run unit tests (go test ./internal/...)
 make test-coverage           # Generate coverage report (coverage.html)
 
 # Database migrations
@@ -167,7 +167,9 @@ make docker-run              # Run in Docker container
 ```
 services/users/
 ├── cmd/
-│   └── user-service/          # Application entrypoint
+│   ├── user-service/          # Application entrypoint
+│   │   └── main.go
+│   └── migrate/               # Migration CLI used by `make migrate-*`
 │       └── main.go
 ├── internal/                  # Private application code
 │   ├── auth/                 # JWT and token management
@@ -185,14 +187,19 @@ services/users/
 │   ├── handlers/            # HTTP request handlers
 │   │   ├── auth_handler.go  # Auth endpoints
 │   │   ├── user_handler.go  # User management endpoints
+│   │   ├── errors.go        # Service error -> HTTP response mapping
 │   │   ├── health.go        # Health checks
+│   │   ├── limits.go        # Request body size limit
 │   │   └── router.go        # Route setup
 │   ├── models/              # Data models
 │   │   ├── user.go
 │   │   └── refresh_token.go
-│   └── services/            # Business logic layer
-│       ├── auth_service.go
-│       └── user_service.go
+│   ├── services/            # Business logic layer
+│   │   ├── auth_service.go
+│   │   ├── user_service.go
+│   │   ├── email_verification_service.go
+│   │   └── audit.go         # Audit logging helpers
+│   └── validation/          # Input validation (email)
 ├── migrations/             # Database migrations (golang-migrate up/down pairs)
 │   ├── 000001_create_users_table.up.sql
 │   ├── 000001_create_users_table.down.sql
@@ -218,18 +225,27 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE,            -- Email (nullable for mobile-only)
     password_hash VARCHAR(255),           -- bcrypt hash (nullable for mobile-only)
     expo_device_id VARCHAR(255) UNIQUE,   -- Expo device ID (nullable for email-only)
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),   -- maintained by the update_users_updated_at trigger
     last_login_at TIMESTAMP WITH TIME ZONE,
-    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    failed_login_attempts INTEGER NOT NULL DEFAULT 0,
-    locked_until TIMESTAMP WITH TIME ZONE,
-    last_failed_login_at TIMESTAMP WITH TIME ZONE
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,                -- migration 000005
+    failed_login_attempts INTEGER NOT NULL DEFAULT 0,             -- migration 000004
+    locked_until TIMESTAMP WITH TIME ZONE,                        -- migration 000004
+    last_failed_login_at TIMESTAMP WITH TIME ZONE,                -- migration 000004
+
+    -- Valid account types: email+password, device ID, or both; email and password_hash are all-or-nothing
+    CONSTRAINT check_account_type CHECK (
+        (email IS NOT NULL AND password_hash IS NOT NULL) OR (expo_device_id IS NOT NULL)
+    ),
+    CONSTRAINT check_email_with_password CHECK (
+        (email IS NULL AND password_hash IS NULL) OR (email IS NOT NULL AND password_hash IS NOT NULL)
+    )
 );
 
 -- Indexes
 CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 CREATE INDEX idx_users_expo_device_id ON users(expo_device_id) WHERE expo_device_id IS NOT NULL;
+CREATE INDEX idx_users_created_at ON users(created_at);
 ```
 
 **refresh_tokens** table:
@@ -237,14 +253,14 @@ CREATE INDEX idx_users_expo_device_id ON users(expo_device_id) WHERE expo_device
 CREATE TABLE refresh_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL,     -- SHA-256 hash of refresh token
+    token_hash VARCHAR(255) NOT NULL UNIQUE, -- SHA-256 hash of refresh token
     device_info TEXT,
     ip_address VARCHAR(45),
     token_family UUID,                    -- Groups tokens from the same rotation chain (reuse detection)
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    last_used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    revoked_at TIMESTAMP WITH TIME ZONE   -- Set on rotation/logout; NULL = active. Row is kept until expiry so replay can be detected as reuse.
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMP WITH TIME ZONE   -- Added in migration 000007. Set on rotation/logout; NULL = active. Row is kept until expiry so replay can be detected as reuse.
 );
 
 -- Indexes
@@ -252,9 +268,10 @@ CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
+CREATE INDEX idx_refresh_tokens_revoked_at ON refresh_tokens(revoked_at) WHERE revoked_at IS NOT NULL;
 ```
 
-There is also an `email_verification_tokens` table (added in migration 000005) backing the email verification endpoints below. A `password_reset_tokens` table existed briefly (migration 000006) but was dropped (migration 000008) — see the note under Password reset below.
+There is also an `email_verification_tokens` table (added in migration 000005; columns `id`, `user_id` -> `users(id)` ON DELETE CASCADE, unique `token_hash` (SHA-256 hex, 64 chars), `expires_at`, `created_at`) backing the email verification endpoints below. A `password_reset_tokens` table existed briefly (migration 000006) but was dropped (migration 000008) — see the note under Password reset below.
 
 ### Account Types
 
@@ -270,7 +287,7 @@ Account types are determined by which fields are populated (no separate `account
 - `email` and `password_hash` are NOT NULL
 - `expo_device_id` is NULL
 - Multi-device support
-- Password recovery available
+- No self-service password recovery (password reset is not implemented; see Password reset below)
 
 **Hybrid account** (after upgrade):
 - All three fields (`email`, `password_hash`, `expo_device_id`) are NOT NULL
@@ -288,6 +305,10 @@ curl http://localhost:8082/health/live
 curl http://localhost:8082/health/ready
 ```
 
+All `/api/v1/*` routes sit behind `RequireHTTPS` regardless of `ENVIRONMENT`: a plain-HTTP request is rejected with `403 {"error": "HTTPS required"}` unless it arrives over TLS or carries `X-Forwarded-Proto: https` (as set by a TLS-terminating reverse proxy). When calling the service directly with `curl`, add `-H "X-Forwarded-Proto: https"` to the examples below. `/health/*` is exempt.
+
+Successful responses are wrapped in a `{"data": ..., "meta": {...}}` envelope; error responses are `{"error": "<code>", "message": "...", "details": {...}, "meta": {...}}`. The examples below show the `data` payload.
+
 ### Authentication Endpoints
 
 **Register with email/password**:
@@ -299,9 +320,15 @@ curl -X POST http://localhost:8082/api/v1/auth/register \
     "password": "securepass123"
   }'
 
-# Response:
+# Response (`data`; expires_in is the access token lifetime in seconds):
 {
-  "user_id": "uuid-here",
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "email_verified": false,
+    "created_at": "2025-01-09T10:00:00Z",
+    "updated_at": "2025-01-09T10:00:00Z"
+  },
   "access_token": "eyJhbGciOiJSUzI1NiIs...",
   "refresh_token": "refresh-token-here",
   "expires_in": 3600
@@ -349,6 +376,8 @@ curl -X POST http://localhost:8082/api/v1/auth/refresh \
 # Response: New access token and new refresh token (rotation)
 ```
 
+Repeated failed email/password logins lock the account: 5 consecutive failures lock it for 15 minutes (service defaults; not configurable via environment variables).
+
 **Logout (revoke refresh token)**:
 ```bash
 curl -X POST http://localhost:8082/api/v1/auth/logout \
@@ -386,11 +415,13 @@ curl -X POST http://localhost:8082/api/v1/auth/verify-email \
 curl -H "Authorization: Bearer <JWT>" \
   http://localhost:8082/api/v1/user/{user_id}
 
-# Response:
+# Response (`data`):
 {
   "id": "user-id",
   "email": "user@example.com",
+  "email_verified": false,
   "created_at": "2025-01-09T10:00:00Z",
+  "updated_at": "2025-01-09T11:00:00Z",
   "last_login_at": "2025-01-09T11:00:00Z"
 }
 ```
@@ -447,7 +478,7 @@ the `/api/v1/user` route group in `router.go`), exactly like every other service
 
 **Token Generation**:
 - Algorithm: RS256 (2048-bit RSA keys), with a `kid` header identifying the signing key for rotation
-- Lifetime: 15 minutes (configurable via `JWT_ACCESS_TOKEN_EXPIRY`; code default is 60 minutes if unset)
+- Lifetime: 60 minutes by default (configurable via `JWT_ACCESS_TOKEN_EXPIRY`)
 - Claims: `user_id` (custom) plus standard registered claims - `iss`, `aud`, `sub`, `iat`, `exp`, `nbf`
 - Keys stored in HashiCorp Vault
 
@@ -475,7 +506,7 @@ the `/api/v1/user` route group in `router.go`), exactly like every other service
 **Token Generation**:
 - Cryptographically random 32-byte token (base64-encoded)
 - SHA-256 hashed before database storage
-- Lifetime: 7 days (configurable via `JWT_REFRESH_TOKEN_EXPIRY`; code default is 30 days if unset)
+- Lifetime: 30 days by default (configurable via `JWT_REFRESH_TOKEN_EXPIRY`)
 
 **Token Rotation**:
 1. Client sends refresh token to `/auth/refresh`
@@ -502,9 +533,9 @@ the `/api/v1/user` route group in `router.go`), exactly like every other service
 
 **Hashing**:
 - Algorithm: bcrypt
-- Cost factor: 12 (configurable, minimum 12 for production)
+- Cost factor: 12 by default (`BCRYPT_COST`; startup validation requires 10-14)
 - Password requirements:
-  - Minimum length: 8 characters
+  - Minimum length: 8 characters by default (`MIN_PASSWORD_LENGTH`; startup validation rejects values below 8)
   - Complexity required by default (uppercase, lowercase, digit, and special character; toggle via `REQUIRE_PASSWORD_COMPLEXITY`)
 
 **Validation**:
@@ -578,7 +609,7 @@ There is no `services/users` middleware package — same-user enforcement lives 
 **Configuration**:
 - Applies to the entire `/api/v1/auth/*` route group per IP (single limit, not split by endpoint); `/api/v1/user/*` endpoints are not rate limited
 - Limit and window are configurable via `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` (default: 100 requests per 1 minute); the router falls back to 10/minute only if `RATE_LIMIT_REQUESTS` resolves to 0
-- Uses in-memory store (consider Redis for multi-instance deployments)
+- Uses an in-memory store. `pkg/middleware` also contains a Redis-backed limiter (`NewRedisRateLimiter`), but the users service does not wire it up and has no Redis configuration
 
 **Protected Endpoints** (all routes under `/api/v1/auth`):
 - `/register`, `/register/mobile`, `/login`, `/login/mobile`, `/refresh`, `/logout`, `/logout-all`
@@ -634,7 +665,7 @@ go test -race ./...
 
 **Unit Tests** (no external dependencies):
 - `*_test.go` files alongside source code
-- Mock database with `testify/mock` or `sqlmock`
+- Mock database with `testify` and `golang/mock`
 - Test coverage target: 80%+
 
 **Test Files**:
@@ -738,10 +769,10 @@ make migrate-version
 **Create new migration**:
 ```bash
 # Add a numbered up/down pair to migrations/ (golang-migrate convention)
-# migrations/000007_add_new_column.up.sql
+# migrations/000009_add_new_column.up.sql
 ALTER TABLE users ADD COLUMN new_column TEXT;
 
-# migrations/000007_add_new_column.down.sql
+# migrations/000009_add_new_column.down.sql
 ALTER TABLE users DROP COLUMN new_column;
 ```
 
@@ -833,12 +864,16 @@ if err != nil {
 **Interface**:
 ```go
 type UserRepository interface {
-    Create(ctx context.Context, user *User) error
-    GetByID(ctx context.Context, id string) (*User, error)
-    GetByEmail(ctx context.Context, email string) (*User, error)
-    GetByDeviceID(ctx context.Context, deviceID string) (*User, error)
-    Update(ctx context.Context, user *User) error
-    Delete(ctx context.Context, id string) error
+    CreateUser(ctx context.Context, email, passwordHash string) (*models.User, error)
+    CreateMobileUser(ctx context.Context, expoDeviceID string) (*models.User, error)
+    GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
+    GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+    GetUserByExpoDeviceID(ctx context.Context, expoDeviceID string) (*models.User, error)
+    UpdateUser(ctx context.Context, id uuid.UUID, email *string) (*models.User, error)
+    UpgradeAccount(ctx context.Context, id uuid.UUID, email, passwordHash string) (*models.User, error)
+    UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) (*models.User, error)
+    DeleteUser(ctx context.Context, id uuid.UUID) error
+    // ...plus email verification, last-login and failed-login/lockout methods
 }
 ```
 
@@ -884,58 +919,73 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
     // 1. Parse request body
     var req RegisterRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
         return
     }
 
     // 2. Call service layer
     resp, err := h.authService.Register(r.Context(), req.Email, req.Password)
     if err != nil {
-        // Map service errors to HTTP status codes
-        http.Error(w, err.Error(), http.StatusInternalServerError)
+        // Map service errors to HTTP status codes (handlers/errors.go)
+        writeServiceError(w, err, "failed to register user")
         return
     }
 
-    // 3. Return JSON response
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    json.NewEncoder(w).Encode(resp)
+    // 3. Return the enveloped JSON response (pkg/api)
+    api.WriteSuccess(w, http.StatusCreated, resp, "v1")
 }
 ```
 
 ## Environment Variables
 
+Defaults below are the code defaults in `internal/config/config.go`. Durations use Go syntax (`15m`, `720h`); units like `d` are not supported and silently fall back to the default.
+
 ```bash
 # Server Configuration
 PORT=8080                                    # HTTP server port (default: 8080; dev docker-compose maps host 8082 -> container 8080)
-ENVIRONMENT=development                      # Environment mode (development, production)
+ENVIRONMENT=development                      # Environment mode (default: development). "production" requires Vault credentials
+SHUTDOWN_TIMEOUT=30s                         # Graceful shutdown timeout (default: 30s)
 
 # Database Configuration
-DB_HOST=localhost                            # PostgreSQL host
-DB_PORT=5432                                 # PostgreSQL port
-DB_USER=cairn_user                           # Database user
+DB_HOST=localhost                            # PostgreSQL host (default: localhost)
+DB_PORT=5432                                 # PostgreSQL port (default: 5432)
+DB_USER=cairn_user                           # Database user (required unless Vault credentials are set)
 DB_PASSWORD=secure_password                  # Database password
-DB_NAME=cairn_users                          # Database name
-DB_SSLMODE=disable                           # SSL mode (disable for local dev)
+DB_NAME=cairn_users                          # Database name (default: cairn_users)
+DB_SSLMODE=disable                           # SSL mode (default: disable)
+DB_MAX_OPEN_CONNS=25                         # Max open connections (default: 25)
+DB_MAX_IDLE_CONNS=5                          # Max idle connections (default: 5)
+DB_CONN_MAX_LIFETIME=30m                     # Connection max lifetime (default: 30m)
+DB_STATEMENT_TIMEOUT=30s                     # Statement timeout (default: 30s)
 
 # HashiCorp Vault Configuration (REQUIRED)
-VAULT_ADDR=http://localhost:8200             # Vault address
-VAULT_TOKEN=dev-root-token                   # Vault token
-JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key  # Vault path to private key
-JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key    # Vault path to public key
+VAULT_ADDR=http://localhost:8200             # Vault address (default: http://localhost:8200)
+VAULT_TOKEN=dev-root-token                   # Vault token (or use AppRole below)
+VAULT_ROLE_ID=                               # AppRole role ID (alternative to VAULT_TOKEN)
+VAULT_SECRET_ID=                             # AppRole secret ID
+VAULT_AUTH_PATH=approle                      # AppRole auth mount path (default: approle)
+VAULT_NAMESPACE=                             # Vault namespace (Enterprise only)
+VAULT_TOKEN_RENEWAL_INTERVAL=1h              # How often to renew the Vault token (default: 1h)
+JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key  # Vault path to private key (default shown)
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key    # Vault path to public key (default shown)
+JWT_KEY_ROTATION_INTERVAL=24h                # How often to check Vault for new keys (default: 24h)
 
 # JWT Configuration
-JWT_ACCESS_TOKEN_EXPIRY=15m                  # Access token lifetime (code default: 60 minutes if unset)
-JWT_REFRESH_TOKEN_EXPIRY=7d                  # Refresh token lifetime (code default: 30 days if unset)
+JWT_ACCESS_TOKEN_EXPIRY=60m                  # Access token lifetime (default: 60m)
+JWT_REFRESH_TOKEN_EXPIRY=720h                # Refresh token lifetime (default: 720h = 30 days)
 
 # Password Security
-BCRYPT_COST=12                               # bcrypt cost factor (minimum 12)
-MIN_PASSWORD_LENGTH=8                        # Minimum password length
-REQUIRE_PASSWORD_COMPLEXITY=true             # Require upper/lower/digit/special char (code default: true)
+BCRYPT_COST=12                               # bcrypt cost factor (default: 12; must be 10-14)
+MIN_PASSWORD_LENGTH=8                        # Minimum password length (default: 8; must be >= 8)
+REQUIRE_PASSWORD_COMPLEXITY=true             # Require upper/lower/digit/special char (default: true)
 
 # Rate Limiting (applies to the /api/v1/auth/* route group only; /api/v1/user/* is not rate limited)
-RATE_LIMIT_REQUESTS=100                      # Requests per window per IP (code default: 100)
-RATE_LIMIT_WINDOW=1m                         # Rate limit window (code default: 1 minute)
+RATE_LIMIT_REQUESTS=100                      # Requests per window per IP (default: 100)
+RATE_LIMIT_WINDOW=1m                         # Rate limit window (default: 1m)
+
+# Logging
+LOG_LEVEL=info                               # debug, info, warn, error (default: info)
+LOG_FORMAT=text                              # json or text (default: text)
 ```
 
 Note: CORS is currently hardcoded to a permissive development configuration (`pkg/middleware.DefaultCORSConfig()`, allow-origin `*`) and is not configurable via environment variables for this service.
@@ -956,8 +1006,8 @@ func (h *UserHandler) NewEndpoint(w http.ResponseWriter, r *http.Request) {
 ```go
 // internal/handlers/router.go
 r.Route("/api/v1/user", func(r chi.Router) {
-    r.Use(middleware.RequireAuth) // Apply auth middleware
-    r.Get("/{id}/new-endpoint", h.NewEndpoint)
+    r.Use(authMiddleware.RequireAuth) // Apply auth middleware
+    r.Get("/{user_id}/new-endpoint", userHandler.NewEndpoint)
 })
 ```
 
@@ -989,11 +1039,11 @@ func TestNewEndpoint(t *testing.T) {
 ```yaml
 # api/openapi.yaml
 paths:
-  /api/v1/user/{id}/new-endpoint:
+  /api/v1/user/{user_id}/new-endpoint:
     get:
       summary: Description
       parameters:
-        - name: id
+        - name: user_id
           in: path
           required: true
           schema:
@@ -1007,11 +1057,11 @@ paths:
 
 **1. Create migration files** (golang-migrate up/down pair):
 ```sql
--- migrations/000007_add_display_name.up.sql
+-- migrations/000009_add_display_name.up.sql
 ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
 ```
 ```sql
--- migrations/000007_add_display_name.down.sql
+-- migrations/000009_add_display_name.down.sql
 ALTER TABLE users DROP COLUMN display_name;
 ```
 
@@ -1200,15 +1250,14 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 ### Security Best Practices
 
 **Password Security**:
-- Minimum bcrypt cost: 12 (production)
+- bcrypt cost defaults to 12 (`BCRYPT_COST`, allowed range 10-14)
 - Never log passwords or hashes
 - Enforce minimum password length (8+ characters)
 - Password complexity (upper/lower/digit/special char) required by default; toggle via `REQUIRE_PASSWORD_COMPLEXITY`
 
 **JWT Security**:
 - RS256 algorithm only (not HS256)
-- Short access token lifetime (15 minutes)
-- Longer refresh token lifetime (7 days)
+- Short-lived access tokens (60 minutes by default) and longer-lived refresh tokens (30 days by default); both configurable
 - Validate token signature, expiration, and claims
 
 **Refresh Token Security**:
@@ -1219,7 +1268,7 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 - Revoke all tokens on suspected compromise
 
 **Transport Security**:
-- HTTPS required in production (`RequireHTTPS` middleware)
+- HTTPS required on all `/api/v1/*` routes (`RequireHTTPS` middleware: TLS or `X-Forwarded-Proto: https`)
 - Tokens are returned in the JSON response body, not as cookies
 - CORS currently hardcoded to a permissive dev configuration (see Environment Variables note above)
 - Security headers (CSP, HSTS, X-Frame-Options)
@@ -1227,7 +1276,7 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 **Rate Limiting**:
 - 100 requests/minute (default) on the `/api/v1/auth/*` route group, IP-based (prevent brute force)
 - `/api/v1/user/*` endpoints are not rate limited
-- Use Redis for distributed rate limiting (not yet implemented; in-memory only today)
+- Rate limiting is in-memory per instance; a Redis-backed limiter exists in `pkg/middleware` but is not wired into the users service
 
 ### Cross-Service Integration
 

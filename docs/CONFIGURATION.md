@@ -74,7 +74,6 @@ The User Service handles authentication and account management, requiring HashiC
 |----------|------|----------|---------|-------------|
 | `VAULT_NAMESPACE` | string | No | - | Vault namespace (Enterprise only) |
 | `VAULT_AUTH_PATH` | string | No | `approle` | Vault AppRole auth mount path |
-| `VAULT_DB_CREDS_PATH` | string | No | `secret/data/database/credentials` | Read into config but not currently used; database credentials always come from `DB_USER` / `DB_PASSWORD` |
 | `VAULT_TOKEN_RENEWAL_INTERVAL` | duration | No | `1h` | Token renewal check interval |
 
 ### JWT Configuration
@@ -100,17 +99,6 @@ The User Service handles authentication and account management, requiring HashiC
 | `RATE_LIMIT_WINDOW` | duration | No | `1m` | Rate limit time window |
 
 **Rate Limiting**: Applied to authentication endpoints (`/auth/*`) to prevent brute force attacks.
-
-### Redis Configuration
-
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `REDIS_HOST` | string | No | - | Redis host |
-| `REDIS_PORT` | string | No | `6379` | Redis port |
-| `REDIS_PASSWORD` | string | No | - | Redis password |
-| `REDIS_DB` | int | No | `0` | Redis database index |
-
-These are parsed into config but nothing reads them yet; rate limiting is in-memory only.
 
 ### Logging Configuration
 

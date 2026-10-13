@@ -14,7 +14,6 @@ type Config struct {
 	Vault    VaultConfig
 	JWT      JWTConfig
 	Security SecurityConfig
-	Redis    RedisConfig
 	Logging  LoggingConfig
 }
 
@@ -53,7 +52,6 @@ type VaultConfig struct {
 	RoleID               string // For AppRole authentication
 	SecretID             string // For AppRole authentication
 	AuthPath             string
-	DBCredsPath          string        // Path to database credentials in Vault
 	TokenRenewalInterval time.Duration // How often to renew Vault token
 }
 
@@ -64,14 +62,6 @@ type JWTConfig struct {
 	AccessTokenExpiry   time.Duration
 	RefreshTokenExpiry  time.Duration
 	KeyRotationInterval time.Duration // How often to check for new keys
-}
-
-// RedisConfig contains Redis connection configuration for distributed rate limiting
-type RedisConfig struct {
-	Host     string // Redis host (empty means use in-memory rate limiter)
-	Port     string // Redis port (default: 6379)
-	Password string // Redis password (optional)
-	DB       int    // Redis database index (default: 0)
 }
 
 // SecurityConfig contains security-related configuration
@@ -110,7 +100,6 @@ func Load() (*Config, error) {
 			RoleID:               env.GetString("VAULT_ROLE_ID", ""),
 			SecretID:             env.GetString("VAULT_SECRET_ID", ""),
 			AuthPath:             env.GetString("VAULT_AUTH_PATH", "approle"),
-			DBCredsPath:          env.GetString("VAULT_DB_CREDS_PATH", "secret/data/database/credentials"),
 			TokenRenewalInterval: env.GetDuration("VAULT_TOKEN_RENEWAL_INTERVAL", 1*time.Hour),
 		},
 		JWT: JWTConfig{
@@ -126,12 +115,6 @@ func Load() (*Config, error) {
 			RequirePasswordComplexity: env.GetBool("REQUIRE_PASSWORD_COMPLEXITY", true),
 			RateLimitRequests:         env.GetInt("RATE_LIMIT_REQUESTS", 100),
 			RateLimitWindow:           env.GetDuration("RATE_LIMIT_WINDOW", 1*time.Minute),
-		},
-		Redis: RedisConfig{
-			Host:     env.GetString("REDIS_HOST", ""),
-			Port:     env.GetString("REDIS_PORT", "6379"),
-			Password: env.GetString("REDIS_PASSWORD", ""),
-			DB:       env.GetInt("REDIS_DB", 0),
 		},
 		Logging: LoggingConfig{
 			Level:  env.GetString("LOG_LEVEL", "info"),
