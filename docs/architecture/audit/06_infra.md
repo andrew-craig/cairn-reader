@@ -163,19 +163,17 @@ bypass the limit by distributing requests across instances: each instance sees a
 ## I-5 — DB `sslmode=disable` internally within Docker network (FAST-FOLLOW)
 
 **Current state.** Every service that connects to `cairn-db` uses `sslmode=disable` (or
-`DB_SSL_MODE=disable`). The connections are internal — no traffic leaves the Docker bridge
+`DB_SSLMODE=disable`). The connections are internal — no traffic leaves the Docker bridge
 network (`cairn-network`, driver: bridge).
 
 **Evidence:**
-- `infrastructure/docker/prod/docker-compose.yml:230` — `explore-recommender`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:270` — `explore-fetcher`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:302` — `content-service`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:338` — `content-worker`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:366` — `ingest-rss`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:394` — `ingest-rss-worker`: `DB_SSLMODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:424` — `email-ingest`: `DB_SSL_MODE=disable`
-- `infrastructure/docker/prod/docker-compose.yml:458` — `email-ingest-worker`: `DB_SSL_MODE=disable`
-- `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set; users service uses pgx which defaults to `prefer` — effectively no enforced TLS).
+- `infrastructure/docker/prod/docker-compose.yml` — `content-service`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `content-worker`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `ingest-rss-worker`: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `email-ingest` service: `DB_SSLMODE=disable`
+- `infrastructure/docker/prod/docker-compose.yml` — `email-ingest-worker` service: `DB_SSLMODE=disable`
+- `user-service` uses `DB_HOST=cairn-db` on the same Docker network (no `DB_SSLMODE` set in compose; the users service config defaults `DB_SSLMODE` to `disable`).
 
 **Assessment.** Within a single-host Docker bridge network, inter-container traffic does not leave the kernel network stack; TLS in this context provides negligible security benefit (an attacker who can sniff kernel network traffic has already compromised the host). `sslmode=disable` is the conventional and correct setting here. Audit 2 (D-4) already noted this; the data matches.
 

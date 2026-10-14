@@ -259,7 +259,7 @@ DB_PORT=5432
 DB_USER=cairn
 DB_PASSWORD=<required>
 DB_NAME=ingest_email
-DB_SSL_MODE=disable
+DB_SSLMODE=disable
 
 # Email
 EMAIL_DOMAIN=read.cairnapp.com

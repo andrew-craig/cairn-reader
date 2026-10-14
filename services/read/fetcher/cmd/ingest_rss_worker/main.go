@@ -192,7 +192,7 @@ func loadConfig() Config {
 	dbUser := getEnv("DB_USER", "cairn_rss")
 	dbPassword := getEnv("DB_PASSWORD", "cairn_rss_pass")
 	dbName := getEnv("DB_NAME", "cairn_rss_fetcher")
-	dbSSLMode := getEnv("DB_SSL_MODE", "disable")
+	dbSSLMode := getEnv("DB_SSLMODE", "disable")
 
 	// Connection pool settings (smaller for worker process)
 	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 10)

@@ -118,7 +118,7 @@ func loadConfig() Config {
 	dbUser := getEnv("DB_USER", "cairn_content")
 	dbPassword := getEnv("DB_PASSWORD", "cairn_content_pass")
 	dbName := getEnv("DB_NAME", "cairn_content")
-	dbSSLMode := getEnv("DB_SSL_MODE", "disable")
+	dbSSLMode := getEnv("DB_SSLMODE", "disable")
 
 	// Connection pool settings (smaller for worker process)
 	maxOpenConns := getEnvAsInt("DB_MAX_OPEN_CONNS", 5)

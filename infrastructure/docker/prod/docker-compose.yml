@@ -239,6 +239,7 @@ services:
       - DB_SSLMODE=disable
       - DB_MAX_OPEN_CONNS=15
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
+      - EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
       # Vault AppRole authentication (scoped to content-service policy)
       - VAULT_ADDR=http://vault:8200
@@ -362,7 +363,7 @@ services:
       - DB_USER=${POSTGRES_USER_EMAIL}
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - DB_MAX_OPEN_CONNS=15
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}
       - VAULT_ADDR=http://vault:8200
@@ -399,7 +400,7 @@ services:
       - DB_USER=${POSTGRES_USER_EMAIL}
       - DB_PASSWORD=${POSTGRES_PASSWORD_EMAIL}
       - DB_NAME=${POSTGRES_DB_EMAIL}
-      - DB_SSL_MODE=disable
+      - DB_SSLMODE=disable
       - DB_MAX_OPEN_CONNS=5
       - CONTENT_SERVICE_URL=http://content-service:8080
       - INGEST_API_KEY=${EMAIL_INGEST_API_KEY}

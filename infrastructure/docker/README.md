@@ -240,7 +240,7 @@ Key configurations:
 - `DB_USER=${POSTGRES_USER_CONTENT}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
 - `DB_NAME=${POSTGRES_DB_CONTENT}`
-- `DB_SSL_MODE=disable`
+- `DB_SSLMODE=disable`
 
 ### Content Worker (content-worker)
 - `DB_HOST=cairn-db`
@@ -248,7 +248,7 @@ Key configurations:
 - `DB_USER=${POSTGRES_USER_CONTENT}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
 - `DB_NAME=${POSTGRES_DB_CONTENT}`
-- `DB_SSL_MODE=disable`
+- `DB_SSLMODE=disable`
 - `CLEANUP_CRON=0 2 * * *` (runs at 2 AM daily)
 - `HEALTH_PORT=8084`
 
@@ -259,7 +259,7 @@ Key configurations:
 - `DB_USER=${POSTGRES_USER_RSS}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
 - `DB_NAME=${POSTGRES_DB_RSS}`
-- `DB_SSL_MODE=disable`
+- `DB_SSLMODE=disable`
 
 ### Ingest RSS Worker (ingest-rss-worker)
 - `DB_HOST=cairn-db`
@@ -267,7 +267,7 @@ Key configurations:
 - `DB_USER=${POSTGRES_USER_RSS}`
 - `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
 - `DB_NAME=${POSTGRES_DB_RSS}`
-- `DB_SSL_MODE=disable`
+- `DB_SSLMODE=disable`
 - `CONTENT_SERVICE_URL=http://content-service:8080`
 - `HEALTH_PORT=8086`
 - `OUTBOX_CLEANUP_CRON=0 3 * * *` (runs at 3 AM daily)

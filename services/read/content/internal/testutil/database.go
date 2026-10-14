@@ -47,7 +47,7 @@ func GetTestConnectionInfo() ConnectionInfo {
 		User:     getEnv("TEST_DB_USER", defaultTestDBUser),
 		Password: getEnv("TEST_DB_PASSWORD", defaultTestDBPassword),
 		DBName:   getEnv("TEST_DB_NAME", defaultTestDBName),
-		SSLMode:  getEnv("TEST_DB_SSL_MODE", "disable"),
+		SSLMode:  getEnv("TEST_DB_SSLMODE", "disable"),
 	}
 }
 
