@@ -92,3 +92,6 @@ cmd/selfhost/cairn-selfhost
 # Chalk auto-generated files
 .chalk/task_list.md
 .claude/worktrees/
+
+# Patch/merge backups
+*.orig
