@@ -22,7 +22,7 @@ There is no `docker-compose.yml` under `services/read/`. The dev topology lives 
 (User, Read, Email Ingest) against one consolidated Postgres container.
 
 ```bash
-cd /home/user/cairn-reader/infrastructure/docker/dev
+cd infrastructure/docker/dev   # from the repo root
 
 # Start all services (Read Service + everything else)
 docker compose up -d
@@ -34,7 +34,7 @@ This starts, among other services:
 - Email Ingest Service (http://localhost:8089, container port 8087)
 - `cairn-db`: one Postgres container hosting separate logical databases per service
   (`content_service` for Content Service, `rss_fetcher_service` for Ingest RSS)
-- Background workers for content cleanup, feed polling, and outbox delivery
+- Background workers: `content-worker` (Feed expiry + orphaned content cleanup) and `ingest-rss-worker` (feed polling, content extraction, outbox delivery, cleanup jobs)
 
 See [infrastructure/docker/README.md](/infrastructure/docker/README.md) for the full topology.
 
@@ -139,6 +139,7 @@ services/read/
 │   │   ├── jobs/             # Background jobs (feed expiry + orphaned content cleanup)
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
+│   ├── selfhost/             # Entry point for the single-container selfhost build
 │   ├── Dockerfile            # API server image
 │   ├── Dockerfile.worker     # Background worker image
 │   └── integration_test.go   # Integration tests
@@ -160,13 +161,13 @@ services/read/
 │   │   ├── client/           # Content Service HTTP client
 │   │   └── config/           # Configuration
 │   ├── migrations/           # Database migrations
+│   ├── selfhost/             # Entry point for the single-container selfhost build
 │   ├── Dockerfile            # API server image
 │   ├── Dockerfile.worker     # Background worker image
 │   └── integration_test.go   # Integration tests
 │
 ├── email/                      # Email Ingest Service (see email/CLAUDE.md)
-├── api/                       # Shared OpenAPI documentation
-├── scripts/                   # Utility scripts
+├── scripts/                   # Utility scripts (run-integration-tests.sh)
 ├── Makefile                   # Build and development commands
 └── README.md                  # Main documentation
 ```
@@ -428,6 +429,10 @@ GET    /api/v1/content/user/{user_id}                → List user's contents
        Note: omitting ?list returns both lists; clients showing only Reads must pass list=reads
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
+GET    /api/v1/content/user/{user_id}/count          → Count items matching the filters
+       Auth: Bearer <JWT token>
+       Query: ?status=..., ?is_favorite=true|false, ?list=feed|reads
+
 GET    /api/v1/content/user/{user_id}/search         → Full-text search
        Auth: Bearer <JWT token>
        Query: ?q=golang, ?list=feed|reads, ?limit=20, ?cursor=...
@@ -530,18 +535,20 @@ All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect`
 - Token must contain valid `user_id` claim matching the URL parameter (where applicable —
   `/detect` and `/discover-feed` only require a valid token, not a matching user_id)
 - Expires: Token expiration validated by service
-- Signature: RS256 with public key fetched from Vault at startup
+- Signature: RS256 with public key fetched from Vault at startup and re-fetched periodically (`JWT_PUBLIC_KEY_REFRESH_INTERVAL`, default 5m)
 
 **Protected endpoints**:
 - `POST /api/v1/content/detect` - URL detection
 - `POST /api/v1/content/discover-feed` - Feed discovery
 - `GET /api/v1/content/user/{user_id}` - List user contents
 - `POST /api/v1/content/user/{user_id}` - Add content to user
+- `GET /api/v1/content/user/{user_id}/count` - Count user contents
 - `GET /api/v1/content/user/{user_id}/search` - Search user contents
 - `GET /api/v1/content/user/{user_id}/{content_id}` - Get a single user-content item
 - `PATCH /api/v1/content/user/{user_id}/{content_id}` - Update content metadata
 - `DELETE /api/v1/content/user/{user_id}/{content_id}` - Delete from user
 - `GET /api/v1/content/user/{user_id}/subscriptions` - List all subscriptions
+- `PUT /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list` - Choose Feed or Reads for a source
 - `DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}` - Unsubscribe from RSS feed
 - `POST /api/v1/content/user/bulk` - Bulk add for authenticated user
 
@@ -563,7 +570,7 @@ All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect`
 
 ### Configuration
 
-The service loads JWT public key from HashiCorp Vault at startup:
+The service loads JWT public key from HashiCorp Vault at startup and refreshes it periodically (`JWT_PUBLIC_KEY_REFRESH_INTERVAL`, default 5m):
 
 ```bash
 # Development
@@ -727,7 +734,7 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 ### User Feed Limit
 
 - Maximum 100 feeds per user
-- Enforced by database trigger on `user_feeds` table
+- Enforced by database trigger on `feed_subscriptions` table
 - API returns 400 Bad Request if limit exceeded
 
 ## Background Jobs & Workers
@@ -769,7 +776,7 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 
 **Feed Items Cleanup Job**:
 - **Schedule**: Daily at 4 AM
-- **Purpose**: Delete old completed/failed feed items
+- **Purpose**: Delete completed feed items older than 7 days and failed ones older than 30 days
 - **Location**: `fetcher/internal/jobs/feed_items_cleanup_job.go`
 
 ## Testing
@@ -963,6 +970,15 @@ JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
 INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
 EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
 INTERNAL_API_KEY=...                   # Required; validates X-Internal-API-Key on /api/v1/internal
+JWT_PUBLIC_KEY_REFRESH_INTERVAL=5m     # Optional; how often the JWT public key is re-fetched from Vault
+```
+
+### Content Worker (`cmd/worker`)
+
+```bash
+DB_*, LOG_LEVEL                        # Same discrete DB variables as the Content Service
+CLEANUP_CRON=0 2 * * *                 # Default; schedule of the Feed expiry + orphaned content cleanup
+HEALTH_PORT=8082                       # Default; dev docker-compose overrides to 8084
 ```
 
 ### Ingest RSS Service
@@ -986,6 +1002,14 @@ INTERNAL_API_KEY=...                   # Sent as X-Internal-API-Key when calling
 OUTBOX_CLEANUP_CRON=0 3 * * *
 FEED_ITEMS_CLEANUP_CRON=0 4 * * *
 HEALTH_PORT=8083                       # Default; dev docker-compose overrides to 8086
+FEED_WORKER_COUNT=5                    # Defaults shown: per-feed fetch pool size, queue size
+FEED_WORKER_QUEUE_SIZE=100
+POLL_BATCH_SIZE=50                     # Feeds claimed per poll tick
+POLL_INTERVAL=1m                       # How often the scheduler looks for due feeds
+POLL_WORKER_POOL_SIZE=5
+TIER_UPDATE_INTERVAL=24h               # Tier re-evaluation cadence
+# Also the same DB_* variables, plus CONTENT_SERVICE_TIMEOUT / _MAX_RETRIES / _RETRY_DELAY
+# (see fetcher/cmd/ingest_rss_worker/main.go)
 ```
 
 ## Database Migrations
@@ -1074,7 +1098,7 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 ### Adding a New API Endpoint
 
 1. **Define handler** in `internal/api/handlers/`
-2. **Register route** in `internal/api/server.go`
+2. **Register route** in `internal/api/router.go`
 3. **Add service method** in `internal/service/`
 4. **Add repository method** if database access needed
 5. **Write tests** for handler and service
@@ -1093,13 +1117,7 @@ github.com/DATA-DOG/go-sqlmock       // SQL mocking
 ### Adding a New Background Job
 
 1. **Create job file** in `internal/jobs/job_name.go`
-2. **Implement job interface**:
-   ```go
-   type Job interface {
-       Run(ctx context.Context) error
-       Name() string
-   }
-   ```
+2. **Implement a `Run()` method** (cron jobs are registered with `AddFunc(cronExpr, job.Run)`)
 3. **Register job** in the relevant worker entry point (`content/cmd/worker/main.go` or `fetcher/cmd/ingest_rss_worker/main.go`)
 4. **Add cron schedule** if needed
 5. **Write job tests**
@@ -1174,7 +1192,7 @@ When updating content:
 
 ### Deduplication
 
-- Content is deduplicated by `(content_hash, source_feed_id)`
+- Content is deduplicated by `(content_hash, source_feed_id)` for RSS and `(content_hash, original_url)` otherwise (see Deduplication Strategy)
 - Check for duplicates before creating content
 - Use `/api/v1/content/check-duplicate` endpoint
 
@@ -1208,7 +1226,6 @@ Note: `IMPLEMENTATION_PLAN.md` and `INTEGRATION_TESTS.md` do not exist in this d
 - 🔲 Rate limiting (CORS is already applied via `pkg/middleware` in both routers)
 
 **Future Enhancements**:
-- Recommendation engine
 - Import/export functionality
 - GraphQL API option
 - WebSocket support for real-time updates

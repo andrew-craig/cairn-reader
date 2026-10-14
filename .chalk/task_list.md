@@ -5,7 +5,10 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **chore_65f1** · P2 · in_progress · Docs + OpenAPI completeness review (validate against code)
 - **task_0849** · P2 · in_progress · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
+- **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
+- **bug_d675** · P2 · open · Users service: integration/security test harness runs nothing or the wrong thing
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **feature_bd13** · P2 · open · Mobile: Add feed option on the RSS (feeds) page  (parent: epic_6e4d)
@@ -18,7 +21,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_9188** · P2 · open · Mobile: Redesign Add Feed flow (Feed/Reads choice)  (parent: epic_6e4d)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
+- **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **bug_fa3d** · P3 · open · Behaviour gaps found in docs review (need decisions)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
 - **epic_7c9e** · P3 · open · Hosted launch
@@ -27,6 +32,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_1d5d** · P3 · open · Export/import subscription list and likes
 - **feature_2920** · P3 · open · Mobile: Add filter/sort controls to ReadScreen
 - **feature_34cc** · P3 · open · Reading analytics and statistics  (parent: epic_7c9e)
+- **feature_714e** · P3 · open · Web + mobile: re-enable disabled RSS feeds
 - **feature_9d64** · P3 · open · Image hosting and optimization
 - **feature_9dba** · P3 · open · Article sharing via links
 - **feature_a849** · P3 · open · Enhanced article reader with adjustable fonts
@@ -46,6 +52,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs
 - **task_fbb9** · P3 · open · [Audit/Tier 5] Drop the duplicate constraint-backed indexes in the recommender and users migrations  (parent: epic_fefa)
 - **chore_3ea1** · P4 · open · CI paths: filters over-trigger web/selfhost builds on mobile-only lockfile changes
+- **chore_cc63** · P4 · open · Remove dead code and stale comments found in docs review
 - **feature_753f** · P4 · open · Add proactive duplicate detection in AddLinkModal
 - **feature_7cff** · P4 · open · Add bulk URL import support
 - **feature_a85d** · P4 · open · Add recent URLs history in AddLinkModal

@@ -46,6 +46,8 @@ docker compose up --build
 
 This starts all services with automatic database migrations and Vault initialization.
 
+> **Known issue**: the dev compose sets no `VAULT_*` variables for `content-service`, and the Content Service refuses to start without a Vault token or AppRole (`services/read/content/internal/config/config.go`, `Validate`). See [infrastructure/docker/README.md](../infrastructure/docker/README.md) and task_4f8a.
+
 ### Service Endpoints
 
 After deployment, services are available at:
@@ -71,7 +73,7 @@ After deployment, services are available at:
 
 ### For Local Development
 
-- **Go**: 1.21 or later
+- **Go**: 1.25 or later (`go.mod` in `services/users` and `services/read`)
 - **PostgreSQL**: 15 or later (if running database locally without Docker)
 - **Make**: For using Makefile commands (optional)
 
@@ -210,7 +212,7 @@ When deploying services individually, start them in this order:
 #### 1. Install Dependencies
 
 ```bash
-# Install Go 1.21+
+# Install Go 1.25+
 # See: https://golang.org/doc/install
 
 # Install PostgreSQL 15+
@@ -320,6 +322,8 @@ cp .env.example .env
 # Edit .env
 # - Change all default passwords and API keys
 # - Set GITHUB_ORG and IMAGE_TAG for the published images
+#   (note: the per-service docker-build-*.yml workflows currently have `if: false`,
+#   so these images are not being published; see task_4f8a)
 nano .env
 
 # First start: vault-init initialises Vault, creates the JWT keys and writes the
@@ -340,7 +344,9 @@ docker compose up -d
 docker compose ps
 ```
 
-The vault-init script also writes the Vault unseal keys to `/vault-keys/UNSEAL_KEYS.txt` on first run. Copy them to secure storage and remove the file (see [infrastructure/docker/README.md](../infrastructure/docker/README.md)).
+The vault-init script also writes the Vault unseal keys to `/vault-keys/UNSEAL_KEYS.txt` on first run. Copy them to secure storage. The `vault-unseal` watchdog reads that file to unseal Vault after restarts, so removing it means unsealing by hand each time (see [infrastructure/docker/README.md](../infrastructure/docker/README.md)).
+
+> **Known issue**: `prod/docker-compose.yml` sets no `INTERNAL_API_KEY` on `ingest-rss`, but the service requires it at startup (`services/read/fetcher/internal/config/config.go`, `Validate`). Whether the prod stack is fixed or removed is an open owner decision (task_4f8a).
 
 #### 4. Configure Firewall
 
@@ -625,7 +631,7 @@ echo "Backup completed: $DATE"
 crontab -e
 
 # Add line (run daily at 2 AM):
-0 2 * * * /home/cairn/cairn-reader/scripts/backup.sh >> /var/log/cairn-backup.log 2>&1
+0 2 * * * /path/to/your/backup.sh >> /var/log/cairn-backup.log 2>&1
 ```
 
 ### Restore from Backup
@@ -663,7 +669,7 @@ Cairn is currently designed and tested for **single-instance deployment** — on
 The User Service (`pkg/middleware/rate_limit.go`) uses an in-memory token bucket rate limiter keyed by client IP. This works correctly only when there is **one running instance** of the service:
 
 - With multiple instances, each instance holds its own independent counter. A client sending N requests round-robined across M instances will be allowed up to N×M requests before any single instance triggers the limit.
-- A Redis-backed distributed rate limiter is planned for future multi-instance support.
+- `pkg/middleware/rate_limit_redis.go` provides a `RateLimitRedis` middleware, but nothing wires it in: no service constructs a Redis client, and the compose files run no Redis.
 
 **Scaling ceiling**: Run a single instance of each API service. Use vertical scaling (more CPU/memory) to handle increased traffic until Redis-based rate limiting is implemented.
 
@@ -678,9 +684,8 @@ The User Service (`pkg/middleware/rate_limit.go`) uses an in-memory token bucket
 ### Future Multi-Instance Support
 
 To run multiple instances of the User Service safely:
-1. Replace `pkg/middleware/rate_limit.go` with a Redis-backed implementation (e.g., `go-redis/redis_rate`)
-2. Ensure a shared Redis instance is available to all service instances
-3. Update the `RateLimit` and `RateLimitWithKey` middleware to use Redis instead of an in-memory map
+1. Ensure a shared Redis instance is available to all service instances
+2. Wire the existing `RateLimitRedis` middleware into the User Service router in place of the in-memory `RateLimit` and `RateLimitWithKey`
 
 ---
 
@@ -816,15 +821,7 @@ docker compose up --build
 
 ### View Logs
 
-```bash
-# All services
-docker compose logs -f
-
-# Specific service
-docker compose logs -f user-service
-docker compose logs -f content-service
-docker compose logs -f ingest-rss
-```
+See [Monitoring](#logs).
 
 ### Restart Services
 
@@ -1017,6 +1014,12 @@ After deployment:
 4. **Customize**: Modify environment variables as needed
 5. **Set up monitoring**: Add Prometheus and Grafana
 6. **Configure backups**: Set up automated database backups
+
+---
+
+## Mobile App Releases
+
+The iOS app is not deployed by the compose stacks. Fastlane lanes live in `apps/mobile/ios/fastlane/Fastfile`: `beta` (build and upload to TestFlight), `certificates` (fetch signing certificates and profiles via match) and `build_only` (local build without uploading). The `iOS TestFlight (Fastlane)` and `iOS TestFlight (Local Build)` workflows in `.github/workflows/` are manually triggered (`workflow_dispatch`). See [apps/mobile/CLAUDE.md](../apps/mobile/CLAUDE.md) for mobile build details.
 
 ---
 

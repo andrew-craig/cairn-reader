@@ -11,7 +11,16 @@ info:
     - JWT-based stateless authentication with RS256 signing
     - Refresh token management with automatic rotation
     - Account upgrade from mobile-only to hybrid (email + device)
+    - Email verification (token generation and consumption; no email is sent yet)
     - User profile management
+
+    ## Response Envelope
+    Successful responses wrap the payload: `{"data": <payload>, "meta": {"timestamp", "version"}}`.
+    Error responses use `{"error": "<code>", "message": "...", "details"?, "meta"}`, where `error` is a
+    machine-readable code (`bad_request`, `validation_error`, `unauthorized`, `forbidden`, `not_found`,
+    `conflict`, `too_many_requests`, `internal_error`). Exceptions: the health endpoints, the rate
+    limiter's 429 and the HTTPS-required 403 return their own bare shapes (see the `RateLimitError` schema
+    and the `/api/v1` HTTPS note below).
 
     ## Account Types
     - **Mobile-only**: Created with Expo device ID, can only authenticate with device
@@ -24,10 +33,19 @@ info:
     3. When access_token expires, use refresh_token to get a new one
     4. Refresh tokens are automatically rotated on each use
 
+    Access-token lifetime and refresh-token lifetime are configurable (`JWT_ACCESS_TOKEN_EXPIRY`,
+    `JWT_REFRESH_TOKEN_EXPIRY`); the standalone service defaults are 60 minutes and 30 days, the
+    self-host binary defaults are 15 minutes and 7 days. `expires_in` in auth responses is authoritative.
+
     ## Security
     - Passwords hashed with bcrypt (cost factor 12+)
     - JWT tokens signed with RS256 (2048-bit RSA keys)
-    - Rate limiting on authentication endpoints (10 requests/minute per IP)
+    - Rate limiting on `/api/v1/auth/*` endpoints, per client IP (standalone default 100 requests/minute via
+      `RATE_LIMIT_REQUESTS`/`RATE_LIMIT_WINDOW`; self-host binary 10 requests/minute). Exceeding it returns 429.
+    - Account lockout: 5 consecutive failed email/password logins lock the account for 15 minutes (login returns 429)
+    - All `/api/v1` routes reject non-HTTPS requests with 403 `{"error": "HTTPS required"}` unless the request is
+      TLS or carries `X-Forwarded-Proto: https`
+    - Request bodies are limited to 16KB (413)
     - Authorization checks ensure users can only access their own data
   contact:
     name: Cairn API Support
@@ -36,8 +54,8 @@ info:
     name: MIT
 
 servers:
-  - url: http://localhost:8080
-    description: User service (local development)
+  - url: http://localhost:8082
+    description: User service (local development; host port 8082, container port 8080)
   - url: https://api.cairn.example.com
     description: Production server (HTTPS required)
 
@@ -45,7 +63,7 @@ tags:
   - name: Health
     description: Health check and readiness endpoints
   - name: Authentication
-    description: User registration, login, and token management
+    description: User registration, login, token management and email verification
   - name: User Management
     description: User profile and account operations (requires authentication)
 
@@ -69,6 +87,9 @@ paths:
                   status:
                     type: string
                     example: healthy
+                  version:
+                    type: string
+                    description: Service version (omitted when empty)
 
   /health/ready:
     get:
@@ -77,7 +98,8 @@ paths:
       summary: Readiness check
       description: |
         Checks if the service is ready to accept requests (readiness probe).
-        Verifies database and Vault connectivity.
+        Verifies database connectivity, and Vault connectivity when a Vault client is configured.
+        GET and HEAD are supported on both health endpoints.
       operationId: readyCheck
       responses:
         '200':
@@ -89,19 +111,35 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: ready
-                  database:
+                    example: healthy
+                  version:
                     type: string
-                    example: connected
-                  vault:
-                    type: string
-                    example: connected
+                  checks:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    example:
+                      database: ok
+                      vault: ok
         '503':
-          description: Service not ready
+          description: A dependency is unavailable
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  checks:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    example:
+                      database: error
+                  message:
+                    type: string
+                    example: One or more dependencies are unavailable
 
   # Authentication Endpoints
   /api/v1/auth/register:
@@ -111,7 +149,9 @@ paths:
       summary: Register with email/password
       description: |
         Creates a new email-only account.
-        Password must be at least 8 characters.
+        Email must be a valid RFC 5322 address (no display name) with a dotted domain.
+        Password must be at least 8 characters (`MIN_PASSWORD_LENGTH`); the standalone service also requires
+        upper, lower, digit and special characters by default (`REQUIRE_PASSWORD_COMPLEXITY`, off in the self-host binary).
       operationId: register
       requestBody:
         required: true
@@ -129,7 +169,7 @@ paths:
                   type: string
                   format: password
                   minLength: 8
-                  description: User's password (min 8 characters)
+                  description: User's password (min 8 characters; complexity rules per the description above)
                   example: SecurePass123!
               required:
                 - email
@@ -140,9 +180,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthEnvelope'
         '400':
-          description: Invalid input or weak password
+          description: Invalid input, invalid email format, or weak password (complexity failures use code `validation_error`)
           content:
             application/json:
               schema:
@@ -172,7 +212,7 @@ paths:
         - Authentication
       summary: Register with mobile device ID
       description: |
-        Creates a new mobile-only account using Expo device ID.
+        Creates a new mobile-only account using Expo device ID. The device ID is stored as a credential and is never returned.
         Device info and IP address are extracted from request headers.
       operationId: registerMobile
       requestBody:
@@ -194,7 +234,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthEnvelope'
         '400':
           description: Invalid input
           content:
@@ -228,6 +268,7 @@ paths:
       description: |
         Authenticates a user with email and password.
         Returns access token and refresh token.
+        After 5 consecutive failed attempts the account is locked for 15 minutes.
       operationId: login
       requestBody:
         required: true
@@ -253,7 +294,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthEnvelope'
         '400':
           description: Invalid input
           content:
@@ -272,6 +313,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          description: Account temporarily locked after repeated failures (message includes minutes remaining), or per-IP rate limit exceeded (`RateLimitError` shape)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/RateLimitError'
         '500':
           description: Internal server error
           content:
@@ -307,7 +356,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthEnvelope'
         '400':
           description: Invalid input
           content:
@@ -360,8 +409,8 @@ paths:
               properties:
                 refresh_token:
                   type: string
-                  description: The refresh token to exchange
-                  example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                  description: The refresh token to exchange (opaque random string, not a JWT)
+                  example: k3J9x0Qm1vT8bq2l7Zs4dH6yUe5nWcA1oPfRgXiLhMa
               required:
                 - refresh_token
       responses:
@@ -370,7 +419,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthEnvelope'
         '400':
           description: Invalid input
           content:
@@ -386,13 +435,16 @@ paths:
               examples:
                 expired:
                   value:
-                    error: "refresh token has expired"
+                    error: unauthorized
+                    message: "refresh token has expired"
                 reuse:
                   value:
-                    error: "token reuse detected - all tokens have been revoked"
+                    error: unauthorized
+                    message: "token reuse detected - all tokens have been revoked"
                 invalid:
                   value:
-                    error: "invalid credentials"
+                    error: unauthorized
+                    message: "invalid credentials"
         '413':
           description: Request body too large (max 16KB)
           content:
@@ -423,7 +475,7 @@ paths:
                 refresh_token:
                   type: string
                   description: The refresh token to revoke
-                  example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+                  example: k3J9x0Qm1vT8bq2l7Zs4dH6yUe5nWcA1oPfRgXiLhMa
               required:
                 - refresh_token
       responses:
@@ -432,11 +484,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: successfully logged out
+                allOf:
+                  - $ref: '#/components/schemas/MessageEnvelope'
+                example:
+                  data:
+                    message: successfully logged out
         '400':
           description: Invalid input
           content:
@@ -473,13 +525,135 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: successfully logged out from all devices
+                allOf:
+                  - $ref: '#/components/schemas/MessageEnvelope'
+                example:
+                  data:
+                    message: successfully logged out from all devices
         '401':
           description: Unauthorized - missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email (JSON body)
+      description: |
+        Consumes an email verification token and marks the account's email as verified.
+        Tokens are valid for 24 hours and single-use. If a `token` query parameter is present it takes
+        precedence over the request body. No authentication required.
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Verification token
+              required:
+                - token
+      responses:
+        '200':
+          description: Email verified; returns the updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          description: Missing token, or invalid/expired verification token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Request body too large (max 16KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags:
+        - Authentication
+      summary: Verify email (link)
+      description: Same as the POST variant, taking the token from the query string (for links sent in verification emails).
+      operationId: verifyEmailLink
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email verified; returns the updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          description: Missing token, or invalid/expired verification token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/auth/resend-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend verification email
+      description: |
+        Generates a new verification token for the authenticated user's own account (no request body).
+        Email delivery is not implemented yet: the token is stored but nothing is sent.
+      operationId: resendVerification
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Verification token generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageEnvelope'
+        '400':
+          description: Account has no email (mobile-only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email is already verified
           content:
             application/json:
               schema:
@@ -517,7 +691,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserEnvelope'
         '400':
           description: Invalid user ID format
           content:
@@ -554,7 +728,8 @@ paths:
         - User Management
       summary: Update user profile
       description: |
-        Updates user profile information (currently only email).
+        Updates user profile information (currently only email). `email` is required in practice: an empty body
+        returns 400 "no fields to update". Email must be a valid RFC 5322 address.
         Users can only update their own profile.
       operationId: updateUser
       parameters:
@@ -585,9 +760,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserEnvelope'
         '400':
-          description: Invalid input or no fields to update
+          description: Invalid input, invalid email format, or no fields to update
           content:
             application/json:
               schema:
@@ -654,11 +829,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: user account successfully deleted
+                allOf:
+                  - $ref: '#/components/schemas/MessageEnvelope'
+                example:
+                  data:
+                    message: user account successfully deleted
         '400':
           description: Invalid user ID format
           content:
@@ -726,7 +901,7 @@ paths:
                   type: string
                   format: password
                   minLength: 8
-                  description: Password (min 8 characters)
+                  description: Password (min 8 characters; same policy as registration)
                   example: SecurePass123!
               required:
                 - email
@@ -737,7 +912,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserEnvelope'
         '400':
           description: Invalid input, weak password, or not a mobile-only account
           content:
@@ -789,7 +964,7 @@ paths:
       description: |
         Changes the authenticated user's password.
         Requires the current password for verification.
-        New password must meet strength requirements.
+        New password must meet the same strength policy as registration (min 8 characters; complexity per configuration).
       operationId: changePassword
       parameters:
         - name: user_id
@@ -817,7 +992,7 @@ paths:
                   type: string
                   format: password
                   minLength: 8
-                  description: New password (min 8 characters)
+                  description: New password (min 8 characters; same policy as registration)
                   example: NewSecurePass456!
               required:
                 - current_password
@@ -828,13 +1003,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: password changed successfully
+                allOf:
+                  - $ref: '#/components/schemas/MessageEnvelope'
+                example:
+                  data:
+                    message: password changed successfully
         '400':
-          description: Invalid input, weak password, or account has no password
+          description: Missing fields, weak password (`validation_error`), or account has no password
           content:
             application/json:
               schema:
@@ -883,8 +1058,9 @@ components:
         The JWT contains:
         - user_id: UUID of the authenticated user
         - exp: Expiration timestamp
+        The public key used to verify tokens is held in Vault; the service exposes no JWKS endpoint.
 
-        Default access token lifetime: 15 minutes
+        Access token lifetime is configurable (standalone default 60 minutes, self-host default 15 minutes).
 
   schemas:
     User:
@@ -899,9 +1075,11 @@ components:
         email:
           type: string
           format: email
-          nullable: true
-          description: User email (null for mobile-only accounts)
+          description: User email (omitted for mobile-only accounts)
           example: user@example.com
+        email_verified:
+          type: boolean
+          description: Whether the email address has been verified
         created_at:
           type: string
           format: date-time
@@ -915,11 +1093,11 @@ components:
         last_login_at:
           type: string
           format: date-time
-          nullable: true
-          description: Last login timestamp
+          description: Last login timestamp (omitted if the user has never logged in)
           example: "2025-12-29T12:30:00Z"
       required:
         - id
+        - email_verified
         - created_at
         - updated_at
 
@@ -931,22 +1109,88 @@ components:
           $ref: '#/components/schemas/User'
         access_token:
           type: string
-          description: JWT access token (expires in 15 minutes by default)
+          description: JWT access token (lifetime per `expires_in`)
           example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         refresh_token:
           type: string
-          description: Refresh token (expires in 7 days by default)
-          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+          description: Opaque refresh token (random 256-bit string, not a JWT; lifetime configurable)
+          example: k3J9x0Qm1vT8bq2l7Zs4dH6yUe5nWcA1oPfRgXiLhMa
         expires_in:
           type: integer
           format: int64
           description: Access token expiration time in seconds
-          example: 900
+          example: 3600
       required:
         - user
         - access_token
         - refresh_token
         - expires_in
+
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: v1
+      required:
+        - timestamp
+        - version
+
+    AuthEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthResponse'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required:
+        - data
+        - meta
+
+    UserEnvelope:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required:
+        - data
+        - meta
+
+    MessageEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+          required:
+            - message
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required:
+        - data
+        - meta
+
+    RateLimitError:
+      type: object
+      description: Per-IP rate limit exceeded on /api/v1/auth/*; also sets X-RateLimit-Limit and X-RateLimit-Window headers
+      properties:
+        error:
+          type: string
+          example: rate limit exceeded
+        retry_after:
+          type: string
+          description: Window duration (Go duration string)
+          example: 1m0s
+      required:
+        - error
+        - retry_after
 
     Error:
       type: object
@@ -954,7 +1198,27 @@ components:
       properties:
         error:
           type: string
-          description: Error message
-          example: Invalid request
+          description: Machine-readable error code
+          enum:
+            - bad_request
+            - validation_error
+            - unauthorized
+            - forbidden
+            - not_found
+            - conflict
+            - too_many_requests
+            - internal_error
+          example: bad_request
+        message:
+          type: string
+          description: Human-readable error message
+          example: invalid email format
+        details:
+          type: object
+          additionalProperties: true
+        meta:
+          $ref: '#/components/schemas/Meta'
       required:
         - error
+        - message
+        - meta

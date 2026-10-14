@@ -2,14 +2,16 @@
 
 ## Product Overview
 
-Cairn is a read-it-later mobile application that helps users discover and read long-form content. The app combines two core experiences:
+Cairn is a read-it-later application (mobile and web) that helps users read long-form content. Content lands in one of two lists:
 
-1. **Explore**: Discover curated articles from across the web
-2. **Read**: Subscribe to RSS feeds and build a personal reading library
+1. **Feed**: a list to skim. Items are temporary
+2. **Reads**: a personal reading library of content to read or triage
+
+The app's tabs are **Feed | Reads | You**. Removed: Explore (see `docs/archive/explore_product_requirements.md`).
 
 Target Users: People who want to read thoughtful, long-form content
 
-## Product Requirements - Reading Experience (for both Explore and Read)
+## Product Requirements - Reading Experience (for both Feed and Reads)
 
 The core principles of the reading experience are:
 - **Optimise for readability**: Articles processed for optimal readability
@@ -23,7 +25,7 @@ Optimise for readability
 - All HTML sanitized to prevent security issues
 
 Reading progress saved and synced
-- **Reading Status**: Articles can be unread, read, or archived. Statuses will be synced across devices
+- **Reading Status**: Articles can be unread, reading, completed, or archived. Statuses will be synced across devices
 - **Scroll Position**: Reading position automatically saved
   - Resume reading on any device
   - Character-based position for consistent experience across screen sizes
@@ -32,43 +34,19 @@ Reading progress saved and synced
   - Non-goals: web/PWA offline access (out of scope for the web app, see `docs/detailed_requirements/web_app_requirements.md`); image caching for offline viewing (tracked separately as image hosting/optimization); backend delta-sync or ETag support; server-side conflict resolution — v1 sync is last-write-wins; manual per-article "download for offline" control (article bodies are prefetched automatically, not user-triggered)
 
 
-## Product Requirements - Content Discovery (Explore)
+## Product Requirements - Personal Reading Library (Feed and Reads)
 
-#### Article Curation
-- Content will ffocus on independent blogs, personal websites, and thoughtful writing
-  - Articles will initially be sourced from [Kagi Small Web Text collection](https://github.com/kagisearch/smallweb/blob/main/smallweb.txt)
-- Content will be removed after 90 days
-
-#### Article Recommendations
-- Users receive personalized article recommendations
-- Recommendations balance quality content with exploration. Initial split is:
-  - 80% high-quality articles based on community engagement
-  - 20% exploratory article to discover new content
-- Fresh content added continuously (new articles fetched every minute)
-- Content sourced from curated collection of independent blogs and websites
-
-#### Engagement & Feedback
-- **Upvote/Downvote**: Users can vote on articles to improve recommendations
-- **Vote Management**:
-  - Change vote from upvote to downvote (or vice versa)
-  - Remove vote entirely
-  - One vote per article per user
-- Voting influences future recommendations for all users
-
-
-## Product Requirements - Personal Reading Library (Read)
-
-The personal reading library (Req 2.1) allows users to maintain a list of must-read content that combines
+The personal library (Req 2.1) holds content from the sources a user follows and the links they save. It is split into two lists (Req 2.6). It combines
 - content they have saved to read later (Req 2.2)
 - content from trusted sources that they know they will want to read from RSS feeds (Req. 2.3), email newsletters (Req 2.4) or other sources
 
 #### 2.1 Personal Library
 
-Users will have a personal library of content which they can manage. This library will be accessible as a list of articles/content in the Read tab of the app.
+Users will have a personal library of content which they can manage. The library is accessible as two lists of articles/content, in the Feed and Reads tabs of the app (see Req 2.6).
 
 Users will be able to:
 - **Search** the list of articles (initially title and author, but target state includes full text)
-- **Filter** by status (unread, read, archived) and favorites. The default will be to show all non-archived content
+- **Filter** by status (unread, reading, completed, archived) and favorites. The default will be to show all non-archived content
 - **Add** new content by either saving an article, or adding a new source
 
 Opening an article will the app's reading experience (see above)
@@ -87,7 +65,8 @@ Opening an article will the app's reading experience (see above)
   - View all subscribed feeds
   - Unsubscribe from feeds
   - Feeds auto-disable after 7 consecutive days of errors
-  - Re-enable or remove disabled feeds
+  - Re-enable or remove disabled feeds (the apps do not yet offer re-enable; tracked as a gap)
+- **Choose the list**: each subscription delivers to Feed or Reads (Req 2.6). The default is Reads
 
 Content extraction
 - If full article is not available in the RSS feed, we will attempt to extract it from the source. If this fails, we will fallback to RSS summary if full article unavailable
@@ -99,11 +78,26 @@ Secondary requirements
   - **Preserved Progress**: Reading position maintained when content updates
 
 #### 2.4 Ingestion - Email
+- Each user has one ingest email address (get or create on demand). Newsletters forwarded to it become articles
+- Each sender is tracked as a source (email address, name, count of emails, last received)
+- Content is cleaned (tracking pixels, unsubscribe footers and preheader text removed) and sanitized before delivery
+- **Choose the list**: each sender delivers to Feed or Reads (Req 2.6). New senders default to Reads
+- Delivery to the Content Service is retried automatically on failure
+
+See `services/read/email/CLAUDE.md` for the pipeline.
 
 #### 2.5 Content Management
 - **Delete Articles**: Remove articles from personal reading list
 - **Notes**: Add personal notes to articles (future enhancement)
 - **Tags**: Organize with custom tags (future enhancement)
+
+#### 2.6 Feed and Reads Lists
+- Every saved item is in exactly one list: **Feed** (skim) or **Reads** (read or triage)
+- The user picks the list per source (RSS subscription or email sender), on the RSS and Newsletters pages and when adding a feed
+- A source with no choice delivers to Reads: this is the default for new RSS subscriptions and new email senders
+- Links the user saves directly always go to Reads
+- Changing a source's list affects new items only; existing items stay where they are
+- Non-favorited Feed items are deleted 30 days after they were added. Favorited Feed items are kept, and Reads items are never expired. Removing the favorite from an item older than 30 days makes it eligible for deletion at the next daily cleanup
 
 
 ## Product Requirements - Profile > Content
@@ -123,15 +117,13 @@ Secondary requirements
 
 ### New User Onboarding
 1. Sign up / authenticate
-2. Browse recommended articles (Explore)
-3. Vote on articles to personalize recommendations
-4. Subscribe to favorite RSS feeds (Read)
+2. Subscribe to favorite RSS feeds and choose Feed or Reads for each
 
 ### Daily Reading Routine
-1. Check Explore for new recommendations
-2. Read and vote on interesting articles
+1. Skim the Feed for new items, favoriting any to keep
+2. Read the Reads list
 3. Browse new articles from RSS subscriptions
-4. Mark articles as read/archived
+4. Mark articles as completed/archived
 5. Search for specific topics in reading library
 
 ### Feed Discovery & Management
@@ -150,7 +142,6 @@ Secondary requirements
 - Feed subscriptions per user
 
 ### Content Quality
-- Upvote/downvote ratio
 - Article completion rate
 - Favorite rate
 - Search usage
@@ -177,7 +168,6 @@ The following features are **not** included in the initial release:
 - Email notifications
 - Custom collections/folders
 - Highlights and annotations
-- Web interface (mobile-only initially)
 - Tags and categorization
 
 ## Future Enhancements
@@ -201,8 +191,6 @@ The following features are **not** included in the initial release:
 ### Discovery Features
 - Personalized recommendations based on reading history
 - Topic-based browsing
-- Popular articles from community
-- Trending content alerts
 - Feed discovery engine
 
 ### Mobile Features
@@ -212,9 +200,7 @@ The following features are **not** included in the initial release:
 - Reader themes
 
 ### Technical Improvements
-- Web interface
 - Browser extensions (save from web)
-- Email-to-Cairn (forward articles via email)
 - API for third-party integrations
 - Import from Pocket, Instapaper, etc.
 
@@ -226,7 +212,6 @@ The following features are **not** included in the initial release:
 4. **Reliable Sync**: Reading progress always in sync
 5. **Respectful of Time**: Clean content, no distractions
 6. **Open & Portable**: RSS-based, export capabilities (future)
-7. **Community-Driven**: Upvotes/downvotes improve recommendations for everyone
 
 ## Platform Requirements
 
@@ -235,6 +220,9 @@ The following features are **not** included in the initial release:
 - Android (React Native/Expo)
 - Responsive to various screen sizes
 - Works on tablets and phones
+
+### Web App
+- Browser client (React/Vite) with the same Feed, Reads and You structure. See `docs/detailed_requirements/web_app_requirements.md`
 
 ### Authentication
 - Email/password signup
@@ -292,9 +280,8 @@ The following features are **not** included in the initial release:
 
 ## Open Questions
 
-1. Should users be able to see which articles they've already voted on?
-2. Should there be a limit on how many articles can be saved?
-3. Should feeds be shareable between users?
-4. Should there be categories or topics for Explore content?
-5. Should users be able to report problematic content?
-6. Should there be a "read later" feature separate from subscriptions?
+1. Should there be a limit on how many articles can be saved?
+2. Should feeds be shareable between users?
+3. Should users be able to report problematic content?
+
+Removed: Explore-related questions (see `docs/archive/explore_product_requirements.md`).

@@ -4,1158 +4,166 @@ This file provides guidance to Claude Code when working with the Cairn mobile ap
 
 ## Service Overview
 
-The Cairn mobile app is a React Native application built with Expo that provides a read-it-later experience for iOS and Android. It integrates with the Cairn backend services (User and Read services) for article management.
+The Cairn mobile app is a React Native application built with Expo (iOS and Android; `npm run web` also works) that provides a read-it-later experience. It talks to the Cairn backend (User and Read services) through a single server origin.
 
 **Key Features:**
-- 📱 Cross-platform (iOS, Android, Web via Expo)
-- 🔐 Authentication with device ID or email/password
-- 📖 Article reading and management (Read Later list)
-- ⭐ Favorites and archive functionality
-- 🌓 Dark mode support (follows system preference)
-- 💾 Local persistence with SQLite (read-list articles) and AsyncStorage (auth)
-- 📡 Offline reading: saved articles readable with no connection; edits queue in a mutation outbox and sync when it returns
-- 🔄 Backend integration with JWT authentication
+- Device ID or email/password authentication (JWT, tokens in AsyncStorage)
+- Two lists: **Feed** (online-only skim list) and **Reads** (offline-first read/triage list); the user picks the list per source
+- Favorites (Bookmarks), archive, RSS and newsletter subscriptions
+- Offline reading of Reads articles (SQLite); edits queue in a mutation outbox and sync on reconnect
+- Dark mode (follows system preference)
 
 ## Project Structure
 
 ```
 apps/mobile/
-├── App.tsx                          # Entry point with providers
-├── app.json                         # Expo configuration
-├── package.json                     # Dependencies and scripts
-├── tsconfig.json                    # TypeScript configuration
-├── .eslintrc.js                     # ESLint configuration
-├── assets/                          # Images, fonts, splash screens
-│   ├── icon.png                     # App icon
-│   ├── splash.png                   # Splash screen
-│   └── adaptive-icon.png            # Android adaptive icon
+├── App.tsx / index.js        # Entry (index.js imports src/config/init first, then registers App)
+├── app.json                  # Expo config (no app.config.*, no EXPO_PUBLIC_* env vars)
+├── ios/                      # Committed native project; ios/fastlane lanes: beta (TestFlight), certificates, build_only
+├── jest.config.js, jest.setup.ts, __mocks__/   # Test setup
+├── knip.json                 # Unused-code check config
 └── src/
-    ├── components/                  # Reusable UI components
-    │   ├── common/                  # Shared components
-    │   │   ├── ArticleContent.tsx   # Article body renderer (react-native-render-html)
-    │   │   ├── ArticleRow.tsx       # List row for articles
-    │   │   ├── BottomActionMenu.tsx # Floating bottom action menu
-    │   │   ├── Button.tsx           # Primary button component
-    │   │   ├── CustomTabBar.tsx     # Custom tab bar
-    │   │   ├── HeaderPopover.tsx    # Popover menu anchored to a header
-    │   │   ├── IconButton.tsx       # Icon-only button
-    │   │   ├── ListToggle.tsx       # Feed | Reads picker (subscription rows, AddLinkModal)
-    │   │   ├── OfflineBanner.tsx    # "You're offline" overlay banner
-    │   │   ├── QuickAccessButton.tsx # Icon button used in BottomActionMenu
-    │   │   ├── ScreenHeader.tsx     # Shared screen header
-    │   │   ├── SyncTriggerEffect.tsx # Mounts useSyncTrigger() inside the authenticated tree
-    │   │   └── TopBlurGradient.tsx  # Top-of-screen blur/gradient overlay
-    │   ├── icons/                   # SVG icon components
-    │   ├── AddLinkModal.tsx         # Modal for adding URLs (asks Feed or Reads when subscribing to a feed)
-    │   ├── ArticleListScreen.tsx    # Reusable article list
-    │   ├── LogoMark.tsx             # App logo mark
-    │   ├── SearchModal.tsx          # Modal for searching content
-    │   └── SubscriptionListScreen.tsx  # Reusable RSS/newsletter subscription list, with a per-source Feed/Reads toggle
-    ├── config/                      # App configuration
-    │   ├── init.ts                  # Wires shared API config layer at startup (imported first, from index.js)
-    │   └── storage.ts               # AsyncStorage adapter + DEFAULT_SERVER_URL
-    ├── constants/                   # Constants and theme
-    │   ├── globalStyles.ts          # Global style definitions
-    │   ├── theme.ts                 # Colors, spacing, fonts
-    │   └── index.ts                 # Exports
-    ├── contexts/                    # React contexts
-    │   └── AuthContext.tsx          # Authentication state
-    ├── hooks/                       # Custom hooks
-    │   ├── useCursorArticleList.ts  # Cursor-paginated list state (Read/Bookmarks)
-    │   ├── useNetworkStatus.ts      # Connectivity boolean (expo-network), for the banner + screens
-    │   └── useSyncTrigger.ts        # Fires SyncTrigger.run() on reconnect / app-foreground
-    ├── navigation/                  # Navigation setup
-    │   ├── RootNavigator.tsx        # Stack navigator (root)
-    │   └── TabNavigator.tsx         # Bottom tab navigator
-    ├── screens/                     # App screens
-    │   ├── AboutScreen.tsx          # App/about info
-    │   ├── AccountScreen.tsx        # Account settings (logout, upgrade, password)
-    │   ├── AddArticleScreen.tsx     # Add new article/URL
-    │   ├── BookmarksScreen.tsx      # Favorited articles
-    │   ├── FeedScreen.tsx           # Feed list (online-only skim list, list=feed)
-    │   ├── LoginScreen.tsx          # Authentication
-    │   ├── NewslettersScreen.tsx    # Email newsletter subscriptions
-    │   ├── ReadArticleDetailScreen.tsx  # Read article details
-    │   ├── ReadsScreen.tsx          # Reads list (offline-first, list=reads)
-    │   ├── RssScreen.tsx            # RSS subscriptions
-    │   ├── YouScreen.tsx            # Profile hub (stats, links to Account/About/RSS/etc.)
-    │   └── index.ts                 # Exports
-    ├── services/                    # Service layer (API clients)
-    │   ├── db.ts                    # Shared SQLite connection + migration ladder (ArticleStore, Outbox)
-    │   ├── articleStore.ts          # Local read-list article store (SQLite)
-    │   ├── articlePrefetch.ts       # Background body prefetch for the local store
-    │   ├── feedCache.ts             # AsyncStorage snapshot of the last Feed page (stale render only; cleared on logout)
-    │   ├── readsInvalidation.ts     # Marks Reads stale after Save to Reads so the item shows immediately
-    │   ├── articleMutations.ts      # Store-first write facade; queues to Outbox on a retryable error (NetworkError/401/5xx)
-    │   ├── outbox.ts                # Offline mutation queue (SQLite), drained on reconnect
-    │   ├── syncTrigger.ts           # Runs Outbox.drain() then ArticlePrefetchService.run()
-    │   ├── auth.ts                  # Authentication service
-    │   ├── read.ts                  # Read service API
-    │   ├── system.ts                # Backend metadata not tied to a user session
-    │   └── index.ts                 # Exports
-    ├── types/                       # TypeScript type definitions
-    │   ├── navigation.ts            # Navigation param types (client-specific)
-    │   └── index.ts                 # Re-exports @cairn/shared types + navigation.ts
-    └── utils/                       # Utility functions
-        ├── errors.ts                # NetworkError / HttpError — unreachable vs. a definitive rejection
-        ├── helpers.ts               # Helper functions
-        ├── retry.ts                 # Retry with exponential backoff for transient failures
-        └── index.ts                 # Exports
+    ├── components/           # AddLinkModal, ArticleListScreen, SearchModal, SubscriptionListScreen,
+    │   │                     #   ErrorBoundary, LogoMark; tests co-located (*.test.tsx)
+    │   ├── common/           # ArticleContent, ArticleRow, BottomActionMenu, Button, CustomTabBar, HeaderPopover,
+    │   │                     #   IconButton, ListToggle (Feed|Reads), OfflineBanner, ScreenHeader,
+    │   │                     #   SyncTriggerEffect, TopBlurGradient, ...
+    │   └── icons/            # SVG icons
+    ├── config/               # init.ts (wires @cairn/shared at startup), storage.ts (AsyncStorage adapter + DEFAULT_SERVER_URL)
+    ├── constants/            # theme.ts (Colors, Spacing, FontSizes, FontFamily, BorderRadius, Layout), globalStyles.ts
+    ├── contexts/AuthContext.tsx
+    ├── hooks/                # useCursorArticleList, useNetworkStatus, useSyncTrigger
+    ├── navigation/           # RootNavigator (stack), TabNavigator (tabs)
+    ├── screens/              # Feed, Reads, You (tabs); ReadArticleDetail, AddArticle, Bookmarks, Account, About,
+    │                         #   Rss, Newsletters, Login
+    ├── services/             # auth, read, system, articleStore, articlePrefetch, articleMutations, outbox,
+    │                         #   syncTrigger, feedCache, readsInvalidation, db (SQLite connection + migrations)
+    ├── types/                # navigation.ts (client-specific); index.ts re-exports @cairn/shared types
+    └── utils/                # helpers, network, retry
 ```
+
+## Shared code (`@cairn/shared`, `apps/shared`)
+
+Framework-agnostic code shared with the web app (npm workspace, consumed as source): data-model types (`Article`, `ContentList`, `User`, `LoginResponse`, ...), the server-URL/persistence layer (`getServerUrl`, `setServerUrl`, `configureStorage`, `configureDefaultServerUrl`), the base `AuthService` (token refresh state machine, email login/register, logout, `changePassword`, `fetchWithAuth`), `fetchOrNetworkError`/`NetworkError`/`HttpError`, `throttle`, and date helpers (`formatDate`, `formatPublishedDate`, `pluralize` in `utils/date.ts` — used by `ArticleRow` and `ArticleContent`; web uses the same). Check there before adding a util to mobile or web. Run its tests with `npm test` in `apps/shared` (vitest).
 
 ## Architecture and Patterns
 
-### Navigation Architecture
-The app uses React Navigation with a stack + tabs pattern:
+### Navigation
+React Navigation stack + bottom tabs. **Explore was removed; the tabs are Feed, Reads, You.**
 
 ```
-RootNavigator (Stack)
-├── MainTabs (Bottom Tabs)
-│   ├── Feed Tab → FeedScreen
-│   ├── Reads Tab → ReadsScreen
-│   └── You Tab → YouScreen
+RootNavigator (Stack)               src/navigation/RootNavigator.tsx
+├── MainTabs (Bottom Tabs)          src/navigation/TabNavigator.tsx
+│   ├── Feed → FeedScreen
+│   ├── Reads → ReadsScreen
+│   └── You → YouScreen
 ├── ArticleDetail → ReadArticleDetailScreen
-├── AddArticle (Modal)
-├── Bookmarks
-├── Account
-├── About
-├── RSS
-└── Newsletters
+├── AddArticle (modal), Bookmarks, Account, About, RSS, Newsletters
 ```
 
-**Navigation Types:**
-- All navigation params are typed in `src/types/navigation.ts`
-- Use `RootStackParamList` for stack navigation
-- Use `MainTabParamList` for tab navigation
+Route params are typed in `src/types/navigation.ts` (`RootStackParamList`, `MainTabParamList`); update them when adding a screen. `OfflineBanner` is mounted in `RootNavigator`'s loading, logged-out and authenticated states; `SyncTriggerEffect` only in the authenticated tree.
 
-### State Management
-The app uses React hooks and Context API for state management:
+### State management
+Hooks plus Context; no global store.
+- `AuthContext` (`src/contexts/AuthContext.tsx`): auth state, login/logout. On logout it calls `AuthService.logout()`, then `ArticleStore.clear()` (also empties the outbox) and `FeedCache.clear()`.
+- Persistence: `ArticleStore` and `Outbox` (one SQLite DB, `db.ts`), `FeedCache` (AsyncStorage), tokens/user/server URL (AsyncStorage).
 
-1. **AuthContext** (`src/contexts/AuthContext.tsx`):
-   - Manages authentication state
-   - Provides login, logout, and user info
-   - Handles token refresh automatically
+### Service layer
+Services are static classes or plain objects (no instantiation) in `src/services/`. Backend models are transformed to the shared `Article` in `ReadService.transformToArticle` / `transformDetailToArticle` (`word_count / 200` → `readingTime`, `status === 'completed'` → `isRead`, `image_urls[0]` → `imageUrl`, `list` carried through).
 
-2. **Local State**:
-   - Component-level state with `useState`
-   - Side effects with `useEffect`
+## Screens
 
-3. **Local Persistence**:
-   - Read-list articles: `ArticleStore` (SQLite via `expo-sqlite`)
-   - Offline mutation queue: `Outbox` (same SQLite database as `ArticleStore`, see `db.ts`)
-   - Tokens and user data: AsyncStorage via `AuthService`
+- **FeedScreen** — items from sources routed to Feed (`list=feed`). Online-only: never written to `ArticleStore` or prefetch. Keeps the last page in `FeedCache` so a failed refresh shows a stale banner. In the reader, "Save to Reads" (`ReadService.moveToReads`) replaces Archive, and progress tracking (status, completion, scroll) is off, so only Favorite can reach the outbox for a Feed item.
+- **ReadsScreen** — `list=reads`, search, store-first render (`ArticleStore.listRecent`) with a "Showing cached data" banner when the background refetch fails. Every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`; `readsInvalidation` marks the list stale after Save to Reads.
+- **ReadArticleDetailScreen** — reader (`ArticleContent`, `react-native-render-html`). Resolves the article by id from `ArticleStore`, skips the fetch when the stored `contentHash` matches, and shows "Not available offline" when offline with nothing cached.
+- **YouScreen** — profile hub (stats, links to Bookmarks, Account, About, RSS, Newsletters). **RssScreen / NewslettersScreen** render `SubscriptionListScreen`, which has a per-source Feed/Reads toggle (`ReadService.setSourceList`; affects new items only). **AddLinkModal** asks Feed or Reads when subscribing to a feed.
+- **LoginScreen** — device login, email login/registration, and a server URL field (`setServerUrl()`, no rebuild). **AccountScreen** — logout, device → email/password upgrade, password change.
 
-### Service Layer Pattern
-All backend communication goes through service classes:
+## Services (offline model)
 
-- **AuthService** (`src/services/auth.ts`): Authentication and token management
-- **ReadService** (`src/services/read.ts`): Article storage and management
-- **ArticleStore** (`src/services/articleStore.ts`): Local read-list article store (SQLite)
-- **ArticlePrefetchService** (`src/services/articlePrefetch.ts`): Background body prefetch into the local store
-- **Outbox** (`src/services/outbox.ts`): Offline mutation queue, drained on reconnect
-- **ArticleMutations** (`src/services/articleMutations.ts`): Store-first write facade used by the reading screens
-- **SyncTrigger** (`src/services/syncTrigger.ts`): Runs the outbox drain, then the prefetch pass
-
-**Key Patterns:**
-- Services are static classes (no instantiation needed)
-- All API calls include automatic token refresh on 401 errors
-- Services transform backend models to mobile `Article` interface
-- Error handling with try/catch and console logging
-
-### Component Patterns
-- **Functional components** with hooks (no class components)
-- **TypeScript** interfaces for all props
-- **Styled components** using React Native StyleSheet
-- **Theme system** for colors, spacing, and typography
-
-## Key Components and Screens
-
-### Common Components
-
-**ArticleContent.tsx** - Article body renderer (used by ReadArticleDetailScreen)
-```typescript
-interface ArticleContentProps {
-  article: Article;
-  colors: typeof Colors.light;
-  onScrollProgress?: (info: ScrollProgressInfo) => void;
-  initialScrollFraction?: number;
-}
-```
-
-**ArticleRow.tsx** - List row for articles
-```typescript
-interface ArticleRowProps {
-  article: Article;
-  onPress: () => void;
-}
-```
-
-**Button.tsx** - Primary button component
-```typescript
-interface ButtonProps {
-  title: string;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
-  disabled?: boolean;
-  loading?: boolean;
-}
-```
-
-### Main Screens
-
-**FeedScreen.tsx** - Feed list (skim)
-- Items from sources routed to Feed (`list=feed`); online-only — never written to `ArticleStore` or prefetch
-- Keeps the last page in `FeedCache` so a failed refresh shows a stale banner instead of a blank tab
-- Opens items in the shared reader, where "Save to Reads" replaces Archive and reading progress (status, completion, scroll position) is not tracked, so nothing but Favorite can reach the outbox for a Feed item
-
-**ReadsScreen.tsx** - Reads list (main screen)
-- Displays articles in `list=reads`
-- Search functionality
-- Integrates with Read service
-- Store-first render (`ArticleStore.listRecent`), with a "Showing cached data" banner if the background refetch then fails rather than an alert; every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`
-
-**ReadArticleDetailScreen.tsx** - Full article view
-- Displays article content via `ArticleContent` (`react-native-render-html`)
-- Reading progress tracking
-- Mark as read/unread
-- Favorite/unfavorite actions
-- Archive functionality
-- Offline-first: resolves the article by id from `ArticleStore` (not just route params), skips the network fetch when the stored body's `contentHash` already matches, and shows a "Not available offline" state when offline with nothing cached
-
-**LoginScreen.tsx** - Authentication
-- Device ID login (automatic on first launch)
-- Email/password login/registration
-- Account upgrade (device → email/password)
-
-**YouScreen.tsx** - Profile hub
-- User profile summary and reading stats (RSS, newsletters, bookmarks)
-- Links to Bookmarks, Account, About, RSS, and Newsletters screens
-
-**AccountScreen.tsx** - Account settings
-- Logout functionality
-- Account upgrade (device → email/password) and password change
-
-## Data Models and Types
-
-### Core Article Interface
-Located in `apps/shared/src/types/article.ts` (`@cairn/shared`, re-exported via `src/types/index.ts`):
-
-```typescript
-interface Article {
-  id: string;              // Unique identifier
-  url: string;             // Source URL
-  title: string;
-  description?: string;
-  content?: string;        // Cleaned HTML content from readability extraction
-  contentHash?: string;    // content.content_hash, for diffing cached bodies
-  imageUrl?: string;
-  author?: string;
-  publishedDate?: string;  // ISO 8601 date string
-  readingTime?: number;    // Estimated minutes
-  tags: string[];
-  isRead: boolean;
-  isFavorite: boolean;
-  list: ContentList;       // 'feed' | 'reads' — the reader's actions differ for Feed items
-  addedAt: number;         // Unix timestamp (ms)
-  readAt?: number;         // Unix timestamp (ms)
-  notes?: string;
-  scrollPosition?: number;
-  scrollFraction?: number;
-}
-```
-
-### Navigation Types
-Located in `src/types/navigation.ts`:
-
-```typescript
-type RootStackParamList = {
-  MainTabs: undefined;
-  ArticleDetail: { article: Article; articles?: Article[]; currentIndex?: number; onArchived?: (articleId: string) => void };
-  AddArticle: undefined;
-  Bookmarks: undefined;
-  Account: undefined;
-  About: undefined;
-  RSS: undefined;
-  Newsletters: undefined;
-};
-
-type MainTabParamList = {
-  Feed: undefined;
-  Reads: undefined;
-  You: undefined;
-};
-```
-
-### Authentication Types
-Located in `apps/shared/src/types/auth.ts` (`@cairn/shared`, re-exported via `src/types/index.ts`):
-
-```typescript
-interface User {
-  id: string;
-  email?: string;
-  expoDeviceId?: string;
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
-}
-
-interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt?: number; // Unix timestamp in milliseconds
-}
-
-interface LoginResponse {
-  user: User;
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-}
-```
-
-## Services
-
-### ArticleStore (`src/services/articleStore.ts`)
-SQLite-backed (`expo-sqlite`) local store for read-list articles: metadata,
-user state (`isRead`/`isFavorite`/scroll position) and an opportunistically
-cached `body` (cleaned HTML), diffed against the server by `content_hash` so
-an unchanged body is never re-downloaded. It is a read-through cache for the
-initial render of `ReadsScreen`/`BookmarksScreen`/`ReadArticleDetailScreen`,
-not a paginated query engine — `useCursorArticleList` still drives pagination
-against the network. Sync is upsert-only; rows are only removed via the
-explicit archive path or `clear()` (called on logout, which also empties
-`Outbox` — a queued write must never replay against a different account).
-Schema changes since the original table apply via a
-`PRAGMA user_version`-driven migration inside `getDb()` — see the migration
-comment in the source before widening the table further.
-
-**Methods:**
-```typescript
-ArticleStore.upsertMany(articles: Article[]): Promise<void>
-ArticleStore.listRecent(limit: number): Promise<Article[]>
-ArticleStore.listFavorites(): Promise<Article[]>
-ArticleStore.getById(id: string): Promise<Article | null>
-ArticleStore.listPrefetchCandidates(limit: number): Promise<Article[]>
-ArticleStore.saveBody(id: string, body: string): Promise<void>
-ArticleStore.evictBodiesOutsideCap(limit: number): Promise<void>
-ArticleStore.updateUserState(id: string, updates: Partial<Pick<Article, 'isRead' | 'isFavorite' | 'scrollFraction' | 'readAt'>>): Promise<void>
-ArticleStore.remove(id: string): Promise<void>
-ArticleStore.clear(): Promise<void>
-```
-
-### ArticlePrefetchService (`src/services/articlePrefetch.ts`)
-Downloads `cleaned_html` for unread/reading Read-list articles that lack a
-cached body: bounded concurrency (3 workers), newest first, capped at the 100
-most recent Read-list articles, then evicts cached bodies outside that cap.
-Never runs while offline; aborts the remaining batch on the first
-`NetworkError` (a non-network error skips just that article). Single-flight —
-a run already in progress is not restarted by a second call. Triggered by
-`ReadsScreen`'s sync callback after `ArticleStore.upsertMany`, not by any
-screen directly; no other screen calls it.
-
-**Methods:**
-```typescript
-ArticlePrefetchService.run(): Promise<void>
-```
-
-### Outbox (`src/services/outbox.ts`)
-SQLite-backed mutation queue (the `outbox` table added by `db.ts`'s
-migration, in the same database as `ArticleStore`), keyed on
-`(article_id, field)` so a repeated write to the same field coalesces into
-one row instead of piling up. `field` is one of `status` | `is_favorite` |
-`scroll_position` | `delete` — the server's PATCH field names, plus
-`delete` for an offline archive. Enqueuing a `delete` first clears any
-other pending row for that article, since a PATCH replayed against a
-since-deleted article is a guaranteed 404. `drain()` replays rows in
-`created_at` order (ties broken by `rowid`) and stops at the first row that
-cannot yet succeed, so a later write can never reach the server ahead of an
-earlier one still pending:
-- 2xx, or a 404 on a replayed `delete` → row removed (counts as success)
-- a definitive 4xx other than 401 → row dropped and logged (retrying can
-  only fail the same way)
-- `NetworkError`, 401, or 5xx → row kept, `attempts` incremented
-  (bookkeeping only — no backoff or drop-after-N in v1), rest of the batch
-  left queued for the next drain
-
-**Methods:**
-```typescript
-Outbox.enqueue(articleId: string, field: OutboxField, payload: Record<string, unknown>): Promise<void>
-Outbox.drain(): Promise<void>
-```
-
-### ArticleMutations (`src/services/articleMutations.ts`)
-Facade the reading screens call for status/favorite/scroll/archive edits:
-writes the local store first, then attempts the backend call, and queues
-the write in `Outbox` on the same retryable set `Outbox`'s drain uses
-(`NetworkError`, `HttpError(401)`, `HttpError(5xx)` — see `outbox.ts`'s
-exported `isRetryable`) — a definitive 4xx other than 401 still rethrows to
-the caller. Add-URL is untouched; it stays online-only.
-
-**Methods:**
-```typescript
-ArticleMutations.markCompleted(articleId: string, readAt: number): Promise<void>
-ArticleMutations.markReading(articleId: string): Promise<void>
-ArticleMutations.saveScrollPosition(articleId: string, fraction: number): Promise<void>
-ArticleMutations.setFavorite(articleId: string, isFavorite: boolean): Promise<void>
-ArticleMutations.archive(articleId: string): Promise<void>
-```
-
-### SyncTrigger (`src/services/syncTrigger.ts`)
-Runs `Outbox.drain()` then `ArticlePrefetchService.run()`, in that fixed
-order, isolating each consumer's rejection from the next so one failing
-doesn't stop the other from running. Single-flight, like
-`ArticlePrefetchService`. Fired by `useSyncTrigger` (below) on a transition
-from offline to online or from background to foreground, and by
-`ReadsScreen` after every list sync — including pull-to-refresh — so the
-outbox gets a drain on every path, not only reconnect/foreground.
-
-**Methods:**
-```typescript
-SyncTrigger.run(): Promise<void>
-```
-
-### Connectivity (`src/hooks/useNetworkStatus.ts`, `src/utils/network.ts`)
-`useNetworkStatus()` wraps `expo-network`'s `useNetworkState()` into a
-single `{ isOffline }` boolean for components; `isOffline()` in
-`utils/network.ts` is the equivalent one-off check for non-React service
-code (e.g. `ArticlePrefetchService`). Both treat an unknown/undetermined
-network state as online — only an explicit `isConnected: false` counts as
-offline, so the UI is never blocked on an unreliable signal.
-`OfflineBanner` (`src/components/common/OfflineBanner.tsx`) renders a
-"You're offline" overlay from this hook and is mounted in
-`RootNavigator`'s loading, logged-out, and authenticated states alike.
-
-### Sync trigger hook (`src/hooks/useSyncTrigger.ts`)
-Calls `SyncTrigger.run()` on a *transition* to the foreground (`AppState`)
-and on a *transition* from offline to online — never merely because the app
-is currently active or online. Mounted once via `SyncTriggerEffect`
-(`src/components/common/SyncTriggerEffect.tsx`), rendered only inside
-`RootNavigator`'s authenticated tree so the trigger never runs logged out.
-
-### Errors (`src/utils/errors.ts`)
-`NetworkError` (server unreachable: network failure, timeout, or an
-unparseable body) and `HttpError` (a definitive non-2xx response, carrying
-`status`) are distinct classes so callers can tell "couldn't reach the
-server" apart from "server said no" without parsing message text.
-`ArticleMutations`, `Outbox.drain()`, and `ArticlePrefetchService` all key
-off this distinction.
+- **ArticleStore** (`articleStore.ts`) — SQLite (`expo-sqlite`) store of Reads articles: metadata, user state, and an opportunistically cached body diffed by `content_hash`. A read-through cache for initial render, not a query engine: `useCursorArticleList` still paginates against the network. Upsert-only sync; rows are removed by archive (`remove`) or `clear()`. Schema changes go through the `PRAGMA user_version` ladder in `db.ts`.
+- **ArticlePrefetchService** — downloads `cleaned_html` for unread/reading Reads articles lacking a body: 3 workers, newest first, capped at the 100 most recent, evicts bodies outside the cap. Skips when offline, aborts the batch on the first `NetworkError`, single-flight. Only invoked via `SyncTrigger`.
+- **Outbox** (`outbox.ts`) — SQLite queue of PATCH payloads keyed on `(article_id, field)` (`field`: `status` | `is_favorite` | `scroll_position`; an archive is a `status: 'archived'` row), so repeats coalesce. `drain()` replays in `created_at` order and stops at the first row that cannot succeed: 2xx removes the row; a definitive 4xx other than 401 drops it; `NetworkError`/401/5xx/unrecognized errors keep it and bump `attempts` (no backoff or drop-after-N).
+- **ArticleMutations** (`articleMutations.ts`) — what reading screens call for `markCompleted`, `markReading`, `saveScrollPosition`, `setFavorite`, `archive`: writes the store first, then the backend, and enqueues in `Outbox` on a retryable error (`isRetryable` in `outbox.ts`: `NetworkError`, `HttpError` 401/5xx). A definitive 4xx rethrows. Add-URL stays online-only.
+- **SyncTrigger** (`syncTrigger.ts`) — `Outbox.drain()` then `ArticlePrefetchService.run()`, each isolated from the other's failure, single-flight. Fired by `useSyncTrigger` on offline→online and background→foreground *transitions*, and by `ReadsScreen` after every list sync.
+- **Connectivity** — `useNetworkStatus()` (hook) and `isOffline()` (`utils/network.ts`, non-React code) wrap `expo-network`; unknown state counts as online.
+- **Errors** — `NetworkError` (unreachable, timeout, unparseable body) vs `HttpError` (definitive non-2xx, has `status`), from `@cairn/shared`; offline logic keys off this distinction.
 
 ### AuthService (`src/services/auth.ts`)
-Authentication and token management.
+Subclasses the shared `AuthService` and adds only mobile-specific parts: `getDeviceId()` (`expo-application`: `getIosIdForVendorAsync()` on iOS, `getAndroidId()` on Android), `loginWithDevice()`, `registerWithDevice()`, `upgradeAccount(email, password)` and `fetchWithAuthAndRetry()` (also retries 5xx/network errors). Everything else (`initialize`, `loginWithEmail`, `logout`, `getAccessToken`, `refreshAccessToken`, `fetchWithAuth`, `changePassword`, ...) lives in `apps/shared/src/services/auth.ts`. Session state is module-level there.
 
-**Methods:**
-```typescript
-AuthService.initialize(): Promise<void>
-AuthService.loginWithDevice(): Promise<LoginResponse>
-AuthService.registerWithDevice(): Promise<LoginResponse>
-AuthService.loginWithEmail(credentials: LoginRequest): Promise<LoginResponse>
-AuthService.registerWithEmail(credentials: RegisterRequest): Promise<LoginResponse>
-AuthService.logout(): Promise<void>
-AuthService.getAccessToken(): Promise<string | null>
-AuthService.isAuthenticated(): Promise<boolean>
-AuthService.refreshAccessToken(): Promise<void>
-AuthService.getUser(): Promise<User | null>
-AuthService.getUserId(): Promise<string | null>
-```
-
-**Storage Keys:**
-- Access Token: `@cairn:access_token`
-- Refresh Token: `@cairn:refresh_token`
-- User Data: `@cairn:user`
-
-**Device ID:**
-- iOS: Uses `expo-application.getIosIdForVendorAsync()`
-- Android: Uses `expo-application.getAndroidId()`
+AsyncStorage keys: `@cairn:access_token`, `@cairn:refresh_token`, `@cairn:token_expires_at`, `@cairn:user`, `@cairn:server_url`, `@cairn:feed_cache`.
 
 ### ReadService (`src/services/read.ts`)
-Article storage and reading list management.
+All calls use `AuthService.fetchWithAuth` against `${getServerUrl()}`. Methods and endpoints (all exist in the Go routers):
 
-**Methods:**
-```typescript
-ReadService.listUserContents(params?: ListContentsParams): Promise<UserContentsListResponse>
-ReadService.searchUserContents(params: SearchParams): Promise<UserContentsListResponse>
-ReadService.countUserContents(params?: CountContentsParams): Promise<number>
-ReadService.moveToReads(contentId: string): Promise<UserContentResponse>   // Save to Reads (re-stamps added_at server-side)
-ReadService.setSourceList(type: 'rss' | 'email', key: string, list: ContentList): Promise<SetSourceListResponse>   // new items only
-ReadService.addContentToUser(request: AddContentToUserRequest): Promise<UserContentResponse>
-ReadService.updateUserContent(contentId: string, updates: UpdateUserContentRequest): Promise<UserContentResponse>
-ReadService.deleteUserContent(contentId: string): Promise<void>
-ReadService.detectURL(url: string): Promise<DetectURLResponse>
-ReadService.addURL(request: AddURLRequest): Promise<AddURLResponse>
-```
+| Method | Endpoint |
+|--------|----------|
+| `listUserContents` | `GET /api/v1/content/user/{user_id}` (cursor pagination, `list` filter) |
+| `addContentToUser`, `addURL` | `POST .../user/{user_id}` |
+| `countUserContents` | `GET .../user/{user_id}/count` |
+| `searchUserContents` | `GET .../user/{user_id}/search` |
+| `getContentById` | `GET .../user/{user_id}/{content_id}` |
+| `updateUserContent`, `moveToReads` | `PATCH .../user/{user_id}/{content_id}` (`moveToReads` sends `{ list: 'reads' }`) |
+| `detectURL`, `discoverFeed` | `POST /api/v1/content/detect`, `/api/v1/content/discover-feed` |
+| `listAllSubscriptions` | `GET .../user/{user_id}/subscriptions` |
+| `unsubscribeFromRSSFeed` | `DELETE .../user/{user_id}/subscriptions/rss/{feed_id}` |
+| `setSourceList(type, key, list)` | `PUT .../user/{user_id}/subscriptions/{type}/{key}/list` |
+| `getOrCreateEmailAddress` | `POST /api/v1/source/email/user/{user_id}/address` |
 
-**Backend Integration:**
-- Endpoint: `${getServerUrl()}/api/v1/content/...` (from `@cairn/shared`)
-- Requires JWT authentication
-- Supports cursor-based pagination (limit/cursor)
-- URL detection (feed vs page) with 10s timeout
+Auth/user endpoints used by the shared and mobile `AuthService`: `/api/v1/auth/{login,register,login/mobile,register/mobile,refresh,logout}`, `POST /api/v1/user/{id}/upgrade`, `PUT /api/v1/user/{id}/password`. `SystemService.getServerVersion()` reads `version` from `GET /health/live`. See the OpenAPI specs in the root CLAUDE.md for request/response shapes.
 
-## Navigation
+## Configuration
 
-### Setup
-Navigation is configured in two files:
-
-1. **RootNavigator.tsx** - Stack navigator (modals)
-2. **TabNavigator.tsx** - Bottom tabs (main app)
-
-### Navigation Hooks
-```typescript
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types/navigation';
-
-type NavigationProp = StackNavigationProp<RootStackParamList>;
-
-const navigation = useNavigation<NavigationProp>();
-navigation.navigate('ArticleDetail', { article });
-```
-
-### Route Params
-```typescript
-import { useRoute, RouteProp } from '@react-navigation/native';
-
-type ArticleDetailRouteProp = RouteProp<RootStackParamList, 'ArticleDetail'>;
-
-const route = useRoute<ArticleDetailRouteProp>();
-const { article } = route.params;
-```
-
-## Styling and Theming
-
-### Theme System
-Theme constants defined in `src/constants/theme.ts`:
-
-**Colors:**
-```typescript
-Colors.light.primary        // #0F0C0B
-Colors.light.background     // #FDFCFC
-Colors.light.text           // #0F0C0B
-Colors.light.textSecondary  // #696563
-
-Colors.dark.primary         // #FDFCFC
-Colors.dark.background      // #0F0C0B
-Colors.dark.text            // #FDFCFC
-Colors.dark.textSecondary   // #8E8E93
-```
-
-**Spacing:**
-```typescript
-Spacing.xs    // 4
-Spacing.sm    // 8
-Spacing.md    // 16
-Spacing.lg    // 24
-Spacing.xl    // 32
-Spacing.xxl   // 48
-```
-
-**Typography:**
-```typescript
-FontSizes.xs   // 12
-FontSizes.sm   // 14
-FontSizes.md   // 16
-FontSizes.lg   // 18
-FontSizes.xl   // 24
-FontSizes.xxl  // 32
-
-FontFamily.default          // Inter_400Regular
-FontFamily.defaultMedium    // Inter_500Medium
-FontFamily.defaultSemiBold  // Inter_600SemiBold
-FontFamily.defaultBold      // Inter_700Bold
-FontFamily.heading          // CrimsonPro_400Regular
-FontFamily.headingBold      // CrimsonPro_700Bold
-```
-
-**Border Radius:**
-```typescript
-BorderRadius.sm    // 4
-BorderRadius.md    // 8
-BorderRadius.lg    // 12
-BorderRadius.xl    // 16
-BorderRadius.full  // 9999
-```
-
-### Using Theme
-```typescript
-import { Colors, Spacing, FontSizes, FontFamily } from '../constants/theme';
-import { useColorScheme } from 'react-native';
-
-function MyComponent() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
-  const styles = StyleSheet.create({
-    container: {
-      backgroundColor: colors.background,
-      padding: Spacing.md,
-    },
-    text: {
-      color: colors.text,
-      fontSize: FontSizes.md,
-      fontFamily: FontFamily.default,
-    },
-  });
-
-  return <View style={styles.container}>...</View>;
-}
-```
-
-## Safe Area Strategy
-
-The app uses an edge-to-edge display strategy where content can scroll behind OS UI elements (status bar, home indicator) while keeping interactive UI within safe areas.
-
-### Core Principles
-
-1. **Content scrolls behind OS UI** - Article content, lists, and scrollable areas extend behind the status bar and tab bar/action menu when scrolling
-2. **Initial render within safe areas** - Headers, titles, and initial content position below the status bar
-3. **Floating UI accounts for safe areas** - Tab bar and bottom action menu add bottom inset to their positioning
-
-### Implementation Pattern
-
-**DO NOT use `SafeAreaView`** for wrapping entire screens. Instead:
-
-1. Use plain `View` containers
-2. Import `useSafeAreaInsets` from `react-native-safe-area-context`
-3. Apply insets to specific content areas
-
-```typescript
-import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Layout, Spacing } from '../constants';
-
-function MyScreen() {
-  const insets = useSafeAreaInsets();
-
-  // For tab screens: account for tab bar + bottom safe area
-  const bottomPadding = Layout.tabBarHeight + insets.bottom + Spacing.md;
-
-  // For detail screens: account for action menu + bottom safe area
-  const detailBottomPadding = Layout.bottomActionMenuHeight + insets.bottom + Spacing.md;
-
-  return (
-    <View style={styles.container}>
-      <FlatList
-        ListHeaderComponent={() => (
-          <View style={{ paddingTop: insets.top + Spacing.md }}>
-            <Text>Header renders below status bar</Text>
-          </View>
-        )}
-        contentContainerStyle={{ paddingBottom: bottomPadding }}
-        // Content can scroll behind status bar and tab bar
-      />
-    </View>
-  );
-}
-```
-
-### Layout Constants
-
-Use the `Layout` constants from `src/constants/theme.ts`:
-
-```typescript
-Layout.tabBarHeight           // 70 - Height of floating tab bar (54px pill + 16px padding)
-Layout.bottomActionMenuHeight // 70 - Height of floating action menu
-Layout.headerHeight           // 64 - Standard header height
-```
-
-### Screen-Specific Guidelines
-
-| Screen Type | Top Handling | Bottom Handling |
-|-------------|--------------|-----------------|
-| **Tab screens** (Feed, Reads, You) | Header with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.tabBarHeight + insets.bottom + Spacing.md` |
-| **Detail screens** (ArticleContent) | Content with `paddingTop: insets.top + Spacing.md` | `paddingBottom: Layout.bottomActionMenuHeight + insets.bottom + Spacing.md` |
-| **Modal screens** (AddArticle, Login) | Content with `paddingTop: insets.top` | Content with `paddingBottom: insets.bottom` |
-| **Floating UI** (TabBar, ActionMenu) | N/A | Position absolutely, add `insets.bottom + Spacing.sm` to paddingBottom |
-
-### StatusBar Configuration
-
-The app configures StatusBar in `App.tsx` for edge-to-edge display:
-
-```typescript
-<StatusBar
-  style={colorScheme === 'dark' ? 'light' : 'dark'}
-  translucent={Platform.OS === 'android'}
-  backgroundColor="transparent"
-/>
-```
-
-Android also has `androidStatusBar.translucent: true` in `app.json`.
-
-### Common Mistakes to Avoid
-
-1. **Don't wrap screens in SafeAreaView** - This prevents content from scrolling behind OS UI
-2. **Don't use hardcoded padding values** (e.g., `paddingBottom: 100`) - Use dynamic values based on `useSafeAreaInsets()` and `Layout` constants
-3. **Don't forget bottom padding on scrollable content** - Content will be hidden behind floating tab bar or action menu
+- **Server URL**: a single backend origin. Default `DEFAULT_SERVER_URL` in `src/config/storage.ts` (`https://cairn.seatrain.net`); users override it at runtime from the Login screen (persisted under `@cairn:server_url`; switching server wipes the session keys). `src/config/init.ts` must be imported first in `index.js` so the shared layer is configured before use.
+- **Local backend**: use the [self-hosted stack](/infrastructure/docker/selfhost/README.md), which serves all services on `http://localhost:8099`. iOS simulator: `http://localhost:8099`; Android emulator: `http://10.0.2.2:8099` (or the machine's LAN IP).
+- **Expo**: `app.json` (bundle IDs `com.cairnapp.cairnreader`, plugins `expo-web-browser`, `expo-font`, `expo-sqlite`, translucent Android status bar). There are no `EXPO_PUBLIC_*` variables.
 
 ## Development Workflow
 
-### Initial Setup
+This is an npm workspace (`apps/web`, `apps/shared`, `apps/mobile`); run `npm install` from the repo root. In `apps/mobile`:
+
 ```bash
-cd apps/mobile
-
-# Install dependencies
-npm install
-
-# Start development server
-npm start
+npm start            # expo start (press i / a / w for simulator / emulator / web)
+npm run ios          # expo run:ios
+npm run android      # expo run:android
+npm run type-check   # tsc --noEmit
+npm run lint         # eslint .
+npm test             # jest (jest-expo preset, tests co-located as *.test.ts[x])
+npm run test:ci      # jest --ci --coverage
 ```
 
-### Running on Devices
-
-**iOS Simulator:**
-```bash
-npm run ios
-# or press 'i' in Expo dev server
-```
-
-**Android Emulator:**
-```bash
-npm run android
-# or press 'a' in Expo dev server
-```
-
-**Physical Device:**
-1. Install Expo Go app from App Store or Google Play
-2. Scan QR code from Expo dev server
-3. App will load on your device
-
-**Web:**
-```bash
-npm run web
-# or press 'w' in Expo dev server
-```
-
-### Code Quality
-
-**Type Checking:**
-```bash
-npm run type-check
-# Runs: tsc --noEmit
-```
-
-**Linting:**
-```bash
-npm run lint
-# Runs: eslint .
-```
-
-**Fix Linting Issues:**
-```bash
-npx eslint . --fix
-```
-
-### Development Tips
-
-1. **Hot Reload**: Changes auto-reload in Expo. Shake device or press 'r' to reload manually.
-
-2. **Debug Menu**: Shake device or press `Cmd+D` (iOS) / `Cmd+M` (Android) to open debug menu.
-
-3. **Console Logs**: Use React Native Debugger or browser DevTools (press 'j' to open).
-
-4. **AsyncStorage**: Use Expo DevTools or React Native Debugger to inspect storage.
-
-5. **Network Requests**: Monitor in React Native Debugger Network tab.
-
-## Testing
-
-### Running Tests
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm test -- --watch
-
-# Run tests with coverage
-npm test -- --coverage
-```
-
-### Testing Patterns
-
-**Component Testing:**
-```typescript
-import { render, fireEvent } from '@testing-library/react-native';
-import MyComponent from './MyComponent';
-
-test('renders correctly', () => {
-  const { getByText } = render(<MyComponent />);
-  expect(getByText('Hello')).toBeTruthy();
-});
-```
-
-**Service Testing:**
-```typescript
-import { AuthService } from '../services/auth';
-
-jest.mock('@react-native-async-storage/async-storage');
-
-test('saves tokens correctly', async () => {
-  await AuthService.saveTokens({
-    accessToken: 'access',
-    refreshToken: 'refresh',
-  });
-
-  const token = await AuthService.getAccessToken();
-  expect(token).toBe('access');
-});
-```
-
-## Adding New Features
-
-### Adding a New Screen
-1. Create screen component in `src/screens/`:
-```typescript
-// src/screens/NewScreen.tsx
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
-export default function NewScreen() {
-  return (
-    <View style={styles.container}>
-      <Text>New Screen</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-```
-
-2. Add to navigation in `src/navigation/RootNavigator.tsx` or `TabNavigator.tsx`:
-```typescript
-import NewScreen from '../screens/NewScreen';
-
-// In Stack.Navigator or Tab.Navigator:
-<Stack.Screen name="NewScreen" component={NewScreen} />
-```
-
-3. Update navigation types in `src/types/navigation.ts`:
-```typescript
-export type RootStackParamList = {
-  // ... existing routes
-  NewScreen: { param1: string };  // Add params if needed
-};
-```
-
-4. Export screen from `src/screens/index.ts`:
-```typescript
-export { default as NewScreen } from './NewScreen';
-```
-
-### Adding a New Component
-1. Create component in `src/components/common/`:
-```typescript
-// src/components/common/NewComponent.tsx
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
-interface NewComponentProps {
-  title: string;
-  onPress?: () => void;
-}
-
-export default function NewComponent({ title, onPress }: NewComponentProps) {
-  return (
-    <View style={styles.container}>
-      <Text>{title}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-  },
-});
-```
-
-2. Export from `src/components/common/index.ts`:
-```typescript
-export { default as NewComponent } from './NewComponent';
-```
-
-### Adding a New Service Method
-1. Add method to service class:
-```typescript
-// src/services/myservice.ts
-export class MyService {
-  static async newMethod(param: string): Promise<Result> {
-    try {
-      const response = await fetch(`${API_URL}/endpoint`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ param }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Request failed');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Error in newMethod:', error);
-      throw error;
-    }
-  }
-}
-```
-
-2. Use in component:
-```typescript
-import { MyService } from '../services';
-
-async function handleAction() {
-  try {
-    const result = await MyService.newMethod('param');
-    // Handle success
-  } catch (error) {
-    // Handle error
-  }
-}
-```
-
-## Code Conventions
-
-### TypeScript
-- **Strict mode enabled** in `tsconfig.json`
-- **Type all props** for components
-- **Type all function parameters** and return values
-- **Use interfaces** for object shapes
-- **Use type aliases** for unions and simple types
-- **Avoid `any`** - use `unknown` and type guards instead
-
-### React/React Native
-- **Functional components** with hooks (no class components)
-- **Named exports** for components (except default for screens)
-- **Destructure props** in function signature
-- **Use `useCallback`** for functions passed to children
-- **Use `useMemo`** for expensive computations
-- **Use `useEffect`** for side effects only
-
-### Naming Conventions
-- **Components**: PascalCase (e.g., `ArticleRow.tsx`)
-- **Services**: PascalCase classes (e.g., `AuthService`)
-- **Types/Interfaces**: PascalCase (e.g., `Article`, `LoginResponse`)
-- **Constants**: UPPER_SNAKE_CASE (e.g., `API_BASE_URL`)
-- **Functions**: camelCase (e.g., `handlePress`)
-- **Variables**: camelCase (e.g., `articleList`)
-
-### File Organization
-- **One component per file**
-- **Co-locate types** with components (or use `src/types/`)
-- **Group related files** in folders
-- **Use index.ts** for exports
-- **Keep files under 300 lines** (split if larger)
-
-### Styling
-- **Use StyleSheet.create()** for component styles
-- **Define styles at bottom** of file
-- **Use theme constants** (Colors, Spacing, FontSizes)
-- **Follow platform conventions** (iOS vs Android)
-- **Test dark mode** for all screens
-
-### Error Handling
-- **Try/catch for async operations**
-- **Log errors** with `console.error()`
-- **Show user-friendly messages** (no stack traces)
-- **Handle network errors** gracefully
-- **Validate user input** before submission
-
-### Async Operations
-- **Use async/await** (not .then() chains)
-- **Handle loading states** (show spinners)
-- **Handle error states** (show error messages)
-- **Cleanup on unmount** (cancel pending requests)
-
-## Environment Configuration
-
-### API Configuration
-Unlike the old per-service URL setup, the app now talks to a single backend
-origin via the shared server-URL layer (`@cairn/shared`, wired up in
-`src/config/init.ts`/`src/config/storage.ts`). The default is set in
-`src/config/storage.ts`:
-
-```typescript
-export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
-```
-
-All service calls (`getServerUrl()`) resolve to `<server URL>/api/v1/auth/...`,
-`/api/v1/content/...`, etc. against that single origin.
-
-**For Local Development:**
-Point the app at a single local backend origin — either edit
-`DEFAULT_SERVER_URL` in `src/config/storage.ts`, or use the server URL field on
-the login screen (calls `setServerUrl()` at runtime, no rebuild needed). The
-[self-hosted stack](/infrastructure/docker/selfhost/README.md) runs all
-backend services behind one port for exactly this purpose:
-```
-http://localhost:8099
-```
-
-**iOS Simulator Note:**
-- Use `http://localhost:8099` directly
-
-**Android Emulator Note:**
-- Use `http://10.0.2.2:8099` instead of `localhost`
-- Or use your machine's IP address (e.g., `http://192.168.1.100:8099`)
-
-### Expo Configuration
-App configuration in `app.json`:
-
-```json
-{
-  "expo": {
-    "name": "Cairn Reader",
-    "slug": "cairnreader",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.cairnapp.cairnreader"
-    },
-    "android": {
-      "package": "com.cairnapp.cairnreader"
-    }
-  }
-}
-```
-
-## Backend Integration
-
-### Authentication Flow
-1. **Initial Launch** → Device ID login (automatic)
-2. **Device ID Login** → `POST /api/v1/auth/login/mobile` or `POST /api/v1/auth/register/mobile`
-3. **Store Tokens** → AsyncStorage (`@cairn:access_token`, `@cairn:refresh_token`)
-4. **All API Calls** → Include `Authorization: Bearer <token>` header
-5. **401 Error** → Refresh token → Retry request
-6. **Refresh Fails** → Logout → Show login screen
-
-### API Request Pattern
-All authenticated requests follow this pattern:
-
-```typescript
-private static async fetchWithAuth(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  const accessToken = await AuthService.getAccessToken();
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-      ...options.headers,
-    },
-  });
-
-  // Handle 401 - token expired
-  if (response.status === 401) {
-    await AuthService.refreshAccessToken();
-    // Retry request with new token...
-  }
-
-  return response;
-}
-```
-
-### Data Transformation
-Backend models are transformed to mobile `Article` interface:
-
-**Read Service:**
-```typescript
-UserContentResponse → Article
-- content.id → id
-- content.original_url → url
-- content.title → title
-- content.description → description
-- content.image_urls[0] → imageUrl
-- content.author → author
-- content.published_at → publishedDate
-- content.word_count / 200 → readingTime
-- status === 'completed' → isRead
-- is_favorite → isFavorite
-```
+Testing uses `@testing-library/react-native`; native modules are mocked in `jest.setup.ts` and `__mocks__/`. For general testing philosophy see [docs/TESTING.md](/docs/TESTING.md) and [Engineering Principles](/docs/ENGINEERING_PRINCIPLES.md).
+
+## Conventions
+
+- TypeScript strict mode; type props and function signatures; avoid `any`.
+- Functional components with hooks; styles via `StyleSheet.create()` at the bottom of the file using theme constants (`Colors`, `Spacing`, `FontSizes`, `FontFamily`, `BorderRadius`, `Layout` from `src/constants/theme.ts`; get colors with `Colors[useColorScheme() ?? 'light']`). Test dark mode.
+- Services: static classes/objects; log with `console.error`, show user-friendly messages, handle loading and error states, and throw `NetworkError`/`HttpError` (not bare `Error`) so offline logic can classify failures.
+- Adding a screen: create it in `src/screens/`, export from `src/screens/index.ts`, register it in `RootNavigator.tsx` (or `TabNavigator.tsx`) and add its params to `src/types/navigation.ts`.
+
+### Safe area (edge-to-edge)
+Content scrolls behind the status bar and the floating tab bar/action menu. **Do not wrap screens in `SafeAreaView`**; use plain `View`s with `useSafeAreaInsets()`:
+- Tab screens: top `insets.top + Spacing.md`; bottom `Layout.tabBarHeight + insets.bottom + Spacing.md`.
+- Detail screens: bottom `Layout.bottomActionMenuHeight + insets.bottom + Spacing.md`.
+- Modals: `paddingTop: insets.top`, `paddingBottom: insets.bottom`.
+- Never hardcode bottom padding (e.g. `100`); scrollable content must always include it or it hides behind floating UI.
+
+`App.tsx` configures `StatusBar` as translucent on Android; `app.json` also sets `androidStatusBar.translucent`.
 
 ## Troubleshooting
 
-### Common Issues
-
-**"No bundle URL present" error:**
-- Restart Expo dev server (`npm start`)
-- Clear cache: `npx expo start -c`
-
-**"Cannot connect to Metro" error:**
-- Check that dev server is running
-- Ensure device/simulator is on same network
-- Try restarting dev server
-
-**"Unable to resolve module" error:**
-- Run `npm install` to ensure all dependencies installed
-- Clear node_modules and reinstall: `rm -rf node_modules && npm install`
-- Clear Metro cache: `npx expo start -c`
-
-**AsyncStorage errors:**
-- Check if AsyncStorage is properly imported from `@react-native-async-storage/async-storage`
-- Ensure async functions are awaited
-
-**Authentication errors:**
-- Check API endpoint configuration in `src/config/storage.ts` (`DEFAULT_SERVER_URL`)
-- Verify backend services are running
-- Check device ID is being generated correctly
-- Clear stored tokens: AsyncStorage → Delete `@cairn:*` keys
-
-**Image not loading:**
-- Check image URL is valid
-- Verify network permissions
-- Test with a known working image URL
-
-**TypeScript errors:**
-- Run `npm run type-check` to see all type errors
-- Check that types are imported correctly
-- Verify interface definitions match usage
-
-**Navigation errors:**
-- Check navigation types in `src/types/navigation.ts`
-- Verify screen is registered in navigator
-- Ensure params match type definition
-
-### Debug Tools
-
-**React Native Debugger:**
-```bash
-# Install
-brew install --cask react-native-debugger
-
-# Run
-open "rndebugger://set-debugger-loc?host=localhost&port=8081"
-```
-
-**Expo DevTools:**
-- Press `d` in Expo dev server terminal
-- Opens browser with DevTools interface
-
-**Console Logs:**
-- Press `j` in Expo dev server to open console
-- Use `console.log()`, `console.warn()`, `console.error()`
-
-**Network Monitoring:**
-- Use React Native Debugger Network tab
-- Or Flipper for advanced debugging
+- Metro/bundle errors ("No bundle URL", "Unable to resolve module"): `npx expo start -c`; reinstall from the repo root if modules are missing.
+- Auth errors: check the server URL (Login screen field or `DEFAULT_SERVER_URL`), that the backend is up, and clear `@cairn:*` AsyncStorage keys.
+- Navigation errors: check `src/types/navigation.ts` and that the screen is registered in a navigator.
+- General: [docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md).
 
 ## Related Documentation
 
-- **Main README**: `/README.md` - Project overview
 - **Root CLAUDE.md**: `/CLAUDE.md` - Project-wide guidance
+- **Architecture**: `/docs/ARCHITECTURE.md`
 - **Engineering Principles**: `/docs/ENGINEERING_PRINCIPLES.md` - Coding standards and architecture
+- **Web App**: `/apps/web/CLAUDE.md` - Sibling client sharing `@cairn/shared`
 - **User Service**: `/services/users/CLAUDE.md` - Authentication backend
 - **Read Service**: `/services/read/CLAUDE.md` - Content storage backend
 - **Expo Documentation**: https://docs.expo.dev/
-- **React Navigation**: https://reactnavigation.org/docs/getting-started
-- **React Native**: https://reactnative.dev/docs/getting-started

@@ -4,16 +4,10 @@ This directory contains security testing scripts for the Cairn User Service. The
 
 ## Overview
 
-The security testing suite covers:
-- SQL injection attack simulations
-- XSS vulnerability testing
-- Authentication bypass attempts
-- Authorization testing
-- Rate limiting verification
-- Token manipulation attempts
-- Brute force protection
-- HTTPS enforcement
-- Concurrent request handling
+The security testing suite currently contains three bash suites, run by `run_all_tests.sh`:
+- `sql_injection_test.sh`: SQL injection patterns against login, registration, mobile registration and refresh inputs
+- `auth_bypass_test.sh`: missing, malformed, expired, tampered and `none`-algorithm tokens, plus a few injection and path traversal probes
+- `rate_limit_test.sh`: rate limit headers, enforcement, response format, shared limit across auth endpoints, window reset, health endpoints exempt
 
 ## Prerequisites
 
@@ -28,17 +22,19 @@ Required tools:
 ### Quick Start
 
 ```bash
-# Set service URL
+# Set service URL (script default: http://localhost:8080; the dev docker-compose publishes 8082)
 export USER_SERVICE_URL="http://localhost:8080"
 
-# Run all security tests
+# Run all security tests (also: make test-security from services/users)
 ./run_all_tests.sh
 
-# Run specific test suite
+# Run a specific test suite
 ./auth_bypass_test.sh
 ./rate_limit_test.sh
-./token_manipulation_test.sh
+./sql_injection_test.sh
 ```
+
+All `/api/v1/*` routes reject plain-HTTP requests with `403` unless they arrive over TLS or carry `X-Forwarded-Proto: https`, and the scripts do not send that header. Point `USER_SERVICE_URL` at an HTTPS endpoint (or a TLS-terminating proxy), otherwise most checks see `403` instead of the expected `400`/`401`/`429`.
 
 ### Individual Test Scripts
 
@@ -46,68 +42,34 @@ export USER_SERVICE_URL="http://localhost:8080"
    ```bash
    ./auth_bypass_test.sh
    ```
-   Tests: Missing tokens, expired tokens, invalid signatures, malformed headers
+   Tests: Missing tokens, expired tokens, invalid signatures, malformed headers, `none` algorithm
 
-2. **Authorization Testing**
-   ```bash
-   ./authorization_test.sh
-   ```
-   Tests: Cross-user access, missing auth, invalid UUIDs
-
-3. **Rate Limiting**
+2. **Rate Limiting**
    ```bash
    ./rate_limit_test.sh
    ```
-   Tests: Brute force protection, rate limit headers, window refill
+   Tests: Rate limit headers, enforcement, 429 response format, window refill. The script assumes a limit of 10 requests/minute, but the service default is 100 per minute (`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), so set `RATE_LIMIT_REQUESTS=10` on the service under test
 
-4. **Token Manipulation**
-   ```bash
-   ./token_manipulation_test.sh
-   ```
-   Tests: Payload modification, signature tampering, algorithm confusion
-
-5. **SQL Injection**
+3. **SQL Injection**
    ```bash
    ./sql_injection_test.sh
    ```
-   Tests: Various SQL injection patterns in all inputs
-
-6. **XSS Testing**
-   ```bash
-   ./xss_test.sh
-   ```
-   Tests: Script injection in inputs, HTML rendering checks
-
-7. **HTTPS Enforcement**
-   ```bash
-   ./https_test.sh
-   ```
-   Tests: HTTP rejection, redirect behavior
-
-8. **Token Reuse Detection**
-   ```bash
-   ./token_reuse_test.sh
-   ```
-   Tests: Refresh token reuse, family revocation
+   Tests: Various SQL injection patterns in auth inputs
 
 ## Environment Variables
 
 ```bash
-# Required
+# Target service (default: http://localhost:8080)
 USER_SERVICE_URL="http://localhost:8080"
 
 # Optional
 VERBOSE=1              # Enable verbose output
-PARALLEL=1             # Run tests in parallel (default: serial)
-CONTINUE_ON_FAIL=0     # Stop on first failure (default: continue)
+CONTINUE_ON_FAIL=0     # Stop on first failed suite (run_all_tests.sh default: 1, continue)
 ```
 
 ## Test Output
 
-Tests generate:
-- Console output (pass/fail for each test)
-- `test_results.json` (detailed results)
-- `security_report.html` (formatted report)
+Tests print pass/fail for each check to the console and `run_all_tests.sh` ends with a suite summary; the exit code is non-zero if any suite failed. No report files are written.
 
 ### Example Output
 
@@ -126,60 +88,11 @@ Tests: 7, Passed: 6, Failed: 1
 
 ## Expected Results
 
-All tests should **PASS** except:
-- HTTPS enforcement tests (if running without TLS locally)
-- Any tests marked as "Expected to fail in development"
+All tests should **PASS** against an HTTPS endpoint with the rate limit configured as described above.
 
 ## Security Test Categories
 
-### 1. Input Validation Tests
-- SQL injection patterns
-- XSS payloads
-- Command injection
-- Path traversal
-- Null byte injection
-- Unicode normalization attacks
-
-### 2. Authentication Tests
-- Missing credentials
-- Invalid credentials
-- Expired tokens
-- Malformed tokens
-- Token reuse
-- Concurrent login attempts
-
-### 3. Authorization Tests
-- Horizontal privilege escalation (user A accessing user B data)
-- Vertical privilege escalation (not applicable - no admin roles yet)
-- Missing authorization checks
-- Parameter tampering
-
-### 4. Session Management Tests
-- Token expiration
-- Token rotation
-- Concurrent sessions
-- Token revocation
-- Family revocation on reuse
-
-### 5. Rate Limiting Tests
-- Authentication endpoint limits
-- Brute force protection
-- Rate limit headers
-- Window refill behavior
-- Per-IP vs per-user limiting
-
-### 6. Cryptography Tests
-- Weak password acceptance
-- Password complexity requirements
-- Token signature validation
-- Algorithm confusion attacks
-- Signature stripping
-
-### 7. Transport Security Tests
-- HTTPS enforcement
-- HSTS headers
-- TLS version requirements
-- Certificate validation
+The scripts above cover input validation (SQL injection, null byte and encoding variants), authentication bypass and token tampering, and rate limiting. The following are not yet covered by any script: XSS, authorization (cross-user access), HTTPS enforcement and HSTS, token reuse/family revocation (covered by the Go integration tests in `../integration`), password strength, and concurrent sessions.
 
 ## Creating New Tests
 
@@ -236,41 +149,20 @@ echo "Tests: $((pass_count + fail_count)), Passed: $pass_count, Failed: $fail_co
 
 ## Continuous Integration
 
-These tests can be integrated into CI/CD pipelines:
-
-```yaml
-# .github/workflows/security-tests.yml
-name: Security Tests
-on: [push, pull_request]
-
-jobs:
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Start User Service
-        run: docker compose up -d
-      - name: Run Security Tests
-        run: |
-          cd services/users/test/security
-          ./run_all_tests.sh
-```
+These scripts are not run in CI (`.github/workflows/` has no security workflow). To run them in a pipeline, start the service (with Vault and PostgreSQL) behind HTTPS and run `./run_all_tests.sh`.
 
 ## Interpreting Results
 
 ### Critical Failures
 Tests that **MUST PASS** in production:
-- All authentication bypass tests
-- All authorization tests
+- Authentication bypass tests
 - SQL injection tests
-- XSS tests
 - Rate limiting tests
-- Token manipulation tests
 
 ### Non-Critical Failures
 Tests that may fail in specific environments:
-- HTTPS enforcement (development without TLS)
-- Some rate limit tests (timing-sensitive)
+- Everything, when the target is plain HTTP (see Quick Start)
+- Some rate limit tests (timing-sensitive, depend on the configured limit)
 
 ### Reporting Security Issues
 

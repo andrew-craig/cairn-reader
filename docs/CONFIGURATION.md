@@ -458,12 +458,12 @@ Both the API (`cmd/email_ingest`) and the worker (`cmd/email_ingest_worker`) loa
 | `DB_HOST` | string | No | `localhost` | PostgreSQL host |
 | `DB_PORT` | string | No | `5432` | PostgreSQL port |
 | `DB_USER` | string | No | `cairn_user_email` | Database user |
-| `DB_PASSWORD` | string | Yes** | - | Database password |
+| `DB_PASSWORD` | string | Yes | - | Database password |
 | `DB_NAME` | string | No | `ingest_email` | Database name |
 | `DB_SSLMODE` | string | No | `disable` | SSL mode |
 | `DB_STATEMENT_TIMEOUT` | duration | No | `30s` | Per-connection statement timeout |
 | `EMAIL_DOMAIN` | string | No | `read.cairnapp.com` | Domain for per-user ingest addresses |
-| `INGEST_API_KEY` | string | Yes | - | API key the Cloudflare email worker uses to authenticate |
+| `INGEST_API_KEY` | string | Yes | - | Required at startup. Only the self-hosted binary uses it (seeded into `api_keys`); the multi-container API validates keys against the `api_keys` table. See [DEPLOYMENT.md](DEPLOYMENT.md) |
 | `VAULT_ADDR` | string | No | `http://localhost:8200` | Vault address |
 | `VAULT_TOKEN` | string | No | - | Vault token (dev) |
 | `VAULT_ROLE_ID` | string | No | - | AppRole role ID (production) |
@@ -486,6 +486,29 @@ Both the API (`cmd/email_ingest`) and the worker (`cmd/email_ingest_worker`) loa
 | `HEALTH_PORT` | string | No | `8090` | Worker health check port (worker only) |
 
 The shutdown timeout is fixed at 30s. `RAW_EMAIL_RETENTION_DAYS` is the retention used by both the raw email and the outbox cleanup jobs.
+
+### Self-Hosted Binary Configuration
+
+The single-container build (`cmd/selfhost`, see [infrastructure/docker/selfhost/README.md](../infrastructure/docker/selfhost/README.md)) reads its own variables in `cmd/selfhost/config.go`. Only `DB_PASSWORD` must be set.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8099` | HTTP port serving all APIs and the bundled web UI |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_SSLMODE` | `localhost` / `5432` / `cairn` / - / `disable` | Shared PostgreSQL connection |
+| `DB_NAME_USERS` / `DB_NAME_CONTENT` / `DB_NAME_RSS` / `DB_NAME_EMAIL` | `cairn_users` / `content_service` / `rss_fetcher_service` / `ingest_email` | Per-service database names |
+| `DB_MAX_CONNS` / `DB_MIN_CONNS` | `3` / `1` | Per-service pool max open / idle connections |
+| `JWT_PRIVATE_KEY_FILE` / `JWT_PUBLIC_KEY_FILE` | `/data/keys/private.pem` / `/data/keys/public.pem` | JWT key files (no Vault) |
+| `JWT_AUTO_GENERATE` | `true` | Generate the key pair on first run |
+| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | `15m` / `168h` | Token lifetimes |
+| `INTERNAL_API_KEY` / `INGEST_API_KEY` | generated | Random value generated at startup when unset |
+| `BCRYPT_COST` | `12` | Bcrypt cost factor |
+| `EMAIL_DOMAIN` | `read.cairnapp.com` | Domain for per-user ingest addresses |
+| `WEB_DIR` | `/app/web` | Directory of the bundled web UI |
+| `LOG_LEVEL` / `LOG_FORMAT` | `info` / `text` | Logging |
+
+### Client Configuration
+
+The web app reads `VITE_API_URL` (build-time, optional) to pick the backend; it defaults to the page origin. See [apps/web/CLAUDE.md](../apps/web/CLAUDE.md). The mobile app reads no `EXPO_PUBLIC_*` variables.
 
 ---
 
@@ -527,7 +550,7 @@ Use `infrastructure/docker/prod/docker-compose.yml` with `infrastructure/docker/
 ### Service-to-Service Keys
 
 - `INTERNAL_API_KEY` authenticates the Fetcher worker to the Content Service. Generate a strong random value.
-- `INGEST_API_KEY` (`EMAIL_INGEST_API_KEY` in compose) authenticates the Cloudflare email worker to the Email Ingest API.
+- `INGEST_API_KEY` (`EMAIL_INGEST_API_KEY` in compose) is required at startup; the Cloudflare email worker authenticates with a key from the `api_keys` table (see [DEPLOYMENT.md](DEPLOYMENT.md)). The self-hosted binary seeds `INGEST_API_KEY` into that table.
 
 ---
 

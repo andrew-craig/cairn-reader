@@ -7,6 +7,7 @@ This directory contains database migration files for the Cairn Email Ingest Serv
 Migrations are managed using [golang-migrate](https://github.com/golang-migrate/migrate) and follow a sequential numbering scheme:
 
 - `000001_initial_schema` - Creates the core tables for email ingestion and processing
+- `000002_add_lease_expires_at` - Adds `lease_expires_at` to `raw_emails` and `content_outbox` (lease-based atomic claim for workers)
 
 ## Database Schema
 
@@ -61,6 +62,7 @@ Fields:
 - `retry_count` - INTEGER, number of processing retry attempts
 - `last_error` - TEXT, last error message (nullable)
 - `created_at` - Timestamp of database insertion
+- `lease_expires_at` - Timestamp when the worker's claim expires (nullable, added in 000002)
 - `processed_at` - Timestamp of successful processing (nullable)
 
 Constraints:
@@ -83,6 +85,7 @@ Fields:
 - `next_retry_at` - Timestamp for next retry attempt
 - `last_error` - TEXT, last error message (nullable)
 - `content_service_id` - UUID, ID returned by Content Service (nullable)
+- `lease_expires_at` - Timestamp when the worker's claim expires (nullable, added in 000002)
 - `created_at` - Timestamp of outbox entry creation
 - `delivered_at` - Timestamp of successful delivery (nullable)
 
@@ -143,7 +146,7 @@ Indexes are created for query performance:
 
 ### Using Docker Compose
 
-Migrations run automatically on service startup when using Docker Compose.
+Migrations run automatically on service startup (both `email-ingest` and `email-ingest-worker` run them) when using Docker Compose.
 
 ```bash
 # Start all services (migrations run automatically)

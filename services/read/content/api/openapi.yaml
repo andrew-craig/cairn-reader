@@ -4,6 +4,10 @@ info:
   description: |
     The Content Service is responsible for storing and serving article content with user-specific metadata.
     It provides endpoints for content creation, retrieval, user-content relationship management, and search functionality.
+
+    Every JSON success response (except the health probes and `GET /`) is wrapped as
+    `{"data": ..., "meta": {"timestamp", "version"}}`; the examples below show the `data` payload.
+    Errors are `{"error": <code>, "message": ..., "details"?, "meta"?}`.
   version: 1.0.0
   contact:
     name: Cairn Backend
@@ -19,18 +23,41 @@ tags:
   - name: User Contents
     description: User-specific content operations
   - name: Bulk Operations
-    description: Bulk content operations for RSS Fetcher Service
+    description: Bulk content operations for internal ingest services (Ingest RSS, Email Ingest)
   - name: Subscriptions
     description: Feed and newsletter subscriptions and where their items are delivered
   - name: URL Detection
     description: URL type detection and smart submission
 
 paths:
+  /:
+    get:
+      summary: Service banner
+      description: Static JSON identifying the service (not wrapped in the data/meta envelope)
+      operationId: root
+      security: []
+      responses:
+        '200':
+          description: Service banner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: "content-service"
+                  version:
+                    type: string
+                  status:
+                    type: string
+
   /health/live:
     get:
       summary: Liveness probe
       description: Simple health check to verify the process is running
       operationId: healthLive
+      security: []
       responses:
         '200':
           description: Service is alive
@@ -41,13 +68,14 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "healthy"
+                    example: "ok"
 
   /health/ready:
     get:
       summary: Readiness probe
       description: Health check that verifies database connectivity and service readiness
       operationId: healthReady
+      security: []
       responses:
         '200':
           description: Service is ready to accept traffic
@@ -58,7 +86,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "healthy"
+                    example: "ok"
                   checks:
                     type: object
                     properties:
@@ -74,7 +102,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "unhealthy"
+                    example: "error"
                   checks:
                     type: object
                     properties:
@@ -108,7 +136,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DetectURLResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DetectURLResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
               examples:
                 feedDetected:
                   summary: RSS/Atom feed detected
@@ -183,7 +216,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DiscoverFeedResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DiscoverFeedResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
               examples:
                 feedsDiscovered:
                   summary: One or more feeds discovered
@@ -238,15 +276,15 @@ paths:
                 summary: Create from HTML
                 value:
                   html: "<html><body><h1>Article Title</h1><p>Content here...</p></body></html>"
-                  source_url: "https://example.com/article"
-                  title: "Article Title"
-                  author: "John Doe"
+                  url: "https://example.com/article"
+                  source_type: "rss"
                   published_at: "2025-01-15T10:00:00Z"
                   source_feed_id: "123e4567-e89b-12d3-a456-426614174000"
               fromURL:
                 summary: Create from URL
                 value:
-                  source_url: "https://example.com/article"
+                  url: "https://example.com/article"
+                  source_type: "rss"
                   source_feed_id: "123e4567-e89b-12d3-a456-426614174000"
       responses:
         '201':
@@ -254,7 +292,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContentResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
           content:
@@ -306,7 +349,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContentResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '401':
           description: Unauthorized - missing or invalid internal API key
           content:
@@ -357,7 +405,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContentResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
           content:
@@ -414,7 +467,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkCreateContentResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BulkCreateContentResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input or too many items
           content:
@@ -446,7 +504,7 @@ paths:
         - Bulk Operations
       summary: Check for existing content
       description: |
-        Check if content already exists by feed_id + content_hash.
+        Check if content already exists by source_feed_id + content_hash per item.
 
         **Internal endpoint** - for internal services only. Requires the `X-Internal-API-Key` header.
       operationId: checkDuplicates
@@ -464,7 +522,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckDuplicatesResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CheckDuplicatesResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
           content:
@@ -499,11 +562,14 @@ paths:
       description: |
         **Internal endpoint - for internal services only (e.g., Ingest RSS Service)**
 
-        Bulk add existing content items to multiple users. This endpoint is not authenticated
-        and should only be called from internal services within the system.
+        Bulk add existing content items to multiple users. Requires the `X-Internal-API-Key`
+        header; no user JWT is involved. Items are routed like ingest: each lands in the list the
+        user's route for the content's source names (Reads when there is none).
 
-        External clients should use `POST /api/v1/content/user/{user_id}` with authentication instead.
+        External clients should use `POST /api/v1/content/user/bulk` or `POST /api/v1/content/user/{user_id}` with a JWT instead.
       operationId: bulkAddToUsersInternal
+      security:
+        - InternalApiKey: []
       requestBody:
         required: true
         content:
@@ -516,9 +582,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkAddToUsersResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BulkAddToUsersResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid internal API key
           content:
             application/json:
               schema:
@@ -549,7 +626,7 @@ paths:
         names (Reads when there is none).
 
         Internal services (e.g. Ingest RSS Service) should use
-        `POST /api/v1/internal/content/user/bulk` instead, which does not require authentication.
+        `POST /api/v1/internal/content/user/bulk` instead, which uses the internal API key.
       operationId: bulkAddToUsers
       security:
         - BearerAuth: []
@@ -565,7 +642,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkAddToUsersResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BulkAddToUsersResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
           content:
@@ -645,7 +727,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Cursor for pagination (base64 encoded timestamp)
+          description: Opaque pagination cursor; pass the previous response's `pagination.cursor`. A malformed cursor returns 400.
       responses:
         '200':
           description: User contents retrieved successfully
@@ -734,10 +816,15 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/AddFeedResponse'
-                  - $ref: '#/components/schemas/AddPageResponse'
-                  - $ref: '#/components/schemas/UserContentResponse'
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/AddFeedResponse'
+                      - $ref: '#/components/schemas/AddPageResponse'
+                      - $ref: '#/components/schemas/UserContentDetailResponse'
               examples:
                 feedSubscribed:
                   summary: Feed subscription created
@@ -750,12 +837,14 @@ paths:
                       feed_id: "123e4567-e89b-12d3-a456-426614174000"
                       feed_url: "https://example.com/feed.xml"
                       title: "Example Blog"
+                      list: "reads"
                       subscribed_at: "2025-01-04T10:00:00Z"
                 pageAdded:
                   summary: Page content added
                   value:
                     type: "page"
                     content:
+                      id: "123e4567-e89b-12d3-a456-426614174004"
                       user_id: "123e4567-e89b-12d3-a456-426614174002"
                       content_id: "123e4567-e89b-12d3-a456-426614174003"
                       status: "unread"
@@ -765,7 +854,7 @@ paths:
                       content:
                         id: "123e4567-e89b-12d3-a456-426614174003"
                         title: "Example Article"
-                        source_url: "https://example.com/article"
+                        original_url: "https://example.com/article"
         '400':
           description: Bad request - invalid input or feed limit reached
           content:
@@ -837,6 +926,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
                   data:
                     type: object
                     properties:
@@ -899,6 +990,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
                   data:
                     type: object
                     properties:
@@ -989,6 +1082,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
                   data:
                     type: object
                     properties:
@@ -1078,6 +1173,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
                   data:
                     type: object
                     properties:
@@ -1110,6 +1207,72 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/content/user/{user_id}/{content_id}:
+    get:
+      tags:
+        - User Contents
+      summary: Get a user's content item
+      description: Retrieve one item from the user's lists, including the full `cleaned_html`.
+      operationId: getUserContent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+        - name: content_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Content ID
+      responses:
+        '200':
+          description: User content retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserContentDetailResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '400':
+          description: Bad request - invalid user ID or content ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User-content relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
     patch:
       tags:
         - User Contents
@@ -1145,7 +1308,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserContentResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserContentDetailResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
         '400':
           description: Bad request - invalid input
           content:
@@ -1272,6 +1440,11 @@ paths:
             minimum: 1
             maximum: 100
           description: Number of results to return
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Opaque pagination cursor; pass the previous response's `pagination.cursor`. A malformed cursor returns 400.
       responses:
         '200':
           description: Search results retrieved successfully
@@ -1280,7 +1453,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchUserContentsResponse'
         '400':
-          description: Bad request - missing or invalid query or list
+          description: Bad request - missing query, or invalid list or cursor
           content:
             application/json:
               schema:
@@ -1320,58 +1493,48 @@ components:
     CreateContentRequest:
       type: object
       required:
-        - source_url
+        - url
       properties:
+        url:
+          type: string
+          description: |
+            URL of the original article (an `email://` identifier is accepted for email content).
+            When `html` is omitted the service fetches the page.
         html:
           type: string
-          description: Raw HTML content (optional, will fetch from source_url if not provided)
+          description: Raw HTML content (optional, will fetch from url if not provided)
           maxLength: 5242880  # 5MB
-        source_url:
+        source_type:
           type: string
-          format: uri
-          description: URL of the original article
-        title:
-          type: string
-          description: Article title (optional, extracted from HTML if not provided)
-        author:
-          type: string
-          description: Article author (optional, extracted from HTML if not provided)
-        published_at:
-          type: string
-          format: date-time
-          description: Publication date (optional, extracted from HTML if not provided)
+          enum: [rss, web, email]
+          default: web
+          description: How the content was sourced
         source_feed_id:
           type: string
           format: uuid
-          description: ID of the source RSS feed (optional, null for manually added content)
-        source_sender_id:
+          description: ID of the source RSS feed (optional)
+        published_at:
           type: string
-          format: uuid
-          description: |
-            Bulk create only. ID of the email sender that produced the item (email content only).
-            The Content Service stores it so a user's route for that sender decides which list
-            the item lands in when it is delivered.
+          format: date-time
+          description: Publication date (optional)
 
     UpdateContentRequest:
       type: object
+      required:
+        - url
+        - html
       properties:
+        url:
+          type: string
+          description: URL of the original article
         html:
           type: string
           description: Updated raw HTML content
           maxLength: 5242880  # 5MB
-        title:
-          type: string
-          description: Updated article title
-        author:
-          type: string
-          description: Updated article author
         published_at:
           type: string
           format: date-time
           description: Updated publication date
-        content_hash:
-          type: string
-          description: SHA-256 hash of cleaned content
 
     ContentResponse:
       type: object
@@ -1380,26 +1543,24 @@ components:
           type: string
           format: uuid
           description: Content ID
+        content_hash:
+          type: string
+          description: SHA-256 hash of cleaned content
+        cleaned_html:
+          type: string
+          description: Sanitized and readable HTML content
+        original_url:
+          type: string
+          description: Original article URL
+        canonical_url:
+          type: string
+          description: Canonicalized URL
         title:
           type: string
           description: Article title
         author:
           type: string
           description: Article author
-        original_url:
-          type: string
-          format: uri
-          description: Original article URL
-        canonical_url:
-          type: string
-          format: uri
-          description: Canonicalized URL
-        cleaned_html:
-          type: string
-          description: Sanitized and readable HTML content
-        content_hash:
-          type: string
-          description: SHA-256 hash of cleaned content
         published_at:
           type: string
           format: date-time
@@ -1411,15 +1572,73 @@ components:
           type: array
           items:
             type: string
-            format: uri
           description: Image URLs extracted from the content (lead image first)
+        word_count:
+          type: integer
+          description: Word count of the cleaned content
         source_type:
           type: string
-          description: How the content was added (e.g. rss, manual, web)
+          enum: [rss, web, email]
+          description: How the content was added
         source_feed_id:
           type: string
           format: uuid
-          description: Source RSS feed ID (null for manually added)
+          description: Source RSS feed ID (absent for manually added content)
+        created_at:
+          type: string
+          format: date-time
+          description: Content creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Content last update timestamp
+
+    ContentSummaryResponse:
+      type: object
+      description: Content item as returned in list/search results (no `cleaned_html`)
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Content ID
+        content_hash:
+          type: string
+          description: SHA-256 hash of cleaned content
+        original_url:
+          type: string
+          description: Original article URL
+        canonical_url:
+          type: string
+          description: Canonicalized URL
+        title:
+          type: string
+          description: Article title
+        author:
+          type: string
+          description: Article author
+        published_at:
+          type: string
+          format: date-time
+          description: Publication date
+        description:
+          type: string
+          description: Short article description or summary
+        image_urls:
+          type: array
+          items:
+            type: string
+          description: Image URLs extracted from the content (lead image first)
+        word_count:
+          type: integer
+          description: Word count of the cleaned content
+        source_type:
+          type: string
+          enum: [rss, web, email]
+          description: How the content was added
+        source_feed_id:
+          type: string
+          format: uuid
+          description: Source RSS feed ID (absent for manually added content)
         created_at:
           type: string
           format: date-time
@@ -1436,58 +1655,102 @@ components:
       properties:
         contents:
           type: array
+          minItems: 1
           maxItems: 100
           items:
-            $ref: '#/components/schemas/CreateContentRequest'
+            $ref: '#/components/schemas/BulkContentItem'
+
+    BulkContentItem:
+      type: object
+      required:
+        - url
+        - html
+        - source_type
+      properties:
+        url:
+          type: string
+          description: Original URL (an `email://` identifier is accepted for email content)
+        html:
+          type: string
+          maxLength: 5242880  # 5MB
+          description: Raw HTML content
+        source_type:
+          type: string
+          enum: [rss, web, email]
+        source_feed_id:
+          type: string
+          format: uuid
+          description: ID of the source RSS feed (optional)
+        source_sender_id:
+          type: string
+          format: uuid
+          description: |
+            ID of the email sender that produced the item (email content only). The Content
+            Service stores it so a user's route for that sender decides which list the item
+            lands in when it is delivered.
+        published_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+          maxLength: 1000
+        author:
+          type: string
+          maxLength: 255
+
+    BulkFailedItem:
+      type: object
+      properties:
+        index:
+          type: integer
+          description: Index in the input array
+        url:
+          type: string
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Error message
 
     BulkCreateContentResponse:
       type: object
       properties:
-        success_count:
-          type: integer
-          description: Number of successfully created/updated items
-        failure_count:
-          type: integer
-          description: Number of failed items
-        results:
+        created:
           type: array
           items:
-            type: object
-            properties:
-              index:
-                type: integer
-                description: Index in the input array
-              success:
-                type: boolean
-                description: Whether the operation succeeded
-              content_id:
-                type: string
-                format: uuid
-                description: Created/updated content ID (present if success=true)
-              error:
-                type: string
-                description: Error message (present if success=false)
+            $ref: '#/components/schemas/ContentResponse'
+        existing:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentResponse'
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkFailedItem'
 
     CheckDuplicatesRequest:
       type: object
       required:
-        - feed_id
-        - content_hashes
+        - items
       properties:
-        feed_id:
-          type: string
-          format: uuid
-          description: Feed ID to check duplicates for
-        content_hashes:
+        items:
           type: array
+          minItems: 1
+          maxItems: 100
           items:
-            type: string
-          description: Array of content hashes to check
+            type: object
+            properties:
+              content_hash:
+                type: string
+              source_feed_id:
+                type: string
+                format: uuid
 
     CheckDuplicatesResponse:
       type: object
       properties:
-        duplicates:
+        results:
           type: array
           items:
             type: object
@@ -1495,13 +1758,15 @@ components:
               content_hash:
                 type: string
                 description: Content hash
-              content_id:
-                type: string
-                format: uuid
-                description: Existing content ID
               exists:
                 type: boolean
                 description: Whether content exists
+              content_id:
+                type: string
+                format: uuid
+                description: Existing content ID (present if exists)
+              content:
+                $ref: '#/components/schemas/ContentResponse'
 
     BulkAddToUsersRequest:
       type: object
@@ -1539,30 +1804,11 @@ components:
           items:
             type: string
             format: uuid
-          description: IDs of successfully added user-content relationships
+          description: IDs of the user-content relationships created (already-present items are ignored, not failed)
         failed:
           type: array
           items:
-            type: object
-            properties:
-              index:
-                type: integer
-                description: Index in the input array
-              user_id:
-                type: string
-                format: uuid
-                description: User ID
-              content_id:
-                type: string
-                format: uuid
-                description: Content ID
-              error:
-                type: string
-                description: Error code
-              message:
-                type: string
-                description: Error message
-          description: Failed items with error details
+            $ref: '#/components/schemas/BulkFailedItem'
 
     URLType:
       type: string
@@ -1748,7 +1994,7 @@ components:
           enum: [page]
           description: Always "page"
         content:
-          $ref: '#/components/schemas/UserContentResponse'
+          $ref: '#/components/schemas/UserContentDetailResponse'
 
     UpdateUserContentRequest:
       type: object
@@ -1773,7 +2019,12 @@ components:
 
     UserContentResponse:
       type: object
+      description: User-content item as returned in list/search results (summary content, no `cleaned_html`)
       properties:
+        id:
+          type: string
+          format: uuid
+          description: User-content ID
         user_id:
           type: string
           format: uuid
@@ -1801,10 +2052,44 @@ components:
           type: string
           format: date-time
           description: When content was added to user's list
-        last_accessed_at:
+        updated_at:
           type: string
           format: date-time
-          description: Last access timestamp
+          description: Last update timestamp
+        content:
+          $ref: '#/components/schemas/ContentSummaryResponse'
+
+    UserContentDetailResponse:
+      type: object
+      description: Single user-content item; `content` includes the full `cleaned_html`
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        content_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [unread, reading, completed, archived]
+        list:
+          type: string
+          enum: [feed, reads]
+        scroll_position:
+          type: number
+          format: float
+          description: Reading progress as a fraction of the article scrolled (0–1)
+        is_favorite:
+          type: boolean
+        added_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
         content:
           $ref: '#/components/schemas/ContentResponse'
 
@@ -1817,6 +2102,8 @@ components:
           type: string
           enum: [rss, email]
         title:
+          type: string
+        description:
           type: string
         subscribed_at:
           type: string
@@ -1831,40 +2118,64 @@ components:
           type: object
           description: Present for type email (id is the sender ID, the key for the list endpoint)
 
-    ListUserContentsResponse:
+    Meta:
       type: object
       properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserContentResponse'
-        next_cursor:
+        timestamp:
           type: string
-          description: Cursor for next page (null if no more pages)
+          format: date-time
+        version:
+          type: string
+          example: v1
+
+    Pagination:
+      type: object
+      properties:
+        cursor:
+          type: string
+          description: Cursor for the next page (omitted when there are no more pages)
         has_more:
           type: boolean
           description: Whether there are more results
+        limit:
+          type: integer
+          description: Page size used
+
+    ListUserContentsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserContentResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        meta:
+          $ref: '#/components/schemas/Meta'
 
     SearchUserContentsResponse:
       type: object
       properties:
-        items:
+        data:
           type: array
           items:
             $ref: '#/components/schemas/UserContentResponse'
-        total:
-          type: integer
-          description: Total number of search results
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        meta:
+          $ref: '#/components/schemas/Meta'
 
     ErrorResponse:
       type: object
       properties:
         error:
           type: string
-          description: Error message
-        code:
+          description: Error code (e.g. bad_request, validation_error, unauthorized, forbidden, not_found, conflict, internal_error)
+        message:
           type: string
-          description: Error code
+          description: Human-readable error message
         details:
           type: object
           description: Additional error details
+        meta:
+          $ref: '#/components/schemas/Meta'

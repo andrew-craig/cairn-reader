@@ -9,35 +9,36 @@ All services should use Go's standard library `log/slog` package for structured 
 ### Why `log/slog`?
 
 1. **Standard library** - No external dependencies, maintained by Go team
-2. **Available in Go 1.21+** - Both services use Go 1.24
+2. **Available in Go 1.21+** - All services use Go 1.25 (see each module's `go.mod`)
 3. **Structured logging** - Native support for key-value pairs
 4. **Flexible handlers** - JSON for production, text for development
 5. **Log levels** - Built-in DEBUG, INFO, WARN, ERROR levels
 6. **Context integration** - Works seamlessly with `context.Context`
 7. **Performance** - Designed for high-performance production use
 
-## Current State Issues
+## Current State
 
-| Issue | Current Pattern | Impact |
-|-------|-----------------|--------|
-| Mixed logging methods | `log.Printf`, `fmt.Printf`, `log.Println` | Inconsistent output format |
-| No log levels | All logs treated equally | Cannot filter by severity |
-| Unstructured output | String interpolation | Hard to parse/search |
-| Inconsistent prefixes | `[Recommendations]`, `[DB]`, `AUTH_SUCCESS` | No standard categorization |
-| No JSON support | Text only | Not machine-parseable |
+The shared `pkg/logging` package exists and all HTTP services use `log/slog` with `LOG_LEVEL` / `LOG_FORMAT` (JSON or text), a request ID, and request-scoped loggers. The original issues (mixed `log.Printf`/`fmt.Printf`, no levels, no JSON, ad-hoc prefixes) are resolved for service code. Remaining items:
+
+| Item | Where | Status |
+|------|-------|--------|
+| `log.Printf` in env-parsing helpers | `services/read/content/cmd/worker/main.go` (lines 163, 177) | Open - runs after the slog logger is configured, should use `slog.Warn` |
+| `log.Printf` / `log.Fatalf` in example program | `pkg/auth/examples/basic/main.go` | Open, low priority - sample code, not a service |
+| `log.*` / `fmt.Print*` in CLI tools | `services/read/email/cmd/manage_keys/main.go`, `services/users/cmd/migrate/main.go`, `cmd/selfhost/version.go` | Intentional - interactive command output, not service logs |
+| Log aggregation (e.g., CloudWatch, Datadog) | - | Not configured |
 
 ## Implementation Guide
 
 ### 1. Package Structure
 
-Create a shared logging package that can be used across services:
+The shared logging package (`pkg/logging`, its own Go module) is used across services:
 
 ```
 pkg/
 └── logging/
-    ├── logger.go       # Logger initialization and configuration
-    ├── middleware.go   # HTTP middleware for request logging
-    └── context.go      # Context helpers for request-scoped logging
+    ├── logger.go           # Logger initialization and configuration
+    ├── chi_middleware.go   # chi middleware for request logging
+    └── context.go          # Context helpers for request-scoped logging
 ```
 
 ### 2. Logger Initialization
@@ -55,7 +56,7 @@ import (
 type Config struct {
     Level       string // debug, info, warn, error
     Format      string // json, text
-    ServiceName string // e.g., "user-service", "fetcher", "recommender"
+    ServiceName string // e.g., "user-service", "fetcher", "content-service"
 }
 
 // NewLogger creates a configured slog.Logger
@@ -114,7 +115,7 @@ LOG_FORMAT=json
 #### Service Startup
 
 ```go
-// Before (current)
+// Before (legacy)
 log.Printf("Starting service on port %s", port)
 log.Println("✓ Database connected")
 
@@ -133,7 +134,7 @@ slog.Info("component initialized",
 #### HTTP Request Logging
 
 ```go
-// Before (current)
+// Before (legacy)
 log.Printf("[%s] %s %s %d %v %s user=%s",
     requestID, method, path, statusCode, duration, clientIP, userID)
 
@@ -152,21 +153,21 @@ slog.Info("http request",
 #### Business Logic
 
 ```go
-// Before (current)
-log.Printf("[Recommendations] Found %d eligible articles for user: %s", len(articles), userID)
+// Before (legacy)
+log.Printf("[Fetcher] Found %d new items for feed: %s", len(items), feedID)
 
 // After (slog)
-slog.Debug("found eligible articles",
-    slog.String("component", "recommendations"),
-    slog.String("user_id", userID),
-    slog.Int("count", len(articles)),
+slog.Debug("found new feed items",
+    slog.String("component", "fetcher"),
+    slog.String("feed_id", feedID),
+    slog.Int("count", len(items)),
 )
 ```
 
 #### Error Logging
 
 ```go
-// Before (current)
+// Before (legacy)
 log.Printf("ERROR: Failed to get articles: %v", err)
 fmt.Printf("warning: failed to update timestamp: %v\n", err)
 
@@ -185,121 +186,111 @@ slog.Warn("failed to update timestamp",
 #### Database Operations
 
 ```go
-// Before (current)
-log.Printf("[DB] GetForRecommendation: userID=%s, limit=%d", userID, limit)
+// Before (legacy)
+log.Printf("[DB] ListUserContent: userID=%s, limit=%d", userID, limit)
 
 // After (slog)
 slog.Debug("database query",
-    slog.String("operation", "GetForRecommendation"),
+    slog.String("operation", "ListUserContent"),
     slog.String("user_id", userID),
     slog.Int("limit", limit),
 )
 ```
 
-### 5. HTTP Middleware (Gin)
+### 5. HTTP Middleware (chi)
 
 ```go
-// pkg/logging/middleware.go
+// pkg/logging/chi_middleware.go
 package logging
 
 import (
     "log/slog"
+    "net/http"
     "time"
 
-    "github.com/gin-gonic/gin"
+    "github.com/go-chi/chi/v5/middleware"
     "github.com/google/uuid"
 )
 
-// RequestLogger returns Gin middleware for structured request logging
-func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        start := time.Now()
+// ChiRequestLogger returns Chi middleware for structured request logging
+func ChiRequestLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            start := time.Now()
 
-        // Generate or extract request ID
-        requestID := c.GetHeader("X-Request-ID")
-        if requestID == "" {
-            requestID = uuid.New().String()
-        }
-        c.Set("request_id", requestID)
-        c.Header("X-Request-ID", requestID)
+            // Generate or extract request ID
+            requestID := r.Header.Get(HeaderXRequestID)
+            if requestID == "" {
+                requestID = uuid.New().String()
+            }
+            w.Header().Set(HeaderXRequestID, requestID)
 
-        // Create request-scoped logger
-        reqLogger := logger.With(
-            slog.String("request_id", requestID),
-            slog.String("method", c.Request.Method),
-            slog.String("path", c.Request.URL.Path),
-            slog.String("client_ip", c.ClientIP()),
-        )
-        c.Set("logger", reqLogger)
+            // Create request-scoped logger
+            reqLogger := logger.With(
+                slog.String("request_id", requestID),
+                slog.String("method", r.Method),
+                slog.String("path", r.URL.Path),
+                slog.String("client_ip", r.RemoteAddr),
+            )
 
-        // Process request
-        c.Next()
+            // Wrap the response writer to capture status code and size
+            ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-        // Log completed request
-        duration := time.Since(start)
-        status := c.Writer.Status()
+            // Store logger and request ID in context
+            ctx := WithLogger(r.Context(), reqLogger)
+            ctx = WithRequestID(ctx, requestID)
+            r = r.WithContext(ctx)
 
-        // Choose log level based on status code
-        logFn := reqLogger.Info
-        if status >= 500 {
-            logFn = reqLogger.Error
-        } else if status >= 400 {
-            logFn = reqLogger.Warn
-        }
+            next.ServeHTTP(ww, r)
 
-        attrs := []any{
-            slog.Int("status", status),
-            slog.Duration("duration", duration),
-            slog.Int("size", c.Writer.Size()),
-        }
+            // Choose log level based on status code
+            status := ww.Status()
+            logFn := reqLogger.Info
+            if status >= 500 {
+                logFn = reqLogger.Error
+            } else if status >= 400 {
+                logFn = reqLogger.Warn
+            }
 
-        // Add user ID if authenticated
-        if userID, exists := c.Get("user_id"); exists {
-            attrs = append(attrs, slog.Any("user_id", userID))
-        }
-
-        logFn("http request completed", attrs...)
+            logFn("http request completed",
+                slog.Int("status", status),
+                slog.Duration("duration", time.Since(start)),
+                slog.Int("size", ww.BytesWritten()),
+            )
+        })
     }
-}
-
-// GetLogger retrieves the request-scoped logger from context
-func GetLogger(c *gin.Context) *slog.Logger {
-    if logger, exists := c.Get("logger"); exists {
-        if l, ok := logger.(*slog.Logger); ok {
-            return l
-        }
-    }
-    return slog.Default()
 }
 ```
+
+Register it first on the router (`r.Use(logging.ChiRequestLogger(logger))`, as in each service's `router.go`). Handlers and services then retrieve the request-scoped logger with `logging.FromContext(r.Context())` (see section 6) rather than a framework-specific getter.
 
 ### 6. Context Integration (net/http)
 
 ```go
-// pkg/logging/context.go
+// pkg/logging/context.go (abridged)
 package logging
 
-import (
-    "context"
-    "log/slog"
-)
-
-type contextKey string
-
-const loggerKey contextKey = "logger"
+const HeaderXRequestID = "X-Request-ID"
 
 // WithLogger adds a logger to the context
-func WithLogger(ctx context.Context, logger *slog.Logger) context.Context {
-    return context.WithValue(ctx, loggerKey, logger)
-}
+func WithLogger(ctx context.Context, logger *slog.Logger) context.Context
 
-// FromContext retrieves the logger from context, or returns default
-func FromContext(ctx context.Context) *slog.Logger {
-    if logger, ok := ctx.Value(loggerKey).(*slog.Logger); ok {
-        return logger
-    }
-    return slog.Default()
-}
+// FromContext retrieves the logger from context, or returns slog.Default()
+func FromContext(ctx context.Context) *slog.Logger
+
+// WithRequestID / GetRequestIDFromContext store and read the request ID
+func WithRequestID(ctx context.Context, requestID string) context.Context
+func GetRequestIDFromContext(ctx context.Context) string
+
+// SetRequestIDHeader copies the request ID from ctx onto an outbound request.
+// Call before every service-to-service HTTP call so IDs propagate.
+func SetRequestIDHeader(ctx context.Context, req *http.Request)
+```
+
+Usage in a handler (from `services/users/internal/handlers/auth_handler.go`):
+
+```go
+logging.FromContext(r.Context()).Warn("refresh request: body too large", slog.String("ip", ipAddress))
 ```
 
 ### 7. Log Level Guidelines
@@ -317,8 +308,8 @@ Use consistent attribute names across all services:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `service` | string | Service name (user-service, fetcher, recommender) |
-| `component` | string | Logical component (auth, recommendations, db) |
+| `service` | string | Service name (user-service, fetcher, content-service) |
+| `component` | string | Logical component (auth, fetcher, db) |
 | `request_id` | string | UUID for request tracing |
 | `user_id` | string | User identifier |
 | `article_id` | string | Article identifier |
@@ -331,29 +322,18 @@ Use consistent attribute names across all services:
 | `count` | int | Count of items |
 | `operation` | string | DB/API operation name |
 
-## Migration Strategy
+## Migration Status
 
-### Phase 1: Create Shared Package
-1. Create `pkg/logging` with logger initialization and middleware
-2. Add to both service module dependencies
+### Phase 1: Create Shared Package - Done
+`pkg/logging` provides logger initialization, chi middleware and context helpers; service modules depend on it.
 
-### Phase 2: Service-by-Service Migration
+### Phase 2: Service-by-Service Migration - Done
+User, Content, Fetcher and Email services initialize the logger in `main.go` from `LOG_LEVEL` / `LOG_FORMAT`, use `logging.ChiRequestLogger`, and log through `logging.FromContext`.
 
-**Priority order:**
-1. **User Service** - Already has sophisticated middleware, highest visibility
-2. **Recommender** - Core business logic with debugging needs
-3. **Fetcher** - Background processing, simpler logging needs
-
-**Per-service steps:**
-1. Initialize logger in `main.go` with environment config
-2. Replace middleware logging
-3. Update handlers and services
-4. Update repositories
-
-### Phase 3: Cleanup
-1. Remove old logging imports (`"log"`, `"fmt"` for logging)
-2. Update documentation
-3. Configure log aggregation (e.g., CloudWatch, Datadog)
+### Phase 3: Cleanup - Partly done
+1. Remaining `"log"` usage in service code: `services/read/content/cmd/worker/main.go` (see Current State)
+2. Documentation updated (this file)
+3. Log aggregation (e.g., CloudWatch, Datadog) - open
 
 ## Output Examples
 

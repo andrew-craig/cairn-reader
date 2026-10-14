@@ -1,12 +1,14 @@
 # Cairn Backend
 
-A modern, scalable read-it-later backend system built with Go, PostgreSQL, and Docker. Cairn enables users to subscribe to RSS feeds, automatically receive new content, save articles, and manage their reading list.
+A read-it-later backend built with Go, PostgreSQL, and Docker. Cairn enables users to subscribe to RSS feeds and email senders, automatically receive new content, save articles, and manage two lists: **Feed** (skim) and **Reads** (read or triage).
 
 ## Overview
 
 Cairn is a microservices-based backend that provides:
 
 - **RSS Feed Management**: Subscribe to RSS/Atom feeds with intelligent tiered polling
+- **Email Ingestion**: Turn newsletters into articles (see [email/CLAUDE.md](/services/read/email/CLAUDE.md))
+- **Feed and Reads Lists**: The user picks the list per source (new email senders default to Reads, saved links always go to Reads). Re-routing a source affects new items only, and non-favorited Feed items are deleted after 30 days
 - **Content Storage**: Store and serve article content with readability extraction and HTML sanitization
 - **User Reading Lists**: Personal reading lists with status tracking, favorites, and scroll position
 - **Content Deduplication**: Automatic deduplication to avoid storing duplicate articles
@@ -16,7 +18,7 @@ Cairn is a microservices-based backend that provides:
 
 ## Architecture
 
-Cairn consists of two main microservices:
+Cairn consists of three microservices (Content, Ingest RSS, Email Ingest) plus background workers:
 
 ```
 ┌─────────────────────┐         ┌──────────────────────┐
@@ -27,35 +29,37 @@ Cairn consists of two main microservices:
 │  - Search           │   API   │  - Subscription Mgmt │
 │  - Metadata         │         │  - Outbox Delivery   │
 └──────────┬──────────┘         └──────────┬───────────┘
-           │                               │
-           │                               │
-     ┌─────▼─────┐                   ┌─────▼─────┐
-     │ PostgreSQL│                   │ PostgreSQL│
-     │ (Content) │                   │(ingest_rss)│
-     └───────────┘                   └───────────┘
+           │   ▲                           │
+           │   └──── Email Ingest ─────────┤  (same delivery path;
+     ┌─────▼─────┐   Service           ┌───▼───────┐   see email/CLAUDE.md)
+     │ PostgreSQL│                     │ PostgreSQL│
+     │ (Content) │                     │(rss_fetcher)│
+     └───────────┘                     └───────────┘
 ```
 
 ### Services
 
-#### Content Service (`services/content-service/`)
+#### Content Service (`content/`, [README](content/README.md))
 
-Manages article content and user reading lists:
+Manages article content, user lists and Feed/Reads routing:
 
-- **Port**: 8080
-- **Database**: PostgreSQL (content_service)
+- **Port**: 8080 in the container, 8083 on the dev host
+- **Database**: PostgreSQL (`content_service`)
 - **Responsibilities**:
   - Store and serve cleaned article content
-  - Manage user-content relationships (status, favorites, scroll position)
+  - Manage user-content relationships (status, favorites, scroll position, list)
+  - Own the Feed/Reads routing (`source_routes`, `user_contents.list`)
   - Provide search functionality with PostgreSQL full-text search
-  - Handle content deduplication by hash and feed ID
-  - Support bulk operations for RSS Fetcher integration
+  - Handle content deduplication by hash and feed (RSS) or URL (email/manual)
+  - Support bulk operations for Ingest RSS and Email Ingest
+  - Aggregate and proxy subscription management for RSS and email
 
-#### Ingest RSS Service (ingest_rss) (`services/rss-fetcher-service/`)
+#### Ingest RSS Service (`fetcher/`, binary `ingest_rss`)
 
 Manages RSS feed subscriptions and content delivery:
 
-- **Port**: 8081
-- **Database**: PostgreSQL (ingest_rss)
+- **Port**: 8081 in the container, 8085 on the dev host
+- **Database**: PostgreSQL (`rss_fetcher_service`)
 - **Responsibilities**:
   - Subscribe/unsubscribe users to RSS feeds
   - Poll feeds using tiered strategy (hourly, 6-hourly, daily)
@@ -63,6 +67,10 @@ Manages RSS feed subscriptions and content delivery:
   - Detect content updates via ETag/Last-Modified headers
   - Deliver content to Content Service via outbox pattern
   - Auto-disable feeds after 7 consecutive error days
+
+#### Email Ingest Service (`email/`)
+
+Email-to-article ingestion pipeline. See [email/CLAUDE.md](/services/read/email/CLAUDE.md).
 
 ### Key Design Principles
 
@@ -77,7 +85,7 @@ Manages RSS feed subscriptions and content delivery:
 
 - **Docker** 20.10+
 - **Docker Compose** 2.0+
-- **Go** 1.21+ (for local development)
+- **Go** 1.25+ (for local development; see `go.mod`)
 - **Make** (optional, for convenience commands)
 
 ## Quick Start
@@ -86,53 +94,58 @@ Manages RSS feed subscriptions and content delivery:
 
 ```bash
 git clone https://github.com/andrew-craig/cairn-reader.git
-cd cairn/services/read
+cd cairn-reader
 ```
 
 ### 2. Start Services with Docker Compose
 
+There is no `docker-compose.yml` under `services/read/`; the dev stack lives in `infrastructure/docker/dev/`.
+
 ```bash
+cd infrastructure/docker/dev
 docker compose up -d
 ```
 
-This will start:
-- Content Service (http://localhost:8080)
-- Ingest RSS Service (http://localhost:8081)
-- PostgreSQL databases for both services
-- Background workers for feed polling and content delivery
+This will start (among other services):
+- Content Service (http://localhost:8083)
+- Ingest RSS Service (http://localhost:8085)
+- Email Ingest Service (http://localhost:8089)
+- One consolidated PostgreSQL container with a logical database per service
+- Background workers (`content-worker`, `ingest-rss-worker`, email worker)
 
 ### 3. Verify Services are Running
 
 ```bash
-# Check Content Service health
-curl http://localhost:8080/health/ready
-
-# Check Ingest RSS Service health
-curl http://localhost:8081/health/ready
+curl http://localhost:8083/health/ready
+curl http://localhost:8085/health/ready
 ```
 
 ### 4. Run Database Migrations
 
-Migrations run automatically on service startup. To run manually:
+Migrations run automatically on service startup. To run manually from `services/read/`
+(per-service targets; the Makefile targets the standalone `localhost:5433`/`5434` databases):
 
 ```bash
-# Apply all pending migrations
 make migrate-up
-
-# Check migration status
-make migrate-status
+make migrate-status-content
+make migrate-status-fetcher
 ```
 
 ## Usage Examples
 
-### Subscribe to a Feed
+All user-facing calls go through the Content Service with a JWT from the User Service.
+The Ingest RSS routes (`/api/v1/source/rss`) are internal and require `X-Internal-API-Key`.
+
+### Subscribe to a Feed (and choose Feed or Reads)
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/source/rss/user/550e8400-e29b-41d4-a716-446655440000/subscription \
+curl -X POST http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "feed_url": "https://blog.golang.org/feed.atom"
+    "url": "https://blog.golang.org/feed.atom",
+    "type": "feed",
+    "list": "feed"
   }'
 ```
 
@@ -144,7 +157,7 @@ curl -X POST http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-4
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
     "url": "https://example.com/article",
-    "source_type": "manual"
+    "type": "page"
   }'
 ```
 
@@ -152,7 +165,7 @@ curl -X POST http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-4
 
 ```bash
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  "http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000?limit=20"
+  "http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-446655440000?list=reads&limit=20"
 ```
 
 ### Search User's Contents
@@ -178,8 +191,9 @@ curl -X PATCH http://localhost:8083/api/v1/content/user/550e8400-e29b-41d4-a716-
 
 Comprehensive API documentation is available in OpenAPI 3.0 format:
 
-- **Content Service API**: [services/content-service/api/openapi.yaml](services/content-service/api/openapi.yaml)
-- **Ingest RSS Service API**: [services/rss-fetcher-service/api/openapi.yaml](services/rss-fetcher-service/api/openapi.yaml)
+- **Content Service API**: [content/api/openapi.yaml](content/api/openapi.yaml)
+- **Ingest RSS Service API**: [fetcher/api/openapi.yaml](fetcher/api/openapi.yaml)
+- **Email Ingest Service API**: [email/api/openapi.yaml](email/api/openapi.yaml)
 
 You can view these specifications using any OpenAPI viewer like [Swagger Editor](https://editor.swagger.io/).
 
@@ -187,86 +201,43 @@ You can view these specifications using any OpenAPI viewer like [Swagger Editor]
 
 ### Project Structure
 
-```
-cairn/services/read/
-├── services/
-│   ├── content-service/           # Content Service
-│   │   ├── api/                   # OpenAPI specs
-│   │   ├── cmd/                   # Entry points
-│   │   ├── internal/              # Internal packages
-│   │   │   ├── api/              # HTTP handlers & middleware
-│   │   │   ├── repository/       # Database layer
-│   │   │   ├── service/          # Business logic
-│   │   │   ├── processor/        # Content processing
-│   │   │   └── jobs/             # Background jobs
-│   │   ├── migrations/           # Database migrations
-│   │   └── Dockerfile
-│   │
-│   └── rss-fetcher-service/      # Ingest RSS Service (ingest_rss)
-│       ├── api/                   # OpenAPI specs
-│       ├── cmd/                   # Entry points
-│       ├── internal/              # Internal packages
-│       │   ├── api/              # HTTP handlers & middleware
-│       │   ├── repository/       # Database layer
-│       │   ├── service/          # Business logic
-│       │   ├── fetcher/          # Feed fetching
-│       │   ├── processor/        # Content processing
-│       │   ├── worker/           # Background workers
-│       │   ├── jobs/             # Scheduled jobs
-│       │   └── client/           # Content Service client
-│       ├── migrations/           # Database migrations
-│       └── Dockerfile
-│
-├── docs/                          # Documentation
-├── scripts/                       # Utility scripts
-├── docker-compose.yml            # Docker Compose config
-├── Makefile                      # Build commands
-└── README.md                     # This file
-```
+See the Directory Structure section of [CLAUDE.md](/services/read/CLAUDE.md). In short:
+`content/`, `fetcher/` and `email/` each hold `cmd/` (server and worker entry points), `internal/`,
+`migrations/`, `api/openapi.yaml` and Dockerfiles; `scripts/` and the `Makefile` live at this level.
 
 ### Building Locally
 
 ```bash
-# Build Content Service
-cd services/content-service
-go build -o bin/content-service ./cmd/server
-
-# Build Ingest RSS Service
-cd services/rss-fetcher-service
-go build -o bin/ingest-rss ./cmd/server
+make build-all        # content, content-worker, fetcher (ingest_rss), fetcher-worker, email, email-worker -> bin/
+make build-content    # one service (also build-fetcher, build-email, build-*-worker)
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all unit tests (content, fetcher, email)
 make test
 
-# Run tests with coverage
-make test-coverage
-
-# Run integration tests (requires PostgreSQL)
-make test-integration
-
 # Run tests for a specific service
-cd services/content-service
-go test ./...
+make test-content     # also test-fetcher, test-email
+
+# Integration tests use the `integration` build tag and need PostgreSQL (TEST_DB_* env vars)
+cd content && go test -tags=integration ./...
+cd fetcher && go test -tags=integration ./...
+
+# Coverage (no make target)
+cd content && go test -coverprofile=coverage.out ./...
 ```
 
 ### Database Migrations
 
+Per-service targets (content and fetcher; email has its own migrations):
+
 ```bash
-# Apply all pending migrations
-make migrate-up
-
-# Rollback last migration
-make migrate-down
-
-# Create new migration
-make migrate-create name=add_new_feature
-
-# Check migration status
-make migrate-status
+make migrate-up                           # content + fetcher
+make migrate-down                         # roll back last migration in each
+make migrate-create-content name=add_new_feature   # or migrate-create-fetcher
+make migrate-status-content               # or migrate-status-fetcher
 ```
 
 ## Configuration
@@ -274,21 +245,23 @@ make migrate-status
 Services are configured via environment variables. See:
 
 - [../../docs/CONFIGURATION.md](../../docs/CONFIGURATION.md) - Complete configuration reference
-- [.env.example](services/content-service/.env.example) - Example environment files
+- [content/.env.example](content/.env.example), [fetcher/.env.example](fetcher/.env.example) - Example environment files
+- The Environment Variables section of [CLAUDE.md](/services/read/CLAUDE.md) - per-service and worker variables
 
 Key environment variables:
 
 ```bash
 # Content Service
-DATABASE_URL=postgres://user:pass@localhost:5432/content_service?sslmode=disable
-SERVER_PORT=8080
+PORT=8080
+DB_HOST=cairn-db  DB_PORT=5432  DB_USER=...  DB_PASSWORD=...  DB_NAME=content_service
+INTERNAL_API_KEY=...
 LOG_LEVEL=info
 
 # Ingest RSS Service
-DATABASE_URL=postgres://user:pass@localhost:5433/ingest_rss?sslmode=disable
-SERVER_PORT=8081
-CONTENT_SERVICE_URL=http://content-service:8080
-LOG_LEVEL=info
+PORT=8081
+DB_HOST=cairn-db  DB_PORT=5432  DB_USER=...  DB_PASSWORD=...  DB_NAME=rss_fetcher_service
+INTERNAL_API_KEY=...
+# Ingest RSS worker also needs CONTENT_SERVICE_URL=http://content-service:8080
 ```
 
 ## Deployment
@@ -297,39 +270,34 @@ For detailed deployment instructions, see [../../docs/DEPLOYMENT.md](../../docs/
 
 ### Docker Compose (Recommended for Single-Server)
 
+Run from `infrastructure/docker/dev/` (dev) or see the deployment docs for production:
+
 ```bash
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
-
-# Stop and remove volumes (WARNING: deletes data)
-docker compose down -v
+docker compose up -d      # Start all services
+docker compose logs -f    # View logs
+docker compose down       # Stop all services
+docker compose down -v    # Stop and remove volumes (WARNING: deletes data)
 ```
 
 ### Health Checks
 
-Both services provide health check endpoints:
+Each service provides health check endpoints (dev host ports shown):
 
 ```bash
 # Liveness - is the service running?
-curl http://localhost:8080/health/live
-curl http://localhost:8081/health/live
+curl http://localhost:8083/health/live
+curl http://localhost:8085/health/live
 
 # Readiness - is the service ready (includes DB check)?
-curl http://localhost:8080/health/ready
-curl http://localhost:8081/health/ready
+curl http://localhost:8083/health/ready
+curl http://localhost:8085/health/ready
 ```
 
 ## Background Jobs & Workers
 
 ### Content Service
 
-- **Orphaned Content Cleanup**: Runs daily at 2 AM, deletes content orphaned for 90+ days
+- **Cleanup Job** (`content-worker`): Runs daily at 2 AM (`CLEANUP_CRON`); first deletes non-favorited Feed items older than 30 days, then content orphaned for 90+ days
 
 ### Ingest RSS Service
 
@@ -341,7 +309,7 @@ curl http://localhost:8081/health/ready
 - **Content Extraction Worker**: Processes pending feed items, extracts full content
 - **Outbox Delivery Worker**: Delivers content to Content Service with retry logic
 - **Outbox Cleanup Job**: Runs daily at 3 AM, removes delivered entries older than 7 days
-- **Feed Items Cleanup Job**: Runs daily at 4 AM, removes old completed/failed items
+- **Feed Items Cleanup Job**: Runs daily at 4 AM, removes completed items older than 7 days and failed items older than 30 days
 
 ## Features
 
@@ -349,11 +317,12 @@ curl http://localhost:8081/health/ready
 
 - ✅ HTML readability extraction using [go-readability](https://github.com/go-shiori/go-readability)
 - ✅ HTML sanitization using [bluemonday](https://github.com/microcosm-cc/bluemonday)
-- ✅ Content deduplication by hash + feed ID
+- ✅ Content deduplication by hash + feed ID (RSS) or hash + URL (email/manual)
+- ✅ Feed and Reads lists with per-source routing and 30-day Feed expiry
 - ✅ Content size limit (5MB)
 - ✅ URL canonicalization
 - ✅ Full-text search (PostgreSQL GIN index)
-- ✅ Cursor-based pagination (20 items/page)
+- ✅ Cursor-based pagination (20 items/page by default, max 100)
 - ✅ Content update detection via HTTP caching headers
 
 ### Feed Features
@@ -401,10 +370,10 @@ docker compose logs -f | grep ERROR
 
 ```bash
 # Connect to Content Service database
-docker compose exec postgres-content psql -U cairn -d content_service
+docker compose exec cairn-db psql -U cairn_content -d content_service
 
 # Connect to Ingest RSS database
-docker compose exec postgres-fetcher psql -U cairn -d ingest_rss
+docker compose exec cairn-db psql -U cairn_rss -d rss_fetcher_service
 ```
 
 ## Troubleshooting
@@ -429,7 +398,7 @@ Cairn has comprehensive test coverage:
 - **Integration Tests**: End-to-end API and database flows
 - **Test Coverage**: 80%+ across critical paths
 
-See [INTEGRATION_TESTS.md](INTEGRATION_TESTS.md) for details on running integration tests.
+See [../../docs/TESTING.md](../../docs/TESTING.md) for details on running integration tests.
 
 ## License
 
@@ -439,8 +408,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### Core
 
-- **Language**: Go 1.21+
-- **Database**: PostgreSQL 15+
+- **Language**: Go 1.25+
+- **Database**: PostgreSQL 18
 - **Containerization**: Docker & Docker Compose
 
 ### Libraries
@@ -468,14 +437,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 Future enhancements planned:
 
-- [ ] Authentication & authorization (JWT)
 - [ ] Prometheus metrics endpoint
-- [ ] Structured logging with Zap
 - [ ] Rate limiting middleware
 - [ ] Kubernetes deployment manifests
 - [ ] GraphQL API option
 - [ ] WebSocket support for real-time updates
-- [ ] Recommendation engine
 - [ ] Import/export functionality
 
 ## Support

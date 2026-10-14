@@ -8,6 +8,8 @@ This package provides JWT validation and HTTP middleware for protecting endpoint
 - **HTTP Middleware**: Ready-to-use middleware for `net/http` handlers
 - **User Context**: Extract authenticated user ID from request context
 - **Vault Integration**: Fetch JWT public keys from HashiCorp Vault
+- **Key Rotation**: `KeyRefresher` polls for rotated keys and re-fetches on a signature failure
+- **Internal API Key**: `InternalAuthMiddleware` for service-to-service endpoints (`X-Internal-API-Key`)
 - **Token Inspection**: Debug utilities for examining token contents
 - **Thread-Safe**: Safe for concurrent use across multiple goroutines
 
@@ -43,7 +45,7 @@ func main() {
         log.Fatal(err)
     }
 
-    publicKey, err := vaultClient.GetPublicKey("secret/jwt/public-key")
+    publicKey, err := vaultClient.GetPublicKey("secret/data/jwt/public-key")
     if err != nil {
         log.Fatal(err)
     }
@@ -97,7 +99,7 @@ func main() {
 mux := http.NewServeMux()
 
 // Protected routes - require valid JWT
-mux.Handle("/api/v1/recommendations/", middleware.RequireAuth(recommendationsHandler))
+mux.Handle("/api/v1/content/", middleware.RequireAuth(contentHandler))
 mux.Handle("/api/v1/articles/read", middleware.RequireAuth(markReadHandler))
 
 // Optional auth - useful for endpoints that work with or without auth.
@@ -114,7 +116,8 @@ http.ListenAndServe(":8080", mux)
 ### Custom Configuration
 
 ```go
-// Custom issuer and audience validation
+// NewValidator already defaults to issuer "cairn-user-service" and audience
+// "cairn-api"; use NewValidatorWithConfig to override them or set a key ID
 validator := auth.NewValidatorWithConfig(auth.ValidatorConfig{
     PublicKey: publicKey,
     Issuer:    "cairn-user-service",
@@ -153,7 +156,7 @@ validator := auth.NewValidator(publicKey *rsa.PublicKey)
 // Validate a token string
 claims, err := validator.ValidateToken(tokenString)
 
-// Update public key (for key rotation)
+// Update public key (for key rotation; KeyRefresher does this for you)
 validator.UpdatePublicKey(newPublicKey)
 
 // Get token info without full validation (debugging only)
@@ -235,7 +238,7 @@ vaultClient, err := auth.NewVaultClient(&auth.VaultConfig{
 })
 
 // Fetch public key
-publicKey, err := vaultClient.GetPublicKey("secret/jwt/public-key")
+publicKey, err := vaultClient.GetPublicKey("secret/data/jwt/public-key")
 
 // Health check
 err := vaultClient.Health()
@@ -385,32 +388,20 @@ func handleListUserContents(w http.ResponseWriter, r *http.Request) {
 
 1. **Store Public Key Securely**: Fetch from Vault, not from environment variables
 2. **Use `GetUserIDOrError()` Instead of `MustGetUserID()`**: Return errors instead of panicking to prevent service crashes on middleware misconfiguration
-3. **Handle Key Rotation**: Update the validator's public key when rotated
+3. **Handle Key Rotation**: Use a `KeyRefresher` (see below) so the validator picks up rotated keys
 4. **Validate Issuer/Audience**: Always set these to prevent token misuse
 5. **Use HTTPS in Production**: JWT tokens should only be transmitted over TLS
-6. **Set Short Token Expiry**: Default is 15 minutes for access tokens
+6. **Set Short Token Expiry**: The User Service issues access tokens valid for 60 minutes by default (`JWT_ACCESS_TOKEN_EXPIRY`)
 7. **Log Authentication Failures**: For security monitoring and debugging
 
 ## Key Rotation Support
 
-When the user service rotates its JWT signing keys, consuming services need to update their public key:
+The User Service rotates its signing key on a timer (`JWT_KEY_ROTATION_INTERVAL`, default 24h), so a validator built once at startup would reject new tokens. `KeyRefresher` keeps it current in two ways: `Start` polls the key source on an interval, and a signature failure triggers an on-demand re-fetch (debounced to once per 10s) before validation retries once.
 
 ```go
-// Periodic key refresh (every 1 hour)
-go func() {
-    ticker := time.NewTicker(1 * time.Hour)
-    defer ticker.Stop()
-
-    for range ticker.C {
-        newPublicKey, err := vaultClient.GetPublicKey("secret/jwt/public-key")
-        if err != nil {
-            log.Printf("Failed to refresh public key: %v", err)
-            continue
-        }
-        validator.UpdatePublicKey(newPublicKey)
-        log.Println("JWT public key refreshed")
-    }
-}()
+// vaultClient satisfies PublicKeyFetcher (GetPublicKey(path))
+keyRefresher := auth.NewKeyRefresher(vaultClient, publicKeyPath, validator)
+keyRefresher.Start(ctx, 5*time.Minute) // a non-positive interval disables polling only
 ```
 
 ## Testing

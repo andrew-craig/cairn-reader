@@ -31,13 +31,13 @@ pkg/logging/chi_middleware.go  → structured request logging (ChiRequestLogger)
 
 ### Global Middleware (all routes)
 
-Applied via `r.Use(...)` at the top of each router, in this order. `ChiRequestLogger` must wrap `Recovery`, or panics are logged with `request_id=unknown` (enforced by each router's `TestRouter_PanicLogCarriesRequestID`):
+Applied via `r.Use(...)` at the top of each router, in this order. `ChiRequestLogger` must wrap `Recovery`, or panics are logged with `request_id=unknown` (enforced by each router's `TestRouter_PanicLogCarriesRequestID`). Which of the shared middleware each router applies globally varies (see "Per-Service Configuration"):
 
 | Middleware | Package | Purpose |
 |---|---|---|
 | `ChiRequestLogger` | `pkg/logging` | Structured `slog` logging; generates `X-Request-ID`; puts the request-scoped logger in context (`logging.FromContext`); logs status, duration, size |
 | `Recovery` | `pkg/middleware` | Catches panics; logs with request ID; returns `500` JSON — never leaks internals |
-| `SecureHeadersRelaxed` | `pkg/middleware` | Sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection`, `Strict-Transport-Security`, `Referrer-Policy` |
+| `SecureHeadersRelaxed` | `pkg/middleware` | Content, Ingest RSS and Email Ingest apply it globally; the User Service applies it inside its `/api/v1` group. Sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection`, `Strict-Transport-Security`, `Referrer-Policy` |
 
 ### Route-Group Middleware
 
@@ -46,8 +46,8 @@ Applied via `r.Use(...)` inside `r.Route(...)` blocks:
 | Middleware | Package | Purpose |
 |---|---|---|
 | `RequireHTTPS` | `pkg/middleware` | Checks `r.TLS` and `X-Forwarded-Proto`; returns `403` if not HTTPS |
-| `CORS` / `DevelopmentCORS` | `pkg/middleware` | Handles CORS preflight and response headers; strict config in prod |
-| `RateLimit` | `pkg/middleware` | Token-bucket rate limiter keyed by client IP; configured per route group |
+| `CORS` / `DevelopmentCORS` | `pkg/middleware` | Handles CORS preflight and response headers. The User, Content and Email Ingest routers apply `CORS(DefaultCORSConfig())` globally (`StrictCORSConfig` exists but has no callers); Ingest RSS has none |
+| `RateLimit` | `pkg/middleware` | Token-bucket rate limiter keyed by client IP; configured per route group (`RateLimitRedis` is a Redis-backed variant) |
 | `RequireAuth` | `pkg/auth` | Validates RS256 JWT; stores `user_id` UUID in context via `UserIDContextKey` |
 | `OptionalAuth` | `pkg/auth` | Anonymous when no `Authorization` header; **401** when a header is present but the token is malformed/invalid (fail-closed on presented credentials) |
 | `RequireInternalAPIKey` | `pkg/auth` | Validates `X-Internal-API-Key` header using constant-time compare |
@@ -59,14 +59,14 @@ Health routes (`/health/live`, `/health/ready`) are registered outside all secur
 
 ## Per-Service Configuration
 
-| Service | Port | Router file | Auth type | Extra middleware |
+Ports are container-internal ports; see the Port Reference in [docs/ARCHITECTURE.md](../ARCHITECTURE.md) for dev host ports.
+
+| Service | Container port | Router file | Auth type | Extra middleware |
 |---|---|---|---|---|
-| User Service | 8082 | `services/users/internal/handlers/router.go` | JWT (`RequireAuth`) | Rate limit on `/auth/*` (10 req/min), CORS |
-| Content Service | 8083 | `services/read/content/internal/api/router.go` | JWT + Internal API key | `ValidateJSON` globally |
-| Ingest RSS Service | 8085 | `services/read/fetcher/internal/api/router.go` | None (internal) | 60s request timeout |
-| Email Ingest Service | 8087 | `services/read/email/internal/api/router.go` | JWT + API key | RequestID, RealIP (chi built-ins) |
-| Explore Fetcher | 8080 | `services/explore/fetcher/...` | None (internal) | Security headers |
-| Explore Recommender | 8081 | `services/explore/recommender/internal/api/server.go` | JWT (`RequireAuth`) | — |
+| User Service | 8080 | `services/users/internal/handlers/router.go` | JWT (`RequireAuth`) | Rate limit on `/auth/*` (`RATE_LIMIT_REQUESTS`, default 100 per `RATE_LIMIT_WINDOW`, default 1m), CORS |
+| Content Service | 8080 | `services/read/content/internal/api/router.go` | JWT + Internal API key | `ValidateJSON` globally, CORS |
+| Ingest RSS Service | 8081 | `services/read/fetcher/internal/api/router.go` | Internal API key | 60s request timeout |
+| Email Ingest Service | 8087 | `services/read/email/internal/api/router.go` | JWT + API key (`/ingest`) + Internal API key | RealIP (chi built-in), CORS |
 
 ## Key Shared Components
 
