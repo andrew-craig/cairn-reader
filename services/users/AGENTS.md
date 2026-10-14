@@ -97,8 +97,14 @@ make run                     # Run user service (default port 8080, set PORT to 
 make dev                     # Run with live reload (requires air)
 
 # Testing
-make test                    # Run unit tests (go test ./internal/...)
+make test                    # Run unit tests (go test -v ./internal/...); alias: make test-unit
 make test-coverage           # Generate coverage report (coverage.html)
+make test-integration        # Integration tests in test/integration (needs Docker; starts/stops its own compose)
+make test-integration-up     # Start only the integration environment (DB localhost:5433, Vault localhost:8201)
+make test-integration-down   # Stop it and remove volumes
+make test-all                # Unit + integration
+make test-security           # Security tests in test/security (needs a running service at USER_SERVICE_URL)
+make clean                   # Remove bin/ and coverage output
 
 # Database migrations
 make migrate-up              # Apply pending migrations
@@ -200,10 +206,14 @@ services/users/
 │   │   ├── email_verification_service.go
 │   │   └── audit.go         # Audit logging helpers
 │   └── validation/          # Input validation (email)
-├── migrations/             # Database migrations (golang-migrate up/down pairs)
+├── migrations/             # Database migrations (golang-migrate up/down pairs, 000001-000008; embed.go embeds them)
 │   ├── 000001_create_users_table.up.sql
 │   ├── 000001_create_users_table.down.sql
 │   └── ...
+├── selfhost/               # Init wrappers used by the consolidated self-hosted binary
+├── test/
+│   ├── integration/        # Docker-based integration tests
+│   └── security/           # Security test scripts (run_all_tests.sh)
 ├── api/
 │   └── openapi.yaml        # OpenAPI 3.0 specification
 ├── Dockerfile              # Multi-stage Docker build
@@ -296,176 +306,33 @@ Account types are determined by which fields are populated (no separate `account
 
 ## API Endpoints
 
-### Health Checks
-```bash
-# Liveness check
-curl http://localhost:8082/health/live
+Request/response schemas, status codes and examples live in [api/openapi.yaml](api/openapi.yaml) (update it with every endpoint change). Routes are registered in `internal/handlers/router.go`.
 
-# Readiness check (includes DB and Vault connectivity)
-curl http://localhost:8082/health/ready
-```
+| Method & path | Auth | Purpose |
+|---------------|------|---------|
+| `GET /health/live`, `GET /health/ready` | none | Liveness; readiness (checks DB and Vault). Also answer `HEAD` |
+| `POST /api/v1/auth/register` | none | Email/password account; returns user + tokens |
+| `POST /api/v1/auth/register/mobile` | none | Mobile-only account from `expo_device_id` |
+| `POST /api/v1/auth/login` | none | Email/password login |
+| `POST /api/v1/auth/login/mobile` | none | Device ID login (rejected for hybrid accounts) |
+| `POST /api/v1/auth/refresh` | none | Rotate refresh token; returns new access + refresh token |
+| `POST /api/v1/auth/logout` | none | Revoke one refresh token |
+| `POST /api/v1/auth/logout-all` | Bearer | Revoke all of the user's refresh tokens |
+| `POST /api/v1/auth/resend-verification` | Bearer | Resend the email verification message |
+| `POST` / `GET /api/v1/auth/verify-email` | none | Verify email with a token (JSON body, or `?token=` for email links) |
+| `GET` / `PATCH` / `DELETE /api/v1/user/{user_id}` | Bearer | Get profile, update email, delete account |
+| `POST /api/v1/user/{user_id}/upgrade` | Bearer | Add email/password to a mobile-only account |
+| `PUT /api/v1/user/{user_id}/password` | Bearer | Change password |
 
-All `/api/v1/*` routes sit behind `RequireHTTPS` regardless of `ENVIRONMENT`: a plain-HTTP request is rejected with `403 {"error": "HTTPS required"}` unless it arrives over TLS or carries `X-Forwarded-Proto: https` (as set by a TLS-terminating reverse proxy). When calling the service directly with `curl`, add `-H "X-Forwarded-Proto: https"` to the examples below. `/health/*` is exempt.
+All `/api/v1/*` routes sit behind `RequireHTTPS` regardless of `ENVIRONMENT`: a plain-HTTP request is rejected with `403 {"error": "HTTPS required"}` unless it arrives over TLS or carries `X-Forwarded-Proto: https` (as set by a TLS-terminating reverse proxy). When calling the service directly with `curl`, add `-H "X-Forwarded-Proto: https"` to the examples in this file. `/health/*` is exempt.
 
-Successful responses are wrapped in a `{"data": ..., "meta": {...}}` envelope; error responses are `{"error": "<code>", "message": "...", "details": {...}, "meta": {...}}`. The examples below show the `data` payload.
-
-### Authentication Endpoints
-
-**Register with email/password**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepass123"
-  }'
-
-# Response (`data`; expires_in is the access token lifetime in seconds):
-{
-  "user": {
-    "id": "uuid-here",
-    "email": "user@example.com",
-    "email_verified": false,
-    "created_at": "2025-01-09T10:00:00Z",
-    "updated_at": "2025-01-09T10:00:00Z"
-  },
-  "access_token": "eyJhbGciOiJSUzI1NiIs...",
-  "refresh_token": "refresh-token-here",
-  "expires_in": 3600
-}
-```
-
-**Register mobile-only account**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/register/mobile \
-  -H "Content-Type: application/json" \
-  -d '{
-    "expo_device_id": "device-id-from-expo-application"
-  }'
-
-# Response: Same as above
-```
-
-**Login with email/password**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepass123"
-  }'
-```
-
-**Login with device ID**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/login/mobile \
-  -H "Content-Type: application/json" \
-  -d '{
-    "expo_device_id": "device-id-from-expo-application"
-  }'
-```
-
-**Refresh access token**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "refresh-token-here"
-  }'
-
-# Response: New access token and new refresh token (rotation)
-```
+Successful responses are wrapped in a `{"data": ..., "meta": {...}}` envelope; error responses are `{"error": "<code>", "message": "...", "details": {...}, "meta": {...}}`. Token responses carry `user`, `access_token`, `refresh_token` and `expires_in` (access token lifetime in seconds).
 
 Repeated failed email/password logins lock the account: 5 consecutive failures lock it for 15 minutes (service defaults; not configurable via environment variables).
 
-**Logout (revoke refresh token)**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/logout \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <JWT>" \
-  -d '{
-    "refresh_token": "refresh-token-here"
-  }'
-```
-
-**Logout all devices (revoke all refresh tokens)**:
-```bash
-curl -X POST http://localhost:8082/api/v1/auth/logout-all \
-  -H "Authorization: Bearer <JWT>"
-```
-
-**Email verification**:
-```bash
-# Resend verification email (requires auth)
-curl -X POST http://localhost:8082/api/v1/auth/resend-verification \
-  -H "Authorization: Bearer <JWT>"
-
-# Verify email with token (also accepts GET with ?token= for email links)
-curl -X POST http://localhost:8082/api/v1/auth/verify-email \
-  -H "Content-Type: application/json" \
-  -d '{"token": "verification-token-here"}'
-```
+After an upgrade the account is hybrid and device ID login is disabled; the user must authenticate with email/password.
 
 **Password reset**: not implemented. `/forgot-password` and `/reset-password` were removed (H3+H4, `epic_fefa`) — the tokens they generated were never delivered to the user by any mailer, and the self-host build panicked on both routes because it never wired up the token repository. Rather than ship a route that appears to work but silently does nothing, the routes were deleted; users with an email/password account who forget their password have no self-service recovery today. Account deletion + re-registration is the only path until a real delivery mechanism (and the routes) are added back deliberately.
-
-### User Management Endpoints (Authenticated)
-
-**Get user profile**:
-```bash
-curl -H "Authorization: Bearer <JWT>" \
-  http://localhost:8082/api/v1/user/{user_id}
-
-# Response (`data`):
-{
-  "id": "user-id",
-  "email": "user@example.com",
-  "email_verified": false,
-  "created_at": "2025-01-09T10:00:00Z",
-  "updated_at": "2025-01-09T11:00:00Z",
-  "last_login_at": "2025-01-09T11:00:00Z"
-}
-```
-
-**Update user profile**:
-```bash
-curl -X PATCH http://localhost:8082/api/v1/user/{user_id} \
-  -H "Authorization: Bearer <JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newemail@example.com"
-  }'
-```
-
-**Upgrade mobile-only account to email/password**:
-```bash
-curl -X POST http://localhost:8082/api/v1/user/{user_id}/upgrade \
-  -H "Authorization: Bearer <JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepass123"
-  }'
-
-# Note: After upgrade, device ID login is disabled
-# User must authenticate with email/password
-```
-
-**Change password**:
-```bash
-curl -X PUT http://localhost:8082/api/v1/user/{user_id}/password \
-  -H "Authorization: Bearer <JWT>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "current_password": "securepass123",
-    "new_password": "newsecurepass123"
-  }'
-```
-
-**Delete account**:
-```bash
-curl -X DELETE http://localhost:8082/api/v1/user/{user_id} \
-  -H "Authorization: Bearer <JWT>"
-```
 
 ## Key Implementation Details
 
@@ -563,8 +430,8 @@ err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
 
 2. **Store in Vault**:
    ```bash
-   vault kv put secret/jwt/private-key value=@private.pem
-   vault kv put secret/jwt/public-key value=@public.pem
+   vault kv put secret/jwt/private-key key=@private.pem
+   vault kv put secret/jwt/public-key key=@public.pem
    ```
 
 3. **Retrieve Keys** (on service startup):
@@ -717,11 +584,11 @@ func TestHashPassword(t *testing.T) {
 
 ### Testing Authentication Flow
 
-**1. Register user**:
+**1. Register user** (default password rules need upper, lower, digit and special character; add `-H "X-Forwarded-Proto: https"` when hitting the service directly):
 ```bash
 curl -X POST http://localhost:8082/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"testpass123"}'
+  -d '{"email":"test@example.com","password":"Testpass123!"}'
 ```
 
 **2. Save tokens** from response:
@@ -1230,11 +1097,11 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
    export VAULT_ADDR=http://localhost:8200
    export VAULT_TOKEN=dev-root-token
 
-   vault kv put secret/jwt/private-key value=@private.pem
-   vault kv put secret/jwt/public-key value=@public.pem
+   vault kv put secret/jwt/private-key key=@private.pem
+   vault kv put secret/jwt/public-key key=@public.pem
    ```
 
-3. Configure User Service:
+3. Configure User Service (the secret must hold the PEM in a `key` field, as read by `GetJWTKeys` in `internal/auth/vault.go`):
    ```bash
    export VAULT_ADDR=http://localhost:8200
    export VAULT_TOKEN=dev-root-token
@@ -1280,28 +1147,10 @@ The centralized Docker Compose setup ([infrastructure/docker/dev/docker-compose.
 
 ### Cross-Service Integration
 
-**How other services validate JWTs**:
-
-1. **Fetch public key from Vault** (on startup):
-   ```go
-   publicKey, err := vault.GetPublicKey()
-   ```
-
-2. **Validate JWT** (on each request):
-   ```go
-   token, err := jwt.ParseWithClaims(tokenString, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-       return publicKey, nil
-   })
-   ```
-
-3. **Extract user_id** from claims:
-   ```go
-   claims := token.Claims.(*jwt.MapClaims)
-   userID := (*claims)["user_id"].(string)
-   ```
+**How other services validate JWTs**: they use the shared `pkg/auth` module (`Validator` plus `RequireAuth` middleware), which loads the public key from Vault at `JWT_PUBLIC_KEY_PATH` and refreshes it periodically (`pkg/auth/key_refresher.go`), so signing-key rotation needs no restart. See [pkg/auth/README.md](/pkg/auth/README.md).
 
 **Shared Auth Package** (`pkg/auth/`):
-- Lightweight JWT validation library
+- JWT validation library (RS256, issuer/audience checks)
 - Middleware for protecting endpoints
 - User context extraction utilities
 - Distributed to other services as Go module

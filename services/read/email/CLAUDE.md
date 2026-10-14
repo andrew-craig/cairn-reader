@@ -10,7 +10,10 @@ The Email Ingest service accepts forwarded emails (via a Cloudflare Email Worker
 
 **Components**:
 - **API Server** (`cmd/email_ingest/`): HTTP endpoints for ingestion, address management, and sender listing (port 8087)
-- **Worker** (`cmd/email_ingest_worker/`): Background email processing, outbox delivery, and cleanup jobs
+- **Worker** (`cmd/email_ingest_worker/`): Background email processing, outbox delivery, and cleanup jobs (health server on `HEALTH_PORT`, default 8090)
+- **API key CLI** (`cmd/manage_keys/`): manages ingest API keys (see [API Key Management](#api-key-management))
+
+The API routes and worker are also mounted into the self-hosted single binary via `selfhost/email.go` (routes under `/api/v1/source/email` and `/api/v1/internal/source/email`; it seeds `INGEST_API_KEY` into `api_keys` as `selfhost-default` on startup).
 
 ## Quick Start
 
@@ -136,7 +139,7 @@ services/read/email/
 | text_body         | TEXT        |                                        |
 | received_at       | TIMESTAMPTZ |                                        |
 | processing_status | VARCHAR     | pending/processing/completed/failed    |
-| content_hash      | CHAR(64)    | nullable                               |
+| content_hash      | VARCHAR(64) | nullable                               |
 | retry_count       | INTEGER     | auto-fails at 5                        |
 | last_error        | TEXT        | nullable                               |
 | lease_expires_at  | TIMESTAMPTZ | nullable, atomic-claim lease set by GetPendingEmails |
@@ -218,6 +221,18 @@ GET /health/live    → 200 OK (plain text)
 GET /health/ready   → 200 OK or 503 if DB unreachable
 ```
 
+## API Key Management
+
+The ingest endpoint authenticates against the `api_keys` table (SHA-256 hash of the key). Manage keys with the CLI, which needs the same `DB_*` env vars as the service:
+
+```bash
+cd services/read/email
+go run ./cmd/manage_keys list                       # all keys and status
+go run ./cmd/manage_keys create --name <name> [--notes <text>]   # prints the raw key once
+go run ./cmd/manage_keys rotate --name <name> [--notes <text>]   # create new key, revoke old
+go run ./cmd/manage_keys revoke --name <name>
+```
+
 ## Background Workers & Jobs
 
 | Component              | Purpose                                     | Schedule         |
@@ -242,7 +257,7 @@ Both cleanup jobs are one type, `jobs.CleanupJob` (`internal/jobs/cleanup.go`), 
 
 - Two-step delivery to Content Service: `POST /api/v1/content/bulk` to create/dedupe the content, then `POST /api/v1/internal/content/user/bulk` to link it to the user. The payload's `sender_id` is sent as `source_sender_id`; the Content Service uses it to look up the user's route for that sender and stamps the item into Feed or Reads (new senders have no route, so Reads)
 - Exponential backoff: 1m, 2m, 4m, 8m, 16m, 32m (max 6 retries)
-- Non-retryable on 4xx (400, 401, 403, 404, 422)
+- Any HTTP error (>= 400) counts as a failure and is retried on the backoff schedule until `max_retries` is reached; there is no separate non-retryable class
 - Circuit breaker: opens after 5 consecutive failures, half-open after 30s
 
 ## Configuration
@@ -256,10 +271,11 @@ PORT=8087
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_USER=cairn
+DB_USER=cairn_user_email
 DB_PASSWORD=<required>
 DB_NAME=ingest_email
 DB_SSLMODE=disable
+DB_STATEMENT_TIMEOUT=30s
 
 # Email
 EMAIL_DOMAIN=read.cairnapp.com
@@ -268,7 +284,11 @@ EMAIL_DOMAIN=read.cairnapp.com
 INGEST_API_KEY=<required>
 VAULT_ADDR=http://localhost:8200
 VAULT_TOKEN=dev-root-token
-JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
+VAULT_ROLE_ID=            # AppRole auth (alternative to VAULT_TOKEN)
+VAULT_SECRET_ID=
+VAULT_AUTH_PATH=approle
+JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key   # code default: secret/data/jwt
+JWT_PUBLIC_KEY_REFRESH_INTERVAL=5m
 
 # Worker
 EMAIL_PROCESS_WORKERS=3
@@ -285,6 +305,9 @@ RAW_EMAIL_RETENTION_DAYS=7
 # service-to-service calls inside the Docker network use container ports.
 CONTENT_SERVICE_URL=http://content-service:8080
 CONTENT_SERVICE_TIMEOUT=30s
+
+# Worker health server
+HEALTH_PORT=8090
 
 # Logging
 LOG_LEVEL=info

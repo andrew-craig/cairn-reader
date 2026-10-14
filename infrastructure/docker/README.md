@@ -1,6 +1,6 @@
 # Cairn Docker Deployment
 
-This directory contains the complete Docker setup for all Cairn backend services, organized into separate `dev/` and `prod/` configurations.
+This directory contains the complete Docker setup for all Cairn backend services, organized into separate `dev/` and `prod/` configurations. The single-binary self-hosted stack lives in `selfhost/` and is documented in [selfhost/README.md](selfhost/README.md); the rest of this file covers `dev/` and `prod/` only.
 
 ## Directory Structure
 
@@ -18,13 +18,14 @@ infrastructure/docker/
 ├── scripts/                  # Shared initialization scripts
 │   ├── init-vault.sh         # Dev Vault setup
 │   ├── init-vault-prod.sh    # Prod Vault setup (AppRole)
-│   ├── init-databases.sh     # PostgreSQL database creation
-│   └── init-postgres.sh      # Legacy PostgreSQL init
+│   ├── unseal-vault.sh       # Prod Vault unseal watchdog
+│   └── init-databases.sh     # PostgreSQL database creation
 ├── vault-config/             # Shared Vault configuration
 │   ├── vault.hcl             # Vault server config (prod)
 │   └── policies/             # Vault ACL policies
-├── vault-init/               # Custom image used by the vault-init container
+├── vault-init/               # Custom image used by the vault-init and vault-unseal containers
 │   └── Dockerfile            # hashicorp/vault + openssl/grep, runs as non-root
+├── selfhost/                 # Single-binary stack (see selfhost/README.md)
 └── README.md
 ```
 
@@ -51,8 +52,10 @@ docker compose up -d
 The Docker Compose configuration includes:
 
 ### Core Infrastructure
-- **Caddy**: Reverse proxy with automatic Let's Encrypt TLS (ports 80, 443) — production only
-- **Vault**: HashiCorp Vault for secrets management (dev mode, port 8200)
+- **Caddy**: Reverse proxy that routes API paths and serves the web app, plain HTTP on `127.0.0.1:8099` (TLS is terminated by a host reverse proxy; see [DEPLOYMENT.md](../../docs/DEPLOYMENT.md)) — production only
+- **Vault**: HashiCorp Vault for secrets management (dev mode with port 8200 in dev; file-storage server, internal only, in prod)
+- **vault-init**: One-shot container that populates Vault with the JWT keys (and, in prod, initialises Vault and creates AppRoles)
+- **vault-unseal**: Prod-only watchdog that unseals Vault after every restart
 
 ### Backend Services
 In production, all services are internal-only (no host ports). Traffic is routed through Caddy.
@@ -60,10 +63,13 @@ In production, all services are internal-only (no host ports). Traffic is routed
 - **User Service**: Authentication and account management (dev port 8082)
 - **Content Service**: Article content storage for Read (dev port 8083)
 - **Ingest RSS**: Feed subscription management (dev port 8085)
+- **Email Ingest**: Newsletter ingestion API (dev port 8089)
+- **Web**: Static web app served by Caddy (prod only, `cairn-web` image)
 
 ### Background Workers
 - **Content Worker**: Article cleanup jobs (health port 8084)
 - **Ingest RSS Worker**: Feed polling and processing (health port 8086)
+- **Email Ingest Worker**: Email processing and delivery (health port 8090)
 
 ### Database (PostgreSQL)
 - `cairn-db` (port 5432) - Single PostgreSQL instance hosting all service databases as separate logical DBs
@@ -95,9 +101,12 @@ In production, all services are internal-only (no host ports). Traffic is routed
               │   :5432     │
               └─────────────┘
 
+Email Ingest (:8089) uses the same Vault and cairn-db pattern, with its own database.
+
 Background Workers:
 ├── Content Worker (:8084) - Content cleanup
-└── Ingest RSS Worker (:8086) - Feed polling
+├── Ingest RSS Worker (:8086) - Feed polling
+└── Email Ingest Worker (:8090) - Email processing
 ```
 
 ## Development Setup
@@ -137,23 +146,29 @@ docker compose down -v
 Once running, services are available at:
 
 - **User Service**: http://localhost:8082
-  - Health: http://localhost:8082/health
-  - API: http://localhost:8082/auth/* and http://localhost:8082/users/*
+  - Health: http://localhost:8082/health/ready
+  - API: http://localhost:8082/api/v1/auth/* and http://localhost:8082/api/v1/user/*
 
 - **Content Service**: http://localhost:8083
-  - Health: http://localhost:8083/health/live
-  - API: http://localhost:8083/api/v1/users/{userID}/contents
+  - Health: http://localhost:8083/health/ready
+  - API: http://localhost:8083/api/v1/content/*
 
 - **Ingest RSS**: http://localhost:8085
-  - Health: http://localhost:8085/health/live
-  - API: http://localhost:8085/api/v1/users/{userID}/feeds
+  - Health: http://localhost:8085/health/ready
+  - API: http://localhost:8085/api/v1/source/rss/* (service-to-service; not exposed by the prod proxy)
+
+- **Email Ingest**: http://localhost:8089
+  - Health: http://localhost:8089/health/ready
+  - API: http://localhost:8089/api/v1/source/email/*
 
 - **Content Worker**: http://localhost:8084/health/ready (health check only)
 
 - **Ingest RSS Worker**: http://localhost:8086/health/ready (health check only)
 
+- **Email Ingest Worker**: http://localhost:8090/health/ready (health check only)
+
 - **Vault UI**: http://localhost:8200/ui
-  - Token: Value from `.env` file (default: `dev-root-token` in dev mode)
+  - Token: `VAULT_DEV_ROOT_TOKEN_ID` from your `.env` file
 
 ## First-Time Setup
 
@@ -212,7 +227,7 @@ All environment variables are configured in the respective `docker-compose.yml` 
 Key configurations:
 
 ### Vault (Development)
-- `VAULT_DEV_ROOT_TOKEN_ID=dev-token`
+- `VAULT_DEV_ROOT_TOKEN_ID` (set in `.env`)
 - `VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200`
 
 ### PostgreSQL (consolidated)
@@ -220,58 +235,9 @@ Key configurations:
 - `POSTGRES_ADMIN_PASSWORD=...` (superuser password)
 - Per-service credentials: `POSTGRES_USER_*`, `POSTGRES_PASSWORD_*`, `POSTGRES_DB_*`
 
-### User Service
-- `PORT=8080` (internal), exposed as 8082
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_NAME=${POSTGRES_DB_USERS}`
-- `DB_USER=${POSTGRES_USER_USERS}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_USERS}`
-- `VAULT_ADDR=http://vault:8200`
-- `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
-- `JWT_ACCESS_TOKEN_EXPIRY=15m`
-- `JWT_REFRESH_TOKEN_EXPIRY=168h`
-- `ENVIRONMENT=development`
+### Services and workers
 
-### Content Service (content-service)
-- `PORT=8080` (internal), exposed as 8083
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_USER=${POSTGRES_USER_CONTENT}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
-- `DB_NAME=${POSTGRES_DB_CONTENT}`
-- `DB_SSLMODE=disable`
-
-### Content Worker (content-worker)
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_USER=${POSTGRES_USER_CONTENT}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_CONTENT}`
-- `DB_NAME=${POSTGRES_DB_CONTENT}`
-- `DB_SSLMODE=disable`
-- `CLEANUP_CRON=0 2 * * *` (runs at 2 AM daily)
-- `HEALTH_PORT=8084`
-
-### Ingest RSS Service (ingest-rss)
-- `PORT=8081` (internal), exposed as 8085
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_USER=${POSTGRES_USER_RSS}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
-- `DB_NAME=${POSTGRES_DB_RSS}`
-- `DB_SSLMODE=disable`
-
-### Ingest RSS Worker (ingest-rss-worker)
-- `DB_HOST=cairn-db`
-- `DB_PORT=5432`
-- `DB_USER=${POSTGRES_USER_RSS}`
-- `DB_PASSWORD=${POSTGRES_PASSWORD_RSS}`
-- `DB_NAME=${POSTGRES_DB_RSS}`
-- `DB_SSLMODE=disable`
-- `CONTENT_SERVICE_URL=http://content-service:8080`
-- `HEALTH_PORT=8086`
-- `OUTBOX_CLEANUP_CRON=0 3 * * *` (runs at 3 AM daily)
-- `FEED_ITEMS_CLEANUP_CRON=0 4 * * *` (runs at 4 AM daily)
+Per-service variables (`PORT`, `DB_*`, `VAULT_*`, `INTERNAL_API_KEY`, `HEALTH_PORT`, cron schedules and so on) are set in the compose files linked above. See [CONFIGURATION.md](../../docs/CONFIGURATION.md) for what each variable does and its default.
 
 ## Viewing Logs
 
@@ -292,19 +258,19 @@ docker compose logs -f vault
 
 ```bash
 # User Service
-curl http://localhost:8082/health
+curl http://localhost:8082/health/ready
 
 # Content Service
-curl http://localhost:8083/health/live
+curl http://localhost:8083/health/ready
 
 # Ingest RSS Service
-curl http://localhost:8085/health/live
+curl http://localhost:8085/health/ready
 ```
 
 ### 2. Register a Test User
 
 ```bash
-curl -X POST http://localhost:8082/auth/register \
+curl -X POST http://localhost:8082/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "email": "test@example.com",
@@ -388,7 +354,7 @@ docker compose up -d
 docker compose logs -f vault-init
 
 # 4. Retrieve AppRole credentials from the vault-keys volume
-docker compose exec vault cat /vault-keys/approle-credentials.env
+docker compose exec vault-unseal cat /vault-keys/approle-credentials.env
 
 # 5. Update .env with the AppRole credentials
 # USER_SERVICE_ROLE_ID=<from step 4>
@@ -402,10 +368,11 @@ docker compose exec vault cat /vault-keys/approle-credentials.env
 docker compose up -d
 
 # 7. IMPORTANT: Secure the unseal keys
-docker compose exec vault cat /vault-keys/UNSEAL_KEYS.txt
-# Copy these keys to a secure location and delete the file:
-docker compose exec vault rm /vault-keys/UNSEAL_KEYS.txt
+docker compose exec vault-unseal cat /vault-keys/UNSEAL_KEYS.txt
+# Copy these keys to a secure location.
 ```
+
+The `vault-unseal` watchdog reads `/vault-keys/UNSEAL_KEYS.txt` (mounted read-only) to unseal Vault after every restart, so deleting that file means Vault must be unsealed by hand (see below) each time it restarts.
 
 ### Vault Security Architecture
 
@@ -431,7 +398,7 @@ docker compose exec vault rm /vault-keys/UNSEAL_KEYS.txt
 
 ### Vault Unseal After Restart
 
-If Vault restarts, it will be sealed. To unseal:
+If Vault restarts, the `vault-unseal` watchdog unseals it automatically as long as `/vault-keys/UNSEAL_KEYS.txt` still exists. If you removed that file, unseal manually:
 
 ```bash
 # Connect to the vault container (from infrastructure/docker/prod)
@@ -451,7 +418,7 @@ vault operator unseal <key3>
    - Never commit passwords to version control
 
 2. **Enable HTTPS** (external traffic):
-   - Add nginx or traefik reverse proxy
+   - Caddy serves plain HTTP on `127.0.0.1:8099`; terminate TLS with a host reverse proxy (see [DEPLOYMENT.md](../../docs/DEPLOYMENT.md))
    - Use SSL certificates (Let's Encrypt)
    - Internal Docker network traffic can remain HTTP
 
@@ -471,6 +438,7 @@ vault operator unseal <key3>
    docker compose exec vault vault write -f auth/approle/role/user-service/secret-id
    # Update .env and restart the service
    ```
+   The root token is not stored (see `init-vault-prod.sh`), so this command needs a `VAULT_TOKEN` with permission to write to that path.
 
 ## Scripts
 
@@ -523,10 +491,16 @@ and the integration test compose all build this image via a `build:` directive.
 > -v` — destructive, requires re-init) or `chown -R vault:vault` the volume
 > contents from a temporary root container before bringing the stack back up.
 
+### unseal-vault.sh (Production)
+
+Run by the `vault-unseal` container. Waits for Vault, unseals it with keys 1-3 from `/vault-keys/UNSEAL_KEYS.txt`, then checks seal status every 30 seconds and re-unseals if needed.
+
+Located at: `scripts/unseal-vault.sh`
+
 ### init-databases.sh
 
 Automatically runs on PostgreSQL first startup to:
-- Create all five service databases with dedicated users
+- Create all four service databases with dedicated users
 - Each service gets its own logical database within the single PostgreSQL instance
 
 Located at: `scripts/init-databases.sh`
@@ -536,7 +510,9 @@ Located at: `scripts/init-databases.sh`
 Persistent data is stored in Docker volumes:
 
 - `cairn_db_data`: Consolidated PostgreSQL data (all service databases)
-- `vault-keys`: Generated JWT keys (temporary, recreated on volume reset)
+- `vault-keys`: Init output shared between `vault-init` and `vault-unseal` (dev: init data; prod: unseal keys and AppRole credentials). The JWT keys themselves live in Vault
+- `vault-data` (prod): Vault file storage
+- `caddy_data`, `caddy_config` (prod): Caddy runtime state
 
 ## Networking
 
@@ -548,6 +524,8 @@ Internal service communication uses service names as hostnames:
 - `user-service:8080`
 - `content-service:8080`
 - `ingest-rss:8081`
+- `email-ingest:8087`
+- `web:8080` (prod)
 
 ## Support
 

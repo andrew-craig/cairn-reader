@@ -2,9 +2,9 @@
 
 ## Overview
 
-Cairn is a mobile read-it-later service that helps users read their longform content and discover new content.
+Cairn is a mobile read-it-later service that helps users read their longform content.
 
-Cairn is implemented as a React Native mobile app and a modular backend implemented in Go.
+Cairn is implemented as a React Native mobile app, a React/Vite web app, and a modular backend implemented in Go.
 
 The Cairn User Service is responsible for managing users access to the service, and managing their user account. It implements stateless JWT authentication with refresh token capability.
 
@@ -50,7 +50,7 @@ Access Token (JWT)
 Refresh Token
 * Type: Opaque UUID or cryptographically random string
 * Lifetime: 30 days
-* Storage: Database (hashed), client httpOnly cookie or secure storage
+* Storage: Database (hashed). Returned in the JSON response body (bearer tokens only, no cookies); the client persists it (AsyncStorage on mobile, `localStorage` on web, per [web-app-adr](../decisions/web-app-adr.md))
 * Rotation: Issue new refresh token on each use, invalidate old token
 * Metadata: user_id, device_info, ip_address, created_at, last_used_at, expires_at
 
@@ -134,8 +134,8 @@ Multi-Device Support
 
 ## Cross-Service Integration
 Token Validation for Other Services
-* Other services (content, recommendations) validate JWTs independently using RS256 public key
-* JWT public key distributed via HashiCorp Vault
+* Other services (e.g. the Content Service) validate JWTs independently using the RS256 public key
+* JWT public key is read from HashiCorp Vault via `pkg/auth` (there is no JWKS endpoint)
 * Private key remains secure within user service only (stored in Vault)
 * No callback to auth service required for token validation
 * Services extract user_id from validated token claims
@@ -151,7 +151,7 @@ Shared Authentication Package
 * Lightweight Go package for JWT validation
 * Middleware for protecting endpoints
 * User context extraction utilities
-* Distributed to content and recommendation services
+* Used by the Content Service and other services that validate user JWTs
 
 Configuration
 * JWT private/public key pair for RS256 signing (stored in HashiCorp Vault)

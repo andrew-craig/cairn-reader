@@ -31,7 +31,7 @@ This document is a **playbook, not a report**. It tells an engineer (or agent) w
 
 ### 1.1 The primary source: the existing review
 
-Do **not** start by re-auditing the codebase. A three-pass deep review already exists in [CODE_QUALITY_REVIEW.md](/docs/CODE_QUALITY_REVIEW.md) with ~50 findings, each with file:line evidence, severity, and often a repro. As of 2026-08-09, **essentially none of it has been remediated** (only P2-C5 landed, PR #298). The backlog below *is* the review, ordered.
+Do **not** start by re-auditing the codebase. A three-pass deep review already exists in [CODE_QUALITY_REVIEW.md](/docs/CODE_QUALITY_REVIEW.md) with ~50 findings, each with file:line evidence, severity, and often a repro. As of 2026-10-15 the wave plan in [§1.3](#13-the-wave-plan) is largely done: 30 of its 33 rows are ticked, and 3 are open (P2-C4 deploy decision, fetch dedup, env parsing). The backlog below *is* the review, ordered; findings that were Explore-only are archived in [explore_code_quality_findings.md](/docs/archive/explore_code_quality_findings.md) (Explore was removed in #425).
 
 Read the review's finding text in full before starting its task — this document only carries the ID, a one-line summary, and the recipe to apply.
 
@@ -62,7 +62,7 @@ Everything here is reachable by an anonymous request or fires on a timer. Small,
 | [x] #309 | P2-C1 | Downstream services fetch the JWT public key once at startup; users service rotates it every 24h → scheduled auth outage | 0 | [R6](#r6--operational-fixes) |
 | [x] #311 | C2 + C1 (routes) | read/content write + URL-detection endpoints have no auth: anonymous content overwrite + SSRF | 0 | [R1](#r1--closing-an-authorization-gap) |
 | [x] #314 | P2 IDOR | read/fetcher has **zero** inbound auth; user_id taken from URL path → cross-tenant read/write/delete of subscriptions | 0 | [R1](#r1--closing-an-authorization-gap) |
-| [x] #317 | Explore auth | explore article-inject + fetch/sync trigger endpoints unauthenticated | 1 | [R1](#r1--closing-an-authorization-gap) |
+| [x] #317 | Explore auth | *(archived: Explore removed in #425, see [docs/archive/explore_code_quality_findings.md](/docs/archive/explore_code_quality_findings.md))* | 1 | [R1](#r1--closing-an-authorization-gap) |
 | [x] #316 | SSRF dialer | Shared fetch path follows any URL (loopback/RFC1918/metadata) — 4+ copies of the fetch logic | 0 | [R2](#r2--ssrf-safe-fetching) |
 | [x] #315 | P2-C2, H1, H2, H14 | Credential material in logs: full verification URL at INFO, refresh-token prefixes, mobile token logging | 0 | [R3](#r3--credential-material-in-logs) |
 | [x] #313 | P3-C1, P3-H1, P3-H2, toolchain | Dependency bumps: `x/net` ≥ v0.55.0 (live XSS on ingestion path), `pgx` ≥ v5.9.2 (SQLi), Go toolchain patch bump — all 12 modules | 0 | [R4](#r4--dependency-bumps) |
@@ -75,7 +75,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 | Done | Finding | Summary | P | Recipe |
 |---|---|---|---|---|
 | [x] #321 | P2-C6 | Bulk content insert PK-collides on any mixed new+seen batch → whole RSS batch fails | 1 | [R7](#r7--db-write-path-bugs) |
-| [x] #322 | P2-C7 / H8 | Recommender upsert conflicts on content-hash `id`, not just `link` → batch dropped every poll cycle | 1 | [R7](#r7--db-write-path-bugs) |
+| [x] #322 | P2-C7 / H8 | *(archived: Explore removed in #425, see [docs/archive/explore_code_quality_findings.md](/docs/archive/explore_code_quality_findings.md))* | 1 | [R7](#r7--db-write-path-bugs) |
 | [x] #323 | Dedup index | `idx_contents_rss_dedup` is not UNIQUE → concurrent deliveries create duplicate content rows; email/manual path has no dedup at all | 1 | [R7](#r7--db-write-path-bugs) |
 | [x] | P2-C8 | Feed-subscribe client unmarshals wrong response shape → app gets empty data with HTTP 201 | 1 | [R8](#r8--cross-service-contract-drift) |
 | [x] #331 | 409→500 | Client matches error codes the server never sends → re-subscribe returns 500 instead of 409 | 2 | [R8](#r8--cross-service-contract-drift) |
@@ -109,7 +109,7 @@ Do this *after* Waves 1–2: consolidation is safest when the behavior being con
 | [ ] | Env parsing | Collapse `pkg/env` vs `pkg/config` vs two service-local copies into one, with one duration-parsing behavior | 3 | [R11](#r11--consolidating-duplicates) |
 | [x] #362 | Email sanitizer | Replace email's hand-maintained bluemonday policy with `pkg/rss/sanitize` | 2 | [R11](#r11--consolidating-duplicates) |
 | [x] #397 | FE auth layer | Move the near-verbatim web/mobile `auth.ts` token state machine into `apps/shared` (injectable-adapter pattern already demonstrated there); fix H12 (swallowed second 401) and offline-clears-tokens in the shared copy | 2 | [R11](#r11--consolidating-duplicates) |
-| [x] #339 | Theme 4 | `FOR UPDATE SKIP LOCKED` on all job-claim queries (read/fetcher, explore/fetcher, email outbox) — prerequisite for ever running >1 replica | 2 | [R7](#r7--db-write-path-bugs) |
+| [x] #339 | Theme 4 | `FOR UPDATE SKIP LOCKED` on all job-claim queries (read/fetcher, email outbox; explore/fetcher has since been removed) — prerequisite for ever running >1 replica | 2 | [R7](#r7--db-write-path-bugs) |
 | [x] #370–#372, #376–#378 | FE resilience | React error boundaries (both apps), mobile list error states, mobile `accessibilityLabel` on the reader action bar, destructive-action confirmations (web) | 2 | standard FE work; test per [§2.2](#22-choosing-the-test-level) |
 
 #### Wave 5 — Steady state
@@ -173,12 +173,11 @@ The review explicitly identified correct implementations already in the repo. Wh
 | Need | Reference |
 |---|---|
 | Internal-endpoint auth | `RequireInternalAPIKey` as applied to `/api/v1/internal/*` in read/content's router |
-| Request body caps (413) | `explore/recommender` handlers' `http.MaxBytesReader` usage |
+| Request body caps (413) | `services/read/content/internal/api/handlers/limits.go` (per-endpoint `maxSimpleRequestSize` / `maxContentBodySize` / `maxBulkContentBodySize` constants applied with `http.MaxBytesReader`) |
 | Bounded batch delete | `services/read/fetcher/.../feed_item.go:379-401` |
 | HTTP error handling in clients | `Unsubscribe` in the content service's ingest-rss client — branches on HTTP **status**, not error-string matching |
 | HTML sanitization | `pkg/rss/sanitize` (the canonical policy) |
 | Fetch with limits | `pkg/rss/fetch` (redirect limit + `io.LimitReader`) |
-| Cross-service DTO that can't drift | `pkg/models.Article` shared by both sides of the explore seam |
 | Front-end URL-injectable adapter | `apps/shared` server-URL pattern |
 
 ### 2.4 Verification commands
@@ -237,7 +236,7 @@ Order matters — cheapest, broadest first:
 
 #### R5 — Resource bounding
 
-1. `http.MaxBytesReader` per handler group, mirroring explore/recommender's limits (tight caps for auth/JSON endpoints, larger for content ingestion). Assert 413 with an oversized body, success just under the cap.
+1. `http.MaxBytesReader` per handler group, mirroring `read/content`'s `handlers/limits.go` (tight caps for auth/JSON endpoints, larger for content ingestion). Assert 413 with an oversized body, success just under the cap.
 2. Depth guards in `content_extractor.go` / `email_cleaner.go` walkers: max-depth parameter (100 is generous for real HTML); truncate or reject beyond it. Test with programmatically nested HTML (~10k deep) — assert graceful handling, don't crash the test runner proving the old bug.
 
 #### R6 — Operational fixes
@@ -250,7 +249,7 @@ Order matters — cheapest, broadest first:
 
 #### R7 — DB write-path bugs
 
-All of these need `//go:build integration` tests against real Postgres with real migrations (testcontainers is already used in explore — reuse `internal/testutil`).
+All of these need `//go:build integration` tests against real Postgres with real migrations (testcontainers is already used in the read services — reuse `internal/testutil`).
 
 - **P2-C6:** integration test: insert a batch mixing one already-stored item and one new → assert both survive and the new one is created. Fix: filter pre-existing rows before `BulkCreate` (preferred — explicit) or `ON CONFLICT (id) DO NOTHING`.
 - **P2-C7:** two articles, different links, same content hash → assert the batch survives and dedup is deliberate. Arm the `id` conflict.

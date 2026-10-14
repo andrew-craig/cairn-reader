@@ -10,6 +10,9 @@ info:
     ## Authentication
     - **Ingest endpoint**: API key via `X-API-Key` header
     - **User-facing endpoints**: JWT Bearer token (RS256, key from Vault)
+    - **Internal endpoint** (Content Service only): `X-Internal-API-Key` header
+
+    All `/api/v1` routes require HTTPS (TLS or `X-Forwarded-Proto: https`); plain HTTP gets 403.
 
     ## Email Flow
     1. Cloudflare Worker forwards email JSON to `POST /api/v1/source/email/ingest`
@@ -35,6 +38,8 @@ tags:
     description: User email address management (JWT protected)
   - name: Senders
     description: Sender listing (JWT protected)
+  - name: Internal
+    description: Service-to-service endpoints (internal API key protected)
 
 paths:
   /health/live:
@@ -115,8 +120,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request was not over HTTPS
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: HTTPS required
         '500':
-          description: Internal server error
+          description: Internal server error (including API key validation failure, or an email with neither html_body nor text_body)
           content:
             application/json:
               schema:
@@ -233,7 +248,7 @@ paths:
             minimum: 1
             maximum: 100
             default: 20
-          description: Number of senders to return
+          description: Number of senders to return (values outside 1-100 fall back to the default)
         - name: offset
           in: query
           schema:
@@ -273,6 +288,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/internal/source/email/user/{user_id}/senders:
+    get:
+      tags: [Internal]
+      summary: List senders (internal)
+      description: |
+        Service-to-service variant of the sender listing, used by the Content
+        Service subscription aggregator. No per-user authorisation; protected
+        by the shared internal API key. Same ordering as the user-facing
+        endpoint, but defaults to 100 senders and includes `created_at`.
+      operationId: listSendersInternal
+      security:
+        - InternalApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+          description: Number of senders to return (values outside 1-100 fall back to the default)
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of senders to skip
+      responses:
+        '200':
+          description: List of senders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse_SenderList'
+        '400':
+          description: Invalid user ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid internal API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Request was not over HTTPS
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: HTTPS required
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -280,6 +360,11 @@ components:
       in: header
       name: X-API-Key
       description: API key for the Cloudflare Email Worker
+    InternalApiKey:
+      type: apiKey
+      in: header
+      name: X-Internal-API-Key
+      description: Shared secret for internal service-to-service calls
     BearerAuth:
       type: http
       scheme: bearer
@@ -294,14 +379,14 @@ components:
       schema:
         type: string
         format: uuid
-      description: User UUID (must match the authenticated JWT user_id)
+      description: User UUID (must match the authenticated JWT user_id on JWT-protected routes)
 
   schemas:
     # --- Request schemas ---
 
     IngestEmailRequest:
       type: object
-      required: [recipient, sender, received_at]
+      required: [recipient, sender]
       properties:
         recipient:
           type: string
@@ -323,7 +408,7 @@ components:
           description: Email subject line (optional)
         html_body:
           type: string
-          description: HTML body of the email
+          description: HTML body of the email (at least one of html_body/text_body is required by the database; the worker processes html_body only)
         text_body:
           type: string
           description: Plain-text body of the email
@@ -331,7 +416,7 @@ components:
           type: string
           format: date-time
           example: "2026-03-29T12:00:00Z"
-          description: When the email was received (RFC 3339)
+          description: When the email was received (RFC 3339). Optional; if missing or unparseable the server uses the current time
 
     # --- Response data schemas ---
 
@@ -370,6 +455,10 @@ components:
         email_count:
           type: integer
           description: Number of emails received from this sender
+        created_at:
+          type: string
+          format: date-time
+          description: When the sender was first seen (internal endpoint only)
         last_received_at:
           type: string
           format: date-time

@@ -1,11 +1,12 @@
 # Cairn
 
-A modern read-it-later application with a React Native mobile app and Go-based backend services for content ingestion, storage, and user management.
+A modern read-it-later application with a React Native mobile app, a React web app and Go-based backend services for content ingestion, storage, and user management.
 
 ## Overview
 
 Cairn is a monorepo containing:
 - **Mobile App**: React Native application for iOS and Android
+- **Web App**: React/Vite browser client with the same Feed, Reads and You structure
 - **Backend Services**: Go microservices for content management and ingestion
 - **Infrastructure**: Docker configuration and deployment scripts
 
@@ -18,11 +19,12 @@ Cairn is a monorepo containing:
 - 🔗 Open articles in browser
 - 📤 Share articles
 - 🌓 Dark mode support
-- 💾 Local storage with AsyncStorage
+- 💾 Offline reading for Reads articles (on-device SQLite)
 
 ### Backend Features
 
 - RSS feed subscriptions and automatic content delivery
+- Newsletter ingestion by email
 - Feed and Reads lists, with the destination chosen per source
 - User authentication with JWT
 - Article storage with cleaned HTML content
@@ -34,12 +36,12 @@ Cairn is a monorepo containing:
 - **Framework**: React Native with Expo
 - **Navigation**: React Navigation (Stack & Bottom Tabs)
 - **Language**: TypeScript
-- **Storage**: AsyncStorage
+- **Storage**: AsyncStorage and SQLite (`expo-sqlite`)
 - **UI**: React Native core components
 - **Icons**: Expo Vector Icons (Ionicons)
 
 ### Backend Services
-- **Language**: Go 1.23+
+- **Language**: Go 1.25+
 - **Database**: PostgreSQL
 - **Authentication**: JWT with RS256 signing
 - **Secrets Management**: HashiCorp Vault
@@ -50,39 +52,28 @@ Cairn is a monorepo containing:
 ```
 cairn/
 ├── apps/
-│   └── mobile/              # React Native mobile app
-│       ├── src/
-│       │   ├── components/  # Reusable UI components
-│       │   ├── screens/     # App screens
-│       │   ├── navigation/  # Navigation configuration
-│       │   ├── services/    # Services (Storage, API, etc.)
-│       │   ├── types/       # TypeScript type definitions
-│       │   ├── utils/       # Utility functions
-│       │   └── constants/   # App constants (theme, colors, etc.)
-│       ├── assets/          # Images, fonts, and other assets
-│       ├── App.tsx          # Entry point
-│       └── package.json
+│   ├── mobile/              # React Native (Expo) mobile app
+│   ├── web/                 # React (Vite) web app
+│   └── shared/              # @cairn/shared: API config layer and types used by mobile and web
 │
 ├── services/
-│   ├── read/                # Content Storage & RSS Feed Management
-│   │   ├── content/         # Content Service (storage, search, user metadata)
-│   │   ├── fetcher/         # Ingest RSS (ingest_rss) - feed subscriptions, polling
-│   │   ├── api/             # OpenAPI specifications
+│   ├── read/                # Read Service (Go module with several binaries)
+│   │   ├── content/         # Content Service + worker (storage, search, Feed/Reads routing)
+│   │   ├── fetcher/         # Ingest RSS service + worker (feed subscriptions, polling)
+│   │   ├── email/           # Email Ingest service + worker (newsletters)
 │   │   └── README.md        # Read service documentation
 │   │
-│   └── users/               # User Management & Authentication
+│   └── users/               # User Service (authentication, accounts)
 │       ├── cmd/             # Application entrypoints
 │       ├── internal/        # Private application code
-│       ├── pkg/             # Public shared libraries
 │       ├── migrations/      # Database migrations
 │       └── README.md        # User service documentation
 │
-├── infrastructure/
-│   └── docker/              # Docker configurations
-│
-├── packages/                # Shared packages across services
-│
-└── scripts/                 # Build and deployment scripts
+├── cmd/selfhost/            # Single-process selfhost binary
+├── pkg/                     # Go packages shared across services (auth, middleware, config, ...)
+├── docs/                    # Architecture, deployment, testing and configuration docs
+└── infrastructure/
+    └── docker/              # dev, prod and selfhost Docker configurations
 ```
 
 ## Getting Started
@@ -92,7 +83,7 @@ cairn/
 - Node.js (v16 or later)
 - npm or yarn
 - Expo CLI (optional, but recommended)
-- Go 1.23+ (for backend services)
+- Go 1.25+ (for backend services)
 - Docker & Docker Compose (for running backend services)
 - PostgreSQL 14+ (if running services locally without Docker)
 
@@ -185,41 +176,24 @@ cd infrastructure/docker/dev
 docker compose up --build
 ```
 
-✅ **All backend services are validated and working!** See [DOCKER_VALIDATION_SUCCESS.md](DOCKER_VALIDATION_SUCCESS.md) for validation report.
-
-For comprehensive deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+For comprehensive deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). For ports and configuration, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 #### Running Individual Services
 
 See the documentation for each service:
-- [Read Service](services/read/README.md) - Content storage and RSS feed management
+- [Read Service](services/read/README.md) - Content storage, RSS feed management and email ingest
 - [User Service](services/users/README.md) - Authentication and user management
 
 ## Services Documentation
 
 ### Read Service
-The Read service is a comprehensive article storage and RSS feed management system consisting of two microservices:
+The Read service handles article storage, RSS subscriptions, newsletter ingestion and the Feed/Reads routing. It consists of three services, each with a background worker:
 
-**Content Service** (port 8080):
-- Cleaned HTML content extraction using go-readability
-- HTML sanitization with bluemonday
-- Content deduplication by hash and feed ID
-- User-specific metadata (read status, scroll position, favorites, notes)
-- Full-text search with PostgreSQL GIN index
-- Cursor-based pagination
-- Feed vs Reads routing: a per-source destination list (`source_routes`, `user_contents.list`); new items only
-- Feed retention (non-favorited Feed items deleted after 30 days) and orphaned content cleanup (90 days)
+- **Content Service**: cleaned article storage, search, user metadata, and the per-source Feed/Reads routing (new items only; non-favorited Feed items are deleted after 30 days)
+- **Ingest RSS Service** (`ingest_rss`): feed subscriptions, polling and content extraction, with outbox delivery to the Content Service
+- **Email Ingest Service**: newsletter ingestion by email
 
-**Ingest RSS Service** (ingest_rss, port 8081):
-- User feed subscriptions (100 feed limit per user)
-- Tiered polling strategy (hourly/6-hourly/daily)
-- Content extraction and processing
-- Outbox pattern for reliable content delivery
-- Circuit breaker for fault tolerance
-- Auto-disable feeds after 7 consecutive error days
-- Update detection via ETag/Last-Modified headers
-
-See the [Read Service README](services/read/README.md) for detailed documentation.
+See the [Read Service README](services/read/README.md) for detailed documentation and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for ports.
 
 ### User Service
 The User service handles authentication and account management.
@@ -260,41 +234,22 @@ The app supports both light and dark modes, automatically following the system p
 
 ## Architecture
 
-Cairn follows a microservices architecture:
-
-```
-┌─────────────────┐
-│   Mobile App    │
-│ (React Native)  │
-└────────┬────────┘
-         │
-         │ REST APIs
-         │
-    ┌────┴─────────────────────────────────┐
-    │                                      │
-    │                                      │
-┌───▼────────┐                          ┌───────▼──────┐
-│   User     │                          │  Read Service│
-│  Service   │                          │              │
-│            │                          │  - Content   │
-│  - Auth    │                          │  - ingest_rss│
-│  - JWT     │                          │              │
-└─────┬──────┘                          └──────┬───────┘
-      │                                        │
-      └────────────────────┬───────────────────┘
-                           │
-                      ┌────▼─────┐
-                      │PostgreSQL│
-                      └──────────┘
-```
+Cairn follows a microservices architecture: the mobile and web clients call the User Service (auth) and the Read services over REST, and each service owns its own logical database in a single PostgreSQL instance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams, ports and data flows.
 
 ### Service Communication
-- All services expose REST APIs
+- All services expose REST APIs; services never access each other's databases
 - Services are independently deployable
-- Shared data models in PostgreSQL
-- JWT-based authentication across services
+- JWT-based authentication: the User Service signs RS256 tokens and the other services validate them with the public key from Vault
 
 ## Development
+
+### Web App Development
+
+```bash
+cd apps/web
+npm run dev          # Vite dev server
+npm test             # Vitest
+```
 
 ### Mobile App Development
 

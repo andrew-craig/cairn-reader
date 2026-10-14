@@ -14,6 +14,8 @@ This document provides comprehensive testing guidelines for the Cairn backend se
 - [Service-Specific Testing](#service-specific-testing)
   - [Read Service](#read-service)
   - [User Service](#user-service)
+  - [Self-host binary and shared packages](#self-host-binary-and-shared-packages)
+  - [Web and Mobile Apps](#web-and-mobile-apps)
 - [Test Helpers and Utilities](#test-helpers-and-utilities)
 - [CI/CD Integration](#cicd-integration)
 - [Troubleshooting](#troubleshooting)
@@ -43,7 +45,7 @@ For detailed testing principles, see [Engineering Principles - Testing Philosoph
 ### Unit Tests
 - **Purpose**: Test individual functions, methods, and components in isolation
 - **Speed**: Fast (milliseconds)
-- **Dependencies**: None (mocked)
+- **Dependencies**: None (mocked), except the User Service `internal/database` and `internal/services` tests, which use a real PostgreSQL (`TEST_DB_*`) and skip when it is unreachable
 - **Coverage Target**: 60-70% of codebase
 
 ### Integration Tests
@@ -70,7 +72,7 @@ The dev stack (`infrastructure/docker/dev`) runs a single `cairn-db` service pub
 
 #### Option 1: Throwaway PostgreSQL container (Recommended)
 
-Each service's `internal/testutil/database.go` defaults to its own port, user and password (Content: 5433, Fetcher: 5434, Email: 5435). Start one container per service under test, using the defaults as the superuser credentials:
+Each Read service's `internal/testutil/database.go` defaults to its own port, user and password (Content: 5433, Fetcher: 5434, Email: 5435). Start one container per service under test, using the defaults as the superuser credentials:
 
 ```bash
 # Content Service (defaults: localhost:5433, cairn_content / cairn_content_pass)
@@ -82,9 +84,14 @@ docker run -d --name cairn-test-content -p 5433:5432 \
 docker run -d --name cairn-test-rss -p 5434:5432 \
   -e POSTGRES_USER=cairn_rss -e POSTGRES_PASSWORD=cairn_rss_pass \
   postgres:18-alpine
+
+# Email Ingest Service (defaults: localhost:5435, cairn_email / cairn_email_pass)
+docker run -d --name cairn-test-email -p 5435:5432 \
+  -e POSTGRES_USER=cairn_email -e POSTGRES_PASSWORD=cairn_email_pass \
+  postgres:18-alpine
 ```
 
-Remove them with `docker rm -f cairn-test-content cairn-test-rss` when finished. The User Service integration tests read `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` (defaults: `localhost:5433`, `cairn_test` / `test_password`, `cairn_users_test`; see `services/users/test/integration/testutil/setup.go`).
+Remove them with `docker rm -f cairn-test-content cairn-test-rss cairn-test-email` when finished. The User Service has two different test setups: its `internal/` tests that need a database read `TEST_DB_*` (defaults: `localhost:5432`, `postgres` / `postgres`, `cairn_test`, already migrated; they skip when the database is unreachable), while its Docker-based integration tests read `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` (defaults: `localhost:5433`, `cairn_test` / `test_password`, `cairn_users_test`; see `services/users/test/integration/testutil/setup.go` and the [integration README](/services/users/test/integration/README.md)).
 
 #### Option 2: Local PostgreSQL
 
@@ -104,7 +111,16 @@ export TEST_DB_PORT=5434
 export TEST_DB_USER=cairn_rss
 export TEST_DB_PASSWORD=cairn_rss_pass
 export TEST_DB_NAME=cairn_rss_test
+
+# For Email Ingest Service
+export TEST_DB_HOST=localhost
+export TEST_DB_PORT=5435
+export TEST_DB_USER=cairn_email
+export TEST_DB_PASSWORD=cairn_email_pass
+export TEST_DB_NAME=cairn_email_test
 ```
+
+`TEST_DB_SSLMODE` (default `disable`) is also read. `TEST_DB_NAME` is only the prefix of the generated database name.
 
 Alternatively, point the tests at the dev `cairn-db` (port 5432) with `TEST_DB_PORT=5432` and the `POSTGRES_ADMIN_USER` / `POSTGRES_ADMIN_PASSWORD` values from your dev `.env` as `TEST_DB_USER` / `TEST_DB_PASSWORD`.
 
@@ -112,7 +128,8 @@ Alternatively, point the tests at the dev `cairn-db` (port 5432) with `TEST_DB_P
 
 - **Docker**: For running databases and services
 - **Make**: For running test commands
-- **Go 1.21+**: For running Go tests
+- **Go 1.25+**: For running Go tests (see `go.mod`)
+- **Node/npm**: For the web, mobile and shared package tests
 - **curl/jq**: For E2E testing
 
 ---
@@ -121,10 +138,10 @@ Alternatively, point the tests at the dev `cairn-db` (port 5432) with `TEST_DB_P
 
 ### Unit Tests
 
-Unit tests run without external dependencies and are the default test mode.
+Unit tests run without external dependencies and are the default test mode. The Go code is split into separate modules (`services/read` containing `content` and `fetcher`, `services/read/email`, `services/users`, `cmd/selfhost`, and each `pkg/*` module), so run `go test` from inside the module you are testing.
 
 ```bash
-# Run all unit tests for a service
+# Run all unit tests for a module
 cd services/{service-name}
 go test ./...
 
@@ -144,11 +161,11 @@ go test -v -run "TestContent.*" ./...
 **Examples**:
 
 ```bash
-# Read service
+# Read services (content, fetcher and email; make test-content / test-fetcher / test-email for one)
 cd services/read
 make test
 
-# User service
+# User service (go test -v ./internal/...)
 cd services/users
 make test
 ```
@@ -166,7 +183,7 @@ cd services/{service-name}
 go test -tags=integration -v ./...
 
 # Run specific integration test
-go test -tags=integration -v -run TestContentCreationIntegration ./...
+go test -tags=integration -v -run TestFeedSubscriptionIntegration ./...
 
 # Run with coverage
 go test -tags=integration -coverprofile=coverage.out -covermode=atomic ./...
@@ -179,22 +196,29 @@ go tool cover -html=coverage.out
 
 ```bash
 # Content Service integration tests
-cd services/read/content-service
+cd services/read/content
 go test -tags=integration -v ./...
 
 # RSS Fetcher Service integration tests
-cd services/read/rss-fetcher-service
+cd services/read/fetcher
+go test -tags=integration -v ./...
+
+# Email Ingest Service integration tests (separate Go module)
+cd services/read/email
 go test -tags=integration -v ./...
 ```
 
 **Skip Integration Tests**:
 
 ```bash
-# Skip with short flag
-go test -short ./...
-
-# Or just run unit tests (default)
+# Just run unit tests (default; the integration build tag is off)
 go test ./...
+
+# With the tag on, -short skips tests that call testing.Short() (the fetcher and email lease tests, among others)
+go test -tags=integration -short ./...
+
+# Skip the tests that call real external sites (URL detection)
+CAIRN_SKIP_NETWORK_TESTS=1 go test -tags=integration ./...
 ```
 
 ### End-to-End Tests
@@ -207,89 +231,39 @@ E2E tests validate complete workflows across multiple services. No automated cro
 
 ### Read Service
 
-The Read service consists of two microservices: Content Service and RSS Fetcher Service.
+The Read service consists of three microservices: Content Service (`services/read/content`), RSS Fetcher Service (`services/read/fetcher`) and Email Ingest Service (`services/read/email`, its own Go module). Integration tests carry the `integration` build tag and create their database with the service's `internal/testutil` package (see [Test Helpers and Utilities](#test-helpers-and-utilities)).
 
 #### Integration Test Overview
 
-Integration tests cover end-to-end flows from HTTP requests through the service layer to the database.
+Integration tests cover the database-backed repository, service and handler layers, plus a few end-to-end flows.
 
 **Test Coverage**:
-- Full content creation flow (HTTP → Service → Repository → Database)
-- User-content relationship management
-- Content update propagation (preserves user relationships)
-- Search functionality with PostgreSQL full-text search
-- Content deduplication by hash and feed ID
-- RSS feed subscription and management
-- Feed limit enforcement (100 feeds per user)
-- Outbox pattern delivery flow
+- Feed/Reads routing: list resolved from `source_routes`, re-routing affects new items only, list filter, moving items between lists, bulk ingest routing by user and source
+- Feed retention (deletion of expired non-favorited Feed items) and orphaned-content cleanup batching
+- Content deduplication under concurrent create and bulk create, and repeat email delivery
+- Migration tests (Feed/Reads routing up/down, dedup backfill)
+- RSS feed subscription and management, including the 100 feeds per user limit
+- Outbox pattern delivery flow (fetcher and email)
 - RSS item processing and deduplication
-- Feed polling logic
-- Error tracking and auto-disable after 7 consecutive days
+- Feed polling logic and error tracking
+- Lease behaviour of the pending-work queries (crash recovery, exclusivity, retry reselection) for feeds, feed items, outbox entries and raw emails
+- JWT auth and Vault JWT key loading in the Content Service (the Vault test needs `VAULT_ADDR`, and skips without it)
 
 #### Content Service Integration Tests
 
-##### 1. TestContentCreationIntegration
+Located under `services/read/content`:
 
-Tests the complete flow of creating and retrieving content.
+- `integration_test.go`: `TestJWTAuthIntegration`, `TestVaultJWTIntegration`
+- `internal/repository/*_integration_test.go`: routing (`routing_integration_test.go`), dedup (`content_dedup_integration_test.go`), cleanup batching, Feed retention
+- `internal/service/*_integration_test.go`: bulk create and email redelivery, plus URL detection (`url_detector_integration_test.go`)
+- `internal/api/handlers/*_integration_test.go`: bulk ingest routing and URL detection
+- `migrations/*_integration_test.go`: routing migration up/down and the dedup backfill
 
-**Scenarios**:
-- Create content from HTML
-- Retrieve content by ID
-- Bulk create multiple contents
-- Verify HTML sanitization (no script tags)
-
-**Example**:
-```go
-func TestContentCreationIntegration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-
-    testDB := testhelpers.SetupTestDatabase(t)
-    defer testDB.Cleanup()
-
-    // Test implementation
-}
-```
-
-##### 2. TestUserContentIntegration
-
-Tests user-specific content management.
-
-**Scenarios**:
-- Add content to user's reading list
-- List user's contents with pagination
-- Update user-content metadata (status, favorite, scroll position)
-- Delete content from user's list
-
-##### 3. TestSearchIntegration
-
-Tests full-text search functionality.
-
-**Scenarios**:
-- Search by title using full-text search
-- Search by author
-- Verify no results for non-matching queries
-
-##### 4. TestContentUpdatePropagation
-
-Tests content updates while preserving user relationships.
-
-**Scenarios**:
-- Update content preserves all user relationships
-- User metadata remains intact after content update
-- Multiple users can have different metadata for same content
-
-##### 5. TestDeduplicationIntegration
-
-Tests content deduplication logic.
-
-**Scenarios**:
-- Content deduplication by hash and feed ID
-- Check-duplicates endpoint
-- Only one database entry for duplicate content
+The URL-detection tests call real external sites; set `CAIRN_SKIP_NETWORK_TESTS=1` to skip them (CI does).
 
 #### RSS Fetcher Service Integration Tests
+
+Located in `services/read/fetcher/integration_test.go` (the scenarios below) plus the lease tests in `internal/repository/*_lease_integration_test.go`. Two further tests there, `TestContentServiceReceivesRSSTitleAndAuthor` and `TestRawHTMLPipelineIntegration`, exercise the fetcher-to-content hand-off using `httptest` servers.
 
 ##### 1. TestFeedSubscriptionIntegration
 
@@ -309,7 +283,7 @@ Tests reliable message delivery.
 - Create outbox entries
 - Get pending entries for delivery
 - Update delivery status
-- Retry logic with exponential backoff
+- Retry count increment and next-retry scheduling
 
 ##### 3. TestFeedItemProcessingIntegration
 
@@ -328,22 +302,23 @@ Tests feed polling logic.
 **Scenarios**:
 - Get feeds due for polling
 - Update feed after successful poll
-- Track consecutive errors
-- Auto-disable after 7 consecutive error days
+- Track consecutive error days (repository-level counter; auto-disable lives in the service layer and is not covered here)
 
 #### Running Read Service Integration Tests
 
-```bash
-# Start database (single PostgreSQL instance for all services)
-cd infrastructure/docker/dev
-docker compose up -d cairn-db
+Start the throwaway PostgreSQL containers from [Prerequisites](#database-requirements) first (the dev `cairn-db` users cannot create databases).
 
+```bash
 # Content Service integration tests
 cd services/read/content
 go test -tags=integration -v ./...
 
 # RSS Fetcher Service integration tests
 cd services/read/fetcher
+go test -tags=integration -v ./...
+
+# Email Ingest Service integration tests
+cd services/read/email
 go test -tags=integration -v ./...
 
 # Run with coverage
@@ -359,35 +334,79 @@ The User service handles authentication and user management.
 
 #### Test Coverage
 
-**Unit Tests**:
+**Unit Tests** (`internal/...`, `cmd/user-service`, `selfhost`):
 - JWT token generation and validation
 - Refresh token rotation
 - Password hashing and verification
 - Device authentication
 
-**Integration Tests**:
+The `internal/database` and `internal/services` tests (and parts of `internal/handlers`) need a migrated PostgreSQL reachable via `TEST_DB_*` (defaults `localhost:5432`, `postgres` / `postgres`, `cairn_test`) and skip when it is not. CI provides one and runs `go run cmd/migrate/main.go -command=up` first.
+
+**Integration Tests** (`test/integration`, `integration` build tag, own Docker Compose environment with PostgreSQL and Vault):
 - Full authentication flow (register → login → refresh)
-- Token validation with Vault integration
+- Logout, token rotation and reuse
 - Account upgrade (device-only → email/password)
+- User get/update/delete
+
+**Security scripts** (`test/security`, bash against a running service): see the [security testing README](/services/users/test/security/README.md).
+
+Details: [integration README](/services/users/test/integration/README.md).
 
 #### Running User Service Tests
 
 ```bash
 cd services/users
 
-# Unit tests only
+# Unit tests only (go test -v ./internal/...)
 make test
 
-# Integration tests (requires Vault and database)
-cd infrastructure/docker/dev
-docker compose up -d vault cairn-db
+# Integration tests: start the test environment (PostgreSQL on 5433, Vault on 8201), then run with the tag
+make test-integration-up
+cd test/integration && go test -tags=integration -v -timeout 5m ./...
+cd ../.. && make test-integration-down
 
-cd services/users
+# Unit tests with coverage (coverage.html)
+make test-coverage
+
+# Security scripts (needs the service running at USER_SERVICE_URL)
+make test-security
+```
+
+---
+
+### Self-host binary and shared packages
+
+```bash
+# Consolidated self-host binary (config, health, router recovery tests)
+cd cmd/selfhost
+go test ./...
+
+# Its integration tests (tag `integration`; TEST_DB_HOST/PORT/USER/PASSWORD/SSLMODE,
+# defaults localhost:5432 postgres/postgres; creates and drops its own databases)
 go test -tags=integration -v ./...
 
-# All tests with coverage
-make test-coverage
+# Shared Go modules, each with its own go.mod
+cd pkg/auth && go test ./...        # also pkg/config, pkg/logging, pkg/middleware, pkg/rss
 ```
+
+`services/users/selfhost` and the other `services/*/selfhost` packages carry their own unit tests and run with their service module.
+
+### Web and Mobile Apps
+
+The npm workspace root (`package.json`) contains `apps/web`, `apps/shared` and `apps/mobile`; run `npm ci` once from the repo root.
+
+```bash
+# Web app: Vitest + jsdom + Testing Library (apps/web/vitest.config.ts, vitest.setup.ts)
+cd apps/web && npm test            # vitest run
+
+# Shared package: Vitest in plain Node (apps/shared/vitest.config.ts)
+cd apps/shared && npm test
+
+# Mobile app: Jest with the jest-expo preset (apps/mobile/jest.config.js, jest.setup.ts)
+cd apps/mobile && npm test         # npm run test:ci for jest --ci --coverage
+```
+
+Tests are colocated as `*.test.ts(x)` next to the source. There is no Playwright or other automated browser/device end-to-end suite in the repo. See [Web App](/apps/web/CLAUDE.md#testing) and [Mobile App](/apps/mobile/CLAUDE.md#testing) for conventions and patterns.
 
 ---
 
@@ -395,7 +414,7 @@ make test-coverage
 
 ### Database Test Helpers
 
-Both Content Service and RSS Fetcher Service include a `testutil` package (`internal/testutil/`) with utilities for integration tests.
+The Content, RSS Fetcher and Email Ingest services each include a `testutil` package (`internal/testutil/`) with the same utilities for integration tests. The User Service uses its own `test/integration/testutil` package instead (see its README).
 
 #### SetupTestDatabase
 
@@ -408,7 +427,7 @@ func SetupTestDatabase(t *testing.T) *TestDatabase
 **Process**:
 1. Connects to the main PostgreSQL instance
 2. Creates a temporary database with timestamp suffix (e.g., `cairn_content_test_1234567890`)
-3. Runs all migrations to set up the schema
+3. Applies every `*up.sql` file found in the service's `migrations/` directory (a missing directory only logs a warning)
 4. Returns a `TestDatabase` instance for use in tests
 
 **Benefits**:
@@ -432,7 +451,7 @@ defer testDB.Cleanup()
 
 #### TruncateAll
 
-Clears all tables in the database (faster than recreation for sequential tests).
+Truncates the service's tables (a fixed list per service, with `CASCADE`); faster than recreation for sequential tests.
 
 ```go
 func (td *TestDatabase) TruncateAll()
@@ -440,8 +459,10 @@ func (td *TestDatabase) TruncateAll()
 
 ### Example Test Structure
 
+Integration test files start with `//go:build integration`. From `services/read/fetcher/integration_test.go`:
+
 ```go
-func TestContentCreationIntegration(t *testing.T) {
+func TestFeedSubscriptionIntegration(t *testing.T) {
     if testing.Short() {
         t.Skip("Skipping integration test")
     }
@@ -450,23 +471,19 @@ func TestContentCreationIntegration(t *testing.T) {
     testDB := testutil.SetupTestDatabase(t)
     defer testDB.Cleanup()
 
-    // Create test server
-    dbWrapper := &database.DB{DB: testDB.DB}
-    router := api.NewRouter(dbWrapper)
+    feedRepo := repository.NewFeedRepository(testDB.DB)
+    subscriptionRepo := repository.NewFeedSubscriptionRepository(testDB.DB)
+    feedService := service.NewFeedService(feedRepo, subscriptionRepo)
+    router := setupTestRouter(handlers.NewSubscriptionHandler(feedService))
     server := httptest.NewServer(router)
     defer server.Close()
 
     // Run tests
-    t.Run("CreateContent", func(t *testing.T) {
-        // Arrange
-        requestBody := []byte(`{"html":"<h1>Test</h1>"}`)
-
-        // Act
-        resp, err := http.Post(server.URL+"/api/v1/content", "application/json", bytes.NewBuffer(requestBody))
-
-        // Assert
-        assert.NoError(t, err)
-        assert.Equal(t, http.StatusCreated, resp.StatusCode)
+    t.Run("ListUserFeeds", func(t *testing.T) {
+        resp, err := http.Get(fmt.Sprintf("%s/api/v1/users/%s/feeds", server.URL, userID))
+        require.NoError(t, err)
+        defer resp.Body.Close()
+        assert.Equal(t, http.StatusOK, resp.StatusCode)
     })
 }
 ```
@@ -475,56 +492,18 @@ func TestContentCreationIntegration(t *testing.T) {
 
 ## CI/CD Integration
 
-### GitHub Actions Example
+Workflows live in `.github/workflows/`; test-related ones are:
 
-```yaml
-name: Integration Tests
+| Workflow | What it runs |
+|----------|--------------|
+| `go-checks.yml` | Per module (path-filtered): gofmt, golangci-lint, `go vet`, `go build`, and `go test -race -count=1` with coverage for `services/read` (content, fetcher), `services/read/email`, `services/users` (`./internal/...` with `-p 1` against a PostgreSQL service container and migrations applied first), `cmd/selfhost` and the `pkg/*` modules |
+| `go-checks.yml` (integration jobs) | `go test -race -tags=integration` for content, fetcher and email (PostgreSQL 16 service, `TEST_DB_*` pointing at it, `CAIRN_SKIP_NETWORK_TESTS=1`) and for `cmd/selfhost` |
+| `web-checks.yml` | `tsc --noEmit`, ESLint, `npx vitest run` for `apps/web`, and `tsc` + `vitest run` for `apps/shared` |
+| `mobile-checks.yml` | `tsc --noEmit`, ESLint, `npx jest --ci --coverage`, an Expo iOS bundle export, and `knip` (dead code) |
+| `selfhost-compose-smoke.yml` | Builds the self-host image, starts `infrastructure/docker/selfhost` with Docker Compose and checks `/health/live` |
+| `docker-test.yml` | Builds each service image (no push) as a smoke test |
 
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: cairn_test
-          POSTGRES_PASSWORD: cairn_test_pass
-          POSTGRES_DB: cairn_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: Run Unit Tests
-        run: |
-          cd services/content-service
-          go test -v ./...
-
-      - name: Run Integration Tests
-        env:
-          TEST_DB_HOST: localhost
-          TEST_DB_PORT: 5432
-          TEST_DB_USER: cairn_test
-          TEST_DB_PASSWORD: cairn_test_pass
-          TEST_DB_NAME: cairn_test
-        run: |
-          cd services/content-service
-          go test -tags=integration -v ./...
-```
+The User Service Docker-based integration tests (`services/users/test/integration`) and the bash security scripts are not run in CI.
 
 ---
 
@@ -559,7 +538,7 @@ jobs:
 
 **Solutions**:
 
-1. Ensure migration files exist in `services/*/migrations/`
+1. Ensure migration files exist in `services/read/{content,fetcher,email}/migrations/` (or `services/users/migrations/`)
 
 2. Check migration file paths in test helper
 
@@ -570,7 +549,7 @@ jobs:
 
 4. Check for syntax errors in migration SQL:
    ```bash
-   cat services/content-service/migrations/*.sql
+   cat services/read/content/migrations/*.up.sql
    ```
 
 ### Port Conflicts
@@ -635,13 +614,15 @@ jobs:
 
 ### Vault Connection Issues (User Service)
 
-**Problem**: User service tests fail with Vault connection errors
+**Problem**: User service integration tests fail with Vault connection errors
 
 **Solutions**:
 
+Note: the User Service integration environment has its own Vault on port 8201 (token `test-root-token`); see the [integration README](/services/users/test/integration/README.md). The commands below are for the dev stack Vault on 8200.
+
 1. Ensure Vault is running:
    ```bash
-   cd infrastructure/docker
+   cd infrastructure/docker/dev
    docker compose up -d vault
    ```
 

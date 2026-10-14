@@ -2,11 +2,12 @@
 
 ## Project Overview
 
-Cairn is a simple read-it-later mobile app that allows users to read and discover long-form content. This repository contains the backend services responsible for fetching, storing, and serving user-selected content.
+Cairn is a simple read-it-later mobile app that allows users to read long-form content. This repository contains the backend services responsible for fetching, storing, and serving user-selected content.
 
 The backend consists of modular services built in Go:
 - **Content Service**: Core service responsible for storing and serving content
 - **RSS Fetcher Service**: Lightweight service for fetching and parsing RSS feeds
+- **Email Ingest Service**: Receives forwarded newsletters and delivers them as content (see [Email Ingestion](#email-ingestion))
 - Future fetcher services can be added (web scraper, API integrations, etc.)
 
 ## Core Principles
@@ -43,7 +44,8 @@ Store the following metadata for each piece of content:
 Track user-specific data for each saved content item:
 
 #### Required Fields
-- **Status**: One of `unread`, `read`, or `archived`
+- **Status**: One of `unread`, `reading`, `completed`, or `archived` (content migration `000002`)
+- **List**: `feed` or `reads` (see [Feed and Reads Lists](#feed-and-reads-lists))
 - **Scroll Position**: Fraction in `[0, 1]` representing how far the reader has scrolled through the content
   - Stores `offsetY / contentHeight` (e.g., `0.5` means halfway through the article)
   - The mobile and web apps compute this from the current scroll offset relative to total content height
@@ -121,7 +123,7 @@ Provide REST APIs for the mobile app to:
 
 **Response Format**: JSON with HTML content embedded in a designated field
 
-**Pagination**: Cursor-based pagination with 20 items per page
+**Pagination**: Cursor-based pagination; `limit` defaults to 20 and is capped at 100 (values outside 1-100 fall back to 20). The `list` filter restricts results to `feed` or `reads`; omitting it returns both. See `services/read/content/api/openapi.yaml`.
 
 ### Content Update API
 
@@ -134,12 +136,23 @@ Provide REST APIs for the RSS Fetcher to update content when source articles cha
 - The content hash is updated to reflect the new content
 - Deduplication is re-evaluated with the new hash
 
+### Feed and Reads Lists
+
+Every `user_contents` row lives in exactly one of two lists: **Feed** (skim) or **Reads** (read or triage). The user chooses the list per source (RSS feed or email sender).
+
+- **Routes**: A `source_routes` row `(user_id, source_type, source_key) -> list` stores the choice. `source_key` is the feed ID (`rss`) or sender ID (`email`). No row means Reads.
+- **Setting a route**: `PUT /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list` (user must be subscribed). Submitting a feed URL with a `list` also sets the route. Saved links always go to Reads. Details in the content OpenAPI spec.
+- **New items only**: Changing a route affects items delivered afterwards. Existing `user_contents` rows are never moved.
+- **Delivery**: Bulk creation resolves each row's `list` from the user's `source_routes` for the content's source (`contents.source_feed_id` or `contents.source_sender_id`). Rows predating the split (migration `000005`) stay in Reads.
+- **Feed expiry**: See [Content Retention Policy](#content-retention-policy).
+
 ### Data Model Considerations
 
 The system should maintain:
 1. **Content Table**: Stores unique content items (shared across users)
 2. **User-Content Junction Table**: Maps users to content with user-specific metadata
 3. **Feed Subscriptions Table**: Tracks which users subscribe to which RSS feeds
+4. **Source Routes Table**: Per-user Feed/Reads destination for each source (Content Service)
 
 **Note**: The Content Service does not maintain a Users table. User IDs are provided in API requests and validated by a separate authentication service.
 
@@ -153,7 +166,10 @@ The system should maintain:
 - **Orphaned Content**: Content that is no longer saved by any user will be automatically deleted after 90 days
   - Content becomes "orphaned" when the last user-content relationship pointing to it is deleted
   - The 90-day grace period allows for potential re-discovery via RSS feeds
-- **Cleanup Process**: A periodic background job will identify and remove orphaned content past the 90-day retention period
+- **Feed Expiry**: Feed-list items are not kept indefinitely. The cleanup job deletes `user_contents` rows with `list = 'feed'`, `is_favorite = false` and `added_at` older than 30 days. Favorited Feed items and all Reads items are exempt. Status and scroll position are not considered.
+  - Expiry deletes the user-content row, so the orphan trigger fires: content left with no users gets `orphaned_at` set and is then removed by the 90-day orphan rule. A Feed item therefore lasts up to 30 days, plus 90 days before its content record is deleted if no other user holds it.
+- **Cleanup Process**: A periodic background job (Content worker, daily at 2 AM) first deletes expired Feed items, then removes orphaned content past the 90-day retention period. Both delete in batches of 1000 (`content/internal/jobs/cleanup_job.go`)
+- **Not to be confused with** the RSS Fetcher's `feed_items` cleanup (7/30 days, see [Feed Items Cleanup](#schema-design-notes)), which prunes the fetcher's own processing table and never touches user content
 
 ## RSS Fetcher Service Requirements
 
@@ -162,7 +178,7 @@ The system should maintain:
 - **User Subscriptions**: Individual users can subscribe to RSS feeds via the mobile app API
 - **Feed Limit**: Maximum of 100 feeds per user (hard limit - API returns error on attempt to exceed)
 - **Feed Registration**: When a user subscribes to a feed, the system should:
-  - Check if the user has reached the 100 feed limit; return error if exceeded
+  - Check if the user has reached the 100 feed limit; return error if exceeded. The limit is enforced twice: by `MaxFeedsPerUser` in the service (`fetcher/internal/service/feed_service.go`) and by the `trg_check_feed_limit` trigger on `feed_subscriptions` (fetcher migration `000001`), which guards concurrent inserts
   - Check if the feed already exists in the database
   - If new, validate the feed URL and add it to the monitoring list
   - Subscribe the user to that feed
@@ -197,7 +213,7 @@ The system should maintain:
 ### Auto-Delivery
 
 When new content is discovered in an RSS feed:
-- Automatically add it to **all subscribed users'** reading lists
+- Automatically add it to **each subscribed user's routed list** (Feed or Reads, per their `source_routes`; Reads when no route exists)
 - Set initial status as `unread`
 - Deduplicate: If content already exists (same feed_id + content_hash), link to existing content record
 
@@ -313,6 +329,7 @@ CREATE TABLE contents (
 
     -- Source-specific identifiers (nullable, depends on source_type)
     source_feed_id UUID, -- Feed ID for RSS content (more efficient than JSONB extraction)
+    source_sender_id UUID, -- Email sender ID for email content (migration 000005); used to look up the sender's route
 
     -- Content-type specific metadata stored as JSONB for flexibility
     -- Use for additional metadata that doesn't need indexing
@@ -352,7 +369,8 @@ CREATE TABLE user_contents (
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
 
     -- User-specific metadata
-    status VARCHAR(20) NOT NULL DEFAULT 'unread', -- 'unread', 'read', 'archived'
+    status VARCHAR(20) NOT NULL DEFAULT 'unread', -- 'unread', 'reading', 'completed', 'archived'
+    list VARCHAR(10) NOT NULL DEFAULT 'reads', -- 'feed' or 'reads' (migration 000005)
     scroll_position NUMERIC(5,4) NOT NULL DEFAULT 0.0, -- Reading progress as a fraction in [0,1]
     is_favorite BOOLEAN NOT NULL DEFAULT false,
 
@@ -361,7 +379,8 @@ CREATE TABLE user_contents (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT chk_status CHECK (status IN ('unread', 'read', 'archived')),
+    CONSTRAINT chk_status CHECK (status IN ('unread', 'reading', 'completed', 'archived')),
+    CONSTRAINT user_contents_list_check CHECK (list IN ('feed', 'reads')),
     CONSTRAINT chk_scroll_position CHECK (scroll_position >= 0 AND scroll_position <= 1),
     CONSTRAINT unique_user_content UNIQUE(user_id, content_id)
 );
@@ -372,6 +391,26 @@ CREATE INDEX idx_user_contents_status ON user_contents(user_id, status);
 CREATE INDEX idx_user_contents_favorite ON user_contents(user_id, is_favorite)
     WHERE is_favorite = true;
 CREATE INDEX idx_user_contents_content ON user_contents(content_id);
+CREATE INDEX idx_user_contents_user_list_added ON user_contents(user_id, list, added_at DESC);
+-- Supports the Feed expiry delete (migration 000006)
+CREATE INDEX idx_user_contents_feed_expiry ON user_contents(added_at)
+    WHERE list = 'feed' AND is_favorite = false;
+```
+
+#### 2a. `source_routes` table
+
+Per-user destination list for a source (migration `000005`). No row means Reads.
+
+```sql
+CREATE TABLE source_routes (
+    user_id     UUID        NOT NULL,
+    source_type VARCHAR(50) NOT NULL CHECK (source_type IN ('rss', 'email')),
+    source_key  UUID        NOT NULL, -- feed ID (rss) or sender ID (email)
+    list        VARCHAR(10) NOT NULL CHECK (list IN ('feed', 'reads')),
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, source_type, source_key)
+);
 ```
 
 #### 3. Triggers for orphaned content tracking
@@ -598,7 +637,7 @@ CREATE INDEX idx_outbox_feed_item ON content_outbox(feed_item_id);
 ### Schema Design Notes
 
 **Service Separation**
-- Content Service database contains: `contents`, `user_contents`
+- Content Service database contains: `contents`, `user_contents`, `source_routes`
 - RSS Fetcher database contains: `feeds`, `feed_subscriptions`, `feed_items`, `content_outbox`
 - Services communicate exclusively via REST APIs, never direct database access
 
@@ -634,15 +673,20 @@ CREATE INDEX idx_outbox_feed_item ON content_outbox(feed_item_id);
 - Enables cross-source deduplication for future web scraper fetcher
 
 **Feed Items Cleanup**
-- Completed `feed_items` older than 7 days are deleted by background job
-- Failed `feed_items` older than 30 days are archived/deleted
+- Completed `feed_items` older than 7 days (by `processed_at`) are deleted by the fetcher's background job
+- Failed `feed_items` older than 30 days (by `discovered_at`) are deleted, not archived (`fetcher/internal/jobs/feed_items_cleanup_job.go`)
 - Prevents unbounded table growth
+- Distinct from Feed expiry: the Content Service deletes non-favorited Feed-list `user_contents` after 30 days (see Content Retention Policy)
 
 **Performance Optimizations**
 - Strategic indexes for common query patterns (user content lists, feed polling schedules)
 - Partial indexes for selective filtering (favorites, orphaned content, active feeds)
 - Dedicated `source_feed_id` column avoids JSONB extraction in deduplication queries
 - Cursor-based pagination supported via `added_at` timestamp ordering
+
+## Email Ingestion
+
+The Email Ingest Service (`services/read/email`) accepts forwarded emails from a Cloudflare Email Worker, converts them to sanitised content and delivers them to the Content Service over REST, using its own database and an outbox like the RSS Fetcher. New senders default to Reads; users can route a sender to Feed via the same route endpoint as RSS. Email content is deduplicated on `(content_hash, original_url)` (content migration `000004`). Details: [services/read/email/CLAUDE.md](../../services/read/email/CLAUDE.md) and `services/read/email/api/openapi.yaml`.
 
 ## Authentication & Authorization
 
@@ -689,10 +733,9 @@ The initial implementation is considered successful when:
 Potential additions for future iterations:
 
 ### Content Features
-- Additional fetcher services (web scraper, Pocket import, email forwarding)
+- Additional fetcher services (web scraper, Pocket import)
 - Offline content caching
 - Reading time estimation
-- Related content suggestions
 - Full-text search with PostgreSQL FTS or external search engine
 
 ### User Features

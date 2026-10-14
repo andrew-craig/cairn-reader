@@ -1,7 +1,7 @@
 # Cairn Reader — Code Quality Review
 
 **Date:** 2026-07-05
-**Scope:** Full repository — four Go backend services (users, read/content, read/fetcher, read/email, explore), shared `pkg/`, the self-host binary, and the React Native mobile + React web front-ends.
+**Scope:** Full repository — four Go backend services (users, read/content, read/fetcher, read/email; the since-removed explore service is covered in [the archive](/docs/archive/explore_code_quality_findings.md)), shared `pkg/`, the self-host binary, and the React Native mobile + React web front-ends.
 **Method:** Seven parallel focused reviews, one per area, each verifying findings against source (a subset were confirmed with throwaway tests). This document is the coordinator's consolidation.
 
 ---
@@ -10,7 +10,7 @@
 
 The codebase is, on the whole, **competently built and consistently structured**: clean repository/service/handler layering in every Go service, RS256 JWT validation that correctly pins the signing method and uses constant-time comparison, a genuinely careful shared RSS pipeline (body-size caps, redirect limits, canonical sanitizer), and thoughtful front-end patterns (refresh-token mutex, stale-while-revalidate caching, optimistic-update rollback guards). Happy-path test coverage is good.
 
-The problems cluster into **six recurring themes** rather than one-off bugs. The most serious are **authorization boundary gaps** in the read and explore services (unauthenticated SSRF and unauthenticated writes to shared content) and a **security feature that silently doesn't work** (refresh-token reuse detection in the users service). Underneath the individual bugs is a consistent story of **organic copy-paste drift**: the "single source of truth in `pkg/`" promise is only partially delivered, and several features marked "done" are incomplete or non-functional in practice.
+The problems cluster into **six recurring themes** rather than one-off bugs. The most serious are **authorization boundary gaps** in the read service (unauthenticated SSRF and unauthenticated writes to shared content) and a **security feature that silently doesn't work** (refresh-token reuse detection in the users service). Underneath the individual bugs is a consistent story of **organic copy-paste drift**: the "single source of truth in `pkg/`" promise is only partially delivered, and several features marked "done" are incomplete or non-functional in practice.
 
 None of the findings are exotic — they read as the natural gaps of a fast-moving multi-service build, and most are fixable without architectural change.
 
@@ -18,8 +18,8 @@ None of the findings are exotic — they read as the natural gaps of a fast-movi
 
 | Severity | Count | Areas |
 |---|---|---|
-| Critical | 5 | read (2), users (1), explore-via-shared CORS (1), email (1×2 outbox) |
-| High | ~11 | users (4), read (1), email (2), explore (2), shared (2), mobile (3), web (0) |
+| Critical | 5 | read (2), users (1), shared CORS (1), email (1×2 outbox) |
+| High | ~11 | users (4), read (1), email (2), shared (2), mobile (3), web (0) |
 | Medium/Low | ~35 | all areas |
 
 ---
@@ -31,7 +31,6 @@ These are the patterns worth fixing structurally, because each spans multiple se
 ### Theme 1 — Authorization boundaries are assumed, not enforced
 Multiple services expose endpoints that comments/docs label "internal only" or "used by internal services," but nothing actually enforces that:
 - **read/content**: `POST/PUT /api/v1/content/*`, `/bulk`, `/check-duplicate`, and the URL-detection endpoints sit behind only `RequireHTTPS`. The service's own CLAUDE.md even lists them under "Public Routes (No Auth)." This yields both **unauthenticated SSRF** and **unauthenticated writes to shared content records** (see Critical #1, #2).
-- **explore**: `POST /api/v1/explore/article` and the fetcher's `/fetch` / `/sync` triggers have no service-to-service auth — anyone who can reach them can inject articles or hammer triggers.
 - **email**: the ingest endpoint has no request body size limit on an explicitly untrusted inbound pipeline.
 
 **Structural fix:** an internal-API-key middleware already exists (`RequireInternalAPIKey`, used correctly on `/api/v1/internal/*` in read/content). Apply it consistently to every endpoint the architecture treats as internal, and add an SSRF-safe HTTP dialer (block loopback/RFC1918/link-local/metadata IPs) to the shared fetch path.
@@ -55,14 +54,12 @@ The same logic is reimplemented in 2–4 places across the repo, so a fix in one
 ### Theme 4 — Job claiming has no locking (latent under horizontal scaling)
 No `FOR UPDATE SKIP LOCKED` or atomic claim-and-update appears **anywhere** in the codebase. Every worker does `SELECT ... WHERE status='pending'` then flips status afterward:
 - read/fetcher (`GetPendingItems`, `GetPendingEntries`, `GetFeedsDueForPolling`)
-- explore/fetcher (`GetNextFeed`)
 - email outbox
 
 Single-replica today, so no active bug — but running any worker with >1 replica (normal for HA) causes duplicate fetches, duplicate outbound traffic to third-party sites, and last-writer-wins races on feed error/tier tracking.
 
 ### Theme 5 — Features marked "done" that are incomplete or non-functional
 - **users**: refresh-token reuse detection never fires for its actual threat (Critical #3); password-reset tokens are generated and stored but **never delivered** to the user (no mailer, no log, no return value); self-host wiring omits two dependencies, panicking on the reset/verify routes.
-- **explore**: `feed_id` is never populated by the production fetch path (all articles have `feed_id = NULL`); the documented discovery/exploration recommendation slot is dead code.
 - **email**: `OUTBOX_MAX_RETRIES` config is silently ignored; `raw_emails.content_hash` column is entirely unused.
 - **read/content**: `CleanupJob.RunWithBatching` claims to batch deletes to avoid long locks but doesn't actually pass the batch size through — the delete has no `LIMIT`.
 
@@ -107,15 +104,15 @@ Across every area, the exact code that's risky is the code that's untested: auth
 - **H7** Divergent hand-maintained bluemonday policy (`processor/content_extractor.go:26-55`) instead of the canonical `pkg/rss/sanitize` — future sanitizer hardening won't reach email content. Also `OUTBOX_MAX_RETRIES` silently ignored (`worker/outbox_worker.go:32-50`).
 
 ### Explore service
-- **H8** A single malformed/colliding article poisons the whole feed batch (`recommender/internal/db/article_repository.go:77-127`): one multi-row `INSERT ... ON CONFLICT (link)`. An empty/duplicate `<link>` trips "cannot affect row a second time"; and because article `id = ContentHash(content)` (not the link), syndicated duplicate content collides on the primary key and **recurs on every subsequent poll** until the feed auto-disables — silently discarding all good articles in the batch.
-- **H9** `feed_id` never populated in production (`fetcher/internal/fetcher/fetcher.go:168-200`) — every article stored with `feed_id = NULL`, breaking documented per-feed metadata/analytics.
+- **H8** — archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md
+- **H9** — archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md
 
 ### Shared `pkg/` + cross-service
 - **H10** Panic-recovery middleware never sees the request ID in **all six routers** (`pkg/middleware/recovery.go:24` + registration order): `Recovery` is registered before `ChiRequestLogger`, so every panic log is stamped `request_id=unknown`, defeating incident correlation. **Verified.**
 - **H11** JWT validation duplicated (~250 lines) in `services/users/internal/auth/jwt.go` vs `pkg/auth/validator.go`, and the duplicate is dead in the request path (only tests use it). Security fixes to the canonical validator won't propagate.
 
 ### Mobile app
-- **H12** A second 401 after token refresh is silently swallowed (`services/read.ts:50-72`, `explore.ts:86-108`) — only a *thrown* refresh failure logs the user out, so a re-rejected retry leaves the user stuck in a broken authenticated UI.
+- **H12** A second 401 after token refresh is silently swallowed (`services/read.ts:50-72`; the `explore.ts` instance is archived) — only a *thrown* refresh failure logs the user out, so a re-rejected retry leaves the user stuck in a broken authenticated UI.
 - **H13** `AddArticleScreen` is a dead/duplicate "add article" path that fabricates content IDs (`id: url.trim()`) and writes to an AsyncStorage key **no active screen reads** (`AddArticleScreen.tsx:62-79`); `ReadArticleDetailScreen` still writes to that dead key on every interaction (silent no-op churn).
 - **H14** Verbose auth logging exposes token fragments and full response bodies to device logs (`services/auth.ts:353-417`). See Theme 2.
 
@@ -131,7 +128,7 @@ Across every area, the exact code that's risky is the code that's untested: auth
 
 **Email:** dead `raw_emails.content_hash` column; hardcoded retry threshold in SQL; `MockAPIKeyRepository` shipped in production source; unbounded recursion on attacker-controlled HTML depth; `sender_email` not case-normalized (duplicate sender rows).
 
-**Explore:** no row locking in `GetNextFeed`; SSRF exposure in feed fetching (no allow/deny-list); internal endpoints unauthenticated; dead `GetLowExposureArticles`; quality-score doc/code sign mismatch (code correct); config-bootstrap duplication + divergent migrate defaults.
+**Explore:** archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md
 
 **Shared:** env-parsing duplicated 4× with divergent duration semantics; 3 of 6 self-host DBs excluded from `/health/ready` (reports healthy while half the DBs are down); stale `google/uuid v1.1.2` pin in `pkg/auth/go.mod`; inconsistent health-check JSON contracts per service; no JWT clock-skew leeway (`jwt.WithLeeway`) → spurious 401s at expiry with 15-min tokens; dead `StubHandler` comment.
 
@@ -143,7 +140,7 @@ Across every area, the exact code that's risky is the code that's untested: auth
 
 ## Recommended priority order
 
-1. **Close the authorization gaps** (C1, C2, explore/email internal endpoints) — apply `RequireInternalAPIKey` consistently and add an SSRF-safe dialer to the shared fetch path.
+1. **Close the authorization gaps** (C1, C2, email internal endpoints) — apply `RequireInternalAPIKey` consistently and add an SSRF-safe dialer to the shared fetch path.
 2. **Fix or disable the broken security features** (C3 reuse detection; H3 password-reset delivery) — a feature that appears to protect but doesn't is worse than an absent one.
 3. **Stop logging credential material** (H1, H2, H14).
 4. **Fix the outbox worker-blocking bug** (C5) before the email pipeline sees real load.
@@ -171,7 +168,7 @@ This first pass was seven **static, per-area** reviews. The highest-value follow
 
 1. **Dynamic verification pass.** Actually build every module and run `go test -race ./...`, `go vet`, `golangci-lint`, plus `tsc --noEmit` / `eslint` on the front-ends. Static review can't see data races, and several findings above (Theme 4 locking, the mobile refresh-race, the users reuse-detection path) are exactly the kind of thing `-race` and a green-but-wrong-path test hide. First job: confirm the whole repo even builds and the suites pass on a clean checkout.
 
-2. **Cross-service contract conformance.** Diff each service's HTTP *client* against the *server* it calls (read/fetcher→content, email→content, explore/fetcher→recommender) and against the four `openapi.yaml` specs. Look for field/enum/status-code drift, error-shape mismatches, and missing idempotency keys across boundaries — the seams are where the per-service reviews had the least visibility.
+2. **Cross-service contract conformance.** Diff each service's HTTP *client* against the *server* it calls (read/fetcher→content, email→content) and against the four `openapi.yaml` specs. Look for field/enum/status-code drift, error-shape mismatches, and missing idempotency keys across boundaries — the seams are where the per-service reviews had the least visibility.
 
 3. **Database & migration review.** Up/down reversibility, index coverage vs. actual query predicates (are the hot `WHERE`/`ORDER BY` paths indexed?), `ON DELETE` behavior, missing constraints, and the broader fallout of the content-hash-as-primary-key design (finding H8). Also transaction boundaries for the multi-step writes flagged in read/content and users.
 
@@ -203,7 +200,7 @@ This pass **did not overturn any Part 1 finding** — it confirmed several with 
 ## New critical findings from Part 2
 
 ### P2-C1 — Scheduled daily auth outage: downstream services never refresh the JWT public key
-The users service **rotates its JWT signing key every `JWT_KEY_ROTATION_INTERVAL` (default 24h)** (`services/users/internal/config/config.go:123`, `KeyRotationManager`). But content, explore-recommender, and email-ingest each call `vaultClient.GetPublicKey()` **exactly once at startup** and never refresh it (`services/read/content/cmd/content/main.go:100-117`, explore-recommender + email-ingest equivalents). After the first rotation, every access token the users service issues fails signature verification on those three services until they are manually restarted. This is a self-inflicted outage baked into the default config — arguably the single highest-impact operational finding in either pass, because it triggers on a timer with no bad input required.
+The users service **rotates its JWT signing key every `JWT_KEY_ROTATION_INTERVAL` (default 24h)** (`services/users/internal/config/config.go:123`, `KeyRotationManager`). But content and email-ingest each call `vaultClient.GetPublicKey()` **exactly once at startup** and never refresh it (`services/read/content/cmd/content/main.go:100-117`, email-ingest equivalent). After the first rotation, every access token the users service issues fails signature verification on those services until they are manually restarted. This is a self-inflicted outage baked into the default config — arguably the single highest-impact operational finding in either pass, because it triggers on a timer with no bad input required.
 
 ### P2-C2 — Full account-takeover URL logged in cleartext at INFO (users)
 `services/users/internal/services/email_verification_service.go:84-91` logs the **raw, unhashed verification token assembled into a ready-to-click URL, plus the user's plaintext email**, at INFO level. Anyone with production log access can take over any unverified account for 24h by replaying the URL. This is a more severe, exploit-ready variant of Part 1's "verification token logged" finding (H2) — it's not a token fragment, it's a working exploit link plus the victim's email in one line.
@@ -221,7 +218,7 @@ Three stacked, independently verified blockers: (a) all 10 `docker-build-*.yml` 
 
 ## Confirmations & amplifications of Part 1 (Part 2 evidence)
 
-- **Readiness probe lies (Part 1 shared-#5), now confirmed from the deploy side:** `addDB` is called for only 3 of 6 self-host databases; users/explore-recommender/explore-fetcher outages report `healthy`, and the CI smoke test curls that same endpoint → **false green in CI**.
+- **Readiness probe lies (Part 1 shared-#5), now confirmed from the deploy side:** `addDB` is called for only 3 of 6 self-host databases; users outages report `healthy`, and the CI smoke test curls that same endpoint → **false green in CI**.
 - **Recovery/request-ID ordering (Part 1 H10):** confirmed in all 6 routers, and *broadened* — the per-request logger (`logging.FromContext`) is actually consumed in **exactly one handler in the whole repo** (users `RefreshToken`); every other error log across all services uses the global logger with no `request_id`. This is the largest correlation gap in the codebase, bigger than the panic-path bug alone. The email service never populates the logging context at all (uses chi's own middleware).
 - **Wrong-sentinel token-expiry ERROR spam (Part 1 users-#6):** root-caused precisely — `auth.ErrTokenExpired` (`jwt.go:21`) vs `apperrors.ErrTokenExpired` (`pkg/errors/errors.go:53`); routine expiry logs at ERROR forever, and with **no metrics backend anywhere in the repo**, the elevated error rate can't be separated from real spikes.
 - **Network-failure-clears-tokens:** Part 1 flagged the mobile 401-retry gap; Part 2 found the adjacent bug on **both** platforms — any error in `doRefreshAccessToken` (including plain offline) calls `clearTokens()`, so opening the app offline near token expiry forces a full re-login instead of retrying.
@@ -233,9 +230,9 @@ A full endpoint-by-endpoint matrix across all services produced a clear, reassur
 - **The JWT-authenticated surface is uniformly solid.** Every `RequireAuth` endpoint derives `user_id` from the validated token and backs it with a SQL `WHERE user_id = $jwt` clause. **There is no query-level scoping bug anywhere** — no resource fetched by PK alone, no `user_id` trusted from body/query, and the one path-param-vs-PK pattern in content is fed a PK from an already-scoped lookup.
 - **The real risk is entire services with no inbound authentication**, relying solely on network topology:
   - **`read/fetcher` (ingest-rss) has ZERO inbound auth** (`internal/api/router.go:73-86`, only `RequireHTTPS`). `user_id` comes straight from the URL path, never checked against a token. Anything that can reach `ingest-rss:8085` (a sibling container, an SSRF pivot from C1/P1) can **read, add, or delete any user's RSS subscriptions** — a direct cross-tenant IDOR the moment the "internal only" assumption is violated. This is the standout Part 2 security finding.
-  - Unauthenticated global feed admin (`PATCH /feed/{feed_id}` disables a feed for all subscribers), unauthenticated article injection into the shared explore catalog, and the Part 1 unauthenticated content writes all share the same root cause: **"internal" is a comment, not an enforced boundary.**
+  - Unauthenticated global feed admin (`PATCH /feed/{feed_id}` disables a feed for all subscribers) and the Part 1 unauthenticated content writes all share the same root cause: **"internal" is a comment, not an enforced boundary.**
 
-**Structural recommendation:** put JWT (or at minimum `RequireInternalAPIKey`, with ownership re-checked at the resource-owning service) on read/fetcher's user routes, the read/content write endpoints, and the explore ingest endpoints. The system's tenant isolation currently hinges on a single unenforced assumption.
+**Structural recommendation:** put JWT (or at minimum `RequireInternalAPIKey`, with ownership re-checked at the resource-owning service) on read/fetcher's user routes, the and the read/content write endpoints. The system's tenant isolation currently hinges on a single unenforced assumption.
 
 ## Observability maturity: Level 1 of 4
 
@@ -248,7 +245,7 @@ Structured-logging plumbing *looks* mature (slog, JSON, request-ID middleware) b
 
 Web is meaningfully more resilient (real loading/error/empty triad + explicit retry on every route); mobile is weak exactly where it matters most:
 - **No React error boundary in either app** — one malformed article throws during render → blank white screen (web) / hard crash (mobile).
-- **Mobile Read/Explore/Bookmarks/Votes have no error state** — a network failure is indistinguishable from an empty account; pull-to-refresh is the only retry affordance (itself an accessibility gap).
+- **Mobile Read/Bookmarks/Votes have no error state** — a network failure is indistinguishable from an empty account; pull-to-refresh is the only retry affordance (itself an accessibility gap).
 - **Every icon-only control in the mobile app lacks an `accessibilityLabel`** — the entire reader action bar (Back, Next, Favorite, Archive, Upvote, Downvote, Save) is unlabeled to screen readers. Web sets `aria-label`/`aria-pressed` correctly; mobile has regressed relative to it.
 - Web reader destructive actions (archive/delete) fire immediately with no confirmation and only `console.error` on failure.
 
@@ -258,8 +255,8 @@ Coverage percentage is a poor proxy for confidence here. Beyond the two dead tes
 
 ## Updated priority order (Parts 1 + 2 combined)
 
-1. **P2-C1 (JWT key-refresh)** — add periodic public-key refresh to content/explore/email before the next rotation. Timer-triggered outage; fix is small.
-2. **Authorization boundaries** — Part 1 C1/C2 + Part 2 read/fetcher IDOR + explore/email ingest. Enforce the "internal" boundary instead of assuming it.
+1. **P2-C1 (JWT key-refresh)** — add periodic public-key refresh to content/email before the next rotation. Timer-triggered outage; fix is small.
+2. **Authorization boundaries** — Part 1 C1/C2 + Part 2 read/fetcher IDOR + email ingest. Enforce the "internal" boundary instead of assuming it.
 3. **Stop logging credential material** — P2-C2 (verification URL) is exploit-ready; plus Part 1 H1/H2/H14.
 4. **Fix or disable broken security features** — reuse detection (P1-C3), and correct the tests that hid them (P2-C3).
 5. **Outbox worker blocking + no liveness signal** — P1-C5 + observability blind spot.
@@ -281,21 +278,20 @@ Empirically verified from a fresh checkout:
 - **All 12 Go modules build cleanly; `golangci-lint` is clean** except 19 pre-existing `errcheck` warnings (unchecked `Encode`/`Fprint` on the HTTP response writer, in `pkg/auth`/`pkg/middleware`/`pkg/api`) — harmless, non-blocking.
 - **`go test -race ./...` found NO data races anywhere.** This is a genuinely good result given Part 1 Theme 4 (unlocked job claiming): the concurrency bugs are latent under *horizontal scaling*, not present in single-process execution, and nothing the existing tests exercise trips the detector.
 - **Front-ends are clean**: `tsc --noEmit` passes for web and mobile; web `vitest` 13/13, mobile `jest` 78/78; lint has only pre-existing warnings.
-- **[Medium — CI/DX] `services/users/test/integration/*.go` is missing the `//go:build integration` tag** that every sibling service uses (`services/read`, `services/read/email`, `services/explore` all gate theirs). Consequence: a naive `go test ./...` in `services/users` (or repo-root) **hangs indefinitely** in `WaitForDatabase` (`testutil/setup.go:221`) trying to reach Postgres at `localhost:5433`, instead of skipping. This is a real CI/onboarding footgun — fix by adding the build tag to match the convention.
+- **[Medium — CI/DX] `services/users/test/integration/*.go` is missing the `//go:build integration` tag** that every sibling service uses (`services/read`, `services/read/email` gate theirs). Consequence: a naive `go test ./...` in `services/users` (or repo-root) **hangs indefinitely** in `WaitForDatabase` (`testutil/setup.go:221`) trying to reach Postgres at `localhost:5433`, instead of skipping. This is a real CI/onboarding footgun — fix by adding the build tag to match the convention.
 
 ## Database & migrations — two new criticals in the write path
 
 ### P2-C6 — Bulk content ingestion PK-collides on any mixed new+seen batch
 `services/read/content/internal/service/content_service.go:270-321` (`BulkCreateFromHTML`) puts *both* already-existing `Content` rows (which already carry a real DB `id`) and genuinely-new rows into one slice, then hands it to `BulkCreate` (`repository/content.go:530-586`), which issues a single multi-row `INSERT` with **no `ON CONFLICT`** and only assigns a UUID when `id == Nil`. The pre-existing row's real `id` violates the `contents` primary key → the whole statement rolls back → the entire `POST /api/v1/content/bulk` fails, including the valid new items. This is the production RSS ingestion path (`bulk_handler.go:67`), and re-polled feeds *routinely* contain a mix of seen + new items, so it fires in normal operation. The existing test mocks the repo and masks it. Fix: filter existing items before `BulkCreate`, or add `ON CONFLICT (id) DO NOTHING`.
 
-### P2-C7 — Recommender batch drops all articles on a content-hash collision (mechanism behind Part 1 explore-H8)
-`services/explore/recommender/internal/db/article_repository.go:77-127` upserts via `ON CONFLICT (link) DO UPDATE`, but `id` is a *separate* primary key set to `SHA256(cleaned_content)` (per `fetcher/migrations/000002`). When two different links carry the same content (syndicated/re-published articles — the exact case the content-hash ID was designed to dedupe), the new row's `link` doesn't conflict but its `id` does → an **unhandled** PK violation, and because it's one multi-row `INSERT`, the whole batch fails and silently drops every other new article in that fetch cycle. Fix: arm the `id` constraint (`ON CONFLICT (id) ...`).
+### P2-C7 — archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md
 
 ### Also from the DB pass
 - **[Critical] Orphan-cleanup "batching" is a no-op** — `DeleteOrphaned` (`repository/content.go:338-358`) has no `LIMIT`, and `RunWithBatching` (`jobs/cleanup_job.go:53-102`) loops it expecting batches, so the first call deletes everything in one long lock-holding, WAL-heavy transaction. The correct bounded pattern already exists at `fetcher/.../feed_item.go:379-401`. Same unbounded-`DELETE` anti-pattern (lower volume) in email `outbox.go:248-268` and `raw_email.go:223-243`.
 - **[High] The `contents` dedup index is NOT unique** — `idx_contents_rss_dedup` (`content/migrations/000001:37-39`) is a plain index, so the check-then-insert in `CreateFromURL`/`CreateFromHTML` has no DB backstop; concurrent RSS deliveries produce genuine duplicate content rows. Make it `UNIQUE` + `ON CONFLICT DO NOTHING`.
-- **[High] Every `explore/recommender` `down.sql` (000001–000006) is an empty comment stub** — including the two destructive user-ID-migration steps (000004, 000006). `make migrate-down` silently "succeeds" while reversing nothing — false reversibility.
-- Medium: non-atomic `Subscribe`; unindexed `ILIKE '%…%'` search on the unbounded `articles` table (no `pg_trgm`); several hot queries lacking composite indexes matching their `ORDER BY`. Low: `explore/*` uses naive `TIMESTAMP` while everything else uses `TIMESTAMP WITH TIME ZONE`; a duplicate index; the `read/content` CLAUDE.md's `VARCHAR(2048)` URL claim is stale (columns are actually `TEXT` — no truncation risk).
+- **[High] `explore/recommender` `down.sql` stubs** — archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md
+- Medium: non-atomic `Subscribe`; several hot queries lacking composite indexes matching their `ORDER BY`. Low: a duplicate index; the `read/content` CLAUDE.md's `VARCHAR(2048)` URL claim is stale (columns are actually `TEXT` — no truncation risk). The Explore-only items (`pg_trgm` search, naive `TIMESTAMP`) are archived, see docs/archive/explore_code_quality_findings.md.
 
 ## Cross-service contracts — loose, and one seam silently broken
 
@@ -306,7 +302,7 @@ The content service's client (`internal/service/ingest_rss_client.go:144-151`) u
 - **[High] 409/400 → 500 mistranslation** on ordinary conditions: the client matches error *codes* (`"already_subscribed"`) the server never sends (it sends generic `"conflict"`/`"bad_request"` with the human text only in `message`), then a downstream exact-string `switch` misses too, so re-subscribing to a feed you already have returns **500 instead of 409**. This is Part 1 read-M6, now confirmed broken end-to-end across the wire.
 - **[High] Email/manual content delivery is not idempotent** — the dedup check in `BulkCreateFromHTML` runs *only* for `source_type=rss`; email/web skip it, there's no unique constraint (per P2-C7-adjacent DB finding), and delivery is two separate HTTP calls, so an outbox retry after a partial success creates a **duplicate content row every time** → the same email appears multiple times in a user's list. The "at-least-once + dedupe" guarantee in `docs/ARCHITECTURE.md` holds for RSS in the common case and is absent for email/manual content.
 - Medium/Low: the RSS outbox marks a batch `delivered` without checking per-user `Failed` counts (and the server can never populate `Failed` anyway — `ON CONFLICT DO NOTHING` + swallowed `ErrNoRows` makes it dead signal); the `Existing`/duplicate DTO fields are dead on the wire; the fetcher OpenAPI documents a *third* subscribe-response shape matching neither side.
-- **Solid:** the one seam that shares a Go type (`explore` fetcher→recommender uses `pkg/models.Article` on both sides) never drifts; JWT issuer/audience defaults are consistent; `Unsubscribe` correctly branches on HTTP *status* rather than string-matching — the counter-example that shows the right pattern.
+- **Solid:** JWT issuer/audience defaults are consistent; `Unsubscribe` correctly branches on HTTP *status* rather than string-matching — the counter-example that shows the right pattern.
 
 ## Net effect on the combined picture
 
@@ -328,10 +324,10 @@ The headline result is a **confirmed, call-graph-verified XSS in the HTML-parsin
 ### New critical/high findings
 
 ### P3-C1 — XSS in `golang.org/x/net/html`, confirmed reachable on the untrusted-article path
-GO-2026-5030 ("duplicate attributes can cause XSS"), plus GO-2026-5025/5027/5028/5029 (parsing bugs incl. a DoS), all fixed in `x/net v0.55.0`. Confirmed call-graph trace: `pkg/rss/readability/readability.go:34 Extract → readability.FromReader → html.Parse`. **Every module pin is below the fix**: `pkg/rss` v0.35.0, `services/explore` v0.42.0, `services/read` + `services/read/email` v0.47.0, `cmd/selfhost` v0.52.0. This is the exact code path that parses fetched article HTML *before* `bluemonday` sanitizes it, so it affects RSS/email/explore/read uniformly. **This is the sharpest supply-chain finding — a live XSS primitive on the attacker-reachable ingestion path, not a latent one.** Fix: bump `x/net` to ≥ v0.55.0 across all modules.
+GO-2026-5030 ("duplicate attributes can cause XSS"), plus GO-2026-5025/5027/5028/5029 (parsing bugs incl. a DoS), all fixed in `x/net v0.55.0`. Confirmed call-graph trace: `pkg/rss/readability/readability.go:34 Extract → readability.FromReader → html.Parse`. **Every module pin is below the fix**: `pkg/rss` v0.35.0, `services/read` + `services/read/email` v0.47.0, `cmd/selfhost` v0.52.0. This is the exact code path that parses fetched article HTML *before* `bluemonday` sanitizes it, so it affects RSS/email/read uniformly. **This is the sharpest supply-chain finding — a live XSS primitive on the attacker-reachable ingestion path, not a latent one.** Fix: bump `x/net` to ≥ v0.55.0 across all modules.
 
 ### P3-H1 — SQL injection in `github.com/jackc/pgx/v5`, reachable from production code
-GO-2026-5004, fixed in v5.9.2. Confirmed reachable (not just tests): `services/explore/recommender/internal/db/vote_repository.go:289 GetUserVotedArticles`, `services/users/internal/database/user_repository.go:441 UpdatePasswordHash`, and `cmd/selfhost` via `selfhost.MountEmail`. Pins are split v5.7.6 / v5.8.0 — consolidate to a single version ≥ v5.9.2.
+GO-2026-5004, fixed in v5.9.2. Confirmed reachable (not just tests): `services/users/internal/database/user_repository.go:441 UpdatePasswordHash`, and `cmd/selfhost` via `selfhost.MountEmail`. Pins are split v5.7.6 / v5.8.0 — consolidate to a single version ≥ v5.9.2.
 
 ### P3-H2 — HTTP/2 infinite-loop DoS in `x/net` (bundled http2)
 GO-2026-4918 (infinite loop via bad `SETTINGS_MAX_FRAME_SIZE`), fixed in x/net v0.53.0. Present in every module — none reach v0.53.0. Same bump as P3-C1 clears it.
@@ -342,14 +338,13 @@ Exact count verified via `npm audit --json` (reproducible from root and from `ap
 ### Medium
 
 - **`pkg/auth/go.mod`: `google/uuid v1.1.2`** — confirms Part 1's stale-pin flag and sharpens it: it's the single sharpest divergence in the repo (2019 release; every *other* module is on current v1.6.0), and it's **not dead** — imported in `pkg/auth/middleware.go` and `validator.go`, i.e. the JWT-validation path hit by every authenticated request. No CVE tied to this version, but a trivial, high-signal fix.
-- **`golang.org/x/crypto/ssh` — 5 advisories** (GO-2026-5013/5017/5018/5019/5020, fixed v0.52.0) in `services/explore` at v0.40.0, but reachable **only** through `testcontainers-go` in test helpers (`internal/testutil/db.go`), not production. Risk confined to local/CI.
 - **Version drift on the HTML/JWT path**: `goquery` v1.8.0/v1.9.1 (latest v1.12.0, transitively via go-readability — same untrusted-HTML path); `go-jose/go-jose/v4` v4.1.1/v4.1.3 (GO-2026-4945 present but trace only reaches `jose.init` via Vault, low real risk); `golang-jwt/jwt/v5` v5.3.0/v5.3.1; `golang-migrate` v4.19.0/v4.19.1.
 - **Go toolchain staleness (highest-leverage fix)**: all 12 modules built with go1.24.7 vs current go1.24.13/go1.25.11. This alone accounts for ~15–20 stdlib CVEs *per module* (`crypto/tls`, `crypto/x509`, `net/url`, `net/http` cookie memory exhaustion, `encoding/pem`+`asn1`+`net/mail` quadratic-complexity DoS). **Bumping the toolchain patch version clears the bulk of the flagged list at once with zero dependency work** — do this first.
 
 ### Low / informational
 
+- Explore-only test-helper advisories (`x/crypto/ssh`, Docker/Moby): archived (Explore removed, #425), see docs/archive/explore_code_quality_findings.md.
 - `infrastructure/cloudflare/email-worker` (on the untrusted email-ingest path): `npm audit` shows 5 vulns (1 low/4 high) — **all inside `wrangler` devDependency** (undici + ws advisories), none reach the deployed Worker. The actual prod parser `postal-mime@2.7.4` (parses untrusted inbound email) is near-current (latest 2.7.5) with **0 findings**.
-- Docker/Moby CVEs in `services/explore` — reachable only via `testcontainers-go` test helpers, not the prod binary.
 - `hashicorp/vault/api` v1.22.0 (consistent, no CVE); `apps/web` `vite` 6.4.3 two majors behind (build-tool only).
 
 ### What's solid (dependency side)
@@ -360,7 +355,7 @@ Exact count verified via `npm audit --json` (reproducible from root and from `ap
 
 ## DoS / resource-exhaustion sweep
 
-The systemic gap is **request-body decoding**: only `explore/recommender` applies `http.MaxBytesReader`; every other service (`users`, `read/content`, `read/fetcher`, `read/email`) calls `json.NewDecoder(r.Body).Decode(...)` directly with no cap, so any JSON endpoint fully buffers an attacker-supplied body before any size/field validation runs. The most severe instance compounds with unbounded recursive HTML tree-walks. Pagination, worker pools, and the shared RSS fetch path are, by contrast, generally well-bounded.
+The systemic gap is **request-body decoding**: at review time only the since-removed `explore/recommender` applied `http.MaxBytesReader`; every other service (`users`, `read/content`, `read/fetcher`, `read/email`) called `json.NewDecoder(r.Body).Decode(...)` directly with no cap, so any JSON endpoint fully buffers an attacker-supplied body before any size/field validation runs. The most severe instance compounds with unbounded recursive HTML tree-walks. Pagination, worker pools, and the shared RSS fetch path are, by contrast, generally well-bounded.
 
 ### New critical findings
 
@@ -379,11 +374,10 @@ Together: an attacker (holding or leaking the single `INGEST_API_KEY`) submits a
 - **[Low] `GetFeedsForTierUpdate`** (`read/fetcher/repository/feed.go:335`) — no `LIMIT`, loads every active feed for the daily tier job; scales with feed count, not attacker-triggered.
 
 ### What's actually bounded correctly (don't re-litigate)
-- **Pagination**: no unbounded endpoint found — every `limit` is clamped to ≤100 with sane defaults (`user_content_handler.go:106,668`; `sender_handler.go:46,92`; `recommender/handlers.go:450,496`). `ListSubscriptions` has no limit param but is backed by a DB trigger capping subscriptions at 100/user.
+- **Pagination**: no unbounded endpoint found — every `limit` is clamped to ≤100 with sane defaults (`user_content_handler.go:106,668`; `sender_handler.go:46,92`). `ListSubscriptions` has no limit param but is backed by a DB trigger capping subscriptions at 100/user.
 - **Worker pools all bounded**: `DiscoverFeeds` 8-worker semaphore; `EmailProcessorWorker` batch-20/3-concurrent; `OutboxWorker` 5-worker/batch-20; `FeedWorker` 5-worker; content-extraction batch-20. No unbounded per-request/per-batch goroutine spawning.
 - **Batch queries `LIMIT`-bound** by fixed config, not attacker input (`feed_item.go`, `outbox.go`, `raw_email.go`).
 - **`io.ReadAll` guarded**: every read outside the two email/content walkers above goes through `io.LimitReader` first (`pkg/rss/fetch/fetch.go:115` 5MB, `url_detector.go` 10MB, parser/readability/email-ingest-client paths).
-- **`explore/recommender` is the reference pattern**: per-handler `http.MaxBytesReader` (10MB/16KB/1KB) returning 413 — the other four services should copy it.
 
 ## Net effect
 

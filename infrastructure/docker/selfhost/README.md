@@ -29,9 +29,11 @@ The single `cairn` container runs:
 
 All background workers (feed polling, outbox delivery, cleanup jobs) run as goroutines within the same process.
 
+The image also bundles the web app (built from `apps/web`, served from `/app/web`). The binary serves it for any request that is not an `/api/` or `/health/` route, so the stack serves both the API and the UI on port 8099.
+
 ## Building From Source
 
-By default the stack pulls the pre-built `cairn-selfhost` image from GHCR. To
+By default the stack pulls the pre-built `cairn-selfhost` image from GHCR (the Build Selfhost workflow publishes `linux/arm64` only, so on an amd64 host build from source as below). To
 test local code changes before they are published, build the image from source
 with the `docker-compose.build.yml` override. The consolidated binary compiles
 every backend service, so a local build picks up changes anywhere in the repo
@@ -69,15 +71,18 @@ JWT keys are auto-generated on first start and persisted in the `cairn_data` vol
 
 All settings go in `.env`. Only `DB_PASSWORD` is required. See `.env.example` for the full list.
 
+`docker-compose.yml` does not use `env_file`: only the variables named in its `environment:` block reach the `cairn` container. Settings that `.env.example` lists but the compose file does not forward (`JWT_ACCESS_EXPIRY`, `JWT_REFRESH_EXPIRY`, `INTERNAL_API_KEY`, `BCRYPT_COST`, `LOG_LEVEL`, `LOG_FORMAT`, `WEB_DIR`) take effect only if you add them to that block.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DB_PASSWORD` | *(required)* | PostgreSQL password |
 | `DB_USER` | `cairn` | PostgreSQL user |
 | `CAIRN_VERSION` | `latest` | Published image tag to run (see [Versioning & Releases](#versioning--releases)) |
-| `PORT` | `8099` | HTTP port |
+| `PORT` | `8099` | Host port published for the app (the container always listens on 8099) |
+| `INGEST_API_KEY` | *(generated each start)* | Email ingest API key for the Cloudflare Email Worker, upserted as `selfhost-default`; set a stable value |
 | `EMAIL_DOMAIN` | `read.cairnapp.com` | Domain for email ingestion |
-| `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
-| `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime (7 days) |
+| `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime (not forwarded by compose, see above) |
+| `JWT_REFRESH_EXPIRY` | `168h` | Refresh token lifetime, 7 days (not forwarded by compose, see above) |
 
 ### PostgreSQL tuning
 
@@ -176,8 +181,12 @@ All services share port 8099:
 | `/api/v1/internal/content/*` | Content Service |
 | `/api/v1/source/rss/*` | RSS Ingest |
 | `/api/v1/source/email/*` | Email Ingest |
+| `/api/v1/internal/source/email/*` | Email Ingest (service-to-service) |
 | `/health/live` | Liveness check |
 | `/health/ready` | Readiness check (includes DB) |
+| everything else | Bundled web app (SPA fallback) |
+
+The `/api/v1/internal/*` and `/api/v1/source/rss/*` routes are service-to-service and are authenticated with `INTERNAL_API_KEY`. The multi-container Caddyfile returns 404 for them; the selfhost binary does not, so consider blocking them at your reverse proxy.
 
 ## Versioning & Releases
 
@@ -198,10 +207,12 @@ Pin `CAIRN_VERSION` in `.env` to control how aggressively you upgrade:
 - `CAIRN_VERSION=latest` (default) — newest build, including `main`
 
 The running version is baked into the binary and reported at `/health/live`
-(and via `cairn-selfhost --version`):
+(and via `cairn-selfhost --version`). The workflow passes the GitHub Actions
+run number as the build `VERSION`, so the reported value is a build number
+rather than the SemVer tag:
 
 ```bash
-curl -s http://localhost:8099/health/live | jq .version   # e.g. "1.2.3"
+curl -s http://localhost:8099/health/live | jq .version   # e.g. "142"
 ```
 
 **Cutting a release** (maintainers):

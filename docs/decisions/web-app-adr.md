@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-06-09
+- **Update (2026-10-15)**: The Explore service and tab were removed (#425). Where this record names `explore`, read it as historical; the notes inline show the current state. The decisions themselves stand.
 - **Context**: Epic "Desktop web app" (`epic_f54e`). See
   [`docs/detailed_requirements/web_app_requirements.md`](../detailed_requirements/web_app_requirements.md).
 
@@ -16,7 +17,7 @@ choices and their rationale so subsequent tasks have a single source of truth.
 **Decision: Extract an `apps/shared` workspace package.**
 
 The framework-agnostic layers — `types/` (`article.ts`, `read.ts`, `auth.ts`), the
-API/service logic (`auth`, `read`, `explore`, parameterized over a storage adapter),
+API/service logic (`auth`, `read`, parameterized over a storage adapter; `explore` was part of the original scope but has since been removed, #425),
 and the theme token *values* — are extracted into an `apps/shared` package consumed by
 both `apps/mobile` and `apps/web`.
 
@@ -65,6 +66,13 @@ both `apps/mobile` and `apps/web`.
 - Theme token *values* live in `apps/shared`; each client maps them to its own
   styling system (RN `StyleSheet` on mobile, CSS custom properties on web).
 
+> **Current state (2026-10-15):** `apps/shared/src/services` now contains only `auth`
+> (token state machine, injected default URL and `StorageAdapter`). The `read` service
+> logic lives per-client in `apps/web/src/services/read.ts` and
+> `apps/mobile/src/services/read.ts`, and `explore` no longer exists. The web reader
+> (`apps/web/src/routes/ReadArticle.tsx`) sanitizes article `content` (`cleaned_html`)
+> through `apps/web/src/utils/sanitize.ts` (DOMPurify) before injection.
+
 ---
 
 ## Decision 2 — Token storage
@@ -98,6 +106,9 @@ browser-equivalent of mobile's `AsyncStorage` keys.
   `AllowCredentials: false` — correct for `Authorization`-header requests. A cookie
   model needs `AllowCredentials: true` with an explicit (non-wildcard) origin, i.e.
   the very backend change ruled out above.
+  *(Verified 2026-10-15: the users, read/content and email services and `cmd/selfhost`
+  all use `pkg/middleware` `DefaultCORSConfig()` — origin `*`, `AllowCredentials: false`.
+  `StrictCORSConfig` (credentials, explicit origins) has no callers.)*
 - The requirements doc names `localStorage` the **pragmatic reuse path** and the
   default for exactly these reasons.
 
@@ -107,7 +118,7 @@ browser-equivalent of mobile's `AsyncStorage` keys.
   to XSS.** Because the app injects remote article HTML into the DOM (replacing
   mobile's RN HTML renderer / WebView), this risk is real and must be contained.
 - **Mitigation is mandatory, not optional**: all remote HTML (`cleaned_html` for
-  saved articles, the explore `content` field for recommendations) **must** be
+  saved articles, the explore `content` field for recommendations, since removed in #425) **must** be
   sanitized with DOMPurify before injection. This is a hard requirement on the
   article reader task (`task_e0f7`), not a nicety. Without sanitization this decision
   is not safe.

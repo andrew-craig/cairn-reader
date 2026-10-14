@@ -8,6 +8,14 @@ Migrations are managed using [golang-migrate](https://github.com/golang-migrate/
 
 - `000001_create_users_table` - Creates the users table with support for email/password and mobile device authentication
 - `000002_create_refresh_tokens_table` - Creates the refresh_tokens table for JWT refresh token management
+- `000003_drop_refresh_tokens_trigger` - Drops a broken `last_used_at` trigger on refresh_tokens
+- `000004_add_login_lockout` - Adds `failed_login_attempts`, `locked_until` and `last_failed_login_at` to users
+- `000005_add_email_verification` - Adds `users.email_verified` and the `email_verification_tokens` table
+- `000006_create_password_reset_tokens_table` - Creates `password_reset_tokens` (never used)
+- `000007_add_revoked_at_to_refresh_tokens` - Adds `refresh_tokens.revoked_at` so revoked tokens are kept until expiry for reuse detection
+- `000008_drop_password_reset_tokens_table` - Drops `password_reset_tokens` (password reset was removed)
+
+Each migration has a matching `.down.sql`; `embed.go` embeds the files for the self-hosted binary.
 
 ## Running Migrations
 
@@ -60,6 +68,8 @@ Fields:
 - `created_at` - Timestamp of account creation
 - `updated_at` - Timestamp of last update (auto-updated via trigger)
 - `last_login_at` - Timestamp of last successful login
+- `email_verified` - Whether the email has been verified (migration 000005)
+- `failed_login_attempts`, `locked_until`, `last_failed_login_at` - Login lockout tracking (migration 000004)
 
 Indexes:
 - `idx_users_email` - Partial index on email (where email IS NOT NULL)
@@ -80,12 +90,20 @@ Fields:
 - `device_info` - User agent or device information
 - `ip_address` - IP address from which token was created
 - `token_family` - UUID for tracking token rotation chains
+- `revoked_at` - When the token was rotated away or logged out; NULL means active (migration 000007)
 
 Indexes:
 - `idx_refresh_tokens_user_id` - Index on user_id for user token lookups
 - `idx_refresh_tokens_token_hash` - Index on token_hash for token validation
 - `idx_refresh_tokens_expires_at` - Index on expires_at for cleanup operations
 - `idx_refresh_tokens_token_family` - Partial index on token_family for rotation tracking
+- `idx_refresh_tokens_revoked_at` - Partial index on revoked_at (where revoked_at IS NOT NULL)
+
+### Email Verification Tokens Table
+
+Backs the email verification endpoints (migration 000005).
+
+Fields: `id` (UUID primary key), `user_id` (foreign key to users, cascading delete), `token_hash` (SHA-256 hex digest, unique), `expires_at`, `created_at`.
 
 ## Database Setup
 
@@ -109,7 +127,7 @@ GRANT ALL PRIVILEGES ON DATABASE cairn_users TO cairn_user;
 
 ### Configuration
 
-Database configuration is loaded from environment variables (see `.env.example`):
+Database configuration is loaded from environment variables (see [CLAUDE.md](../CLAUDE.md#environment-variables)); a `.env` file is also read if present (`-env` flag):
 
 ```bash
 DB_HOST=localhost

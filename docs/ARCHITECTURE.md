@@ -136,7 +136,6 @@ flowchart LR
     subgraph Backend["Backend services (single server URL, path-routed)"]
         UserSvc["User Service<br/>:8082"]
         Content["Content Service<br/>:8083"]
-        IngestRSS["Ingest RSS Service<br/>:8085"]
         EmailIngest["Email Ingest Service<br/>:8089"]
     end
 
@@ -159,7 +158,6 @@ flowchart LR
     ReadSvc -->|"getAccessToken()"| AuthSvc
 
     ReadSvc -->|"Bearer token · /api/v1/content/..."| Content
-    ReadSvc -->|"Bearer token · /api/v1/source/rss/..."| IngestRSS
     ReadSvc -->|"Bearer token · /api/v1/source/email/..."| EmailIngest
 
     You --> Account
@@ -258,7 +256,7 @@ flowchart TB
     end
 
     subgraph Backend["Backend Services (REST over HTTPS)"]
-        UserSvc["User Service<br/>host :8082 → container :8080<br/>/api/v1/auth/*, /api/v1/user/:id/password"]
+        UserSvc["User Service<br/>host :8082 → container :8080<br/>/api/v1/auth/*, /api/v1/user/*"]
         ContentSvc["Content Service (Read)<br/>host :8083 → container :8080<br/>/api/v1/content/*"]
         RssSvc["Ingest RSS Service (Read)<br/>host :8085 → container :8081"]
         EmailSvc["Email Ingest Service<br/>host :8089 → container :8087<br/>/api/v1/source/email/*"]
@@ -303,7 +301,7 @@ The User Service is responsible for managing user access to the Cairn platform, 
 - Secure secrets management with HashiCorp Vault
 
 **Technology Stack**:
-- Go 1.24+
+- Go 1.25+
 - Chi HTTP router (`go-chi/chi/v5`)
 - PostgreSQL (`cairn_users` logical database) for user data, refresh tokens, and verification/reset tokens
 - HashiCorp Vault for JWT key management
@@ -511,7 +509,6 @@ Note on reuse detection: rotation hard-deletes the previous token row rather tha
 **Vault Storage**:
 - RSA private key (2048-bit) for JWT signing
 - RSA public key for JWT validation (fetched independently by other services)
-- Optional database credentials path (`VAULT_DB_CREDS_PATH`) for production
 - Support for key rotation
 
 **Vault Authentication**:
@@ -680,7 +677,7 @@ The Read Service is a microservices-based read-it-later backend system designed 
 ```mermaid
 flowchart TB
     Mobile["Mobile / Web App"] -->|"REST /api/v1/content/*"| CS
-    Mobile -->|"REST /api/v1/source/rss/*"| RSS
+    CS -->|"internal API key<br/>/api/v1/source/rss/*"| RSS
 
     subgraph ReadService["Read Service"]
         CS["Content Service<br/>host :8083 → container :8080"]
@@ -721,7 +718,7 @@ Ingest uses, so Content Service treats both producers identically.
 - Expire old Feed items (daily cleanup job)
 
 **Technology Stack**:
-- Go 1.21+
+- Go 1.25+
 - Chi HTTP router
 - PostgreSQL with full-text search (GIN indexes)
 - go-readability for content extraction
@@ -785,7 +782,7 @@ daily cleanup job (before it reclaims content orphaned for 90+ days).
 - Manage feed polling tiers based on activity
 
 **Technology Stack**:
-- Go 1.21+
+- Go 1.25+
 - Chi HTTP router
 - PostgreSQL for feed metadata and outbox
 - gofeed for RSS/Atom parsing
@@ -1351,40 +1348,7 @@ CREATE TABLE content_outbox (
 
 ### User Service Security
 
-**Password Security**:
-- Algorithm: bcrypt with cost factor 12 (minimum for production)
-- Minimum password length: 8 characters
-- Passwords and hashes are never logged
-
-**JWT Security**:
-- Algorithm: RS256 (asymmetric — private key signs, public key validates)
-- Access token lifetime: 15 minutes
-- Refresh token lifetime: 7 days
-- Private key stored in HashiCorp Vault; public key distributed to other services via Vault
-
-**Refresh Token Security**:
-- Tokens are SHA-256 hashed before database storage (raw token never persisted)
-- Rotated on each use — each refresh issues a new token
-- Tracks `device_info` and `ip_address` for anomaly detection
-- All tokens for a user can be revoked on suspected compromise
-
-**Authorization Middleware**:
-- Extracts `user_id` from validated JWT claims
-- Compares against `user_id` in URL path — returns 403 if mismatch
-- Ensures users can only access their own resources
-
-**Rate Limiting**:
-- Auth endpoints (`/auth/login`, `/auth/register`): 10 requests/minute per IP
-- User endpoints: 60 requests/minute per IP
-- Prevents brute-force attacks on authentication
-
-**Mobile Device Authentication**:
-- Expo device ID treated as a credential (HTTPS-only transmission)
-- App reinstall invalidates device ID; users must re-register
-- Mobile-only accounts can upgrade to email/password; after upgrade, device ID login is permanently disabled to enforce recoverable credentials
-
-**Security Headers** (applied globally):
-- `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `HSTS`
+Password, token, authorization, rate-limiting and header details are covered under "Security Considerations" in the [User Service](#user-service) section above.
 
 ### RSS Ingest Security
 
@@ -1472,7 +1436,7 @@ The current architecture is designed for **single-instance deployment** (one con
 - Auth endpoints are rate-limited per-IP based on local state only
 - Running multiple User Service instances would bypass the rate limit (each instance holds an independent counter)
 
-**Planned**: Replace with a Redis-backed rate limiter to support horizontal scaling of the User Service.
+**Planned**: Use the Redis-backed limiter (`pkg/middleware.RateLimitRedis`, not wired into any service yet) to support horizontal scaling of the User Service.
 
 Workers (RSS Fetcher Worker, Email Ingest Worker) also use in-process schedulers and must run as single instances until distributed locking is added.
 
@@ -1499,7 +1463,7 @@ See [docs/DEPLOYMENT.md](DEPLOYMENT.md#single-instance-topology) for operational
 
 ### Database Scaling
 
-**Current**: Single PostgreSQL instance per service
+**Current**: One PostgreSQL instance with a separate logical database per service
 
 **Future**:
 - Read replicas for read-heavy workloads

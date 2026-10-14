@@ -1,7 +1,7 @@
 # Engineering Principles
 
 **Version:** 1.0
-**Last Updated:** 2025-12-29
+**Last Updated:** 2026-10-15
 **Target Audience:** All engineers contributing to the Cairn codebase
 
 ## Table of Contents
@@ -83,13 +83,13 @@ User Service (8080) → User DB (postgres:5432)
    - Error formatting
    - Authentication middleware
 
-2. **Service Layer** (`internal/services/` or domain packages like `internal/recommend/`)
+2. **Service Layer** (`internal/services/` or domain packages like `internal/processor/`)
    - Business logic
    - Orchestrates multiple repositories
    - Domain-specific error handling
    - No HTTP dependencies
 
-3. **Repository Layer** (`internal/db/`)
+3. **Repository Layer** (`internal/database/` or `internal/repository/`)
    - Database queries
    - Data mapping
    - Transaction management
@@ -98,19 +98,19 @@ User Service (8080) → User DB (postgres:5432)
 **Example:**
 ```go
 // Handler (HTTP Layer)
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
     var req LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid request"})
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request", nil, "v1")
         return
     }
 
-    response, err := h.authService.Login(c.Request.Context(), req.Email, req.Password, ...)
+    response, err := h.authService.Login(r.Context(), req.Email, req.Password, ...)
     if errors.Is(err, services.ErrInvalidCredentials) {
-        c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid credentials"})
+        api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid credentials", nil, "v1")
         return
     }
-    c.JSON(http.StatusOK, response)
+    api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
 
 // Service (Business Logic Layer)
@@ -136,7 +136,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
     var user models.User
     err := r.pool.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, ...)
     if err == pgx.ErrNoRows {
-        return nil, database.ErrUserNotFound
+        return nil, apperrors.ErrUserNotFound  // pkg/errors
     }
     return &user, nil
 }
@@ -164,7 +164,12 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // main.go
 db := setupDatabase()
 userRepo := database.NewUserRepository(db)
-authService := services.NewAuthService(userRepo, jwtManager, refreshTokenRepo)
+authService := services.NewAuthService(services.AuthServiceConfig{
+    UserRepo:            userRepo,
+    RefreshTokenService: refreshTokenService,
+    JWTManager:          jwtManager,
+    PasswordHasher:      passwordHasher,
+})
 authHandler := handlers.NewAuthHandler(authService)
 
 // Handler constructor
@@ -176,22 +181,22 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
     return &AuthHandler{authService: authService}
 }
 
-// Service constructor
-type AuthServiceImpl struct {
-    userRepo         database.UserRepository
-    jwtManager       *auth.JWTManager
-    refreshTokenRepo database.RefreshTokenRepository
+// Service constructor (takes a config struct of dependencies)
+type AuthServiceConfig struct {
+    UserRepo            database.UserRepository
+    RefreshTokenService *auth.RefreshTokenService
+    JWTManager          *auth.JWTManager
+    PasswordHasher      *auth.PasswordHasher
+    // ... tuning options (lockout threshold, password rules)
 }
 
-func NewAuthService(
-    userRepo database.UserRepository,
-    jwtManager *auth.JWTManager,
-    refreshTokenRepo database.RefreshTokenRepository,
-) services.AuthService {
-    return &AuthServiceImpl{
-        userRepo:         userRepo,
-        jwtManager:       jwtManager,
-        refreshTokenRepo: refreshTokenRepo,
+func NewAuthService(config AuthServiceConfig) AuthService {
+    return &authService{
+        userRepo:            config.UserRepo,
+        refreshTokenService: config.RefreshTokenService,
+        jwtManager:          config.JWTManager,
+        passwordHasher:      config.PasswordHasher,
+        // ...
     }
 }
 ```
@@ -237,21 +242,21 @@ func (r *ArticleRepository) GetByID(ctx context.Context, id string) (*models.Art
 }
 
 // Handler extracts context from HTTP request
-func (s *Server) handleGetArticle(w http.ResponseWriter, r *http.Request) {
-    articleID := extractIDFromPath(r.URL.Path)
+func (h *ArticleHandler) GetArticle(w http.ResponseWriter, r *http.Request) {
+    articleID := chi.URLParam(r, "id")
 
     // Use request context (inherits timeout, cancellation)
-    article, err := s.articleRepo.GetByID(r.Context(), articleID)
+    article, err := h.articleRepo.GetByID(r.Context(), articleID)
     if err != nil {
-        http.Error(w, "Article not found", http.StatusNotFound)
+        api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "article not found", nil, "v1")
         return
     }
-    json.NewEncoder(w).Encode(article)
+    api.WriteSuccess(w, http.StatusOK, article, "v1")
 }
 ```
 
 **Files:**
-- All repository methods in `services/*/internal/db/*_repository.go`
+- All repository methods in `services/*/internal/database/*_repository.go` and `services/read/content/internal/repository/*.go`
 - All service methods in `services/*/internal/services/*.go`
 
 ---
@@ -302,23 +307,26 @@ func (s *AuthService) Login(...) (*AuthResponse, error) {
 }
 
 // Handler: Convert to HTTP status codes
-func (h *AuthHandler) Login(c *gin.Context) {
-    response, err := h.authService.Login(...)
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+    response, err := h.authService.Login(r.Context(), ...)
     if errors.Is(err, services.ErrInvalidCredentials) {
-        c.JSON(http.StatusUnauthorized, ErrorResponse{Error: "invalid credentials"})
+        api.WriteError(w, http.StatusUnauthorized, api.ErrCodeUnauthorized, "invalid credentials", nil, "v1")
         return
     }
     if errors.Is(err, services.ErrAccountExists) {
-        c.JSON(http.StatusConflict, ErrorResponse{Error: "account already exists"})
+        api.WriteError(w, http.StatusConflict, api.ErrCodeConflict, "account already exists", nil, "v1")
         return
     }
     if err != nil {
-        slog.Error("login failed", slog.Any("error", err))
-        c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal error"})
+        logging.FromContext(r.Context()).Error("login failed", slog.Any("error", err))
+        api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, "internal error", nil, "v1")
         return
     }
-    c.JSON(http.StatusOK, response)
+    api.WriteSuccess(w, http.StatusOK, response, "v1")
 }
+
+// In the User Service this chain of errors.Is checks lives in one place:
+// the ordered serviceErrorTable in handlers/errors.go, walked by writeServiceError.
 ```
 
 **Never do this:**
@@ -366,10 +374,10 @@ Other Services:
 ```go
 // Generate token pair (User Service)
 func (j *JWTManager) GenerateTokenPair(userID string) (*TokenPair, error) {
-    // Access token: 15 minutes, contains user_id claim
+    // Access token: short-lived (60 min default), contains user_id claim
     accessToken, err := j.GenerateAccessToken(userID)
 
-    // Refresh token: 7 days, random string hashed before storage
+    // Refresh token: long-lived (30 days default), random string hashed before storage
     refreshToken, err := generateSecureToken()
 
     return &TokenPair{
@@ -395,8 +403,8 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 ```
 
 **Token Lifetime:**
-- Access Token: 15 minutes (short-lived, cannot be revoked)
-- Refresh Token: 7 days (stored in DB, can be revoked)
+- Access Token: 60 minutes by default (`JWT_ACCESS_TOKEN_EXPIRY`; short-lived, cannot be revoked)
+- Refresh Token: 30 days by default (`JWT_REFRESH_TOKEN_EXPIRY`; stored in DB, can be revoked)
 
 **Files:**
 - `services/users/internal/auth/jwt.go` (JWT generation)
@@ -409,7 +417,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 
 ### Backend Services (Go)
 
-**Go Version:** 1.24.0
+**Go Version:** 1.25 (see each module's `go.mod`; some `pkg/` modules still declare 1.24)
 
 **Core Libraries:**
 
@@ -417,9 +425,8 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 |---------|---------|---------|-----------|
 | `database/sql` | stdlib | Database abstraction | Standard library, no external deps |
 | `github.com/lib/pq` | v1.10.9 | PostgreSQL driver | Most mature Go postgres driver |
-| `github.com/jackc/pgx/v5` | v5.7.6 | PostgreSQL (User Service) | Better performance, native types |
-| `github.com/gin-gonic/gin` | v1.11.0 | HTTP framework (User Service) | Mature, performant, middleware support |
-| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (Read Service) | Lightweight, idiomatic, stdlib-compatible |
+| `github.com/jackc/pgx/v5` | v5.10.0 | PostgreSQL (User Service) | Better performance, native types |
+| `github.com/go-chi/chi/v5` | v5.2.3 | HTTP router (all services) | Lightweight, idiomatic, stdlib-compatible |
 | `log/slog` | stdlib | Structured logging | Standard library, structured, zero-config |
 | `github.com/golang-jwt/jwt/v5` | v5.3.0 | JWT tokens | Industry standard |
 | `github.com/mmcdole/gofeed` | v1.3.0 | RSS parsing | Handles multiple feed formats |
@@ -429,7 +436,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 **Testing:**
 - `testing` (stdlib) - All unit tests
 - `net/http/httptest` (stdlib) - HTTP handler testing
-- `github.com/stretchr/testify` (User Service) - Assertions and mocking
+- `github.com/stretchr/testify` - Assertions and mocking
 
 **Read Service Specific Libraries:**
 
@@ -442,11 +449,11 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 | `github.com/robfig/cron/v3` | v3.0.1 | Job scheduling | Background jobs (cleanup, polling), cron-compatible syntax |
 
 **Why chi/v5?**
-- Minimal overhead compared to full frameworks (Gin)
+- Minimal overhead compared to full frameworks
 - 100% compatible with stdlib http.Handler
 - Composable middleware chain
 - Path parameter extraction without string manipulation
-- Suitable for services with moderate routing needs (Read Service has ~10 endpoints)
+- Suitable for services with moderate routing needs; used by the User, Content, Fetcher and Email services and the self-host binary
 
 **Why Go?**
 - **Performance:** Fast startup, low memory footprint
@@ -459,21 +466,21 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 ### Mobile App (React Native)
 
 **React Native Version:** 0.81.5
-**Expo SDK:** 54.0.29
+**Expo SDK:** ~54.0.32
 **React Version:** 19.1.0
-**TypeScript Version:** ~5.3.3
+**TypeScript Version:** ^5.3.0
 
 **Core Libraries:**
 
 | Library | Version | Purpose | Rationale |
 |---------|---------|---------|-----------|
-| `@react-navigation/native` | ^7.0.15 | Navigation | Industry standard, type-safe |
-| `@react-navigation/stack` | ^7.1.1 | Stack navigation | Standard screen transitions |
-| `@react-navigation/bottom-tabs` | ^7.2.0 | Tab navigation | Common mobile pattern |
-| `@react-native-async-storage/async-storage` | ^2.1.0 | Local storage | Persistent key-value storage |
+| `@react-navigation/native` | ^6.1.9 | Navigation | Industry standard, type-safe |
+| `@react-navigation/stack` | ^6.3.20 | Stack navigation | Standard screen transitions |
+| `@react-navigation/bottom-tabs` | ^6.5.11 | Tab navigation | Common mobile pattern |
+| `@react-native-async-storage/async-storage` | 2.2.0 | Local storage | Persistent key-value storage |
 | `expo-application` | ~6.0.7 | Device info | Device ID for authentication |
-| `@expo/vector-icons` | ^14.0.4 | Icons | Comprehensive icon set |
-| `@expo-google-fonts/inter` | ^0.2.3 | Typography | Modern, readable font |
+| `@expo/vector-icons` | ^15.0.3 | Icons | Comprehensive icon set |
+| `@expo-google-fonts/inter` | ^0.4.2 | Typography | Modern, readable font |
 
 **Development Tools:**
 - `@typescript-eslint/eslint-plugin` - TypeScript linting
@@ -486,8 +493,6 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 - **Type safety:** TypeScript throughout
 - **Developer experience:** Expo simplifies native module integration
 - **Community:** Large ecosystem of libraries and components
-
-**Current Gap:** No testing framework installed (see Testing Philosophy section)
 
 ---
 
@@ -553,12 +558,7 @@ services/{service}/
 │   ├── db/ or database/         # Repository layer
 │   ├── {domain}/                # Domain-specific logic (fetcher/, processor/)
 │   ├── config/                  # Configuration (User Service)
-│   ├── middleware/              # HTTP middleware (User Service)
 │   └── testutil/                # Test utilities
-├── pkg/                         # Public shared libraries
-│   ├── models/                  # Domain models
-│   ├── logging/                 # Logging utilities
-│   └── auth/                    # Auth helpers
 ├── migrations/                  # Database migrations
 ├── Dockerfile                   # Multi-stage build
 ├── Makefile                     # Build automation
@@ -568,7 +568,7 @@ services/{service}/
 
 **Package Rules:**
 1. **`internal/`** - Service-specific code, cannot be imported by other services
-2. **`pkg/`** - Reusable code that could be shared across services
+2. **`pkg/`** (repo root, one Go module per package: `api`, `auth`, `config`, `env`, `errors`, `logging`, `middleware`, `models`, `rss`) - Reusable code shared across services
 3. **`cmd/`** - Application entry points (main.go files)
 
 **Import Order:**
@@ -580,8 +580,8 @@ import (
     "fmt"
 
     // 2. Third-party libraries
+    "github.com/go-chi/chi/v5"
     "github.com/lib/pq"
-    "github.com/gin-gonic/gin"
 
     // 3. Internal packages
     "github.com/andrew-craig/cairn-reader/services/users/internal/database"
@@ -606,6 +606,7 @@ apps/mobile/
 │   │   └── TabNavigator.tsx    # Bottom tabs
 │   ├── services/                # API clients and storage
 │   ├── contexts/                # React contexts (auth, theme)
+│   ├── hooks/                   # Custom hooks
 │   ├── types/                   # TypeScript type definitions
 │   ├── constants/               # App constants (theme, config)
 │   ├── utils/                   # Utility functions
@@ -862,7 +863,7 @@ const handleLogin = () => {
 #### Environment Variables
 
 **Go Services:**
-- Use `getEnv()` helper with sensible defaults
+- Use the `pkg/env` helpers (`env.GetString`, `GetInt`, `GetBool`, `GetDuration`) with sensible defaults
 - Group related config into structs (User Service pattern)
 - Validate configuration on startup
 
@@ -877,10 +878,10 @@ type Config struct {
 func Load() (*Config, error) {
     cfg := &Config{
         Server: ServerConfig{
-            Port: getEnv("PORT", "8080"),
+            Port: env.GetString("PORT", "8080"),
         },
         Database: DatabaseConfig{
-            Host: getEnv("DB_HOST", "localhost"),
+            Host: env.GetString("DB_HOST", "localhost"),
         },
     }
 
@@ -890,28 +891,17 @@ func Load() (*Config, error) {
 
     return cfg, nil
 }
-
-// Helper function
-func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
 ```
 
 **Mobile App:**
-- Use `src/config/api.ts` for API endpoints
+- Use `src/config/` for startup wiring; the server URL state lives in `@cairn/shared`
 - Use Expo constants for environment-specific config
 - Never commit secrets to version control
 
 ```typescript
-// ✅ GOOD: apps/mobile/src/config/api.ts
-export const API_CONFIG = {
-  USER_SERVICE_URL: process.env.EXPO_PUBLIC_USER_SERVICE_URL || 'https://cairn.seatrain.net',
-  RECOMMENDER_SERVICE_URL: process.env.EXPO_PUBLIC_RECOMMENDER_URL || 'https://cairn.seatrain.net',
-  REQUEST_TIMEOUT: 30000,
-};
+// ✅ GOOD: apps/mobile/src/config/storage.ts
+// The backend the mobile app ships against by default.
+export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 ```
 
 **Secrets Management:**
@@ -1216,23 +1206,18 @@ go test -v ./... -run Integration
 
 ---
 
-### Mobile Testing Standards (To Be Implemented)
+### Mobile Testing Standards
 
-**Current State:** No testing framework installed
+**Current State:** Jest (`jest-expo`) and `@testing-library/react-native` are installed; run `npm test` (or `npm run test:ci` for coverage). Test files sit next to their source (`Button.test.tsx`).
 
-**Required Implementation:**
+**Expectations:**
 
-1. **Install testing framework:**
-```bash
-npm install --save-dev jest @testing-library/react-native @testing-library/jest-native
-```
+1. **Component tests:** Test all components in `src/components/common/`
+2. **Screen tests:** Test user interactions and state changes
+3. **Service tests:** Test API clients and storage services
+4. **Hook tests:** Test custom hooks (useAuth, etc.)
 
-2. **Component tests:** Test all components in `src/components/common/`
-3. **Screen tests:** Test user interactions and state changes
-4. **Service tests:** Test API clients and storage services
-5. **Hook tests:** Test custom hooks (useAuth, etc.)
-
-**Example (future):**
+**Example:**
 ```typescript
 // Button.test.tsx
 import { render, fireEvent } from '@testing-library/react-native';
@@ -1256,7 +1241,7 @@ describe('Button', () => {
 });
 ```
 
-**Coverage Expectations (once implemented):**
+**Coverage Expectations:**
 - Components: 80%+ coverage
 - Services: 90%+ coverage (API clients, storage)
 - Utilities: 100% coverage
@@ -1482,8 +1467,8 @@ func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*mod
 
     var user models.User
     err := r.pool.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash)
-    if err == pgx.ErrNoRows {
-        return nil, database.ErrUserNotFound
+    if errors.Is(err, pgx.ErrNoRows) {
+        return nil, apperrors.ErrUserNotFound
     }
     if err != nil {
         return nil, fmt.Errorf("query user by email: %w", err)
@@ -1519,6 +1504,7 @@ type authServiceImpl struct {
     jwtManager       *auth.JWTManager
 }
 
+// Simplified; the real NewAuthService takes an AuthServiceConfig struct.
 func NewAuthService(
     userRepo database.UserRepository,
     refreshTokenRepo database.RefreshTokenRepository,
@@ -1600,41 +1586,46 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
     })
 }
 
-// Chain middlewares
-handler := s.loggingMiddleware(s.authMiddleware(http.HandlerFunc(s.handleProtected)))
+// Chain middlewares (chi): applied in the order registered
+r := chi.NewRouter()
+r.Use(s.loggingMiddleware)
+r.With(s.authMiddleware).Get("/protected", s.handleProtected)
 ```
 
-**Gin Middleware:**
+**Auth Middleware (chi):**
 ```go
-func JWTAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        authHeader := c.GetHeader("Authorization")
-        tokenString, err := auth.ExtractTokenFromHeader(authHeader)
+// pkg/auth/middleware.go: validates the Bearer token, stores the user ID in the request context
+func (m *Middleware) RequireAuth(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        token, err := ExtractTokenFromHeader(r.Header.Get("Authorization"))
         if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization header"})
-            c.Abort()
+            m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
             return
         }
 
-        claims, err := jwtManager.ValidateToken(tokenString)
+        claims, err := m.validator.ValidateToken(token)
         if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-            c.Abort()
+            m.sendError(w, http.StatusUnauthorized, "unauthorized", "invalid or missing authentication token")
             return
         }
 
-        c.Set(UserIDKey, claims.UserID)
-        c.Next()  // Continue to next handler
-    }
+        ctx := SetUserIDInContext(r.Context(), claims.UserID)
+        next.ServeHTTP(w, r.WithContext(ctx))  // Continue to next handler
+    })
 }
 
-// Usage
-router.Use(middleware.JWTAuth(jwtManager))
+// Usage (services/users/internal/handlers/router.go)
+r.Use(logging.ChiRequestLogger(logger))   // request logging + request ID, router-wide
+r.Use(sharedmw.Recovery)
+r.With(authMiddleware.RequireAuth).Post("/logout-all", authHandler.LogoutAll)  // per-route
+
+// In a handler: userID, err := auth.GetUserIDOrError(r.Context())
 ```
 
 **Files:**
-- `pkg/auth/middleware.go`
-- `services/users/internal/middleware/jwt.go`
+- `pkg/auth/middleware.go` (JWT auth)
+- `pkg/logging/chi_middleware.go` (request logging)
+- `pkg/middleware/` (CORS, recovery, rate limiting, security headers)
 
 ---
 
@@ -1845,15 +1836,15 @@ func (r *UserRepository) GetByEmail(email string) (*User, int, error) {
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, error) {
     // ...
     if err == sql.ErrNoRows {
-        return nil, database.ErrUserNotFound
+        return nil, apperrors.ErrUserNotFound
     }
 }
 
 // Handler converts to HTTP
-func (h *Handler) GetUser(c *gin.Context) {
-    user, err := h.repo.GetByEmail(c.Request.Context(), email)
-    if errors.Is(err, database.ErrUserNotFound) {
-        c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
+    user, err := h.repo.GetUserByID(r.Context(), id)  // id parsed from chi.URLParam(r, "user_id")
+    if errors.Is(err, apperrors.ErrUserNotFound) {
+        api.WriteError(w, http.StatusNotFound, api.ErrCodeNotFound, "user not found", nil, "v1")
         return
     }
 }

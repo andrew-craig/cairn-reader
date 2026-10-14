@@ -2,335 +2,106 @@
 
 The Content Service is responsible for storing and serving article content with user-specific metadata.
 
-## Security: JWT Authentication (Phase 6 - Completed)
+Full service documentation (data model, routing, endpoints, env vars, workers) lives in
+[../CLAUDE.md](/services/read/CLAUDE.md). Endpoint contracts are in [api/openapi.yaml](api/openapi.yaml).
 
-This phase implements JWT-based authentication and authorization for user-specific endpoints:
+## Responsibilities
 
-### Implemented Features
+- Store deduplicated article content (`contents`) and per-user metadata (`user_contents`: status, favorite, scroll position, list)
+- Route each user's items into **Feed** or **Reads** (`source_routes`, `user_contents.list`); re-routing a source affects new items only
+- Serve list, search and count queries for a user, authenticated with RS256 JWTs (public key fetched from Vault)
+- Accept content from Ingest RSS and Email Ingest through `X-Internal-API-Key`-protected internal routes
+- Proxy and aggregate subscription management across Ingest RSS and Email Ingest
+- Run the background worker: delete non-favorited Feed items older than 30 days, then content orphaned for 90+ days
 
-- **Vault Integration**: Fetches RS256 public key from HashiCorp Vault at startup
-- **JWT Validation**: Validates token signature, expiration, issuer, and audience claims
-- **Authorization Checks**: Compares authenticated user ID from JWT with requested user ID in URL
-- **Protected Routes**: All `/api/v1/content/user/{user_id}` endpoints require valid JWT
-- **Internal Routes**: Separate `/api/v1/internal/content/user/bulk` endpoint for service-to-service communication
-- **Error Responses**: Standard 401 Unauthorized and 403 Forbidden responses
-
-### Configuration
-
-```bash
-# Development
-VAULT_ADDR=http://localhost:8200
-VAULT_TOKEN=dev-root-token
-JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
-
-# Production
-VAULT_ADDR=https://vault.example.com:8200
-VAULT_ROLE_ID=<role-id>
-VAULT_SECRET_ID=<secret-id>
-JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
-```
-
-### Database Layer (Phase 1.1 - Foundation)
-
-- **Database Connection Pooling**: Configured PostgreSQL connection pooling with customizable settings
-- **Data Models**:
-  - `Content`: Stores unique content items (shared across users)
-  - `UserContent`: Junction table mapping users to content with user-specific metadata
-- **Repository Pattern**:
-  - `ContentRepository`: Interface and implementation for content CRUD operations
-  - `UserContentRepository`: Interface and implementation for user-content relationship operations
-- **Transaction Support**: Helper functions for executing operations within database transactions
-- **Database Schema**: Migration files with tables, indexes, and triggers for orphaned content tracking
-
-### Directory Structure
+## Directory Structure
 
 ```
-content-service/
+content/
 ├── cmd/
-│   └── server/
-│       └── main.go              # Application entry point
+│   ├── content/main.go          # HTTP server (runs migrations on startup)
+│   └── worker/main.go           # Background worker (cleanup cron, health server)
+├── api/openapi.yaml             # OpenAPI spec
 ├── internal/
-│   ├── database/
-│   │   └── connection.go        # Database connection pooling
-│   ├── models/
-│   │   └── models.go            # Data models (Content, UserContent)
-│   └── repository/
-│       ├── content.go           # ContentRepository implementation
-│       └── user_content.go      # UserContentRepository implementation
-├── migrations/
-│   ├── 000001_initial_schema.up.sql    # Initial schema migration
-│   └── 000001_initial_schema.down.sql  # Schema rollback
-├── Dockerfile                   # Docker image configuration
-├── .env.example                 # Example environment configuration
-├── go.mod                       # Go module definition
-└── README.md                    # This file
+│   ├── api/                     # Router, handlers, middleware, DTOs
+│   ├── config/                  # Configuration
+│   ├── database/                # Connection pooling, migrations runner
+│   ├── jobs/                    # Cleanup job (Feed expiry + orphaned content)
+│   ├── models/                  # Data models
+│   ├── processor/               # Readability, sanitization, hashing
+│   ├── repository/              # Database layer
+│   ├── service/                 # Business logic
+│   └── testutil/                # Integration test helpers
+├── migrations/                  # golang-migrate SQL files
+├── selfhost/                    # Single-container selfhost entry point
+├── Dockerfile                   # API server image
+├── Dockerfile.worker            # Worker image
+├── integration_test.go
+└── .env.example                 # Example environment configuration
 ```
 
-### Configuration
+## Configuration
 
-The service is configured via environment variables. See `.env.example` for available options:
+Environment variables (see `.env.example` and the Environment Variables section of [../CLAUDE.md](/services/read/CLAUDE.md)):
 
 - **Server**: `PORT`
 - **Database**: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE`
 - **Connection Pool**: `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`, `DB_CONN_MAX_LIFETIME`, `DB_CONN_MAX_IDLE_TIME`
+- **JWT**: `VAULT_ADDR`, `VAULT_TOKEN` (or `VAULT_ROLE_ID`/`VAULT_SECRET_ID`), `VAULT_AUTH_PATH`, `JWT_PUBLIC_KEY_PATH`, `JWT_PUBLIC_KEY_REFRESH_INTERVAL`
+- **Internal calls**: `INTERNAL_API_KEY` (required), `INGEST_RSS_SERVICE_URL`, `EMAIL_INGEST_SERVICE_URL`
 
-### Building and Running
+## Building and Running
 
-#### Local Development
+The full dev stack runs from `infrastructure/docker/dev/` (`docker compose up -d`); the Content Service is
+exposed on http://localhost:8083 and the worker on its own container. To build locally from `services/read/`:
 
 ```bash
-# Install dependencies
-go mod download
-
-# Build the service
-go build -o bin/content-service ./cmd/server
-
-# Run the service
-./bin/content-service
+make build-content           # -> bin/content
+make build-content-worker    # -> bin/content-worker
 ```
 
-#### Docker
+## Database Migrations
+
+Migrations also run automatically when the server starts. From `services/read/`:
 
 ```bash
-# Build Docker image
-docker build -t content-service .
-
-# Run container
-docker run -p 8080:8080 \
-  -e DB_HOST=localhost \
-  -e DB_PORT=5433 \
-  -e DB_USER=cairn_content \
-  -e DB_PASSWORD=cairn_content_pass \
-  -e DB_NAME=cairn_content \
-  content-service
-```
-
-#### Docker Compose
-
-From the repository root:
-
-```bash
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f content-service
-
-# Stop services
-docker compose down
-```
-
-### Database Migrations
-
-Run migrations from the repository root:
-
-```bash
-# Apply all pending migrations
 make migrate-up-content
-
-# Rollback last migration
 make migrate-down-content
-
-# Create new migration
 make migrate-create-content name=add_new_feature
-
-# Check migration status
 make migrate-status-content
 ```
 
-### Health Check
-
-The service exposes a health check endpoint:
+## Health Check
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8083/health/live
+curl http://localhost:8083/health/ready   # includes DB check
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "service": "content-service",
-  "message": "Phase 1.1: Database layer complete"
-}
-```
+## URL Detection
 
-### Database Schema
+`POST /api/v1/content/detect` (JWT required, 10 second timeout) classifies a URL as `feed`, `page` or `unknown`.
+`POST /api/v1/content/discover-feed` looks for an RSS/Atom feed behind a page URL.
 
-#### Contents Table
+`POST /api/v1/content/user/{user_id}` routes a submission by `type`:
+- **feed**: subscribes the user via Ingest RSS; an optional `list` (`feed`|`reads`) sets the feed's route
+- **page**: extracts the article and adds it to Reads (saved links always go to Reads)
 
-Stores unique content items (shared across users):
+If `type` is omitted the service detects it. Request and response shapes are in [api/openapi.yaml](api/openapi.yaml).
 
-- Content hash for deduplication (SHA-256)
-- Cleaned HTML (max 5MB)
-- Original and canonical URLs
-- Metadata (title, author, published_at, description, image_urls)
-- Source information (source_type, source_feed_id)
-- Timestamps (created_at, updated_at, orphaned_at)
+The mobile and web "Add" flow calls `/detect` first and submits with the detected type hint
+(see `apps/mobile/src/components/AddLinkModal.tsx`).
 
-#### User-Contents Table
+## API Endpoints
 
-Junction table mapping users to content with user-specific metadata:
+Summary only; paths, parameters and schemas are in [api/openapi.yaml](api/openapi.yaml), and the route
+table with auth requirements is in [../CLAUDE.md](/services/read/CLAUDE.md).
 
-- User ID (external reference)
-- Content ID (foreign key to contents)
-- Status (unread, read, archived)
-- Scroll position (character offset)
-- Is favorite (boolean)
-- Timestamps (added_at, updated_at)
-
-#### Triggers
-
-- **mark_content_orphaned**: Automatically marks content as orphaned when the last user-content relationship is deleted
-- **clear_orphaned_status**: Clears the orphaned status when content is re-saved by a user
-
-## URL Detection Feature
-
-The Content Service now includes smart URL detection and submission capabilities:
-
-### URL Detection Endpoint
-
-**POST /api/v1/content/detect**
-
-Determines if a URL is an RSS/Atom feed or a web page:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/content/detect \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/feed.xml"}'
-```
-
-Response:
-```json
-{
-  "url": "https://example.com/feed.xml",
-  "type": "feed",
-  "title": "Example Blog"
-}
-```
-
-Possible types: `feed`, `page`, `unknown` (on timeout/error)
-
-### Smart URL Submission
-
-**POST /api/v1/content/user/{user_id}**
-
-Automatically routes URLs based on type:
-- **feed**: Subscribes user to RSS feed via Ingest RSS service
-- **page**: Extracts and saves article content
-
-```bash
-# Auto-detect and add
-curl -X POST http://localhost:8080/api/v1/content/user/{user_id} \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/article"}'
-
-# With type hint (from detection)
-curl -X POST http://localhost:8080/api/v1/content/user/{user_id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com/feed.xml",
-    "type": "feed",
-    "title": "Example Blog"
-  }'
-```
-
-Feed response:
-```json
-{
-  "type": "feed",
-  "feed_id": "...",
-  "subscription": {
-    "id": "...",
-    "user_id": "...",
-    "feed_id": "...",
-    "feed_url": "https://example.com/feed.xml",
-    "title": "Example Blog",
-    "subscribed_at": "2025-01-04T10:00:00Z"
-  }
-}
-```
-
-Page response:
-```json
-{
-  "type": "page",
-  "content": {
-    "user_id": "...",
-    "content_id": "...",
-    "status": "unread",
-    "content": {
-      "title": "Article Title",
-      "cleaned_html": "...",
-      ...
-    }
-  }
-}
-```
-
-### Implementation Details
-
-- **Timeout**: 10 seconds for URL detection (non-blocking)
-- **Feed Detection**: Uses gofeed parser for RSS/Atom feeds
-- **Page Extraction**: go-readability for article content
-- **Feed Management**: Integrates with Ingest RSS service for subscriptions
-- **Error Handling**: Returns specific error codes for duplicate subscriptions, feed limits, etc.
-
-### Mobile Integration
-
-The mobile app uses these endpoints to provide a seamless "Add" experience:
-1. User enters URL
-2. App calls `/detect` endpoint (non-blocking, 10s timeout)
-3. UI updates button text ("Add" → "Add Feed" if feed detected)
-4. User submits with detected type hint
-5. Backend routes to appropriate handler
-
-See `apps/mobile/src/components/AddLinkModal.tsx` for implementation.
-
-### API Endpoints
-
-**User-Specific Endpoints (Require JWT):**
-
-```
-POST   /api/v1/content/user/{user_id}                → Add content to user (requires auth)
-GET    /api/v1/content/user/{user_id}                → List user's contents (requires auth)
-GET    /api/v1/content/user/{user_id}/search         → Search user's contents (requires auth)
-PATCH  /api/v1/content/user/{user_id}/{content_id}   → Update content metadata (requires auth)
-DELETE /api/v1/content/user/{user_id}/{content_id}   → Delete from user (requires auth)
-POST   /api/v1/content/user/bulk                     → Bulk add to user (requires auth)
-```
-
-**Public Endpoints (No Auth Required):**
-
-```
-POST   /api/v1/content/detect                        → Detect if URL is feed or page
-POST   /api/v1/content/                              → Create content (internal use)
-GET    /api/v1/content/{content_id}                  → Get content (internal use)
-PUT    /api/v1/content/{content_id}                  → Update content (internal use)
-POST   /api/v1/content/bulk                          → Bulk create (internal use)
-POST   /api/v1/content/check-duplicate               → Check for duplicates (internal use)
-```
-
-**Internal Service Endpoints (No Auth Required):**
-
-```
-POST   /api/v1/internal/content/user/bulk            → Bulk add to users (Ingest RSS only)
-```
-
-**Health Checks:**
-
-```
-GET    /health/live                                  → Liveness probe
-GET    /health/ready                                 → Readiness probe (includes DB check)
-```
-
-### Next Steps
-
-- **Phase 1.2**: Content processing (readability, sanitization, deduplication) ✅ Complete
-- **Phase 1.3**: REST API - Basic operations ✅ Complete
-- **Phase 1.4**: REST API - Bulk operations ✅ Complete
-- **URL Detection**: Smart URL submission and feed detection ✅ Complete
-- **Phase 6**: JWT Authentication and authorization ✅ Complete
+- **JWT (`Authorization: Bearer`)**: `/api/v1/content/detect`, `/discover-feed`, `/api/v1/content/user/bulk`,
+  and everything under `/api/v1/content/user/{user_id}` (list, count, search, get, patch, delete, subscriptions)
+- **Internal (`X-Internal-API-Key`)**: `/api/v1/content` create/get/update, `/bulk`, `/check-duplicate`,
+  and `/api/v1/internal/content/user/bulk`
+- **Unauthenticated**: `/health/live`, `/health/ready`, `/`
 
 ## Development
 
@@ -355,6 +126,9 @@ go test -v ./...
 # Run specific test package
 go test -v ./internal/api/handlers/
 go test -v ./internal/api/handlers/ -run TestUserContent
+
+# Integration tests (build tag; needs PostgreSQL, TEST_DB_* env vars)
+go test -tags=integration ./...
 ```
 
 ### Testing Protected Endpoints
@@ -383,15 +157,9 @@ When testing user-specific endpoints, you need a valid JWT token. Here's how:
 
 ### Testing Without JWT
 
-Public endpoints don't require authentication:
+Only the health endpoints are unauthenticated (`/detect` and `/discover-feed` need a JWT):
 
 ```bash
-# URL detection (no auth needed)
-curl -X POST http://localhost:8083/api/v1/content/detect \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com"}'
-
-# Health checks (no auth needed)
 curl http://localhost:8083/health/ready
 ```
 

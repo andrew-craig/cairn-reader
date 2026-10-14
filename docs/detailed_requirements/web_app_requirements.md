@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document specifies requirements for a **desktop web application** for Cairn, a read-it-later product. The web app delivers the same core experience as the existing React Native/Expo mobile app (`apps/mobile`) — saving, reading, and discovering long-form content — optimized for desktop browsers and larger viewports.
+This document specifies requirements for a **desktop web application** for Cairn, a read-it-later product. The web app delivers the same core experience as the existing React Native/Expo mobile app (`apps/mobile`) — saving and reading long-form content — optimized for desktop browsers and larger viewports.
 
 The guiding principle is **maximum reuse of the mobile app**: its feature set, backend service contracts, data models, service-layer logic, design tokens, and information architecture should be carried over directly. The web app is a new **presentation layer** over the same backend, not a new product.
 
@@ -25,13 +25,13 @@ The guiding principle is **maximum reuse of the mobile app**: its feature set, b
 
 The mobile app lives at `apps/mobile` and is organized as:
 `config/`, `constants/` (theme), `contexts/` (AuthContext), `services/`
-(auth, read, explore, storage), `types/`, `screens/`, `components/`, `navigation/`.
+(auth, read, storage), `types/`, `screens/`, `components/`, `navigation/`.
 
 What carries over to the web app, and how:
 
 | Mobile layer | Reuse on web | Notes |
 |---|---|---|
-| `services/auth.ts`, `services/read.ts`, `services/explore.ts` | **Reuse logic ~verbatim** | Pure `fetch` + JSON; only the storage backend and device-ID paths change. |
+| `services/auth.ts`, `services/read.ts` | **Reuse logic ~verbatim** | Pure `fetch` + JSON; only the storage backend and device-ID paths change. |
 | `types/` (`article.ts`, `read.ts`, `auth.ts`) | **Reuse as-is** | Plain TypeScript interfaces with no RN dependency. |
 | `config/api.ts` | **Reuse, swap storage** | Replace `AsyncStorage` with `localStorage`. |
 | `constants/theme.ts` | **Reuse token values** | Same colors/spacing/fonts; map to CSS/web styling. |
@@ -39,9 +39,9 @@ What carries over to the web app, and how:
 | Screens & components (`*.tsx` using `react-native`) | **Re-implement** | Rebuilt with web primitives; same layout, copy, and behavior. |
 | `navigation/` (React Navigation) | **Replace** | Use a web router; preserve the same screen graph. |
 
-### Shared code recommendation
+### Shared code
 
-Extract the framework-agnostic layers — `types/`, the API/service logic, and the theme token values — into a **shared package**: an `apps/shared` workspace containing types, service logic (parameterized over a storage adapter), and theme tokens, imported by both `apps/mobile` and `apps/web`.
+Superseded: the framework-agnostic layers (types, service logic parameterized over a storage adapter, theme tokens) live in the `apps/shared` workspace, imported by both `apps/mobile` and `apps/web`. See [docs/decisions/web-app-adr.md](../decisions/web-app-adr.md).
 
 ## Technology Stack
 
@@ -63,7 +63,6 @@ backend over REST with JWT bearer auth.
 Desktop Browser (React SPA)
   → REST + JWT bearer  →  Existing Cairn backend (cairn.seatrain.net by default)
                           ├── User Service   (auth, account)
-                          ├── Explore Service (recommendations, votes)
                           └── Read Service    (content, subscriptions, newsletters)
 ```
 
@@ -117,15 +116,17 @@ authenticated routes redirect to login when there is no valid session.
 
 ## Information Architecture & Navigation
 
-The mobile app uses a bottom tab bar (`Read`, `Explore`, `You`) plus a stack of
+The mobile app uses a bottom tab bar (`Feed`, `Reads`, `You`) plus a stack of
 detail/secondary screens. The web app preserves the **same screen graph** but maps
-the primary navigation to a persistent **left sidebar** (or top nav bar) with the three primary destinations: **Read**, **Explore**, **You**. This replaces `CustomTabBar`.
+the primary navigation to a persistent **left sidebar** (or top nav bar) with the three primary destinations: **Feed**, **Reads**, **You**. This replaces `CustomTabBar`. Removed: Explore (see [docs/archive/explore_web_app_requirements.md](../archive/explore_web_app_requirements.md)).
+
+Feed and Reads are the two lists described in `docs/product_requirements.md`; each is the same article list filtered by `list`.
 
 The top quick-actions bar (add, search) will remain at the top of the list:
-- There will be a near full width search bar across the width of the read article list.
+- There will be a near full width search bar across the width of the article list.
 - Non-search actions will be buttons (in the same style) to the right of the search box.
 
-The sub-sections of the You page (Account, Feeds, Newsletters) will be shown as sub-items in the left navigation menu.
+The sub-sections of the You page (Account, RSS, Newsletters, Bookmarks, About) will be shown as sub-items in the left navigation menu.
 - Clicking the You item in the left nav will expand this list.
 - Clicking on an individual item (e.g. Account) will open a page for that account.
 
@@ -134,16 +135,15 @@ The sub-sections of the You page (Account, Feeds, Newsletters) will be shown as 
 | Route | Screen (mobile equivalent) | Purpose |
 |---|---|---|
 | `/login` | `LoginScreen` | Email/password login & registration |
-| `/read` | `ReadScreen` | The user's saved reading list (default landing) |
-| `/explore` | `ExploreScreen` | Recommended articles to discover |
+| `/feed` | `FeedScreen` | The Feed list (skim) |
+| `/reads` | `ReadsScreen` | The Reads list (read or triage; default landing) |
 | `/you` | `YouScreen` | Account hub with counts & links |
-| `/read/:id` | `ReadArticleDetailScreen` | Full article reader (saved item) |
-| `/explore/:id` | `ExploreArticleDetailScreen` | Full article reader (recommendation) |
+| `/feed/:id`, `/reads/:id` | `ReadArticleDetailScreen` | Full article reader |
 | `/you/account` | `AccountScreen` | Profile, change password, log out |
-| `/you/feeds` | `FeedsScreen` | RSS/feed subscriptions management |
-| `/you/newsletters` | `NewslettersScreen` | Newsletter (email-ingest) address & subs |
+| `/you/rss` | `FeedsScreen` | RSS subscriptions management, with per-source list picker |
+| `/you/newsletters` | `NewslettersScreen` | Newsletter (email-ingest) address & senders, with per-sender list picker |
 | `/you/bookmarks` | `BookmarksScreen` | Saved/bookmarked items |
-| `/you/votes` | `VotesScreen` | Articles the user up/down-voted |
+| `/you/about` | `AboutScreen` | About |
 | Add-link modal | `AddArticleScreen` / `AddLinkModal` | Add a URL (page or feed) |
 | Search modal | `SearchModal` | Search saved content |
 
@@ -154,9 +154,9 @@ Add-link and Search present as **modal/overlay** on web, matching mobile. Implem
 All endpoints below already exist and are consumed by the mobile service layer; the
 web app reuses the same request/response handling and `Article` transforms.
 
-### FR-1: Reading List (Read)
+### FR-1: Article Lists (Feed and Reads)
 
-- Display the user's saved content via `GET /api/v1/content/user/{userId}` with
+- Display the user's content for the selected list via `GET /api/v1/content/user/{userId}` (with the `list` filter) with
   cursor-based pagination (`ReadService.listUserContents`).
 - Support **infinite scroll / "load more"** using the returned `cursor` / `has_more`
   (mobile `PAGE_SIZE = 20`).
@@ -164,7 +164,7 @@ web app reuses the same request/response handling and `Article` transforms.
   estimated reading time (`word_count / 200`), reusing the `transformToArticle`
   mapping.
 - Provide a **refresh** action that reloads the first page.
-- Clicking an item opens the article reader (`/read/:id`), passing along the current
+- Clicking an item opens the article reader (`/feed/:id` or `/reads/:id`), passing along the current
   list and index to enable in-reader navigation (mobile passes `{ article, articles,
   currentIndex }`).
 - Reflect changes made elsewhere (archive, favorite) on return to the list, matching
@@ -191,8 +191,7 @@ web app reuses the same request/response handling and `Article` transforms.
 
 ### FR-4: Article Reader
 
-- Render the article from the `Article` model. Saved articles use
-  `content.cleaned_html`; recommendations use the explore `content` field.
+- Render the article from the `Article` model, using `content.cleaned_html`.
 - **Render sanitized HTML natively in the DOM** (replacing mobile's RN HTML renderer
   / WebView). See Security for sanitization requirements.
 - Reading experience requirements:
@@ -207,43 +206,26 @@ web app reuses the same request/response handling and `Article` transforms.
   - **Favorite / unfavorite** via the same PATCH (`is_favorite`).
   - **Delete** a saved item via `DELETE /api/v1/content/user/{userId}/{contentId}`.
   - **Open original** in a new tab (the `original_url`).
-  - **Previous/next** navigation through the list passed from the Read view.
-- For recommendation articles (`/explore/:id`): support **mark as read**
-  (`POST /api/v1/explore/article/{id}/read`) and **up/down vote** (see FR-6), plus
-  saving the article to the reading list.
+  - **Previous/next** navigation through the list passed from the list view.
 
-### FR-5: Explore (Discovery)
+### FR-5: Per-source list choice (Feed or Reads)
 
-- Fetch recommendations via `GET /api/v1/explore/recommendation?offset=...`
-  (`ExploreService.getRecommendations`), paginated by offset.
-- Display recommended articles in a card layout suited to desktop (e.g. a responsive
-  grid or a centered feed column).
-- Best-effort **"shown" reporting** via `POST /api/v1/explore/shown` (batched
-  article IDs), matching mobile telemetry behavior.
-- Support **up/down vote** directly from the feed and from the reader (FR-6).
+- Subscriptions (RSS feeds and email senders) carry a `list` of `feed` or `reads` (default `reads`).
+- The RSS and Newsletters pages show a `SourceListToggle` per source to pick its list.
+- The Add-link modal lets the user pick the list when subscribing to a feed; saved pages always go to Reads.
 
-### FR-6: Voting
+### FR-6: You (Left Nav)
 
-- Up/down vote and remove vote on recommendation articles:
-  - `POST /api/v1/explore/article/{id}/vote` with `{ vote_type: 'upvote' | 'downvote' }`.
-  - `DELETE /api/v1/explore/article/{id}/vote` to remove.
-  - `GET /api/v1/explore/article/{id}/vote` for counts and the user's current vote.
-- Optimistic UI for vote toggles is acceptable, matching the responsive feel of
-  mobile.
-
-### FR-7: You (Left Nav)
-
-- Clicking You in the left nav will show the `YouScreen` items as a sub-menu: **Account**, **Feeds**, **Newsletters**, **Bookmarks**, **Votes**, and **Log out**.
+- Clicking You in the left nav will show the `YouScreen` items as a sub-menu: **Account**, **RSS**, **Newsletters**, **Bookmarks**, **About**, and **Log out**.
 - Where appropriate, these items will have a count next to them in the sidebar.
 - Counts are fetched in parallel with **independent failure tolerance**
   (`Promise.allSettled`), so one failing endpoint doesn't hide the others:
-  - Vote stats — `ExploreService.getUserVoteStats`.
   - Subscriptions (feeds vs newsletters split by `type === 'email'`) —
     `ReadService.listAllSubscriptions` (`GET /api/v1/content/user/{userId}/subscriptions`).
   - Bookmarks total — `ReadService.listUserContents({ limit: 1 })` total count.
 - Refresh counts when re-opening the sub-menu.
 
-### FR-8: Feeds (Subscriptions)
+### FR-7: RSS (Subscriptions)
 
 - List the user's feed subscriptions via the unified subscriptions endpoint
   (`listAllSubscriptions`), filtering to non-email types.
@@ -251,7 +233,7 @@ web app reuses the same request/response handling and `Article` transforms.
   `DELETE /api/v1/content/user/{userId}/subscriptions/rss/{feedId}`
   (existing items in the reading list are preserved).
 
-### FR-9: Newsletters (Email Ingest)
+### FR-8: Newsletters (Email Ingest)
 
 - Show the user's newsletter ingest email address, creating it on demand via
   `POST /api/v1/source/email/user/{userId}/address` (`getOrCreateEmailAddress`).
@@ -259,12 +241,12 @@ web app reuses the same request/response handling and `Article` transforms.
   `expo-clipboard`).
 - List email-type subscriptions from `listAllSubscriptions`.
 
-### FR-10: Bookmarks
+### FR-9: Bookmarks
 
 - List bookmarked/saved items (mobile `BookmarksScreen`) using the content list
-  endpoints, in the same list layout as Read.
+  endpoints, in the same list layout as the Feed and Reads lists.
 
-### FR-11: Account
+### FR-10: Account
 
 - Show profile info (email or "Anonymous user").
 - **Change password** via `PUT /api/v1/user/{userId}/password`
@@ -298,8 +280,7 @@ interface Article {
 
 Read service types (`types/read.ts`) — `UserContentResponse`, `ContentResponse`,
 `UnifiedSubscription`, `DetectURLResponse`, `AddURLResponse`, etc. — and auth types
-(`types/auth.ts`) are reused verbatim. The `transformToArticle` (read) and
-`transformArticle` (explore) mappings carry over directly.
+(`types/auth.ts`) are reused verbatim. The `transformToArticle` mapping carries over directly.
 
 ## Design System
 
@@ -363,7 +344,7 @@ instead must:
 
 ### Performance
 
-- Initial authenticated view (Read list first page) should render quickly; lists use
+- Initial authenticated view (Reads list first page) should render quickly; lists use
   pagination/virtualization as needed for long lists.
 - Article HTML rendering should not block interaction; large articles render
   progressively where feasible.
@@ -409,7 +390,7 @@ instead must:
 - Type checking (`tsc --noEmit`) and linting must pass, matching mobile's
   `type-check` / `lint` gates.
 - Manual verification of auth, save, read (with scroll persistence), archive,
-  favorite, delete, vote, subscribe/unsubscribe, and newsletter-address flows
+  favorite, delete, subscribe/unsubscribe, and newsletter-address flows
   against a running backend.
 
 ## Project Structure (proposed)
@@ -424,22 +405,21 @@ apps/
       config/        # api base URL (localStorage-backed)
       constants/     # theme tokens (shared with mobile or mirrored)
       contexts/      # AuthContext (web)
-      services/      # auth, read, explore (reused logic, web storage adapter)
+      services/      # auth, read (reused logic, web storage adapter)
       types/         # reused from mobile / shared package
-      routes/        # route-level views (Read, Explore, You, Reader, ...)
+      routes/        # route-level views (Feed/Reads list, You, Reader, ...)
       components/     # web UI components (ArticleCard, ArticleRow, Modal, ...)
 ```
 
-If the shared-package approach is chosen, `types/`, `services/` logic, and theme
-tokens move to `packages/shared` and both apps import them.
+Shared types, service logic and theme tokens live in `apps/shared` (see Shared code above).
 
 ## Dependencies & Prerequisites
 
 1. **Backend CORS** configured for the web origin(s) (preflight + `Authorization`).
    Hard blocker if absent.
-2. Confirmation that existing auth/content/explore endpoints are reachable from a
+2. Confirmation that existing auth/content endpoints are reachable from a
    browser origin with bearer tokens (no mobile-only assumptions).
-3. Decision on shared-code strategy (shared package vs. copy-and-adapt).
+3. ~~Decision on shared-code strategy~~ Resolved: `apps/shared` (see Shared code above).
 4. Fonts (Inter, Crimson Pro) available for web (Google Fonts or self-hosted).
 
 ## Out of Scope / Future Work
@@ -453,12 +433,11 @@ tokens move to `packages/shared` and both apps import them.
 
 ## Open Questions
 
-1. **Shared code**: extract a `packages/shared` now, or copy-and-adapt into
-   `apps/web` and converge later?
+1. ~~**Shared code**~~ Resolved: `apps/shared` workspace (see `docs/decisions/web-app-adr.md`).
 2. **Token storage**: accept `localStorage` (reuse path, XSS-exposed) or invest in an
    httpOnly-cookie auth model (requires backend changes)?
 3. **CORS**: is the backend already configured for any browser origin, or is this net
    new work to schedule first?
-4. **Default landing route**: `/read` (parity with mobile's primary list) — confirm.
+4. **Default landing route**: `/reads` (the default landing list) — confirm.
 5. **Reader navigation**: replicate mobile's pass-the-list prev/next, or fetch
    neighbors on demand from the reader route?
