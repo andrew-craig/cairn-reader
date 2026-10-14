@@ -230,7 +230,7 @@ Key configurations:
 - `VAULT_ADDR=http://vault:8200`
 - `VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}`
 - `JWT_ACCESS_TOKEN_EXPIRY=15m`
-- `JWT_REFRESH_TOKEN_EXPIRY=7d`
+- `JWT_REFRESH_TOKEN_EXPIRY=168h`
 - `ENVIRONMENT=development`
 
 ### Content Service (content-service)
