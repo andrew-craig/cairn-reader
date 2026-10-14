@@ -2,14 +2,14 @@
 id: bug_989c
 title: Content: subscribe response list ignores existing route; openapi missing RSS unsubscribe
 type: bug
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_6e4d
 remote_task_url: null
 created_at: 2026-10-13T20:20:48Z
-updated_at: 2026-10-13T20:22:15Z
+updated_at: 2026-10-13T21:10:11Z
 ---
 
 

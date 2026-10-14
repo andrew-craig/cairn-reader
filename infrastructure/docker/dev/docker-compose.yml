@@ -96,8 +96,8 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
       - JWT_ACCESS_TOKEN_EXPIRY=15m
-      - JWT_REFRESH_TOKEN_EXPIRY=7d
-      - SERVER_ENVIRONMENT=development
+      - JWT_REFRESH_TOKEN_EXPIRY=168h
+      - ENVIRONMENT=development
     depends_on:
       cairn-db:
         condition: service_healthy

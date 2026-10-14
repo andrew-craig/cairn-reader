@@ -206,7 +206,7 @@ services:
       - JWT_PRIVATE_KEY_PATH=secret/data/jwt/private-key
       - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
       - JWT_ACCESS_TOKEN_EXPIRY=15m
-      - JWT_REFRESH_TOKEN_EXPIRY=7d
+      - JWT_REFRESH_TOKEN_EXPIRY=168h
       - ENVIRONMENT=production
     depends_on:
       cairn-db:

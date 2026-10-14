@@ -382,7 +382,7 @@ Use the production compose file at `infrastructure/docker/prod/docker-compose.ym
 
 - Every long-running service has `restart: unless-stopped`, and the API and worker services have `/health/ready` healthchecks.
 - Services run with `ENVIRONMENT=production` (User Service, Email Ingest) and authenticate to Vault with AppRole credentials.
-- `JWT_ACCESS_TOKEN_EXPIRY=15m` and `JWT_REFRESH_TOKEN_EXPIRY=7d` for the User Service.
+- `JWT_ACCESS_TOKEN_EXPIRY=15m` and `JWT_REFRESH_TOKEN_EXPIRY=168h` for the User Service.
 - Per-process `DB_MAX_OPEN_CONNS` values follow the connection budget documented above `cairn-db` in the compose file.
 - The compose file sets no CPU or memory limits; add `deploy.resources.limits` to the services if you need them.
 
