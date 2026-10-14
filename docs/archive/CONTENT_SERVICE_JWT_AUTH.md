@@ -3,6 +3,8 @@
 ## Overview
 
 > **Status: implemented.** This is the original implementation plan, kept for context; the text below describes the pre-implementation state ("currently", "Current State") and is not a description of the running service. The router in `services/read/content/internal/api/router.go` is the source of truth. Where it differs from this plan: `POST /detect` and `POST /discover-feed` require JWT (`RequireAuth`); the content CRUD and bulk routes (`POST /`, `GET|PUT /{content_id}`, `POST /bulk`, `POST /check-duplicate`) and `/api/v1/internal/*` require the internal API key (`RequireInternalAPIKey`) rather than being unauthenticated; and the public key is re-fetched periodically (`JWT_PUBLIC_KEY_REFRESH_INTERVAL`, default 5m) rather than only at startup.
+>
+> **Archived 2026-10-15.** Current behaviour is documented in [pkg/auth/README.md](../../pkg/auth/README.md) and [services/read/CLAUDE.md](../../services/read/CLAUDE.md#jwt-authentication).
 
 The Content Service originally lacked JWT authentication, allowing any client to access any user's content by providing a user ID in the URL. This document describes the implementation plan to add proper authentication using the shared `pkg/auth` package.
 
@@ -360,10 +362,10 @@ The Ingest RSS Service currently makes requests to Content Service to add conten
 
 ## Related Documentation
 
-- [User Service architecture and authentication flow](ARCHITECTURE.md#user-service)
-- [Shared auth package](../pkg/auth/README.md)
-- [Security Principles](ENGINEERING_PRINCIPLES.md#security)
-- [Vault Configuration](CONFIGURATION.md)
+- [User Service architecture and authentication flow](../ARCHITECTURE.md#user-service)
+- [Shared auth package](../../pkg/auth/README.md)
+- [Security Principles](../ENGINEERING_PRINCIPLES.md#security)
+- [Vault Configuration](../CONFIGURATION.md)
 
 ## Rollout Notes
 

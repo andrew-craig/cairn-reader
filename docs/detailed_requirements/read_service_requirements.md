@@ -166,7 +166,7 @@ The system should maintain:
 - **Orphaned Content**: Content that is no longer saved by any user will be automatically deleted after 90 days
   - Content becomes "orphaned" when the last user-content relationship pointing to it is deleted
   - The 90-day grace period allows for potential re-discovery via RSS feeds
-- **Feed Expiry**: Feed-list items are not kept indefinitely. The cleanup job deletes `user_contents` rows with `list = 'feed'`, `is_favorite = false` and `added_at` older than 30 days. Favorited Feed items and all Reads items are exempt. Status and scroll position are not considered.
+- **Feed Expiry**: Feed-list items are not kept indefinitely. The cleanup job deletes `user_contents` rows with `list = 'feed'`, `is_favorite = false` and `added_at` older than 30 days. Favorited Feed items and all Reads items are exempt. Status and scroll position are not considered. Expiry is measured from `added_at`, so an item un-favorited after more than 30 days becomes eligible at the next nightly cleanup.
   - Expiry deletes the user-content row, so the orphan trigger fires: content left with no users gets `orphaned_at` set and is then removed by the 90-day orphan rule. A Feed item therefore lasts up to 30 days, plus 90 days before its content record is deleted if no other user holds it.
 - **Cleanup Process**: A periodic background job (Content worker, daily at 2 AM) first deletes expired Feed items, then removes orphaned content past the 90-day retention period. Both delete in batches of 1000 (`content/internal/jobs/cleanup_job.go`)
 - **Not to be confused with** the RSS Fetcher's `feed_items` cleanup (7/30 days, see [Feed Items Cleanup](#schema-design-notes)), which prunes the fetcher's own processing table and never touches user content

@@ -535,7 +535,7 @@ All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect`
 - Token must contain valid `user_id` claim matching the URL parameter (where applicable —
   `/detect` and `/discover-feed` only require a valid token, not a matching user_id)
 - Expires: Token expiration validated by service
-- Signature: RS256 with public key fetched from Vault at startup
+- Signature: RS256 with public key fetched from Vault at startup and re-fetched periodically (`JWT_PUBLIC_KEY_REFRESH_INTERVAL`, default 5m)
 
 **Protected endpoints**:
 - `POST /api/v1/content/detect` - URL detection
@@ -570,7 +570,7 @@ All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect`
 
 ### Configuration
 
-The service loads JWT public key from HashiCorp Vault at startup:
+The service loads JWT public key from HashiCorp Vault at startup and refreshes it periodically (`JWT_PUBLIC_KEY_REFRESH_INTERVAL`, default 5m):
 
 ```bash
 # Development
