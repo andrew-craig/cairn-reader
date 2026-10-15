@@ -38,7 +38,7 @@ Either the project pivoted to the `selfhost` binary — making `prod/` dead and 
 Whichever way this task resolves (fix `docker-build-*.yml`'s `if: false` gates, or fix `prod/` some other way), `docker-test.yml` should be explicitly deleted as part of it — it's dead weight duplicating whatever the real answer turns out to be. Left untouched by task_7722 (PR #342) to keep that PR surgical; not deleted there despite being fully inert, per review feedback that an unrelated 371-line deletion doesn't belong on a one-file smoke-test fix.
 
 ## Re-verification (chore_65f1 docs review, 2026-10-15)
-- Blocker 1 confirmed: nine `docker-build-*.yml` workflows still `if: false` (`docker-build-selfhost.yml` is live).
+- Blocker 1 confirmed: eight `docker-build-*.yml` workflows still `if: false` (`docker-build-selfhost.yml` is live).
 - Blocker 2 looks **stale**: `init-vault-prod.sh:257-291` now creates AppRoles for content-service and email-ingest. Re-check.
 - Blocker 3 confirmed: dev compose gives `content-service` no `VAULT_*` vars, which `services/read/content/internal/config/config.go:87-94` requires.
 - **New blocker 4:** prod compose gives `ingest-rss` no `INTERNAL_API_KEY`, which `services/read/fetcher/internal/config/config.go:50` requires, so it won't start.
