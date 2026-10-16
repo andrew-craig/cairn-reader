@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ReadService } from '../services/read';
 import FeedIcon from './icons/FeedIcon';
+import ReadsIcon from './icons/ReadsIcon';
 
 // Counts shown beside the You sub-items. `null` means "not loaded yet" so the
 // badge can stay hidden until the first successful fetch.
@@ -30,24 +31,6 @@ const YOU_ITEMS: Array<{ to: string; label: string; countKey?: keyof YouCounts }
 
 // Outline SVG icons ported from apps/mobile/src/components/icons/
 // viewBox "0 0 24 24", stroke="currentColor", fill="none"
-
-function ReadIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-    </svg>
-  );
-}
 
 function ProfileIcon() {
   return (
@@ -136,10 +119,12 @@ export default function Sidebar() {
         </li>
         <li>
           <NavLink to="/reads" className="sidebar__item" aria-label="Reads">
-            <span className="sidebar__item-leading">
-              <span className="sidebar__icon"><ReadIcon /></span>
-              <span>Reads</span>
-            </span>
+            {({ isActive }) => (
+              <span className="sidebar__item-leading">
+                <span className="sidebar__icon"><ReadsIcon size={18} filled={isActive} /></span>
+                <span>Reads</span>
+              </span>
+            )}
           </NavLink>
         </li>
         <li>

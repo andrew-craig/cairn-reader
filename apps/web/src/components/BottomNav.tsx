@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import FeedIcon from './icons/FeedIcon';
+import ReadsIcon from './icons/ReadsIcon';
 import './BottomNav.css';
 
 // Mobile bottom navigation bar — shown only at <768px.
@@ -22,14 +23,14 @@ export default function BottomNav() {
       </NavLink>
 
       <NavLink to="/reads" className={({ isActive }) => `bottom-nav__item${isActive ? ' bottom-nav__item--active' : ''}`}>
-        <span className="bottom-nav__icon" aria-hidden="true">
-          {/* Book/read icon */}
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </span>
-        <span className="bottom-nav__label">Reads</span>
+        {({ isActive }) => (
+          <>
+            <span className="bottom-nav__icon" aria-hidden="true">
+              <ReadsIcon filled={isActive} />
+            </span>
+            <span className="bottom-nav__label">Reads</span>
+          </>
+        )}
       </NavLink>
 
       <NavLink
