@@ -101,6 +101,8 @@ interface SubscriptionListScreenProps {
   getSubtitle?: (s: UnifiedSubscription) => string | undefined;
   headerActions?: ReactNode;
   emptyMessage?: string;
+  /** Change it to reload the list, e.g. after the screen adds a subscription. */
+  reloadKey?: number;
 }
 
 export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
@@ -109,6 +111,7 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
   getSubtitle,
   headerActions,
   emptyMessage = 'No subscriptions yet',
+  reloadKey,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -141,6 +144,14 @@ export const SubscriptionListScreen: React.FC<SubscriptionListScreenProps> = ({
       load();
     }, [load])
   );
+
+  // Focus already loads; this only covers changes made while the screen stays focused.
+  const loadedKeyRef = useRef(reloadKey);
+  useEffect(() => {
+    if (loadedKeyRef.current === reloadKey) return;
+    loadedKeyRef.current = reloadKey;
+    load();
+  }, [reloadKey, load]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
