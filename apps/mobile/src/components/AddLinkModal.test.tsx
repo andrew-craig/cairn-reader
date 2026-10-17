@@ -135,7 +135,7 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     render(<AddLinkModal visible onClose={jest.fn()} />);
     fireEvent.changeText(screen.getByPlaceholderText('Add link'), 'https://example.com/rss');
     await screen.findByText('Add Feed');
-    fireEvent.press(screen.getByLabelText('Send this feed to Feed'));
+    fireEvent.press(screen.getByRole('radio', { name: /^Feed:/ }));
     fireEvent.press(screen.getByText('Add Feed'));
 
     await waitFor(() => expect(addSpy).toHaveBeenCalled());
@@ -167,7 +167,7 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     // Edit to a different URL: the feed result and its Feed/Reads choice go away.
     fireEvent.changeText(input, 'https://example.com/post');
     await waitFor(() => expect(screen.queryByText('Add Feed')).toBeNull());
-    expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
+    expect(screen.queryByRole('radio', { name: /^Feed:/ })).toBeNull();
 
     // Submitting now would drop type/list for lack of a detection, so the press is ignored.
     fireEvent(input, 'submitEditing');
@@ -213,8 +213,70 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Add link'), 'https://example.com/post');
     fireEvent.press(await screen.findByText('Add'));
 
-    expect(screen.queryByLabelText('Send this feed to Feed')).toBeNull();
+    expect(screen.queryByRole('radio', { name: /^Feed:/ })).toBeNull();
     await waitFor(() => expect(addSpy).toHaveBeenCalled());
     expect(addSpy.mock.calls[0][0]).not.toHaveProperty('list');
+  });
+});
+
+// feature_bd13 / task_9188: the RSS page opens the same modal in feed mode.
+
+describe('AddLinkModal feed mode', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('explains both destinations when a feed is detected', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockResolvedValue({
+      url: 'https://example.com/rss',
+      type: 'feed',
+      title: 'Example',
+    });
+
+    render(<AddLinkModal mode="feed" visible onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByPlaceholderText('Feed or website URL'), 'https://example.com/rss');
+    await screen.findByText('Add Feed');
+
+    expect(screen.getByText('Where should new items go?')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Feed:.*deleted after 30 days/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /^Reads:/, checked: true })).toBeTruthy();
+  });
+
+  it('never saves a page as an article: Find feed is the only action, and return runs it', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockResolvedValue({
+      url: 'https://example.com',
+      type: 'page',
+      title: null,
+    });
+    const discoverSpy = jest
+      .spyOn(ReadService, 'discoverFeed')
+      .mockResolvedValue({ feeds: [{ url: 'https://example.com/rss', title: 'Example' }] } as never);
+    const addSpy = jest.spyOn(ReadService, 'addURL');
+
+    render(<AddLinkModal mode="feed" visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Feed or website URL');
+    fireEvent.changeText(input, 'https://example.com');
+    await screen.findByText('Find feed');
+
+    expect(screen.queryByText('Add')).toBeNull();
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => expect(discoverSpy).toHaveBeenCalledWith('https://example.com'));
+    expect(addSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs Find feed on return while detection is still in flight', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockReturnValue(new Promise(() => {}));
+    const discoverSpy = jest
+      .spyOn(ReadService, 'discoverFeed')
+      .mockResolvedValue({ feeds: [{ url: 'https://example.com/rss', title: 'Example' }] } as never);
+
+    render(<AddLinkModal mode="feed" visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Feed or website URL');
+    fireEvent.changeText(input, 'https://example.com');
+    await waitFor(() => expect(ReadService.detectURL).toHaveBeenCalled());
+
+    expect(screen.queryByText('Add')).toBeNull();
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => expect(discoverSpy).toHaveBeenCalledWith('https://example.com'));
   });
 });

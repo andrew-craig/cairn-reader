@@ -26,7 +26,7 @@ apps/mobile/
     ├── components/           # AddLinkModal, ArticleListScreen, SearchModal, SubscriptionListScreen,
     │   │                     #   ErrorBoundary, LogoMark; tests co-located (*.test.tsx)
     │   ├── common/           # ArticleContent, ArticleRow, BottomActionMenu, Button, CustomTabBar, HeaderPopover,
-    │   │                     #   IconButton, ListToggle (Feed|Reads), OfflineBanner, ScreenHeader,
+    │   │                     #   IconButton, ListChoice (explained Feed/Reads), ListToggle (Feed|Reads), OfflineBanner, ScreenHeader,
     │   │                     #   SyncTriggerEffect, TopBlurGradient, ...
     │   └── icons/            # SVG icons
     ├── config/               # init.ts (wires @cairn/shared at startup), storage.ts (AsyncStorage adapter + DEFAULT_SERVER_URL)
@@ -76,7 +76,7 @@ Services are static classes or plain objects (no instantiation) in `src/services
 - **FeedScreen** — items from sources routed to Feed (`list=feed`). Online-only: never written to `ArticleStore` or prefetch. Keeps the last page in `FeedCache` so a failed refresh shows a stale banner. In the reader, "Save to Reads" (`ReadService.moveToReads`) replaces Archive, and progress tracking (status, completion, scroll) is off, so only Favorite can reach the outbox for a Feed item.
 - **ReadsScreen** — `list=reads`, search, store-first render (`ArticleStore.listRecent`) with a "Showing cached data" banner when the background refetch fails. Every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run()`; `readsInvalidation` marks the list stale after Save to Reads.
 - **ReadArticleDetailScreen** — reader (`ArticleContent`, `react-native-render-html`). Resolves the article by id from `ArticleStore`, skips the fetch when the stored `contentHash` matches, and shows "Not available offline" when offline with nothing cached.
-- **YouScreen** — profile hub (stats, links to Bookmarks, Account, About, RSS, Newsletters). **RssScreen / NewslettersScreen** render `SubscriptionListScreen`, which has a per-source Feed/Reads toggle (`ReadService.setSourceList`; affects new items only). **AddLinkModal** asks Feed or Reads when subscribing to a feed.
+- **YouScreen** — profile hub (stats, links to Bookmarks, Account, About, RSS, Newsletters). **RssScreen / NewslettersScreen** render `SubscriptionListScreen`, which has a per-source Feed/Reads toggle (`ReadService.setSourceList`; affects new items only). **AddLinkModal** asks Feed or Reads (`ListChoice`, which explains both) when subscribing to a feed. RssScreen's "Add feed" button opens it with `mode="feed"`: a non-feed URL can only go through Find feed, never be saved as an article.
 - **LoginScreen** — device login, email login/registration, and a server URL field (`setServerUrl()`, no rebuild). **AccountScreen** — logout, device → email/password upgrade, password change.
 
 ## Services (offline model)

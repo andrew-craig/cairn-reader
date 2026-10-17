@@ -5,13 +5,10 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
-- **chore_65f1** · P2 · in_progress · Docs + OpenAPI completeness review (validate against code)
-- **task_0849** · P2 · in_progress · [Worker liveness] Outbox/fetcher workers: heartbeat log, recover() in loop, circuit-breaker state via slog  (parent: epic_fefa)
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **bug_d675** · P2 · open · Users service: integration/security test harness runs nothing or the wrong thing
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
-- **feature_bd13** · P2 · open · Mobile: Add feed option on the RSS (feeds) page  (parent: epic_6e4d)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
@@ -19,7 +16,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
-- **task_9188** · P2 · open · Mobile: Redesign Add Feed flow (Feed/Reads choice)  (parent: epic_6e4d)
 - **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)

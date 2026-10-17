@@ -2,14 +2,14 @@
 id: chore_65f1
 title: Docs + OpenAPI completeness review (validate against code)
 type: chore
-status: in_progress
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-10-14T11:57:56Z
-updated_at: 2026-10-14T11:58:06Z
+updated_at: 2026-10-16T10:46:03Z
 ---
 
 
