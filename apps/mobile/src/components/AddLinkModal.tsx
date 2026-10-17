@@ -269,8 +269,9 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   const isFeed = detectionResult?.type === 'feed';
-  // In feed mode a page can't be saved: until a feed is detected, Find feed is the only way on.
-  const showAdd = mode === 'link' || detecting || isFeed;
+  // In feed mode a page can't be saved: until a feed is detected (including while detection
+  // runs), Find feed is the only action. Discovery accepts a feed URL as-is, so that's safe.
+  const showAdd = mode === 'link' || isFeed;
 
   // Button text changes based on detection
   const getSubmitButtonText = () => {

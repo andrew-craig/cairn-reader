@@ -255,12 +255,28 @@ describe('AddLinkModal feed mode', () => {
     const input = screen.getByPlaceholderText('Feed or website URL');
     fireEvent.changeText(input, 'https://example.com');
     await screen.findByText('Find feed');
-    await waitFor(() => expect(screen.queryByText('Detecting...')).toBeNull());
 
     expect(screen.queryByText('Add')).toBeNull();
     fireEvent(input, 'submitEditing');
 
     await waitFor(() => expect(discoverSpy).toHaveBeenCalledWith('https://example.com'));
     expect(addSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs Find feed on return while detection is still in flight', async () => {
+    jest.spyOn(ReadService, 'detectURL').mockReturnValue(new Promise(() => {}));
+    const discoverSpy = jest
+      .spyOn(ReadService, 'discoverFeed')
+      .mockResolvedValue({ feeds: [{ url: 'https://example.com/rss', title: 'Example' }] } as never);
+
+    render(<AddLinkModal mode="feed" visible onClose={jest.fn()} />);
+    const input = screen.getByPlaceholderText('Feed or website URL');
+    fireEvent.changeText(input, 'https://example.com');
+    await waitFor(() => expect(ReadService.detectURL).toHaveBeenCalled());
+
+    expect(screen.queryByText('Add')).toBeNull();
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => expect(discoverSpy).toHaveBeenCalledWith('https://example.com'));
   });
 });
