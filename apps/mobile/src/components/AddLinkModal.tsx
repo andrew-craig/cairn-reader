@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Colors, Spacing, FontSizes, BorderRadius, FontFamily } from '../constants';
 import { HeaderPopover } from './common/HeaderPopover';
-import { ListToggle } from './common/ListToggle';
+import { ListChoice } from './common/ListChoice';
 import { ReadService } from '../services/read';
 import { ContentList, DetectURLResponse } from '@cairn/shared';
 
@@ -19,12 +19,15 @@ interface AddLinkModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess?: () => void; // Optional callback after successful add
+  /** 'feed' subscribes only: a non-feed URL can only go through Find feed, never be saved as an article. */
+  mode?: 'link' | 'feed';
 }
 
 export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   visible,
   onClose,
   onSuccess,
+  mode = 'link',
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
@@ -196,6 +199,8 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
   };
 
   const handleFindFeedPress = async () => {
+    // The return key can fire while a lookup is already running.
+    if (discovering) return;
     if (!isValidUrl(url)) {
       setError('Please enter a valid URL');
       return;
@@ -263,6 +268,11 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
     onClose();
   };
 
+  const isFeed = detectionResult?.type === 'feed';
+  // In feed mode a page can't be saved: until a feed is detected (including while detection
+  // runs), Find feed is the only action. Discovery accepts a feed URL as-is, so that's safe.
+  const showAdd = mode === 'link' || isFeed;
+
   // Button text changes based on detection
   const getSubmitButtonText = () => {
     if (loading) return 'Adding...';
@@ -284,7 +294,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                     borderColor: error ? colors.error : 'transparent',
                   }
                 ]}
-                placeholder="Add link"
+                placeholder={mode === 'feed' ? 'Feed or website URL' : 'Add link'}
                 placeholderTextColor={colors.textSecondary}
                 value={url}
                 onChangeText={(text) => {
@@ -296,7 +306,7 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
                 keyboardType="url"
                 editable={!loading}
                 returnKeyType="done"
-                onSubmitEditing={handleAddPress}
+                onSubmitEditing={showAdd ? handleAddPress : handleFindFeedPress}
               />
               {error && (
                 <Text style={[styles.errorText, { color: colors.error }]}>
@@ -305,38 +315,37 @@ export const AddLinkModal: React.FC<AddLinkModalProps> = ({
               )}
             </View>
 
-            {detectionResult?.type === 'feed' && (
+            {isFeed && (
               <View style={styles.listChoice}>
-                <Text style={[styles.listChoiceLabel, { color: colors.textSecondary }]}>
-                  New items go to
-                </Text>
-                <ListToggle subject="this feed" list={feedList} onChange={setFeedList} disabled={loading} />
+                <ListChoice list={feedList} onChange={setFeedList} disabled={loading} />
               </View>
             )}
 
             <View style={styles.buttonContainer}>
-              <View style={styles.buttonWrapper}>
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    {
-                      backgroundColor: colors.primary,
-                      opacity: loading || detecting || !url.trim() ? 0.5 : 1,
-                    }
-                  ]}
-                  onPress={handleAddPress}
-                  disabled={loading || detecting || !url.trim()}
-                  activeOpacity={0.7}
-                >
-                  {loading || detecting ? (
-                    <ActivityIndicator color={colors.background} size="small" />
-                  ) : (
-                    <Text style={[styles.primaryButtonText, { color: colors.background }]}>{getSubmitButtonText()}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              {showAdd && (
+                <View style={styles.buttonWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryButton,
+                      {
+                        backgroundColor: colors.primary,
+                        opacity: loading || detecting || !url.trim() ? 0.5 : 1,
+                      }
+                    ]}
+                    onPress={handleAddPress}
+                    disabled={loading || detecting || !url.trim()}
+                    activeOpacity={0.7}
+                  >
+                    {loading || detecting ? (
+                      <ActivityIndicator color={colors.background} size="small" />
+                    ) : (
+                      <Text style={[styles.primaryButtonText, { color: colors.background }]}>{getSubmitButtonText()}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
 
-              {detectionResult?.type !== 'feed' && (
+              {!isFeed && (
                 <View style={styles.buttonWrapper}>
                   <TouchableOpacity
                     style={[
@@ -386,14 +395,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   listChoice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
     marginTop: Spacing.sm,
-  },
-  listChoiceLabel: {
-    fontSize: FontSizes.sm,
-    fontFamily: FontFamily.default,
   },
   buttonContainer: {
     flexDirection: 'row',
