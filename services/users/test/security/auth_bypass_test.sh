@@ -170,14 +170,20 @@ test_case "SQL injection in email returns 401" "401" "$status"
 
 # Test 12: Path traversal in user ID
 echo "Test 12: Path traversal in user ID"
+# A real token gets the request past the auth middleware, so routing is what's tested
+register=$(curl -s "$BASE_URL/api/v1/auth/register/mobile" \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"expo_device_id\":\"security-test-$(date +%s%N)\"}")
+access_token=$(echo "$register" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
 # --path-as-is: otherwise curl collapses the ../ segments and never sends the traversal
 response=$(curl -s --path-as-is -w "\n%{http_code}" "$BASE_URL/api/v1/user/../../../etc/passwd" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer valid_token")
+    -H "Authorization: Bearer $access_token")
 status=$(echo "$response" | tail -n1)
 log_verbose "Response: $(echo "$response" | head -n-1)"
-# Rejected by the auth middleware before any routing to a handler
-test_case "Path traversal in user ID returns 401" "401" "$status"
+# The traversal matches no route
+test_case "Path traversal in user ID with a valid token returns 404" "404" "$status"
 
 # Test 13: Account enumeration via timing
 echo "Test 13: Account enumeration protection"
