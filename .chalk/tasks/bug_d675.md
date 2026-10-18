@@ -29,7 +29,8 @@ Reproduced each item, then fixed and re-ran against a local Postgres + Vault.
 - [x] Security scripts: added a `curl` wrapper that sends `X-Forwarded-Proto: https`. Found while running: `((n++))` under `set -e` exits the script when n is 0, so every script stopped after its first check, and SQL injection reported "0 tests, all passed". Replaced with `n=$((n + 1))`.
 - [x] rate_limit: `X-RateLimit-*` headers are only set on 429 responses, so the old "headers on first request" check could never pass. The limit now comes from `RATE_LIMIT_REQUESTS` (default 100, same as the service), and the header checks run on the 429.
 - [x] auth_bypass: SQL-injection login expects 401 (it only accepted 400). The path-traversal check uses `--path-as-is`, because curl collapsed `../` and sent `/etc/passwd`.
-- [ ] **Decision needed: run these suites in CI?** go-checks.yml already runs tagged integration jobs for content/fetcher/email with a Postgres service. The users suite also needs Vault seeded with keys.
+- [x] CI (owner: yes, 2026-10-18): `test-integration-users` in go-checks.yml starts the suite's own docker-compose.test.yml (incl. `test-vault-init`, gated by `docker compose wait`) and runs `go test -race -tags=integration`. Checked locally: the init script's `kv put … key=` seeding works against the real Vault image, and the suite passes with `-race` (~100s).
+- [ ] Security suite in CI: blocked on bug_168d (the NUL-byte 500 is a real failure, so the job would be red).
 
 Results: integration 78 subtests pass from an empty DB. Security: auth_bypass 13/13, rate_limit 7/7, sql_injection 29/30. The one failure is real: a NUL byte returns 500, filed as bug_168d.
 Not verified here: the `test-vault-init` image build, because the sandbox can't reach the Alpine package mirror. Vault was seeded by hand with the same `kv put … key=` commands.

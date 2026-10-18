@@ -20,3 +20,6 @@ Not an injection (queries are parameterised), but a client-controlled 500. Every
 Also: the service log line for the 500 is only "http request completed status=500"; the underlying error is not logged, so the cause was only visible in the Postgres log.
 
 Fix direction: reject strings containing NUL as invalid input (400) at validation, once, rather than per endpoint. Then `make test-security` should pass fully.
+
+
+Adding the security suite to CI (owner decision on bug_d675) waits on this fix.

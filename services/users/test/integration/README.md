@@ -277,7 +277,7 @@ docker compose -f docker-compose.test.yml rm -f
 
 ## CI/CD Integration
 
-These tests are not run in CI (`.github/workflows/go-checks.yml` runs `go test ./internal/...` for this service only). To run them in a pipeline, start `docker-compose.test.yml` and run `go test -tags=integration -v -timeout 5m ./...` from this directory.
+The `test-integration-users` job in `.github/workflows/go-checks.yml` runs these tests on every PR that touches `services/users` or `pkg`. It starts `docker-compose.test.yml`, waits for `test-vault-init` to finish, and runs `go test -race -tags=integration` from this directory.
 
 ## Performance
 
