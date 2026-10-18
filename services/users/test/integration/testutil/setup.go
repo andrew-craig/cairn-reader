@@ -12,6 +12,7 @@ import (
 	pkgauth "github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/auth"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/database"
+	"github.com/andrew-craig/cairn-reader/services/users/migrations"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -43,10 +44,9 @@ func (env *TestEnv) ValidateAccessToken(t *testing.T, token string) *pkgauth.Cla
 	return claims
 }
 
-// SetupTestEnvironment initializes all dependencies for integration tests
-func SetupTestEnvironment(t *testing.T) *TestEnv {
-	// Load test database configuration
-	dbConfig := &database.Config{
+// testDBConfig returns the test database configuration
+func testDBConfig() *database.Config {
+	return &database.Config{
 		Host:            getEnv("DB_HOST", "localhost"),
 		Port:            getEnv("DB_PORT", "5433"),
 		User:            getEnv("DB_USER", "cairn_test"),
@@ -57,6 +57,14 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 		MaxIdleConns:    5,
 		ConnMaxLifetime: 5 * time.Minute,
 	}
+}
+
+// SetupTestEnvironment initializes all dependencies for integration tests
+func SetupTestEnvironment(t *testing.T) *TestEnv {
+	dbConfig := testDBConfig()
+
+	// Apply the service's own migrations (no-op when already current)
+	require.NoError(t, database.RunMigrationsFS(dbConfig, migrations.FS), "Failed to migrate test database")
 
 	// Connect to database
 	db, err := database.New(dbConfig)
@@ -80,8 +88,8 @@ func SetupTestEnvironment(t *testing.T) *TestEnv {
 
 	if vaultClient != nil {
 		privateKey, publicKey, err = vaultClient.GetJWTKeys(
-			getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/cairn/jwt/private"),
-			getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/cairn/jwt/public"),
+			getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/jwt/private-key"),
+			getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 		)
 		if err != nil {
 			t.Logf("Warning: Could not load keys from Vault, generating test keys: %v", err)
@@ -224,16 +232,7 @@ func (env *TestEnv) GenerateTestTokens(t *testing.T, userID uuid.UUID, deviceInf
 func WaitForDatabase(t *testing.T, maxWait time.Duration) {
 	start := time.Now()
 	for {
-		dbConfig := &database.Config{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5433"),
-			User:     getEnv("DB_USER", "cairn_test"),
-			Password: getEnv("DB_PASSWORD", "test_password"),
-			Database: getEnv("DB_NAME", "cairn_users_test"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
-		}
-
-		db, err := database.New(dbConfig)
+		db, err := database.New(testDBConfig())
 		if err == nil {
 			db.Close()
 			return
@@ -261,8 +260,8 @@ func WaitForVault(t *testing.T, maxWait time.Duration) {
 			// Try to read a key to verify it's fully initialized
 			_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_, _, err = client.GetJWTKeys(
-				getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/cairn/jwt/private"),
-				getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/cairn/jwt/public"),
+				getEnv("JWT_PRIVATE_KEY_PATH", "secret/data/jwt/private-key"),
+				getEnv("JWT_PUBLIC_KEY_PATH", "secret/data/jwt/public-key"),
 			)
 			cancel()
 

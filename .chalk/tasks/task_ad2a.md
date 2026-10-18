@@ -3,13 +3,13 @@ id: task_ad2a
 title: Mobile: prefetch silently retries an article with no extracted body on every run, forever
 type: task
 status: open
-priority: 2
+priority: 3
 labels: [mobile,offline]
 blocked_by: []
 parent: 
 remote_task_url: null
 created_at: 2026-09-12T10:38:48Z
-updated_at: 2026-09-12T22:37:45Z
+updated_at: 2026-10-18T01:55:27Z
 ---
 Found during the task_de93 coverage check on `apps/mobile/src/services/articlePrefetch.ts`.
 
@@ -50,3 +50,9 @@ in the shared fixture), so the `if (content)` false path has zero coverage
   fetched" so it doesn't burn a request on every sync forever).
 
 Not a fix folded into task_de93 per that task's own scope — this is its own task.
+
+## Triage (2026-10-18): lowered to P3
+- There is no periodic sync. `SyncTrigger.run()` fires on background→foreground, offline→online, and after each successful Reads list load (focus refetch has a 30s TTL). A missing body never triggers a sync itself; the article is just re-requested whenever a sync runs anyway.
+- The backend single-item handler always returns `content` when the item exists (`contents.cleaned_html` NOT NULL, FK from `user_contents`), so the "not finished processing" case doesn't exist. The realistic trigger is an empty `cleaned_html` (unverified whether extraction can store one).
+- Likely bigger sibling (unverified): an article deleted server-side stays in the mobile store (sync is upsert-only), 404s on every prefetch, and is logged and retried forever.
+- Cost: one GET per stuck article per sync, capped at 100, 3 concurrent. Low severity.

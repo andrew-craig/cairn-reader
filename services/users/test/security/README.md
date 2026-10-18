@@ -34,7 +34,7 @@ export USER_SERVICE_URL="http://localhost:8080"
 ./sql_injection_test.sh
 ```
 
-All `/api/v1/*` routes reject plain-HTTP requests with `403` unless they arrive over TLS or carry `X-Forwarded-Proto: https`, and the scripts do not send that header. Point `USER_SERVICE_URL` at an HTTPS endpoint (or a TLS-terminating proxy), otherwise most checks see `403` instead of the expected `400`/`401`/`429`.
+All `/api/v1/*` routes reject plain-HTTP requests with `403` unless they arrive over TLS or carry `X-Forwarded-Proto: https`. The scripts send that header on every request, so `USER_SERVICE_URL` can point straight at a plain-HTTP service.
 
 ### Individual Test Scripts
 
@@ -48,7 +48,7 @@ All `/api/v1/*` routes reject plain-HTTP requests with `403` unless they arrive 
    ```bash
    ./rate_limit_test.sh
    ```
-   Tests: Rate limit headers, enforcement, 429 response format, window refill. The script assumes a limit of 10 requests/minute, but the service default is 100 per minute (`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), so set `RATE_LIMIT_REQUESTS=10` on the service under test
+   Tests: Enforcement, 429 response format and headers, window refill. Set `RATE_LIMIT_REQUESTS` to the limit the service under test runs with (default 100, the service default). The window-refill check waits 65 seconds, so it assumes the default 1-minute `RATE_LIMIT_WINDOW`
 
 3. **SQL Injection**
    ```bash
@@ -63,6 +63,7 @@ All `/api/v1/*` routes reject plain-HTTP requests with `403` unless they arrive 
 USER_SERVICE_URL="http://localhost:8080"
 
 # Optional
+RATE_LIMIT_REQUESTS=100 # Limit the service under test runs with (default: 100, the service default)
 VERBOSE=1              # Enable verbose output
 CONTINUE_ON_FAIL=0     # Stop on first failed suite (run_all_tests.sh default: 1, continue)
 ```

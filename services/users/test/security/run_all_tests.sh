@@ -35,7 +35,7 @@ function run_test_suite() {
     local test_script="$1"
     local test_name="$2"
 
-    ((total_suites++))
+    total_suites=$((total_suites + 1))
 
     echo ""
     echo -e "${BLUE}========================================${NC}"
@@ -45,10 +45,10 @@ function run_test_suite() {
     if [ -x "$SCRIPT_DIR/$test_script" ]; then
         if USER_SERVICE_URL="$BASE_URL" VERBOSE="$VERBOSE" "$SCRIPT_DIR/$test_script"; then
             echo -e "${GREEN}✓ Suite Passed: $test_name${NC}"
-            ((passed_suites++))
+            passed_suites=$((passed_suites + 1))
         else
             echo -e "${RED}✗ Suite Failed: $test_name${NC}"
-            ((failed_suites++))
+            failed_suites=$((failed_suites + 1))
 
             if [ "$CONTINUE_ON_FAIL" -eq 0 ]; then
                 echo -e "${RED}Stopping on first failure${NC}"
@@ -57,7 +57,7 @@ function run_test_suite() {
         fi
     else
         echo -e "${RED}✗ Test script not found or not executable: $test_script${NC}"
-        ((failed_suites++))
+        failed_suites=$((failed_suites + 1))
     fi
 }
 

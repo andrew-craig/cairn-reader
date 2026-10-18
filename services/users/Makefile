@@ -1,10 +1,11 @@
-.PHONY: help build run test test-unit test-integration test-integration-up test-integration-down test-security clean deps lint fmt vet migrate-up migrate-down docker-build docker-run
+.PHONY: help build run dev test test-unit test-integration test-integration-up test-integration-down test-all test-coverage test-security clean deps lint fmt vet migrate-up migrate-down migrate-version db-create db-drop docker-build docker-run
 
 # Default target
 help:
 	@echo "Available targets:"
 	@echo "  build                 - Build the user service binary"
 	@echo "  run                   - Run the user service"
+	@echo "  dev                   - Run with live reload (requires air)"
 	@echo "  test                  - Run unit tests only"
 	@echo "  test-unit             - Run unit tests only (alias for test)"
 	@echo "  test-integration      - Run integration tests (requires Docker)"
@@ -53,7 +54,7 @@ test-integration:
 	@echo "Waiting for services to be ready..."
 	@sleep 10
 	@echo "Running integration tests..."
-	cd test/integration && go test -v -timeout 5m ./...
+	cd test/integration && go test -tags=integration -v -timeout 5m ./...
 	@echo "Stopping test environment..."
 	cd test/integration && docker compose -f docker-compose.test.yml down
 
