@@ -10,11 +10,11 @@ openssl rsa -in /tmp/private.pem -pubout -out /tmp/public.pem
 
 echo "Storing JWT private key in Vault..."
 PRIVATE_KEY=$(cat /tmp/private.pem)
-vault kv put secret/jwt/private-key value="$PRIVATE_KEY"
+vault kv put secret/jwt/private-key key="$PRIVATE_KEY"
 
 echo "Storing JWT public key in Vault..."
 PUBLIC_KEY=$(cat /tmp/public.pem)
-vault kv put secret/jwt/public-key value="$PUBLIC_KEY"
+vault kv put secret/jwt/public-key key="$PUBLIC_KEY"
 
 echo "Vault initialization complete!"
 echo "JWT keys stored at:"

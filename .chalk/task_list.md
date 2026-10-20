@@ -5,8 +5,8 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **bug_d675** · P2 · in_progress · Users service: integration/security test harness runs nothing or the wrong thing
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
-- **bug_d675** · P2 · open · Users service: integration/security test harness runs nothing or the wrong thing
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
@@ -16,9 +16,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
-- **task_ad2a** · P2 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **bug_168d** · P3 · open · Users service: NUL byte in a request string returns 500 instead of 400
 - **bug_fa3d** · P3 · open · Behaviour gaps found in docs review (need decisions)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
@@ -43,6 +43,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_6f3a** · P3 · open · Add integration test workflow with Docker/Postgres  (parent: epic_7c9e)
 - **task_7ada** · P3 · open · [Env parsing] Collapse pkg/env vs pkg/config vs two service-local copies into one  (parent: epic_fefa)
 - **task_a8ed** · P3 · open · Add firewall configuration documentation for production deployment  (parent: epic_7c9e)
+- **task_ad2a** · P3 · open · Mobile: prefetch silently retries an article with no extracted body on every run, forever
 - **task_d910** · P3 · open · [Docs] .github/workflows/README.md is stale: documents a non-existent docker-build.yml, omits real per-service workflows  (parent: epic_fefa)
 - **task_dc5b** · P3 · open · [Audit/Tier 3] content worker rolls its own config loader instead of internal/config.Load()  (parent: epic_fefa)
 - **task_eb89** · P3 · open · Add SSH hardening guide to deployment docs

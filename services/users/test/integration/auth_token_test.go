@@ -214,7 +214,7 @@ func TestAuthService_Logout_Integration(t *testing.T) {
 
 	t.Run("Logout with empty token", func(t *testing.T) {
 		err := authService.Logout(ctx, "")
-		assert.NoError(t, err) // Should succeed silently
+		assert.ErrorIs(t, err, services.ErrInvalidInput)
 	})
 
 	t.Run("Logout already logged out token", func(t *testing.T) {

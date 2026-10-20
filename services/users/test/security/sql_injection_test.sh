@@ -7,6 +7,12 @@
 set -e
 
 BASE_URL="${USER_SERVICE_URL:-http://localhost:8080}"
+
+# /api/v1 requires HTTPS (pkg/middleware.RequireHTTPS). Send the header a TLS-terminating
+# proxy would set, so plain-HTTP runs reach the handlers instead of getting 403.
+function curl() {
+    command curl -H "X-Forwarded-Proto: https" "$@"
+}
 VERBOSE="${VERBOSE:-0}"
 
 # Color output
@@ -42,15 +48,15 @@ function test_sql_injection() {
     # Should NOT return 500 (SQL error exposed)
     if [ "$status" -eq 400 ] || [ "$status" -eq 401 ] || [ "$status" -eq 409 ]; then
         echo -e "${GREEN}✓ PASS${NC}: $description (status: $status)"
-        ((pass_count++))
+        pass_count=$((pass_count + 1))
     elif [ "$status" -eq 200 ]; then
         echo -e "${RED}✗ FAIL${NC}: $description (SQL injection may have succeeded - status: 200)"
         log_verbose "Response: $body"
-        ((fail_count++))
+        fail_count=$((fail_count + 1))
     elif [ "$status" -eq 500 ]; then
         echo -e "${RED}✗ FAIL${NC}: $description (SQL error exposed - status: 500)"
         log_verbose "Response: $body"
-        ((fail_count++))
+        fail_count=$((fail_count + 1))
     else
         echo -e "${YELLOW}⚠ WARN${NC}: $description (unexpected status: $status)"
         log_verbose "Response: $body"

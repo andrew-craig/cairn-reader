@@ -7,6 +7,12 @@
 set -e
 
 BASE_URL="${USER_SERVICE_URL:-http://localhost:8080}"
+
+# /api/v1 requires HTTPS (pkg/middleware.RequireHTTPS). Send the header a TLS-terminating
+# proxy would set, so plain-HTTP runs reach the handlers instead of getting 403.
+function curl() {
+    command curl -H "X-Forwarded-Proto: https" "$@"
+}
 VERBOSE="${VERBOSE:-0}"
 
 # Color output
@@ -31,10 +37,10 @@ function test_case() {
 
     if [ "$expected_status" -eq "$actual_status" ]; then
         echo -e "${GREEN}✓ PASS${NC}: $description"
-        ((pass_count++))
+        pass_count=$((pass_count + 1))
     else
         echo -e "${RED}✗ FAIL${NC}: $description (expected $expected_status, got $actual_status)"
-        ((fail_count++))
+        fail_count=$((fail_count + 1))
     fi
 }
 
@@ -160,17 +166,24 @@ response=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/v1/auth/login" \
     -d "{\"email\":\"admin' OR '1'='1\",\"password\":\"password\"}")
 status=$(echo "$response" | tail -n1)
 log_verbose "Response: $(echo "$response" | head -n-1)"
-test_case "SQL injection in email returns 400 or 401" "400" "$status"
+test_case "SQL injection in email returns 401" "401" "$status"
 
 # Test 12: Path traversal in user ID
 echo "Test 12: Path traversal in user ID"
-response=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/v1/user/../../../etc/passwd" \
+# A real token gets the request past the auth middleware, so routing is what's tested
+register=$(curl -s "$BASE_URL/api/v1/auth/register/mobile" \
+    -X POST \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer valid_token")
+    -d "{\"expo_device_id\":\"security-test-$(date +%s%N)\"}")
+access_token=$(echo "$register" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+# --path-as-is: otherwise curl collapses the ../ segments and never sends the traversal
+response=$(curl -s --path-as-is -w "\n%{http_code}" "$BASE_URL/api/v1/user/../../../etc/passwd" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $access_token")
 status=$(echo "$response" | tail -n1)
 log_verbose "Response: $(echo "$response" | head -n-1)"
-# Should return 400 (bad UUID format) or 401 (invalid token)
-test_case "Path traversal in user ID returns 400 or 401" "401" "$status"
+# The traversal matches no route
+test_case "Path traversal in user ID with a valid token returns 404" "404" "$status"
 
 # Test 13: Account enumeration via timing
 echo "Test 13: Account enumeration protection"
@@ -198,7 +211,7 @@ log_verbose "Timing difference: ${diff}ms"
 
 if [ $diff -lt 100 ]; then
     echo -e "${GREEN}✓ PASS${NC}: Constant time login (timing difference: ${diff}ms)"
-    ((pass_count++))
+    pass_count=$((pass_count + 1))
 else
     echo -e "${YELLOW}⚠ WARN${NC}: Potential timing attack vector (timing difference: ${diff}ms)"
     echo -e "  This may indicate account enumeration vulnerability"
