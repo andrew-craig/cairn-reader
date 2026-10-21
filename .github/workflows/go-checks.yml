@@ -421,10 +421,36 @@ jobs:
       - name: Run integration tests
         working-directory: services/users/test/integration
         run: go test -race -tags=integration -count=1 -timeout 10m ./...
+      # The security scripts need a running service; point it at the same
+      # Postgres and Vault the integration tests used.
+      - name: Start user service
+        working-directory: services/users
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5433'
+          DB_USER: cairn_test
+          DB_PASSWORD: test_password
+          DB_NAME: cairn_users_test
+          VAULT_ADDR: http://localhost:8201
+          VAULT_TOKEN: test-root-token
+        run: |
+          go build -o "$RUNNER_TEMP/user-service" ./cmd/user-service
+          nohup "$RUNNER_TEMP/user-service" > "$RUNNER_TEMP/user-service.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8080/health/ready > /dev/null && exit 0
+            sleep 1
+          done
+          echo "user service did not become ready"
+          exit 1
+      - name: Run security tests
+        working-directory: services/users
+        run: make test-security
       - name: Show test environment logs
         if: failure()
         working-directory: services/users/test/integration
-        run: docker compose -f docker-compose.test.yml logs
+        run: |
+          docker compose -f docker-compose.test.yml logs
+          cat "$RUNNER_TEMP/user-service.log" || true
 
   # ── Selfhost (consolidated binary) ────────────────────────────────────
 

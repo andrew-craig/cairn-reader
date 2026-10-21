@@ -150,7 +150,7 @@ echo "Tests: $((pass_count + fail_count)), Passed: $pass_count, Failed: $fail_co
 
 ## Continuous Integration
 
-These scripts are not run in CI (`.github/workflows/` has no security workflow). To run them in a pipeline, start the service (with Vault and PostgreSQL) behind HTTPS and run `./run_all_tests.sh`.
+The `test-integration-users` job in `.github/workflows/go-checks.yml` runs these scripts on every change to `services/users`: after the integration tests it starts the service against the same PostgreSQL and Vault (`test/integration/docker-compose.test.yml`) and runs `make test-security`.
 
 ## Interpreting Results
 

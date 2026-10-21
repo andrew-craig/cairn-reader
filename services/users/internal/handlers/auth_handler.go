@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -68,16 +67,8 @@ type ErrorResponse struct {
 // Register handles POST /auth/register
 // Creates a new user account with email and password
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -102,7 +93,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Register user
 	authResp, err := h.authService.Register(r.Context(), req.Email, req.Password)
 	if err != nil {
-		writeServiceError(w, err, "failed to register user")
+		writeServiceError(w, r, err, "failed to register user")
 		return
 	}
 
@@ -112,16 +103,8 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // RegisterMobile handles POST /auth/register/mobile
 // Creates a new mobile-only account with Expo device ID
 func (h *AuthHandler) RegisterMobile(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req RegisterMobileRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -143,7 +126,7 @@ func (h *AuthHandler) RegisterMobile(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		writeServiceError(w, err, "failed to register mobile user")
+		writeServiceError(w, r, err, "failed to register mobile user")
 		return
 	}
 
@@ -153,16 +136,8 @@ func (h *AuthHandler) RegisterMobile(w http.ResponseWriter, r *http.Request) {
 // Login handles POST /auth/login
 // Authenticates a user with email and password
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -185,7 +160,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		writeServiceError(w, err, "failed to authenticate user")
+		writeServiceError(w, r, err, "failed to authenticate user")
 		return
 	}
 
@@ -195,16 +170,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // LoginMobile handles POST /auth/login/mobile
 // Authenticates a user with Expo device ID
 func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req LoginMobileRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -226,7 +193,7 @@ func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
 		ipAddress,
 	)
 	if err != nil {
-		writeServiceError(w, err, "failed to authenticate user")
+		writeServiceError(w, r, err, "failed to authenticate user")
 		return
 	}
 
@@ -236,22 +203,18 @@ func (h *AuthHandler) LoginMobile(w http.ResponseWriter, r *http.Request) {
 // Refresh handles POST /auth/refresh
 // Validates a refresh token and issues a new access token
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req RefreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		ipAddress := getClientIP(r)
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			logging.FromContext(r.Context()).Warn("refresh request: body too large", slog.String("ip", ipAddress))
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
 			return
 		}
 		logging.FromContext(r.Context()).Error("refresh request: failed to parse JSON",
 			slog.String("error", err.Error()),
 			slog.String("ip", ipAddress),
 		)
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
 		return
 	}
 
@@ -296,7 +259,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 			slog.String("client_ip", ipAddress),
 			slog.String("error", err.Error()),
 		)
-		writeServiceError(w, err, "failed to refresh access token")
+		writeServiceError(w, r, err, "failed to refresh access token")
 		return
 	}
 
@@ -312,16 +275,8 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // Logout handles POST /auth/logout
 // Revokes a specific refresh token
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	var req LogoutRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -334,7 +289,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	// Revoke the token
 	err := h.authService.Logout(r.Context(), req.RefreshToken)
 	if err != nil {
-		writeServiceError(w, err, "failed to logout")
+		writeServiceError(w, r, err, "failed to logout")
 		return
 	}
 
@@ -356,7 +311,7 @@ func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	// Revoke all user tokens
 	err = h.authService.LogoutAll(r.Context(), userID)
 	if err != nil {
-		writeServiceError(w, err, "failed to logout from all devices")
+		writeServiceError(w, r, err, "failed to logout from all devices")
 		return
 	}
 
@@ -383,16 +338,8 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	if q := r.URL.Query().Get("token"); q != "" {
 		token = q
 	} else {
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 		var req VerifyEmailRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			var maxBytesErr *http.MaxBytesError
-			if errors.As(err, &maxBytesErr) {
-				api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-				return
-			}
-			api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+		if err := decodeJSONBody(w, r, &req); err != nil {
 			return
 		}
 		token = req.Token
@@ -405,7 +352,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.emailVerificationService.VerifyEmail(r.Context(), token)
 	if err != nil {
-		writeServiceError(w, err, "failed to verify email")
+		writeServiceError(w, r, err, "failed to verify email")
 		return
 	}
 
@@ -423,7 +370,7 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.emailVerificationService.SendVerificationEmail(r.Context(), userID); err != nil {
-		writeServiceError(w, err, "failed to resend verification email")
+		writeServiceError(w, r, err, "failed to resend verification email")
 		return
 	}
 

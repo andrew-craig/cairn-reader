@@ -193,6 +193,7 @@ services/users/
 │   ├── handlers/            # HTTP request handlers
 │   │   ├── auth_handler.go  # Auth endpoints
 │   │   ├── user_handler.go  # User management endpoints
+│   │   ├── decode.go        # Shared JSON body decoding (size cap, rejects NUL in strings)
 │   │   ├── errors.go        # Service error -> HTTP response mapping
 │   │   ├── health.go        # Health checks
 │   │   ├── limits.go        # Request body size limit
@@ -784,9 +785,10 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (*Au
 ```go
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
     // 1. Parse request body
+    // decodeJSONBody (handlers/decode.go) caps the body size, rejects NUL
+    // bytes in string fields, and writes the 4xx response on failure
     var req RegisterRequest
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+    if err := decodeJSONBody(w, r, &req); err != nil {
         return
     }
 
@@ -794,7 +796,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
     resp, err := h.authService.Register(r.Context(), req.Email, req.Password)
     if err != nil {
         // Map service errors to HTTP status codes (handlers/errors.go)
-        writeServiceError(w, err, "failed to register user")
+        writeServiceError(w, r, err, "failed to register user")
         return
     }
 

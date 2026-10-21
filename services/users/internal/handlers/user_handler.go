@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/andrew-craig/cairn-reader/pkg/api"
@@ -63,7 +61,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	// Get user (service layer handles authorization)
 	user, err := h.userService.GetUser(r.Context(), requestingUserID, targetUserID)
 	if err != nil {
-		writeServiceError(w, err, "failed to retrieve user")
+		writeServiceError(w, r, err, "failed to retrieve user")
 		return
 	}
 
@@ -88,17 +86,9 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	// Parse request body
 	var req UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -119,7 +109,7 @@ func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	// Update user (service layer handles authorization)
 	user, err := h.userService.UpdateUser(r.Context(), requestingUserID, targetUserID, req.Email)
 	if err != nil {
-		writeServiceError(w, err, "failed to update user")
+		writeServiceError(w, r, err, "failed to update user")
 		return
 	}
 
@@ -144,17 +134,9 @@ func (h *UserHandler) UpgradeAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	// Parse request body
 	var req UpgradeAccountRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -185,7 +167,7 @@ func (h *UserHandler) UpgradeAccount(w http.ResponseWriter, r *http.Request) {
 		req.Password,
 	)
 	if err != nil {
-		writeServiceError(w, err, "failed to upgrade account")
+		writeServiceError(w, r, err, "failed to upgrade account")
 		return
 	}
 
@@ -210,17 +192,9 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-
 	// Parse request body
 	var req ChangePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		var maxBytesErr *http.MaxBytesError
-		if errors.As(err, &maxBytesErr) {
-			api.WriteError(w, http.StatusRequestEntityTooLarge, api.ErrCodeBadRequest, "Request body too large", nil, "v1")
-			return
-		}
-		api.WriteError(w, http.StatusBadRequest, api.ErrCodeBadRequest, "invalid request: "+err.Error(), nil, "v1")
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		return
 	}
 
@@ -233,7 +207,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Change password (service layer handles authorization and validation)
 	err = h.userService.ChangePassword(r.Context(), requestingUserID, targetUserID, req.CurrentPassword, req.NewPassword)
 	if err != nil {
-		writeServiceError(w, err, "failed to change password")
+		writeServiceError(w, r, err, "failed to change password")
 		return
 	}
 
@@ -263,7 +237,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Delete user (service layer handles authorization)
 	err = h.userService.DeleteUser(r.Context(), requestingUserID, targetUserID)
 	if err != nil {
-		writeServiceError(w, err, "failed to delete user")
+		writeServiceError(w, r, err, "failed to delete user")
 		return
 	}
 
