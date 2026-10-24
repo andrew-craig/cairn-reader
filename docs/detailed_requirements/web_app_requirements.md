@@ -123,8 +123,8 @@ the primary navigation to a persistent **left sidebar** (or top nav bar) with th
 Feed and Reads are the two lists described in `docs/product_requirements.md`; each is the same article list filtered by `list`.
 
 The top quick-actions bar (add, search) will remain at the top of the list:
-- There will be a near full width search bar across the width of the article list.
-- Non-search actions will be buttons (in the same style) to the right of the search box.
+- Actions are right-aligned icon buttons using mobile's Ionicons: search (`search-outline`) and, on Reads only, add link (`add-outline`).
+- Clicking the search icon slides a search field out of the icon to fill the space to its left; clicking it again (or Escape) closes the field and returns to the full list.
 
 The sub-sections of the You page (Account, RSS, Newsletters, Bookmarks, About) will be shown as sub-items in the left navigation menu.
 - Clicking the You item in the left nav will expand this list.
@@ -145,9 +145,9 @@ The sub-sections of the You page (Account, RSS, Newsletters, Bookmarks, About) w
 | `/you/bookmarks` | `BookmarksScreen` | Saved/bookmarked items |
 | `/you/about` | `AboutScreen` | About |
 | Add-link modal | `AddArticleScreen` / `AddLinkModal` | Add a URL (page or feed) |
-| Search modal | `SearchModal` | Search saved content |
+| Search (inline) | `SearchModal` | Search saved content |
 
-Add-link and Search present as **modal/overlay** on web, matching mobile. Implementation of these should be lightweight as they will be improved as a fast follow.
+Add-link presents as a **modal/overlay** on web, matching mobile; search is an inline field in the list header. Implementation of these should be lightweight as they will be improved as a fast follow.
 
 ## Functional Requirements
 
@@ -174,8 +174,8 @@ web app reuses the same request/response handling and `Article` transforms.
 
 - Search saved content via `GET /api/v1/content/user/{userId}/search?q=...`
   (`ReadService.searchUserContents`).
-- Present as a modal/overlay; show results in the same list layout; provide a clear
-  action to return to the full list.
+- Present as an inline header field; show results in place of the list, in the same
+  list layout; closing the field returns to the full list.
 
 ### FR-3: Add Link
 

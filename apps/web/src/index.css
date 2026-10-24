@@ -115,24 +115,27 @@ h6 {
   /* Press feedback — strip the transition and active transform */
   .login-submit,
   .read__refresh,
-  .read__add-link,
+  .read__icon-button,
   .add-link-modal__btn,
   .reader__action,
   .sidebar__item,
-  .article-row__button,
-  .search-modal__close {
+  .article-row__button {
     transition: none;
   }
 
   .login-submit:active,
   .read__refresh:active,
-  .read__add-link:active,
+  .read__icon-button:active,
   .add-link-modal__btn:active,
   .reader__action:active,
   .sidebar__item:active,
-  .article-row__button:active,
-  .search-modal__close:active {
+  .article-row__button:active {
     transform: none;
+  }
+
+  /* List search field — fade in place instead of sliding out */
+  .read__search {
+    transition: opacity 150ms var(--ease-out);
   }
 
   /* Sidebar chevron rotation */
@@ -141,20 +144,15 @@ h6 {
   }
 
   /* Modal enter/exit animations — replace with opacity-only fade (no scale) */
-  .search-overlay,
-  .search-overlay--closing,
   .add-link-overlay,
   .add-link-overlay--closing {
     animation: overlay-in 200ms var(--ease-out) both;
   }
 
-  .search-overlay--closing,
   .add-link-overlay--closing {
     animation: overlay-out 150ms var(--ease-out) both;
   }
 
-  .search-modal,
-  .search-overlay--closing .search-modal,
   .add-link-modal,
   .add-link-overlay--closing .add-link-modal {
     animation: none;

@@ -8,42 +8,76 @@
 .read__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--spacing-xs);
   margin-bottom: var(--spacing-sm);
 }
 
-.read__search-bar {
+/* Search field: fills the space left of the icons. Closed, it is clipped away
+   to its right edge; opening reveals it leftwards so it slides out of the
+   search icon. */
+.read__search {
   flex: 1;
   min-width: 0;
+  clip-path: inset(0 0 0 100% round var(--radius-md));
+  opacity: 0;
+  transition:
+    clip-path 250ms var(--ease-out),
+    opacity 150ms var(--ease-out);
+}
+
+.read__search--open {
+  clip-path: inset(0 0 0 0 round var(--radius-md));
+  opacity: 1;
+}
+
+.read__search-input {
+  width: 100%;
   padding: 10px var(--spacing-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background-color: var(--color-background);
-  color: var(--color-text-secondary);
+  color: var(--color-text);
   font-size: var(--font-size-md);
-  text-align: left;
-  cursor: text;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .read__search-bar:hover {
-    border-color: var(--color-text-secondary);
-  }
-}
-
-.read__search-bar:focus-visible {
+.read__search-input:focus {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
 
-.read__actions {
+/* Round icon buttons, sized like mobile's IconButton. */
+.read__icon-button {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
 }
 
-.read__refresh,
-.read__add-link {
+.read__icon-button:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .read__icon-button:hover {
+    background-color: var(--color-hover);
+  }
+}
+
+.read__icon-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.read__refresh {
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -55,14 +89,12 @@
   transition: transform 160ms var(--ease-out);
 }
 
-.read__refresh:active,
-.read__add-link:active {
+.read__refresh:active {
   transform: scale(0.97);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .read__refresh:hover:not(:disabled),
-  .read__add-link:hover:not(:disabled) {
+  .read__refresh:hover:not(:disabled) {
     background-color: var(--color-hover);
   }
 }
@@ -72,8 +104,7 @@
   cursor: default;
 }
 
-.read__refresh:focus-visible,
-.read__add-link:focus-visible {
+.read__refresh:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
 }
