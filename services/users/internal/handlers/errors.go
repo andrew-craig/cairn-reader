@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/andrew-craig/cairn-reader/pkg/api"
 	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 )
 
@@ -69,8 +71,9 @@ func lookupServiceError(err error) (serviceErrorMapping, bool) {
 // fallbackMessage — that is the only path to a 500, so a newly added service
 // sentinel that is missing from the table surfaces as an obvious 500 (and is
 // caught by TestServiceErrorTable_CoversAllSentinels) rather than being silently
-// mishandled by a forgotten per-handler branch.
-func writeServiceError(w http.ResponseWriter, err error, fallbackMessage string) {
+// mishandled by a forgotten per-handler branch. The 500 path logs err, since
+// the client only sees fallbackMessage.
+func writeServiceError(w http.ResponseWriter, r *http.Request, err error, fallbackMessage string) {
 	if m, ok := lookupServiceError(err); ok {
 		message := m.message
 		if m.useErrText {
@@ -79,5 +82,6 @@ func writeServiceError(w http.ResponseWriter, err error, fallbackMessage string)
 		api.WriteError(w, m.status, m.code, message, nil, "v1")
 		return
 	}
+	logging.FromContext(r.Context()).Error(fallbackMessage, slog.String("error", err.Error()))
 	api.WriteError(w, http.StatusInternalServerError, api.ErrCodeInternal, fallbackMessage, nil, "v1")
 }

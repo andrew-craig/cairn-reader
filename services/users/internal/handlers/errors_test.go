@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	apperrors "github.com/andrew-craig/cairn-reader/pkg/errors"
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	"github.com/andrew-craig/cairn-reader/services/users/internal/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,7 +55,7 @@ func TestWriteServiceError_Mapping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Bare sentinel.
 			rec := httptest.NewRecorder()
-			writeServiceError(rec, tt.err, "fallback")
+			writeServiceError(rec, httptest.NewRequest(http.MethodGet, "/", nil), tt.err, "fallback")
 			assert.Equal(t, tt.wantStatus, rec.Code)
 			code, msg := decodeErrorBody(t, rec.Body.Bytes())
 			assert.Equal(t, tt.wantCode, code)
@@ -60,19 +63,30 @@ func TestWriteServiceError_Mapping(t *testing.T) {
 
 			// Wrapped sentinel — errors.Is must still resolve it.
 			recWrapped := httptest.NewRecorder()
-			writeServiceError(recWrapped, fmt.Errorf("service call failed: %w", tt.err), "fallback")
+			writeServiceError(recWrapped, httptest.NewRequest(http.MethodGet, "/", nil), fmt.Errorf("service call failed: %w", tt.err), "fallback")
 			assert.Equal(t, tt.wantStatus, recWrapped.Code, "wrapped sentinel should map the same")
 		})
 	}
 }
 
 func TestWriteServiceError_UnmappedIs500(t *testing.T) {
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logBuf, nil))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(logging.WithLogger(req.Context(), logger))
+
 	rec := httptest.NewRecorder()
-	writeServiceError(rec, fmt.Errorf("some unexpected failure"), "failed to do the thing")
+	writeServiceError(rec, req, fmt.Errorf("some unexpected failure"), "failed to do the thing")
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	code, msg := decodeErrorBody(t, rec.Body.Bytes())
 	assert.Equal(t, "internal_error", code)
 	assert.Equal(t, "failed to do the thing", msg)
+
+	// The client only sees the fallback message, so the cause must be logged.
+	level, found := findLogLevel(t, logBuf.Bytes(), "failed to do the thing")
+	require.True(t, found, "expected the 500 to be logged, got: %s", logBuf.String())
+	assert.Equal(t, slog.LevelError.String(), level)
+	assert.Contains(t, logBuf.String(), "some unexpected failure")
 }
 
 // TestServiceErrorTable_CoversAllSentinels fails loudly if a service-layer

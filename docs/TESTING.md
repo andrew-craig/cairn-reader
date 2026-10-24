@@ -497,13 +497,11 @@ Workflows live in `.github/workflows/`; test-related ones are:
 | Workflow | What it runs |
 |----------|--------------|
 | `go-checks.yml` | Per module (path-filtered): gofmt, golangci-lint, `go vet`, `go build`, and `go test -race -count=1` with coverage for `services/read` (content, fetcher), `services/read/email`, `services/users` (`./internal/...` with `-p 1` against a PostgreSQL service container and migrations applied first), `cmd/selfhost` and the `pkg/*` modules |
-| `go-checks.yml` (integration jobs) | `go test -race -tags=integration` for content, fetcher and email (PostgreSQL 16 service, `TEST_DB_*` pointing at it, `CAIRN_SKIP_NETWORK_TESTS=1`) and for `cmd/selfhost`; for `services/users` it starts `test/integration/docker-compose.test.yml` (PostgreSQL, Vault and the key-seeding init container) and runs `test/integration` |
+| `go-checks.yml` (integration jobs) | `go test -race -tags=integration` for content, fetcher and email (PostgreSQL 16 service, `TEST_DB_*` pointing at it, `CAIRN_SKIP_NETWORK_TESTS=1`) and for `cmd/selfhost`; for `services/users` it starts `test/integration/docker-compose.test.yml` (PostgreSQL, Vault and the key-seeding init container), runs `test/integration`, then starts the service against the same environment and runs the `test/security` scripts (`make test-security`) |
 | `web-checks.yml` | `tsc --noEmit`, ESLint, `npx vitest run` for `apps/web`, and `tsc` + `vitest run` for `apps/shared` |
 | `mobile-checks.yml` | `tsc --noEmit`, ESLint, `npx jest --ci --coverage`, an Expo iOS bundle export, and `knip` (dead code) |
 | `selfhost-compose-smoke.yml` | Builds the self-host image, starts `infrastructure/docker/selfhost` with Docker Compose and checks `/health/live` |
 | `docker-test.yml` | Builds each service image (no push) as a smoke test |
-
-The User Service bash security scripts (`services/users/test/security`) are not run in CI.
 
 ---
 
