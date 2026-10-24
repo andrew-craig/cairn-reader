@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Article, ContentList } from '@cairn/shared';
 import { PAGE_SIZE, ReadService } from '../services/read';
 import ArticleRow from '../components/ArticleRow';
 import AddLinkModal from '../components/AddLinkModal';
-import SearchModal from '../components/SearchModal';
+import SearchResults from '../components/SearchResults';
+import AddIcon from '../components/icons/AddIcon';
+import SearchIcon from '../components/icons/SearchIcon';
 import './Read.css';
 
 const COPY: Record<ContentList, { search: string; loading: string; empty: string; error: string }> = {
@@ -39,8 +42,10 @@ export default function ArticleList({ list }: { list: ContentList }) {
   const [error, setError] = useState<string | null>(null);
   const [showAddLink, setShowAddLink] = useState(false);
   const [closingAddLink, setClosingAddLink] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [closingSearch, setClosingSearch] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleCloseAddLink = useCallback(() => {
     setClosingAddLink(true);
@@ -50,13 +55,17 @@ export default function ArticleList({ list }: { list: ContentList }) {
     }, 150);
   }, []);
 
-  const handleCloseSearch = useCallback(() => {
-    setClosingSearch(true);
-    setTimeout(() => {
-      setShowSearch(false);
-      setClosingSearch(false);
-    }, 150);
-  }, []);
+  // The search icon toggles the header search field; closing it clears the
+  // query so the list comes back. flushSync lifts `inert` before focus moves
+  // into the field, or back to the icon (focus would be lost inside it).
+  const toggleSearch = useCallback(() => {
+    const opening = !searchOpen;
+    flushSync(() => {
+      setSearchOpen(opening);
+      setQuery('');
+    });
+    (opening ? searchInputRef : searchButtonRef).current?.focus();
+  }, [searchOpen]);
 
   // Pagination cursor + guards kept in refs so the IntersectionObserver
   // callback reads current values without re-subscribing on every page.
@@ -149,24 +158,43 @@ export default function ArticleList({ list }: { list: ContentList }) {
   return (
     <div className="read">
       <header className="read__header">
+        <div className={`read__search${searchOpen ? ' read__search--open' : ''}`} inert={!searchOpen}>
+          <input
+            ref={searchInputRef}
+            id="read-search"
+            type="search"
+            className="read__search-input"
+            placeholder={copy.search}
+            aria-label={copy.search}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') toggleSearch();
+            }}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
         <button
+          ref={searchButtonRef}
           type="button"
-          className="read__search-bar"
-          onClick={() => setShowSearch(true)}
-          aria-label={copy.search}
+          className="read__icon-button"
+          onClick={toggleSearch}
+          aria-label="Search"
+          aria-expanded={searchOpen}
+          aria-controls="read-search"
         >
-          {copy.search}
+          <SearchIcon />
         </button>
         {list === 'reads' && (
-          <div className="read__actions">
-            <button
-              type="button"
-              className="read__add-link"
-              onClick={() => setShowAddLink(true)}
-            >
-              Add link
-            </button>
-          </div>
+          <button
+            type="button"
+            className="read__icon-button"
+            onClick={() => setShowAddLink(true)}
+            aria-label="Add link"
+          >
+            <AddIcon />
+          </button>
         )}
       </header>
 
@@ -178,9 +206,9 @@ export default function ArticleList({ list }: { list: ContentList }) {
         />
       )}
 
-      {showSearch && <SearchModal list={list} onClose={handleCloseSearch} closing={closingSearch} />}
-
-      {loading ? (
+      {query.trim() ? (
+        <SearchResults list={list} query={query} />
+      ) : loading ? (
         <p className="read__status">{copy.loading}</p>
       ) : error ? (
         <div className="read__status">

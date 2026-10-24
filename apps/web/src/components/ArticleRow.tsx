@@ -9,7 +9,7 @@ interface ArticleRowProps {
 
 // A single reading-list entry: title, source/author, excerpt and an optional
 // lead image. Mirrors mobile's ArticleRow (muted once read) while adding the
-// excerpt the web list calls for. Shared by Read, Bookmarks and SearchModal
+// excerpt the web list calls for. Shared by Read, Bookmarks and SearchResults
 // so all lists render identically.
 export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
   const publishedDate = formatPublishedDate(article.publishedDate);
