@@ -211,6 +211,10 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 			logging.FromContext(r.Context()).Warn("refresh request: body too large", slog.String("ip", ipAddress))
 			return
 		}
+		if errors.Is(err, errNULInString) {
+			logging.FromContext(r.Context()).Warn("refresh request: NUL in string field", slog.String("ip", ipAddress))
+			return
+		}
 		logging.FromContext(r.Context()).Error("refresh request: failed to parse JSON",
 			slog.String("error", err.Error()),
 			slog.String("ip", ipAddress),

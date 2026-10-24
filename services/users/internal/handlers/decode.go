@@ -38,17 +38,31 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-// containsNUL reports whether any string reachable from v through pointers
-// and struct fields contains a NUL byte.
+// containsNUL reports whether any string reachable from v (through pointers,
+// struct fields, slice/array elements, and map keys and values) contains a
+// NUL byte.
 func containsNUL(v reflect.Value) bool {
 	switch v.Kind() {
 	case reflect.String:
 		return strings.ContainsRune(v.String(), 0)
-	case reflect.Pointer:
+	case reflect.Pointer, reflect.Interface:
 		return !v.IsNil() && containsNUL(v.Elem())
 	case reflect.Struct:
 		for i := range v.NumField() {
 			if containsNUL(v.Field(i)) {
+				return true
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			if containsNUL(v.Index(i)) {
+				return true
+			}
+		}
+	case reflect.Map:
+		iter := v.MapRange()
+		for iter.Next() {
+			if containsNUL(iter.Key()) || containsNUL(iter.Value()) {
 				return true
 			}
 		}

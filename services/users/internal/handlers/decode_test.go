@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/andrew-craig/cairn-reader/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,4 +61,52 @@ func TestLogin_NULInEmailIs400(t *testing.T) {
 	handler.Login(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+// containsNUL must cover every container a future request struct might use,
+// not just today's flat string fields.
+func TestContainsNUL_Containers(t *testing.T) {
+	type nested struct {
+		Aliases []string
+		Tags    [1]string
+		Meta    map[string]string
+		Any     any
+	}
+	tests := []struct {
+		name string
+		v    any
+		want bool
+	}{
+		{"clean", nested{Aliases: []string{"a"}, Meta: map[string]string{"k": "v"}, Any: "x"}, false},
+		{"slice element", nested{Aliases: []string{"a", "b\x00"}}, true},
+		{"array element", nested{Tags: [1]string{"\x00"}}, true},
+		{"map value", nested{Meta: map[string]string{"k": "\x00"}}, true},
+		{"map key", nested{Meta: map[string]string{"\x00": "v"}}, true},
+		{"interface", nested{Any: "\x00"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, containsNUL(reflect.ValueOf(&tt.v)))
+		})
+	}
+}
+
+// A NUL rejection is a routine client error: Refresh must log it at Warn,
+// not on the Error-level "failed to parse JSON" path.
+func TestRefresh_NULLogsAtWarn(t *testing.T) {
+	var logBuf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logBuf, nil))
+	handler := NewAuthHandler(&stubAuthService{}, &mockEmailVerificationService{})
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", strings.NewReader(`{"refresh_token":"abc\u0000"}`))
+	req = req.WithContext(logging.WithLogger(req.Context(), logger))
+	rec := httptest.NewRecorder()
+
+	handler.Refresh(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	level, found := findLogLevel(t, logBuf.Bytes(), "refresh request: NUL in string field")
+	require.True(t, found, "expected a NUL log line, got: %s", logBuf.String())
+	assert.Equal(t, slog.LevelWarn.String(), level)
+	assert.NotContains(t, logBuf.String(), "failed to parse JSON")
 }
