@@ -89,4 +89,19 @@ describe('ArticleList', () => {
     expect(document.activeElement).toBe(toggle);
     expect(screen.getByText('No saved articles yet.')).toBeTruthy();
   });
+
+  it('closes the search field from its close button', async () => {
+    vi.spyOn(ReadService, 'listUserContents').mockResolvedValue(emptyPage);
+    renderList('reads');
+    await screen.findByText('No saved articles yet.');
+
+    const toggle = screen.getByRole('button', { name: 'Search' });
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'rust' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(toggle);
+    expect((screen.getByRole('searchbox', { hidden: true }) as HTMLInputElement).value).toBe('');
+  });
 });

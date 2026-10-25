@@ -7,6 +7,7 @@ import ArticleRow from '../components/ArticleRow';
 import AddLinkModal from '../components/AddLinkModal';
 import SearchResults from '../components/SearchResults';
 import AddIcon from '../components/icons/AddIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import SearchIcon from '../components/icons/SearchIcon';
 import './Read.css';
 
@@ -158,34 +159,47 @@ export default function ArticleList({ list }: { list: ContentList }) {
   return (
     <div className="read">
       <header className="read__header">
-        <div className={`read__search${searchOpen ? ' read__search--open' : ''}`} inert={!searchOpen}>
-          <input
-            ref={searchInputRef}
-            id="read-search"
-            type="search"
-            className="read__search-input"
-            placeholder={copy.search}
-            aria-label={copy.search}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') toggleSearch();
-            }}
-            autoComplete="off"
-            spellCheck={false}
-          />
+        <div className="read__search-slot">
+          <div className={`read__search${searchOpen ? ' read__search--open' : ''}`}>
+            <input
+              ref={searchInputRef}
+              id="read-search"
+              type="search"
+              className="read__search-input"
+              placeholder={copy.search}
+              aria-label={copy.search}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') toggleSearch();
+              }}
+              autoComplete="off"
+              spellCheck={false}
+              inert={!searchOpen}
+            />
+            <button
+              ref={searchButtonRef}
+              type="button"
+              className="read__icon-button read__search-toggle"
+              onClick={toggleSearch}
+              aria-label="Search"
+              aria-expanded={searchOpen}
+              aria-controls="read-search"
+              inert={searchOpen}
+            >
+              <SearchIcon />
+            </button>
+            <button
+              type="button"
+              className="read__icon-button read__search-close"
+              onClick={toggleSearch}
+              aria-label="Close search"
+              inert={!searchOpen}
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
-        <button
-          ref={searchButtonRef}
-          type="button"
-          className="read__icon-button"
-          onClick={toggleSearch}
-          aria-label="Search"
-          aria-expanded={searchOpen}
-          aria-controls="read-search"
-        >
-          <SearchIcon />
-        </button>
         {list === 'reads' && (
           <button
             type="button"

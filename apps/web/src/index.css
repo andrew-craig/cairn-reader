@@ -133,8 +133,17 @@ h6 {
     transform: none;
   }
 
-  /* List search field — fade in place instead of sliding out */
-  .read__search {
+  /* List search pill — snap to size and fade its contents instead of
+     stretching. `.read` outranks the base rules in Read.css. */
+  .read .read__search {
+    transition: box-shadow 150ms var(--ease-out);
+  }
+
+  .read .read__search-input,
+  .read .read__search-close,
+  .read .read__search-close:active {
+    transform: none;
+    filter: none;
     transition: opacity 150ms var(--ease-out);
   }
 

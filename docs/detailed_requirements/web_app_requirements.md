@@ -124,7 +124,7 @@ Feed and Reads are the two lists described in `docs/product_requirements.md`; ea
 
 The top quick-actions bar (add, search) will remain at the top of the list:
 - Actions are right-aligned icon buttons using mobile's Ionicons: search (`search-outline`) and, on Reads only, add link (`add-outline`).
-- Clicking the search icon slides a search field out of the icon to fill the space to its left; clicking it again (or Escape) closes the field and returns to the full list.
+- Clicking the round search button morphs it into a pill-shaped search field: its border appears, then it stretches leftwards to fill the space, the search icon moving to the leading position and a close (✕) button appearing where the icon was. The ✕ (or Escape) reverses the morph and returns to the full list.
 
 The sub-sections of the You page (Account, RSS, Newsletters, Bookmarks, About) will be shown as sub-items in the left navigation menu.
 - Clicking the You item in the left nav will expand this list.
