@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { UserContentsListResponse } from '@cairn/shared';
 import ArticleList from './ArticleList';
@@ -51,5 +51,42 @@ describe('ArticleList', () => {
     renderList('feed');
     await screen.findByText(/Your feed is empty/);
     expect(screen.queryByRole('button', { name: 'Add link' })).toBeNull();
+  });
+
+  it('opens Add link from the plus icon', async () => {
+    vi.spyOn(ReadService, 'listUserContents').mockResolvedValue(emptyPage);
+    renderList('reads');
+    await screen.findByText('No saved articles yet.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('toggles an inline search field that shows results in place of the list', async () => {
+    vi.spyOn(ReadService, 'listUserContents').mockResolvedValue(emptyPage);
+    const search = vi.spyOn(ReadService, 'searchUserContents').mockResolvedValue({
+      ...emptyPage,
+      contents: [],
+    });
+    renderList('reads');
+    await screen.findByText('No saved articles yet.');
+
+    const toggle = screen.getByRole('button', { name: 'Search' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle);
+    const input = screen.getByRole('searchbox', { name: 'Search your reads' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.change(input, { target: { value: 'rust' } });
+    await screen.findByText('No results.');
+    expect(search).toHaveBeenCalledWith({ q: 'rust', list: 'reads' });
+    expect(screen.queryByText('No saved articles yet.')).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(toggle);
+    expect(screen.getByText('No saved articles yet.')).toBeTruthy();
   });
 });
