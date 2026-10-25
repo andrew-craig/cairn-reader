@@ -131,8 +131,8 @@ export const ReadsScreen: React.FC = () => {
 
   const headerActions = (
     <>
-      <IconButton icon="add-outline" onPress={() => setModalVisible(true)} accessibilityLabel="Add link" />
       <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
+      <IconButton icon="add-outline" onPress={() => setModalVisible(true)} accessibilityLabel="Add link" />
     </>
   );
 
