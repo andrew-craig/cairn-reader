@@ -59,13 +59,15 @@ export default function ArticleList({ list }: { list: ContentList }) {
   // The search icon toggles the header search field; closing it clears the
   // query so the list comes back. flushSync lifts `inert` before focus moves
   // into the field, or back to the icon (focus would be lost inside it).
+  // preventScroll: the input is wider than the still-round pill, so a plain
+  // focus() scrolls the clipped pill sideways and shoves the icon off-centre.
   const toggleSearch = useCallback(() => {
     const opening = !searchOpen;
     flushSync(() => {
       setSearchOpen(opening);
       setQuery('');
     });
-    (opening ? searchInputRef : searchButtonRef).current?.focus();
+    (opening ? searchInputRef : searchButtonRef).current?.focus({ preventScroll: true });
   }, [searchOpen]);
 
   // Pagination cursor + guards kept in refs so the IntersectionObserver
@@ -177,6 +179,8 @@ export default function ArticleList({ list }: { list: ContentList }) {
               spellCheck={false}
               inert={!searchOpen}
             />
+            {/* Inert while open: the pill's close button takes over as the
+                control, so the toggle's aria-expanded only matters closed. */}
             <button
               ref={searchButtonRef}
               type="button"

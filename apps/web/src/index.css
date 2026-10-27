@@ -134,14 +134,17 @@ h6 {
   }
 
   /* List search pill — snap to size and fade its contents instead of
-     stretching. `.read` outranks the base rules in Read.css. */
+     stretching. The extra `.read` outranks each matching rule in Read.css
+     (closed and open state), so this holds regardless of import order. */
   .read .read__search {
     transition: box-shadow 150ms var(--ease-out);
   }
 
   .read .read__search-input,
+  .read .read__search--open .read__search-input,
   .read .read__search-close,
-  .read .read__search-close:active {
+  .read .read__search--open .read__search-close,
+  .read .read__search--open .read__search-close:active {
     transform: none;
     filter: none;
     transition: opacity 150ms var(--ease-out);
