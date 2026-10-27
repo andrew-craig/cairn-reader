@@ -7,6 +7,7 @@ import ArticleRow from '../components/ArticleRow';
 import AddLinkModal from '../components/AddLinkModal';
 import SearchResults from '../components/SearchResults';
 import AddIcon from '../components/icons/AddIcon';
+import CloseIcon from '../components/icons/CloseIcon';
 import SearchIcon from '../components/icons/SearchIcon';
 import './Read.css';
 
@@ -58,13 +59,15 @@ export default function ArticleList({ list }: { list: ContentList }) {
   // The search icon toggles the header search field; closing it clears the
   // query so the list comes back. flushSync lifts `inert` before focus moves
   // into the field, or back to the icon (focus would be lost inside it).
+  // preventScroll: the input is wider than the still-round pill, so a plain
+  // focus() scrolls the clipped pill sideways and shoves the icon off-centre.
   const toggleSearch = useCallback(() => {
     const opening = !searchOpen;
     flushSync(() => {
       setSearchOpen(opening);
       setQuery('');
     });
-    (opening ? searchInputRef : searchButtonRef).current?.focus();
+    (opening ? searchInputRef : searchButtonRef).current?.focus({ preventScroll: true });
   }, [searchOpen]);
 
   // Pagination cursor + guards kept in refs so the IntersectionObserver
@@ -158,34 +161,49 @@ export default function ArticleList({ list }: { list: ContentList }) {
   return (
     <div className="read">
       <header className="read__header">
-        <div className={`read__search${searchOpen ? ' read__search--open' : ''}`} inert={!searchOpen}>
-          <input
-            ref={searchInputRef}
-            id="read-search"
-            type="search"
-            className="read__search-input"
-            placeholder={copy.search}
-            aria-label={copy.search}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') toggleSearch();
-            }}
-            autoComplete="off"
-            spellCheck={false}
-          />
+        <div className="read__search-slot">
+          <div className={`read__search${searchOpen ? ' read__search--open' : ''}`}>
+            <input
+              ref={searchInputRef}
+              id="read-search"
+              type="search"
+              className="read__search-input"
+              placeholder={copy.search}
+              aria-label={copy.search}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') toggleSearch();
+              }}
+              autoComplete="off"
+              spellCheck={false}
+              inert={!searchOpen}
+            />
+            {/* Inert while open: the pill's close button takes over as the
+                control, so the toggle's aria-expanded only matters closed. */}
+            <button
+              ref={searchButtonRef}
+              type="button"
+              className="read__icon-button read__search-toggle"
+              onClick={toggleSearch}
+              aria-label="Search"
+              aria-expanded={searchOpen}
+              aria-controls="read-search"
+              inert={searchOpen}
+            >
+              <SearchIcon />
+            </button>
+            <button
+              type="button"
+              className="read__icon-button read__search-close"
+              onClick={toggleSearch}
+              aria-label="Close search"
+              inert={!searchOpen}
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
-        <button
-          ref={searchButtonRef}
-          type="button"
-          className="read__icon-button"
-          onClick={toggleSearch}
-          aria-label="Search"
-          aria-expanded={searchOpen}
-          aria-controls="read-search"
-        >
-          <SearchIcon />
-        </button>
         {list === 'reads' && (
           <button
             type="button"

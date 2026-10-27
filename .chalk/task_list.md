@@ -17,6 +17,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
 - **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
+- **task_ed6a** · P2 · open · Web: morph the round search button into a pill search field
 - **bug_fa3d** · P3 · open · Behaviour gaps found in docs review (need decisions)
 - **chore_88f9** · P3 · open · apps/web/Dockerfile: mobile-only lockfile changes bust the web build cache
 - **decision_4052** · P3 · open · Decide to offer hosted service
