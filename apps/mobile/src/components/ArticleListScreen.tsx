@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
   ViewToken,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, GlobalStyles, Layout, Spacing, FontSizes, FontFamily } from '../constants';
 import { ArticleRow } from './common/ArticleRow';
 import { ScreenHeader } from './common/ScreenHeader';
+import { HeaderSearchProps } from './common/HeaderSearch';
 import { Article } from '../types';
 
 interface ArticleListScreenProps {
@@ -34,8 +34,8 @@ interface ArticleListScreenProps {
   onScrollBeginDrag?: () => void;
   loadingMore?: boolean;
   endOfListMessage?: string;
-  searchQuery?: string;
-  onClearSearch?: () => void;
+  /** Header search. While it is open the screen keeps its header mounted. */
+  search?: HeaderSearchProps;
   /** When set, renders a small banner below the header to indicate stale data. */
   staleMessage?: string;
   /**
@@ -63,8 +63,7 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   onScrollBeginDrag,
   loadingMore = false,
   endOfListMessage,
-  searchQuery,
-  onClearSearch,
+  search,
   staleMessage,
   error,
   onRetry,
@@ -83,27 +82,12 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 
   const renderHeader = (showStaleMessage = true) => (
     <View>
-      <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} />
-      {showStaleMessage && staleMessage && !searchQuery && (
+      <ScreenHeader title={title} onBack={onBack} rightActions={headerActions} search={search} />
+      {showStaleMessage && staleMessage && !search?.open && (
         <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
           <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
             {staleMessage}
           </Text>
-        </View>
-      )}
-      {searchQuery && onClearSearch && (
-        <View style={[searchBannerStyles.container, { backgroundColor: colors.hover }]}>
-          <Text style={[searchBannerStyles.text, { color: colors.textSecondary }]} numberOfLines={1}>
-            Results for "{searchQuery}"
-          </Text>
-          <TouchableOpacity
-            onPress={onClearSearch}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-          >
-            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -154,8 +138,9 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
   // Only take over the whole screen with a spinner on the first load. Once
   // articles are on screen, a reload (pull-to-refresh, search) keeps the list
   // visible and shows progress via the RefreshControl instead of replacing the
-  // populated list with a spinner.
-  if (loading && articles.length === 0) {
+  // populated list with a spinner. Never while the search field is open: that
+  // would unmount it mid-typing.
+  if (loading && articles.length === 0 && !search?.open) {
     return (
       <View
         style={[
@@ -171,9 +156,9 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
 
   // A load failure with nothing to show: distinguish it from an empty account
   // and give an explicit retry (pull-to-refresh alone is an accessibility gap).
-  // Suppressed during an active search — a failed reset load shouldn't hide
-  // empty search results behind a stale Retry that would abandon the search.
-  if (error && articles.length === 0 && !searchQuery) {
+  // Suppressed while the search field is open — a failed reset load shouldn't
+  // hide empty search results behind a stale Retry that would abandon the search.
+  if (error && articles.length === 0 && !search?.open) {
     return (
       <View style={[GlobalStyles.container, { backgroundColor: colors.background }]}>
         {renderHeader(false)}
@@ -200,7 +185,9 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         data={articles}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
+        // An element, not a component: a new component type each render would
+        // remount the header and drop focus from the search field.
+        ListHeaderComponent={renderHeader()}
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}

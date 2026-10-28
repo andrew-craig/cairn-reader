@@ -97,20 +97,21 @@ describe('useCursorArticleList', () => {
     await waitFor(() => expect(fetchPage).toHaveBeenCalledTimes(1));
   });
 
-  it('search populates from ReadService.searchUserContents and sets searchQuery', async () => {
+  it('live search debounces the query and replaces the list with the results', async () => {
     const fetchPage = jest.fn().mockResolvedValue(page([], '', false));
-    jest
+    const searchSpy = jest
       .spyOn(ReadService, 'searchUserContents')
       .mockResolvedValue(page(['s1', 's2'], '', false));
 
     const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
 
-    await act(async () => {
-      await result.current.search('term');
-    });
+    act(() => result.current.setQuery('te'));
+    act(() => result.current.setQuery('term '));
 
     expect(result.current.searchQuery).toBe('term');
-    expect(result.current.articles.map((a) => a.id)).toEqual(['s1', 's2']);
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1', 's2']));
+    expect(searchSpy).toHaveBeenCalledTimes(1);
+    expect(searchSpy).toHaveBeenCalledWith(expect.objectContaining({ q: 'term' }));
   });
 
   it('scopes search to the list the hook was given', async () => {
@@ -121,11 +122,11 @@ describe('useCursorArticleList', () => {
 
     const { result } = renderHook(() => useCursorArticleList({ fetchPage, list: 'feed' }));
 
-    await act(async () => {
-      await result.current.search('term');
-    });
+    act(() => result.current.setQuery('term'));
 
-    expect(searchSpy).toHaveBeenCalledWith(expect.objectContaining({ q: 'term', list: 'feed' }));
+    await waitFor(() =>
+      expect(searchSpy).toHaveBeenCalledWith(expect.objectContaining({ q: 'term', list: 'feed' })),
+    );
   });
 
   it('clears the refreshing indicator after a pull-to-refresh during search', async () => {
@@ -134,14 +135,61 @@ describe('useCursorArticleList', () => {
 
     const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
 
-    await act(async () => {
-      await result.current.search('term');
-    });
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
 
     await act(async () => {
       result.current.handleRefresh();
     });
 
     await waitFor(() => expect(result.current.refreshing).toBe(false));
+  });
+
+  it('closing search restores the list at once, then refreshes it without a spinner', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'b'], 'c1', true));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page([], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+
+    act(() => result.current.openSearch());
+    act(() => result.current.setQuery('nothing'));
+    await waitFor(() => expect(result.current.articles).toEqual([]));
+
+    fetchPage.mockClear();
+    fetchPage.mockResolvedValue(page(['a', 'b', 'new'], 'c2', true));
+    act(() => result.current.closeSearch());
+
+    expect(result.current.searchOpen).toBe(false);
+    expect(result.current.searchQuery).toBeNull();
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']);
+    expect(result.current.loading).toBe(false);
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b', 'new']));
+    expect(fetchPage).toHaveBeenCalledWith(undefined);
+  });
+
+  it('a list reload during search updates what search restores, not the results', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a'], '', false));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+
+    fetchPage.mockResolvedValue(page(['a', 'fresh'], '', false));
+    await act(async () => {
+      await result.current.load(true);
+    });
+    expect(result.current.articles.map((a) => a.id)).toEqual(['s1']);
+
+    fetchPage.mockReturnValue(new Promise(() => {}));
+    act(() => result.current.setQuery(''));
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'fresh']);
   });
 });

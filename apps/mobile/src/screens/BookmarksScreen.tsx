@@ -2,8 +2,6 @@ import React, { useCallback, useState } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
-import { IconButton } from '../components/common/IconButton';
-import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
@@ -13,7 +11,6 @@ type BookmarksScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Bo
 
 export const BookmarksScreen: React.FC = () => {
   const navigation = useNavigation<BookmarksScreenNavigationProp>();
-  const [searchVisible, setSearchVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPage = useCallback(
@@ -42,10 +39,13 @@ export const BookmarksScreen: React.FC = () => {
     setLoading,
     refreshing,
     loadingMore,
+    searchOpen,
+    query,
+    setQuery,
     searchQuery,
+    openSearch,
+    closeSearch,
     load,
-    search,
-    clearSearch,
     handleRefresh,
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError });
@@ -71,34 +71,28 @@ export const BookmarksScreen: React.FC = () => {
     navigation.navigate('ArticleDetail', { article });
   };
 
-  const headerActions = (
-    <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
-  );
-
   return (
-    <>
-      <ArticleListScreen
-        title="Bookmarks"
-        articles={articles}
-        loading={loading}
-        onBack={() => navigation.goBack()}
-        headerActions={headerActions}
-        onArticlePress={handleArticlePress}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        emptyMessage={searchQuery ? 'No matching articles' : 'No bookmarked articles yet'}
-        onEndReached={handleLoadMore}
-        loadingMore={loadingMore}
-        searchQuery={searchQuery ?? undefined}
-        onClearSearch={clearSearch}
-        error={error}
-        onRetry={() => load(true)}
-      />
-      <SearchModal
-        visible={searchVisible}
-        onClose={() => setSearchVisible(false)}
-        onSearch={search}
-      />
-    </>
+    <ArticleListScreen
+      title="Bookmarks"
+      articles={articles}
+      loading={loading}
+      onBack={() => navigation.goBack()}
+      onArticlePress={handleArticlePress}
+      onRefresh={handleRefresh}
+      refreshing={refreshing}
+      emptyMessage={searchQuery ? 'No matching articles' : 'No bookmarked articles yet'}
+      onEndReached={handleLoadMore}
+      loadingMore={loadingMore}
+      search={{
+        open: searchOpen,
+        query,
+        onChangeQuery: setQuery,
+        onOpen: openSearch,
+        onClose: closeSearch,
+        placeholder: 'Search your bookmarks',
+      }}
+      error={error}
+      onRetry={() => load(true)}
+    />
   );
 };

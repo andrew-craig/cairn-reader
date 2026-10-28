@@ -5,7 +5,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { AddLinkModal } from '../components/AddLinkModal';
-import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
@@ -24,7 +23,6 @@ type ReadsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTa
 export const ReadsScreen: React.FC = () => {
   const navigation = useNavigation<ReadsScreenNavigationProp>();
   const [modalVisible, setModalVisible] = useState(false);
-  const [searchVisible, setSearchVisible] = useState(false);
   const [isStale, setIsStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,10 +70,13 @@ export const ReadsScreen: React.FC = () => {
     setLoading,
     refreshing,
     loadingMore,
+    searchOpen,
+    query,
+    setQuery,
     searchQuery,
+    openSearch,
+    closeSearch,
     load,
-    search,
-    clearSearch,
     handleRefresh,
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'reads' });
@@ -130,10 +131,7 @@ export const ReadsScreen: React.FC = () => {
   };
 
   const headerActions = (
-    <>
-      <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
-      <IconButton icon="add-outline" onPress={() => setModalVisible(true)} accessibilityLabel="Add link" />
-    </>
+    <IconButton icon="add-outline" onPress={() => setModalVisible(true)} accessibilityLabel="Add link" />
   );
 
   return (
@@ -149,8 +147,14 @@ export const ReadsScreen: React.FC = () => {
         emptyMessage={searchQuery ? 'No matching articles' : 'No saved articles yet'}
         onEndReached={handleLoadMore}
         loadingMore={loadingMore}
-        searchQuery={searchQuery ?? undefined}
-        onClearSearch={clearSearch}
+        search={{
+          open: searchOpen,
+          query,
+          onChangeQuery: setQuery,
+          onOpen: openSearch,
+          onClose: closeSearch,
+          placeholder: 'Search your reads',
+        }}
         staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
         error={error}
         onRetry={() => load(true)}
@@ -159,11 +163,6 @@ export const ReadsScreen: React.FC = () => {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onSuccess={handleRefresh}
-      />
-      <SearchModal
-        visible={searchVisible}
-        onClose={() => setSearchVisible(false)}
-        onSearch={search}
       />
     </>
   );

@@ -145,7 +145,7 @@ The sub-sections of the You page (Account, RSS, Newsletters, Bookmarks, About) w
 | `/you/bookmarks` | `BookmarksScreen` | Saved/bookmarked items |
 | `/you/about` | `AboutScreen` | About |
 | Add-link modal | `AddArticleScreen` / `AddLinkModal` | Add a URL (page or feed) |
-| Search (inline) | `SearchModal` | Search saved content |
+| Search (inline) | `HeaderSearch` (in `ScreenHeader`) | Live search of the current list |
 
 Add-link presents as a **modal/overlay** on web, matching mobile; search is an inline field in the list header. Implementation of these should be lightweight as they will be improved as a fast follow.
 
