@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { Article } from '../types';
 import { ReadService } from '../services/read';
@@ -6,6 +6,9 @@ import { ContentList, UserContentsListResponse } from '@cairn/shared';
 
 /** Reading-list / bookmarks page size. */
 export const PAGE_SIZE = 20;
+
+/** Live search fires this long after the user stops typing (matches web). */
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface CursorArticleListSource {
   /** Fetch one page. `cursor` is undefined for the first page. */
@@ -24,8 +27,11 @@ interface CursorArticleListSource {
 /**
  * The cursor-paginated article-list state machine shared by the Reads, Feed and
  * Bookmarks screens: items + cursor + hasMore + loading/loadingMore/refreshing,
- * reset-vs-append, and the search overlay (both screens search via
- * ReadService.searchUserContents). Screen-specific concerns — cache priming,
+ * reset-vs-append, and the header search: open state, query, and a debounced
+ * live search via ReadService.searchUserContents. Results replace the list
+ * while a query is held; clearing it restores the pre-search list at once and
+ * refreshes it quietly, so the screen never swaps to a full-screen spinner
+ * under the search field. Screen-specific concerns — cache priming,
  * stale banners, focus-refetch TTL, archive mutation — stay in the screens and
  * use the exposed `setArticles` / `setLoading` / `load`.
  *
@@ -44,21 +50,48 @@ export function useCursorArticleList({
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchQuery = query.trim() || null;
+  // Read after a search response lands: a response for any other query is stale.
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
 
   const cursorRef = useRef<string>('');
+  const articlesRef = useRef<Article[]>(articles);
+  articlesRef.current = articles;
+  const hasMoreRef = useRef(hasMore);
+  hasMoreRef.current = hasMore;
+  // The list as it was when the current search started; null when no search
+  // results are showing.
+  const preSearchRef = useRef<{ articles: Article[]; cursor: string; hasMore: boolean } | null>(null);
+  // True while a quiet reset is in flight: it has blanked the cursor without
+  // setting `loading`, so load-more must wait for it.
+  const quietResetRef = useRef(false);
 
   const load = useCallback(
-    async (reset = false) => {
+    async (reset = false, quiet = false) => {
       try {
-        if (reset) {
+        // A quiet reset keeps the restored cursor until its page lands, so a
+        // failure leaves load-more continuing the list on screen.
+        if (reset && quiet) {
+          quietResetRef.current = true;
+        } else if (reset) {
           setLoading(true);
           cursorRef.current = '';
           setHasMore(true);
         }
 
-        const response = await fetchPage(cursorRef.current || undefined);
+        const response = await fetchPage(reset ? undefined : cursorRef.current || undefined);
         const page = response.contents.map((c) => ReadService.transformToArticle(c));
+
+        // A reset that lands while search results are showing refreshes the
+        // list they will restore to, rather than replacing the results.
+        if (reset && preSearchRef.current) {
+          preSearchRef.current = { articles: page, cursor: response.cursor, hasMore: response.has_more };
+          onResetLoaded?.(page);
+          return;
+        }
 
         if (reset) {
           setArticles(page);
@@ -76,48 +109,82 @@ export function useCursorArticleList({
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
+        if (reset && quiet) quietResetRef.current = false;
       }
     },
     [fetchPage, onResetLoaded, onLoadError],
   );
 
-  const search = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    setLoading(true);
-    setHasMore(false);
-
-    try {
-      const response = await ReadService.searchUserContents({ q: query, limit: PAGE_SIZE, list });
-      setArticles(response.contents.map((c) => ReadService.transformToArticle(c)));
-      cursorRef.current = '';
-      setHasMore(false);
-    } catch (error) {
-      console.error('Error searching articles:', error);
-      Alert.alert('Error', 'Failed to search articles. Please try again.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  // Saves the list search results are about to replace, once per search.
+  const savePreSearchList = useCallback(() => {
+    if (!preSearchRef.current) {
+      preSearchRef.current = {
+        articles: articlesRef.current,
+        cursor: cursorRef.current,
+        hasMore: hasMoreRef.current,
+      };
     }
-  }, [list]);
+  }, []);
 
-  const clearSearch = useCallback(() => {
-    setSearchQuery(null);
-    setArticles([]);
-    cursorRef.current = '';
-    void load(true);
-  }, [load]);
+  const runSearch = useCallback(
+    async (q: string) => {
+      try {
+        const response = await ReadService.searchUserContents({ q, limit: PAGE_SIZE, list });
+        if (q !== searchQueryRef.current) return;
+        setArticles(response.contents.map((c) => ReadService.transformToArticle(c)));
+        cursorRef.current = '';
+        setHasMore(false);
+      } catch (error) {
+        if (q !== searchQueryRef.current) return;
+        console.error('Error searching articles:', error);
+        Alert.alert('Error', 'Failed to search articles. Please try again.');
+      } finally {
+        if (q === searchQueryRef.current) setRefreshing(false);
+      }
+    },
+    [list],
+  );
+
+  useEffect(() => {
+    if (!searchQuery) {
+      const saved = preSearchRef.current;
+      if (saved) {
+        preSearchRef.current = null;
+        setArticles(saved.articles);
+        cursorRef.current = saved.cursor;
+        setHasMore(saved.hasMore);
+        void load(true, true);
+      }
+      return;
+    }
+
+    const timerId = setTimeout(() => {
+      savePreSearchList();
+      void runSearch(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timerId);
+  }, [searchQuery, savePreSearchList, runSearch, load]);
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false);
+    setQuery('');
+  }, []);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     if (searchQuery) {
-      void search(searchQuery);
+      savePreSearchList();
+      void runSearch(searchQuery);
     } else {
       void load(true);
     }
-  }, [searchQuery, search, load]);
+  }, [searchQuery, savePreSearchList, runSearch, load]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !loading && !searchQuery) {
+    if (!loadingMore && hasMore && !loading && !searchQuery && !quietResetRef.current) {
       setLoadingMore(true);
       void load(false);
     }
@@ -131,10 +198,13 @@ export function useCursorArticleList({
     refreshing,
     loadingMore,
     hasMore,
+    searchOpen,
+    query,
+    setQuery,
     searchQuery,
+    openSearch,
+    closeSearch,
     load,
-    search,
-    clearSearch,
     handleRefresh,
     handleLoadMore,
   };

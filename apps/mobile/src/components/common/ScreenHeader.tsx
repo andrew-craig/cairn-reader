@@ -1,14 +1,17 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlobalStyles } from '../../constants/globalStyles';
 import { Colors, Spacing } from '../../constants/theme';
+import { HeaderSearch, HeaderSearchProps } from './HeaderSearch';
 
 interface ScreenHeaderProps {
   title: string;
   onBack?: () => void;
   rightActions?: ReactNode;
+  /** Adds the header search; its open pill covers the title. */
+  search?: HeaderSearchProps;
 }
 
 const BackButton: React.FC<{ onPress: () => void; color: string }> = ({ onPress, color }) => (
@@ -29,10 +32,13 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
   title,
   onBack,
   rightActions,
+  search,
 }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
   const insets = useSafeAreaInsets();
+  // Where the title starts within the header; the open search pill grows to it.
+  const [titleX, setTitleX] = useState(0);
 
   return (
     <View
@@ -47,8 +53,20 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
     >
       <View style={GlobalStyles.headerLeft}>
         {onBack && <BackButton onPress={onBack} color={colors.text} />}
-        <Text style={[GlobalStyles.headerTitle, { color: colors.text }]}>{title}</Text>
+        <Text
+          style={[GlobalStyles.headerTitle, { color: colors.text }]}
+          onLayout={(e) => setTitleX(e.nativeEvent.layout.x)}
+        >
+          {title}
+        </Text>
       </View>
+      {search && (
+        <HeaderSearch
+          {...search}
+          leftEdge={Spacing.md + titleX}
+          style={rightActions ? styles.searchBeforeActions : undefined}
+        />
+      )}
       {rightActions && (
         <View style={GlobalStyles.headerRight}>{rightActions}</View>
       )}
@@ -57,6 +75,9 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
+  searchBeforeActions: {
+    marginRight: Spacing.sm,
+  },
   backButton: {
     width: 42,
     height: 42,

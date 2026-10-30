@@ -3,8 +3,6 @@ import { Alert } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
-import { IconButton } from '../components/common/IconButton';
-import { SearchModal } from '../components/SearchModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
@@ -23,7 +21,6 @@ type FeedScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTab
  */
 export const FeedScreen: React.FC = () => {
   const navigation = useNavigation<FeedScreenNavigationProp>();
-  const [searchVisible, setSearchVisible] = useState(false);
   const [isStale, setIsStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,10 +58,13 @@ export const FeedScreen: React.FC = () => {
     setLoading,
     refreshing,
     loadingMore,
+    searchOpen,
+    query,
+    setQuery,
     searchQuery,
+    openSearch,
+    closeSearch,
     load,
-    search,
-    clearSearch,
     handleRefresh,
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'feed' });
@@ -119,34 +119,28 @@ export const FeedScreen: React.FC = () => {
     });
   };
 
-  const headerActions = (
-    <IconButton icon="search-outline" onPress={() => setSearchVisible(true)} accessibilityLabel="Search" />
-  );
-
   return (
-    <>
-      <ArticleListScreen
-        title="Feed"
-        articles={articles}
-        loading={loading}
-        headerActions={headerActions}
-        onArticlePress={handleArticlePress}
-        onRefresh={handleRefresh}
-        refreshing={refreshing}
-        emptyMessage={searchQuery ? 'No matching articles' : 'Your Feed is empty'}
-        onEndReached={handleLoadMore}
-        loadingMore={loadingMore}
-        searchQuery={searchQuery ?? undefined}
-        onClearSearch={clearSearch}
-        staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
-        error={error}
-        onRetry={() => load(true)}
-      />
-      <SearchModal
-        visible={searchVisible}
-        onClose={() => setSearchVisible(false)}
-        onSearch={search}
-      />
-    </>
+    <ArticleListScreen
+      title="Feed"
+      articles={articles}
+      loading={loading}
+      onArticlePress={handleArticlePress}
+      onRefresh={handleRefresh}
+      refreshing={refreshing}
+      emptyMessage={searchQuery ? 'No matching articles' : 'Your Feed is empty'}
+      onEndReached={handleLoadMore}
+      loadingMore={loadingMore}
+      search={{
+        open: searchOpen,
+        query,
+        onChangeQuery: setQuery,
+        onOpen: openSearch,
+        onClose: closeSearch,
+        placeholder: 'Search your feed',
+      }}
+      staleMessage={isStale ? 'Showing cached data — pull to refresh' : undefined}
+      error={error}
+      onRetry={() => load(true)}
+    />
   );
 };

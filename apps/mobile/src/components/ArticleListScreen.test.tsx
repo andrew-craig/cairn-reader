@@ -112,23 +112,29 @@ describe('ArticleListScreen error state', () => {
     expect(screen.getByText('Showing cached data — pull to refresh')).toBeTruthy();
   });
 
-  it('suppresses the stale banner while a search is active', () => {
+  it('suppresses the stale banner while the search field is open', () => {
     render(
       <ArticleListScreen
         title="Read"
         articles={[article]}
         loading={false}
         staleMessage="Showing cached data — pull to refresh"
-        searchQuery="whatever"
-        onClearSearch={() => {}}
+        search={{
+          open: true,
+          query: 'whatever',
+          onChangeQuery: () => {},
+          onOpen: () => {},
+          onClose: () => {},
+          placeholder: 'Search your reads',
+        }}
       />,
     );
 
     expect(screen.queryByText('Showing cached data — pull to refresh')).toBeNull();
-    expect(screen.getByText('Results for "whatever"')).toBeTruthy();
+    expect(screen.getByDisplayValue('whatever')).toBeTruthy();
   });
 
-  it('shows empty search results (not the error state) when a search is active', () => {
+  it('shows empty search results (not the error state) while the search field is open', () => {
     render(
       <ArticleListScreen
         title="Read"
@@ -136,8 +142,14 @@ describe('ArticleListScreen error state', () => {
         loading={false}
         error="Couldn't load your reading list."
         onRetry={() => {}}
-        searchQuery="whatever"
-        onClearSearch={() => {}}
+        search={{
+          open: true,
+          query: 'whatever',
+          onChangeQuery: () => {},
+          onOpen: () => {},
+          onClose: () => {},
+          placeholder: 'Search your reads',
+        }}
         emptyMessage="No matching articles"
       />,
     );
@@ -145,5 +157,25 @@ describe('ArticleListScreen error state', () => {
     expect(screen.queryByText("Couldn't load your reading list.")).toBeNull();
     expect(screen.queryByLabelText('Retry loading')).toBeNull();
     expect(screen.getByText('No matching articles')).toBeTruthy();
+  });
+
+  it('keeps the header (and search field) mounted while loading with the search open', () => {
+    render(
+      <ArticleListScreen
+        title="Read"
+        articles={[]}
+        loading
+        search={{
+          open: true,
+          query: 'whatever',
+          onChangeQuery: () => {},
+          onOpen: () => {},
+          onClose: () => {},
+          placeholder: 'Search your reads',
+        }}
+      />,
+    );
+
+    expect(screen.getByDisplayValue('whatever')).toBeTruthy();
   });
 });
