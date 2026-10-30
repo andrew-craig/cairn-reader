@@ -53,6 +53,9 @@ export function useCursorArticleList({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const searchQuery = query.trim() || null;
+  // Read after a search response lands: a response for any other query is stale.
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
 
   const cursorRef = useRef<string>('');
   const articlesRef = useRef<Article[]>(articles);
@@ -62,12 +65,16 @@ export function useCursorArticleList({
   // The list as it was when the current search started; null when no search
   // results are showing.
   const preSearchRef = useRef<{ articles: Article[]; cursor: string; hasMore: boolean } | null>(null);
+  // True while a quiet reset is in flight: it has blanked the cursor without
+  // setting `loading`, so load-more must wait for it.
+  const quietResetRef = useRef(false);
 
   const load = useCallback(
     async (reset = false, quiet = false) => {
       try {
         if (reset) {
-          if (!quiet) setLoading(true);
+          if (quiet) quietResetRef.current = true;
+          else setLoading(true);
           cursorRef.current = '';
           setHasMore(true);
         }
@@ -99,25 +106,37 @@ export function useCursorArticleList({
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
+        if (reset && quiet) quietResetRef.current = false;
       }
     },
     [fetchPage, onResetLoaded, onLoadError],
   );
 
+  // Saves the list search results are about to replace, once per search.
+  const savePreSearchList = useCallback(() => {
+    if (!preSearchRef.current) {
+      preSearchRef.current = {
+        articles: articlesRef.current,
+        cursor: cursorRef.current,
+        hasMore: hasMoreRef.current,
+      };
+    }
+  }, []);
+
   const runSearch = useCallback(
-    async (q: string, isCancelled: () => boolean = () => false) => {
+    async (q: string) => {
       try {
         const response = await ReadService.searchUserContents({ q, limit: PAGE_SIZE, list });
-        if (isCancelled()) return;
+        if (q !== searchQueryRef.current) return;
         setArticles(response.contents.map((c) => ReadService.transformToArticle(c)));
         cursorRef.current = '';
         setHasMore(false);
       } catch (error) {
-        if (isCancelled()) return;
+        if (q !== searchQueryRef.current) return;
         console.error('Error searching articles:', error);
         Alert.alert('Error', 'Failed to search articles. Please try again.');
       } finally {
-        if (!isCancelled()) setRefreshing(false);
+        setRefreshing(false);
       }
     },
     [list],
@@ -136,23 +155,13 @@ export function useCursorArticleList({
       return;
     }
 
-    let cancelled = false;
     const timerId = setTimeout(() => {
-      if (!preSearchRef.current) {
-        preSearchRef.current = {
-          articles: articlesRef.current,
-          cursor: cursorRef.current,
-          hasMore: hasMoreRef.current,
-        };
-      }
-      void runSearch(searchQuery, () => cancelled);
+      savePreSearchList();
+      void runSearch(searchQuery);
     }, SEARCH_DEBOUNCE_MS);
 
-    return () => {
-      cancelled = true;
-      clearTimeout(timerId);
-    };
-  }, [searchQuery, runSearch, load]);
+    return () => clearTimeout(timerId);
+  }, [searchQuery, savePreSearchList, runSearch, load]);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
 
@@ -164,14 +173,15 @@ export function useCursorArticleList({
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     if (searchQuery) {
+      savePreSearchList();
       void runSearch(searchQuery);
     } else {
       void load(true);
     }
-  }, [searchQuery, runSearch, load]);
+  }, [searchQuery, savePreSearchList, runSearch, load]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !loading && !searchQuery) {
+    if (!loadingMore && hasMore && !loading && !searchQuery && !quietResetRef.current) {
       setLoadingMore(true);
       void load(false);
     }

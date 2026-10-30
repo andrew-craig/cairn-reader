@@ -132,6 +132,8 @@ export const HeaderSearch: React.FC<
         <Animated.View
           style={[StyleSheet.absoluteFill, { opacity: input }]}
           pointerEvents={open ? 'auto' : 'none'}
+          accessibilityElementsHidden={!open}
+          importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
         >
           <TextInput
             ref={inputRef}

@@ -38,4 +38,9 @@ describe('HeaderSearch', () => {
     fireEvent.press(screen.getByLabelText('Search', { includeHiddenElements: true }));
     expect(props.onOpen).not.toHaveBeenCalled();
   });
+
+  it('hides the closed field from screen readers', () => {
+    renderSearch(false);
+    expect(screen.queryByLabelText('Search your reads')).toBeNull();
+  });
 });

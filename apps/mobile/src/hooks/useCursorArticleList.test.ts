@@ -192,4 +192,76 @@ describe('useCursorArticleList', () => {
     act(() => result.current.setQuery(''));
     expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'fresh']);
   });
+
+  it('drops a pull-to-refresh search response that lands after search closes', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'b'], 'c1', true));
+    const searchSpy = jest
+      .spyOn(ReadService, 'searchUserContents')
+      .mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+
+    let resolveRefresh!: (r: ReturnType<typeof page>) => void;
+    searchSpy.mockReturnValue(new Promise((r) => (resolveRefresh = r)));
+    act(() => result.current.handleRefresh());
+    act(() => result.current.closeSearch());
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']));
+
+    await act(async () => resolveRefresh(page(['late'], '', false)));
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']);
+    expect(result.current.refreshing).toBe(false);
+  });
+
+  it('a pull-to-refresh inside the debounce still restores the pre-search list', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'b'], 'c1', true));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+
+    act(() => result.current.setQuery('term'));
+    await act(async () => {
+      result.current.handleRefresh();
+    });
+    expect(result.current.articles.map((a) => a.id)).toEqual(['s1']);
+    // Let the debounce timer fire after the refresh already showed results.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 350));
+    });
+
+    fetchPage.mockReturnValue(new Promise(() => {}));
+    act(() => result.current.setQuery(''));
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']);
+  });
+
+  it('holds load-more while the quiet reload after search is in flight', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'b'], 'c1', true));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+
+    let resolveReset!: (r: ReturnType<typeof page>) => void;
+    fetchPage.mockClear();
+    fetchPage.mockReturnValueOnce(new Promise((r) => (resolveReset = r)));
+    act(() => result.current.closeSearch());
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.handleLoadMore());
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveReset(page(['a', 'b'], 'c1', true)));
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']);
+  });
 });
