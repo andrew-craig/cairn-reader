@@ -49,7 +49,7 @@ Framework-agnostic code shared with the web app (npm workspace, consumed as sour
 ## Architecture and Patterns
 
 ### Navigation
-React Navigation stack + bottom tabs. **Explore was removed; the tabs are Feed, Reads, You.**
+React Navigation stack + bottom tabs. **Explore was removed; the tabs are Feed, Reads, You.** The app opens on Reads (`initialRouteName`).
 
 ```
 RootNavigator (Stack)               src/navigation/RootNavigator.tsx
