@@ -20,7 +20,7 @@ jest.mock('../screens', () => {
 
 // Same safe-area-context mock gap as RootNavigator.test.tsx keeps the real
 // bottom-tabs navigator from rendering here, so it is stubbed to list the
-// declared screens and render the first (the initial tab).
+// declared screens and render the initial tab (initialRouteName, else the first).
 jest.mock('@react-navigation/bottom-tabs', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Text } = require('react-native');
@@ -28,12 +28,19 @@ jest.mock('@react-navigation/bottom-tabs', () => {
   const ReactModule = require('react');
   return {
     createBottomTabNavigator: () => ({
-      Navigator: ({ children }: { children: React.ReactNode }) => {
+      Navigator: ({
+        children,
+        initialRouteName,
+      }: {
+        children: React.ReactNode;
+        initialRouteName?: string;
+      }) => {
         const screens = ReactModule.Children.toArray(children) as React.ReactElement<{
           name: string;
           component: React.ComponentType;
         }>[];
-        const Initial = screens[0].props.component;
+        const Initial = (screens.find((s) => s.props.name === initialRouteName) ?? screens[0]).props
+          .component;
         return ReactModule.createElement(
           ReactModule.Fragment,
           null,
@@ -53,9 +60,9 @@ describe('TabNavigator', () => {
     expect(screen.getByText('tabs:Feed,Reads,You')).toBeTruthy();
   });
 
-  it('opens on the Feed tab', () => {
+  it('opens on the Reads tab', () => {
     render(<TabNavigator />);
 
-    expect(screen.getByText('screen:Feed')).toBeTruthy();
+    expect(screen.getByText('screen:Reads')).toBeTruthy();
   });
 });

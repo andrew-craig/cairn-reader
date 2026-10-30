@@ -13,6 +13,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 export const TabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
+      initialRouteName="Reads"
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
