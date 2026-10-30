@@ -264,4 +264,51 @@ describe('useCursorArticleList', () => {
     await act(async () => resolveReset(page(['a', 'b'], 'c1', true)));
     expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']);
   });
+
+  it('a stale refresh response leaves the spinner for the newer search', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page([], '', false));
+    const searchSpy = jest
+      .spyOn(ReadService, 'searchUserContents')
+      .mockResolvedValue(page(['s1'], '', false));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    act(() => result.current.setQuery('old'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+
+    let resolveOld!: (r: ReturnType<typeof page>) => void;
+    searchSpy.mockReturnValueOnce(new Promise((r) => (resolveOld = r)));
+    act(() => result.current.handleRefresh());
+    act(() => result.current.setQuery('new'));
+
+    await act(async () => resolveOld(page(['stale'], '', false)));
+    expect(result.current.refreshing).toBe(true);
+    expect(result.current.articles.map((a) => a.id)).toEqual(['s1']);
+  });
+
+  it('a failed quiet reload leaves load-more continuing the restored list', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'b'], 'c1', true));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage }));
+    await act(async () => {
+      await result.current.load(true);
+    });
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+
+    fetchPage.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => {
+      result.current.closeSearch();
+    });
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b']));
+
+    fetchPage.mockClear();
+    fetchPage.mockResolvedValue(page(['c'], '', false));
+    await act(async () => {
+      result.current.handleLoadMore();
+    });
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['a', 'b', 'c']));
+    expect(fetchPage).toHaveBeenCalledWith('c1');
+  });
 });

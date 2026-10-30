@@ -72,14 +72,17 @@ export function useCursorArticleList({
   const load = useCallback(
     async (reset = false, quiet = false) => {
       try {
-        if (reset) {
-          if (quiet) quietResetRef.current = true;
-          else setLoading(true);
+        // A quiet reset keeps the restored cursor until its page lands, so a
+        // failure leaves load-more continuing the list on screen.
+        if (reset && quiet) {
+          quietResetRef.current = true;
+        } else if (reset) {
+          setLoading(true);
           cursorRef.current = '';
           setHasMore(true);
         }
 
-        const response = await fetchPage(cursorRef.current || undefined);
+        const response = await fetchPage(reset ? undefined : cursorRef.current || undefined);
         const page = response.contents.map((c) => ReadService.transformToArticle(c));
 
         // A reset that lands while search results are showing refreshes the
@@ -136,7 +139,7 @@ export function useCursorArticleList({
         console.error('Error searching articles:', error);
         Alert.alert('Error', 'Failed to search articles. Please try again.');
       } finally {
-        setRefreshing(false);
+        if (q === searchQueryRef.current) setRefreshing(false);
       }
     },
     [list],
