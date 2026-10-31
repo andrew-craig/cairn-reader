@@ -7,19 +7,24 @@ import { SwipeToArchive, ARCHIVE_THRESHOLD } from './SwipeToArchive';
 
 const ROW_WIDTH = 400;
 
-// Swipeable sizes its action panel from layout events, which jest never emits.
+// Swipeable sizes its action panel from layout events, which jest never emits,
+// so the test fires them by hand. Which nodes carry `onLayout` is internal to
+// react-native-gesture-handler's Swipeable (written against 2.28): the first is
+// the row container, the last the action panel's left-edge marker. The length
+// guard makes a gesture-handler upgrade that reshapes that tree fail here,
+// rather than as a misleading "did not archive".
 const renderRow = (onArchive: () => void) => {
   const utils = render(
     <SwipeToArchive onArchive={onArchive}>
       <Text>Row</Text>
     </SwipeToArchive>,
   );
-  const row = screen.UNSAFE_root.findAll(
+  const layoutNodes = screen.UNSAFE_root.findAll(
     (node: { props: Record<string, unknown> }) => typeof node.props.onLayout === 'function',
   );
-  // First onLayout is the row container; the last is the action panel's left-edge marker.
-  fireEvent(row[0], 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: ROW_WIDTH, height: 80 } } });
-  fireEvent(row[row.length - 1], 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 0, height: 0 } } });
+  expect(layoutNodes).toHaveLength(5);
+  fireEvent(layoutNodes[0], 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: ROW_WIDTH, height: 80 } } });
+  fireEvent(layoutNodes[layoutNodes.length - 1], 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 0, height: 0 } } });
   return utils;
 };
 

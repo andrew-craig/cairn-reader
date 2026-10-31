@@ -84,8 +84,8 @@ export const ReadsScreen: React.FC = () => {
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'reads' });
 
-  // Mirror the current list so the archive mutation can compute the next list
-  // (and persist it) without a side effect inside a state updater.
+  // Mirror the current list so the stable archive callback (also handed to the
+  // reader) computes the next list from the latest articles.
   const articlesRef = useRef<Article[]>(articles);
   articlesRef.current = articles;
 
@@ -117,8 +117,9 @@ export const ReadsScreen: React.FC = () => {
   const handleArticleArchived = useCallback(
     (articleId: string) => {
       const next = articlesRef.current.filter((a) => a.id !== articleId);
+      // The store row is removed by ArticleMutations.archive, which every
+      // caller runs alongside this list update.
       setArticles(next);
-      void ArticleStore.remove(articleId);
     },
     [setArticles],
   );
