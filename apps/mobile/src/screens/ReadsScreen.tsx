@@ -1,13 +1,16 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
+import { ArticleRow } from '../components/common/ArticleRow';
+import { SwipeToArchive } from '../components/common/SwipeToArchive';
 import { AddLinkModal } from '../components/AddLinkModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
+import { ArticleMutations } from '../services/articleMutations';
 import { SyncTrigger } from '../services/syncTrigger';
 import { readsInvalidatedSince } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
@@ -120,6 +123,16 @@ export const ReadsScreen: React.FC = () => {
     [setArticles],
   );
 
+  const handleSwipeArchive = (articleId: string) => {
+    // Collapse the gap the swiped-away row leaves behind.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    handleArticleArchived(articleId);
+    ArticleMutations.archive(articleId).catch((error) => {
+      console.error('Failed to archive article:', error);
+      Alert.alert('Error', 'Failed to archive article');
+    });
+  };
+
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex((a) => a.id === article.id);
     navigation.navigate('ArticleDetail', {
@@ -141,7 +154,11 @@ export const ReadsScreen: React.FC = () => {
         articles={articles}
         loading={loading}
         headerActions={headerActions}
-        onArticlePress={handleArticlePress}
+        renderItem={(article) => (
+          <SwipeToArchive onArchive={() => handleSwipeArchive(article.id)}>
+            <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
+          </SwipeToArchive>
+        )}
         onRefresh={handleRefresh}
         refreshing={refreshing}
         emptyMessage={searchQuery ? 'No matching articles' : 'No saved articles yet'}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform, useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import {
@@ -43,20 +44,22 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <AuthProvider>
-          <NavigationContainer>
-            <RootNavigator />
-            <TopBlurGradient />
-            <StatusBar
-              style={colorScheme === 'dark' ? 'light' : 'dark'}
-              translucent={Platform.OS === 'android'}
-              backgroundColor="transparent"
-            />
-          </NavigationContainer>
-        </AuthProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <NavigationContainer>
+              <RootNavigator />
+              <TopBlurGradient />
+              <StatusBar
+                style={colorScheme === 'dark' ? 'light' : 'dark'}
+                translucent={Platform.OS === 'android'}
+                backgroundColor="transparent"
+              />
+            </NavigationContainer>
+          </AuthProvider>
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
