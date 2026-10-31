@@ -1,13 +1,16 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
+import { ArticleRow } from '../components/common/ArticleRow';
+import { SwipeToArchive } from '../components/common/SwipeToArchive';
 import { AddLinkModal } from '../components/AddLinkModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
+import { ArticleMutations } from '../services/articleMutations';
 import { SyncTrigger } from '../services/syncTrigger';
 import { readsInvalidatedSince } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
@@ -81,8 +84,8 @@ export const ReadsScreen: React.FC = () => {
     handleLoadMore,
   } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'reads' });
 
-  // Mirror the current list so the archive mutation can compute the next list
-  // (and persist it) without a side effect inside a state updater.
+  // Mirror the current list so the stable archive callback (also handed to the
+  // reader) computes the next list from the latest articles.
   const articlesRef = useRef<Article[]>(articles);
   articlesRef.current = articles;
 
@@ -114,11 +117,22 @@ export const ReadsScreen: React.FC = () => {
   const handleArticleArchived = useCallback(
     (articleId: string) => {
       const next = articlesRef.current.filter((a) => a.id !== articleId);
+      // The store row is removed by ArticleMutations.archive, which every
+      // caller runs alongside this list update.
       setArticles(next);
-      void ArticleStore.remove(articleId);
     },
     [setArticles],
   );
+
+  const handleSwipeArchive = (articleId: string) => {
+    // Collapse the gap the swiped-away row leaves behind.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    handleArticleArchived(articleId);
+    ArticleMutations.archive(articleId).catch((error) => {
+      console.error('Failed to archive article:', error);
+      Alert.alert('Error', 'Failed to archive article');
+    });
+  };
 
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex((a) => a.id === article.id);
@@ -141,7 +155,11 @@ export const ReadsScreen: React.FC = () => {
         articles={articles}
         loading={loading}
         headerActions={headerActions}
-        onArticlePress={handleArticlePress}
+        renderItem={(article) => (
+          <SwipeToArchive onArchive={() => handleSwipeArchive(article.id)}>
+            <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
+          </SwipeToArchive>
+        )}
         onRefresh={handleRefresh}
         refreshing={refreshing}
         emptyMessage={searchQuery ? 'No matching articles' : 'No saved articles yet'}

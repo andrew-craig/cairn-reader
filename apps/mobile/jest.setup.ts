@@ -3,3 +3,5 @@
 // startup. Tests never import that entry point, so wire the same AsyncStorage
 // adapter (itself mocked via jest.config moduleNameMapper) here.
 import './src/config/init';
+
+import 'react-native-gesture-handler/jestSetup';
