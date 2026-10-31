@@ -9,7 +9,7 @@ blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-10-30T10:19:00Z
-updated_at: 2026-10-30T10:24:48Z
+updated_at: 2026-10-31T00:49:07Z
 ---
 Each TestFlight upload shows 'Missing Compliance' and requires answering the encryption questions in App Store Connect. Set ios.config.usesNonExemptEncryption=false in apps/mobile/app.json so expo prebuild writes ITSAppUsesNonExemptEncryption=false into Info.plist (CI regenerates ios/ with prebuild --clean, so the setting must live in app.json). Cairn only uses HTTPS via Apple's system networking, which is exempt.
 
@@ -25,3 +25,4 @@ Each TestFlight upload shows 'Missing Compliance' and requires answering the enc
 
 Validation (second pass): the app.json change was correct, but `apps/mobile/ios/` is committed and its Info.plist did not have the key, so only the two CI workflows (both run `expo prebuild --clean`) were covered. Added the key there too; `plistlib` parses it. Note: `expo config --type introspect` runs config mods and rewrites `project.pbxproj` and adds a `cairnreader.entitlements` in the committed ios/ as a side effect, so revert those after running it. The committed Info.plist is already out of date in other ways (e.g. `CFBundleDisplayName` is `cairnreader`, not `Cairn Reader`). That is left out of scope here.
 
+Review follow-up (PR #442): the reviewer said `ios.config.usesNonExemptEncryption` is a legacy ExpoKit field that prebuild ignores. That is wrong for SDK 54: `@expo/config-plugins` has `IOSConfig.UsesNonExemptEncryption.withUsesNonExemptEncryption`, which reads `ios.config.usesNonExemptEncryption` and is in `@expo/prebuild-config`'s default plugin chain. Running `npx expo prebuild --platform ios --clean --no-install` on a `git archive` copy writes `ITSAppUsesNonExemptEncryption = false` to the regenerated `ios/CairnReader/Info.plist`. No change needed.
