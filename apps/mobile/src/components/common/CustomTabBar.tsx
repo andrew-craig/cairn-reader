@@ -39,16 +39,14 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         },
       ]}
     >
-      <View style={styles.shadowWrapper}>
+      <View style={[styles.shadowWrapper, { shadowColor: colors.shadow }]}>
         <BlurView
           intensity={Platform.OS === 'ios' ? 10 : 20}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={[
             styles.tabBar,
             {
-              backgroundColor: colorScheme === 'dark'
-                ? 'rgba(28, 28, 30, 0.85)'
-                : 'rgba(251, 250, 249, 0.85)',
+              backgroundColor: colors.floating,
             },
           ]}
         >
@@ -119,13 +117,11 @@ const styles = StyleSheet.create({
   },
   shadowWrapper: {
     borderRadius: 32,
-    // Shadow matching Figma design: 0px 2px 4px 0px rgba(15, 23, 42, 0.2)
-    shadowColor: '#0F172A',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.2,
+    shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 4,
   },

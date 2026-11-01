@@ -43,10 +43,10 @@ export const SwipeToArchive: React.FC<SwipeToArchiveProps> = ({ children, onArch
       <View style={[styles.action, { backgroundColor: colors.success }]}>
         <View style={styles.icon}>
           <Animated.View style={{ opacity: outlineOpacity }}>
-            <ArchiveIcon size={ICON_SIZE} color="#FFFFFF" />
+            <ArchiveIcon size={ICON_SIZE} color={colors.onAccent} />
           </Animated.View>
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: solidOpacity }]}>
-            <ArchiveIcon size={ICON_SIZE} color="#FFFFFF" filled />
+            <ArchiveIcon size={ICON_SIZE} color={colors.onAccent} filled />
           </Animated.View>
         </View>
       </View>

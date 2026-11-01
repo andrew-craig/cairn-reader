@@ -3,13 +3,13 @@ import Svg, { Path } from 'react-native-svg';
 
 interface ArchiveIconProps {
   size?: number;
-  color?: string;
+  color: string;
   filled?: boolean;
 }
 
 export const ArchiveIcon: React.FC<ArchiveIconProps> = ({
   size = 24,
-  color = '#0F0C0B',
+  color,
   filled = false
 }) => {
   return (

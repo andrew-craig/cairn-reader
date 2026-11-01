@@ -4,6 +4,7 @@
   "workspaces": [
     "apps/web",
     "apps/shared",
-    "apps/mobile"
+    "apps/mobile",
+    "design/tokens"
   ]
 }

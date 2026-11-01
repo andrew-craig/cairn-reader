@@ -45,7 +45,7 @@
 
 .account-success {
   margin: 0;
-  color: var(--color-success, #22863a);
+  color: var(--color-success);
   font-size: var(--font-size-sm);
 }
 

@@ -1,21 +1,11 @@
-/* Cairn design system.
-   Token values mirror apps/mobile/src/constants/theme.ts exactly so the web and
-   mobile apps share one visual identity. Light is the default; the dark palette
-   is swapped in via prefers-color-scheme. Fonts (Inter for body/UI, Crimson Pro
-   for headings) are loaded from Google Fonts in index.html. */
-:root {
-  /* Colors — light (mirrors Colors.light) */
-  --color-primary: #0f0c0b;
-  --color-background: #fdfcfc;
-  --color-card: #fbfaf9;
-  --color-text: #0f0c0b;
-  --color-text-secondary: #696563;
-  --color-border: #f1efee;
-  --color-hover: #edeae9;
-  --color-success: #34c759;
-  --color-error: #c63e06;
-  --color-warning: #ff9500;
+/* Cairn design system. Light is the default; the dark palette is swapped in via
+   prefers-color-scheme. Colors are generated from design/tokens/colors.json
+   (shared with the mobile app) into theme/colors.css; never hardcode a color.
+   Fonts (Inter for body/UI, Crimson Pro for headings) are loaded from Google
+   Fonts in index.html. */
+@import './theme/colors.css';
 
+:root {
   /* Spacing (mirrors Spacing) */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -55,18 +45,6 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Colors — dark (mirrors Colors.dark) */
-    --color-primary: #fdfcfc;
-    --color-background: hsl(40, 21%, 9%);
-    --color-card: hsl(40, 13%, 13%);
-    --color-text: hsl(40, 21%, 88%);
-    --color-text-secondary: hsl(40, 4%, 68%);
-    --color-border: #38383a;
-    --color-hover: #2c2c2e;
-    --color-success: #30d158;
-    --color-error: #ff453a;
-    --color-warning: #ff9f0a;
-
     color-scheme: dark;
   }
 }

@@ -3,13 +3,13 @@ import Svg, { Path } from 'react-native-svg';
 
 interface ReadIconProps {
   size?: number;
-  color?: string;
+  color: string;
   filled?: boolean;
 }
 
 export const ReadIcon: React.FC<ReadIconProps> = ({
   size = 24,
-  color = '#0F0C0B',
+  color,
   filled = false
 }) => {
   if (filled) {

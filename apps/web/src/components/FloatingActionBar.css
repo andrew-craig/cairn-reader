@@ -33,20 +33,11 @@
   justify-content: center;
   padding: 6px 8px;
   border-radius: 32px;
-  /* Light: rgba(251,250,249,0.85) — mirrors mobile BottomActionMenu */
-  background-color: rgba(251, 250, 249, 0.85);
+  background-color: var(--color-floating);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  /* Shadow: 0px 2px 4px rgba(15,23,42,0.2) — from Figma design */
-  box-shadow: 0px 2px 4px rgba(15, 23, 42, 0.2);
+  box-shadow: 0px 2px 4px var(--color-shadow);
   pointer-events: auto;
-}
-
-@media (prefers-color-scheme: dark) {
-  .fab__pill {
-    /* Dark: rgba(28,28,30,0.85) — mirrors mobile BottomActionMenu dark tint */
-    background-color: rgba(28, 28, 30, 0.85);
-  }
 }
 
 /* Individual icon buttons: 42x42, border-radius 21px, transparent BG */
@@ -68,13 +59,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .fab__btn:hover:not(:disabled) {
-    background-color: rgba(0, 0, 0, 0.06);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .fab__btn:hover:not(:disabled) {
-      background-color: rgba(255, 255, 255, 0.08);
-    }
+    background-color: var(--color-hover);
   }
 }
 

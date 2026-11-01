@@ -3,13 +3,13 @@ import Svg, { Path } from 'react-native-svg';
 
 interface FeedIconProps {
   size?: number;
-  color?: string;
+  color: string;
   filled?: boolean;
 }
 
 export const FeedIcon: React.FC<FeedIconProps> = ({
   size = 24,
-  color = '#0F0C0B',
+  color,
   filled = false,
 }) => {
   if (filled) {
