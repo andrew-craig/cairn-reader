@@ -9,6 +9,8 @@ import { ReadIcon } from '../components/icons';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
+import { ArticleMutations } from '../services/articleMutations';
+import { Outbox } from '../services/outbox';
 import { invalidateReads } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
@@ -19,9 +21,10 @@ type FeedScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTab
 
 /**
  * The Feed list: items from sources the user routed to Feed, to skim. Online
- * only — nothing here goes through ArticleStore, prefetch or the outbox. The
- * last page is kept in FeedCache purely so a failed refresh can still show
- * something (with a stale banner).
+ * only, except Save to Reads: that goes through ArticleMutations.saveToReads,
+ * which stores the item as a Reads item and queues the move in the outbox
+ * when offline. The last page is kept in FeedCache purely so a failed refresh
+ * can still show something (with a stale banner).
  */
 export const FeedScreen: React.FC = () => {
   const navigation = useNavigation<FeedScreenNavigationProp>();
@@ -31,11 +34,15 @@ export const FeedScreen: React.FC = () => {
   // Timestamp of the last successful network fetch (null = never fetched)
   const lastFetchedAtRef = useRef<number | null>(null);
 
-  const fetchPage = useCallback(
-    (cursor: string | undefined) =>
+  // Until a queued Save to Reads drains, the server still lists the item in
+  // Feed; leave it out so a refetch doesn't bring it back.
+  const fetchPage = useCallback(async (cursor: string | undefined) => {
+    const [response, pendingSaves] = await Promise.all([
       ReadService.listUserContents({ limit: PAGE_SIZE, cursor, list: 'feed' }),
-    [],
-  );
+      Outbox.pendingSaveIds(),
+    ]);
+    return { ...response, contents: response.contents.filter((c) => !pendingSaves.has(c.content_id)) };
+  }, []);
 
   const onResetLoaded = useCallback((next: Article[]) => {
     FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
@@ -113,11 +120,12 @@ export const FeedScreen: React.FC = () => {
     [setArticles],
   );
 
-  // Awaited, like the reader's Save to Reads: the row only leaves the Feed once
-  // the server has moved it. Rethrowing makes SwipeAction spring the row back.
-  const handleSwipeSaveToReads = async (articleId: string) => {
+  // Awaited, like the reader's Save to Reads: the row leaves the Feed once the
+  // server has moved it or the move is queued offline. Only a definitive
+  // rejection rethrows, which makes SwipeAction spring the row back.
+  const handleSwipeSaveToReads = async (article: Article) => {
     try {
-      await ReadService.moveToReads(articleId);
+      await ArticleMutations.saveToReads(article);
     } catch (error) {
       console.error('Failed to save article to Reads:', error);
       Alert.alert('Error', 'Failed to save to Reads');
@@ -126,7 +134,7 @@ export const FeedScreen: React.FC = () => {
     invalidateReads();
     // Collapse the gap the swiped-away row leaves behind.
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    handleLeftFeed(articleId);
+    handleLeftFeed(article.id);
   };
 
   const handleArticlePress = (article: Article) => {
@@ -145,7 +153,7 @@ export const FeedScreen: React.FC = () => {
       articles={articles}
       loading={loading}
       renderItem={(article) => (
-        <SwipeAction direction="right" icon={ReadIcon} color="info" onAction={() => handleSwipeSaveToReads(article.id)}>
+        <SwipeAction direction="right" icon={ReadIcon} color="info" onAction={() => handleSwipeSaveToReads(article)}>
           <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
         </SwipeAction>
       )}

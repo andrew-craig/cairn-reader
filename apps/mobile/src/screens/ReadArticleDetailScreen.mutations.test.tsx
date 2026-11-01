@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { ReadArticleDetailScreen } from './ReadArticleDetailScreen';
-import { ArticleStore, ArticleMutations, ReadService, invalidateReads } from '../services';
+import { ArticleStore, ArticleMutations, invalidateReads } from '../services';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
 import { HttpError } from '@cairn/shared';
@@ -32,7 +32,6 @@ jest.mock('../services', () => ({
     getContentById: jest.fn(),
     updateUserContent: jest.fn(),
     transformDetailToArticle: jest.fn(),
-    moveToReads: jest.fn(),
   },
   invalidateReads: jest.fn(),
   ArticleMutations: {
@@ -41,6 +40,7 @@ jest.mock('../services', () => ({
     saveScrollPosition: jest.fn(),
     setFavorite: jest.fn(),
     archive: jest.fn(),
+    saveToReads: jest.fn(),
   },
 }));
 
@@ -91,7 +91,6 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
-const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
 const mockedInvalidateReads = invalidateReads as jest.Mock;
 const mockedArticleMutations = ArticleMutations as jest.Mocked<typeof ArticleMutations>;
 const mockedUseNetworkStatus = useNetworkStatus as jest.Mock;
@@ -224,24 +223,28 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
       expect(screen.queryByText('Save to Reads:off')).toBeNull();
     });
 
-    it('moves the item, marks Reads stale, then leaves the reader', async () => {
-      mockedReadService.moveToReads.mockResolvedValue({} as never);
+    // Online or offline alike: saveToReads resolves once the move is done or
+    // queued (see articleMutations.test.ts).
+    it('saves the item, marks Reads stale, then leaves the reader', async () => {
+      mockedArticleMutations.saveToReads.mockResolvedValue(undefined);
 
       render(<ReadArticleDetailScreen />);
       fireEvent.press(screen.getByText('Save to Reads:off'));
 
       await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
-      expect(mockedReadService.moveToReads).toHaveBeenCalledWith('a1');
+      expect(mockedArticleMutations.saveToReads).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'a1', title: 'Article One' }),
+      );
       expect(mockedInvalidateReads).toHaveBeenCalledTimes(1);
       expect(mockRouteParams.onArchived).toHaveBeenCalledWith('a1');
       // Not an archive: no status mutation, no outbox.
       expect(mockedArticleMutations.archive).not.toHaveBeenCalled();
     });
 
-    it('stays in the reader and alerts when the move fails', async () => {
+    it('stays in the reader and alerts when the move is rejected', async () => {
       const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      mockedReadService.moveToReads.mockRejectedValue(new HttpError(500, 'boom'));
+      mockedArticleMutations.saveToReads.mockRejectedValue(new HttpError(422, 'nope'));
 
       render(<ReadArticleDetailScreen />);
       fireEvent.press(screen.getByText('Save to Reads:off'));
@@ -252,7 +255,7 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
       expect(mockedInvalidateReads).not.toHaveBeenCalled();
 
       // The failure releases the guard, so the user can retry.
-      mockedReadService.moveToReads.mockResolvedValue({} as never);
+      mockedArticleMutations.saveToReads.mockResolvedValue(undefined);
       fireEvent.press(screen.getByText('Save to Reads:off'));
       await waitFor(() => expect(mockGoBack).toHaveBeenCalledTimes(1));
 
@@ -304,16 +307,16 @@ describe('ReadArticleDetailScreen mutation call sites', () => {
 
     it('ignores a second tap while the move is in flight', async () => {
       let resolveMove: () => void;
-      mockedReadService.moveToReads.mockReturnValue(
+      mockedArticleMutations.saveToReads.mockReturnValue(
         new Promise((resolve) => {
-          resolveMove = () => resolve({} as never);
+          resolveMove = () => resolve();
         }),
       );
 
       render(<ReadArticleDetailScreen />);
       fireEvent.press(screen.getByText('Save to Reads:off'));
       fireEvent.press(screen.getByText('Save to Reads:off'));
-      expect(mockedReadService.moveToReads).toHaveBeenCalledTimes(1);
+      expect(mockedArticleMutations.saveToReads).toHaveBeenCalledTimes(1);
 
       await act(async () => {
         resolveMove!();

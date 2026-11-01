@@ -275,15 +275,15 @@ export const ReadArticleDetailScreen: React.FC = () => {
   };
 
   // Feed items are triaged by saving them to Reads, not by archiving. Awaited
-  // (unlike archive): it's online-only, and the item should only leave the
-  // Feed once the server has actually moved it.
+  // (unlike archive) so a definitive rejection keeps the reader open; offline
+  // the move is queued and resolves straight away.
   const savingToReadsRef = useRef(false);
   const handleSaveToReads = async () => {
     if (savingToReadsRef.current) return;
     savingToReadsRef.current = true;
     const targetId = article.id;
     try {
-      await ReadService.moveToReads(targetId);
+      await ArticleMutations.saveToReads(article);
     } catch (error) {
       console.error('Failed to save article to Reads:', error);
       Alert.alert('Error', 'Failed to save to Reads');

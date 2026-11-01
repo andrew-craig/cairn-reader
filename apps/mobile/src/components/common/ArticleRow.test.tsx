@@ -29,4 +29,13 @@ describe('ArticleRow', () => {
     const flat = StyleSheet.flatten(screen.getByText(baseArticle.title).props.style);
     expect(flat.fontFamily).toBe(FontFamily.default);
   });
+
+  it('shows the waiting-to-save note only for a pending row', () => {
+    const note = 'Waiting to save — will sync when online';
+    const { rerender } = render(<ArticleRow article={baseArticle} onPress={() => {}} />);
+    expect(screen.queryByText(note)).toBeNull();
+
+    rerender(<ArticleRow article={baseArticle} onPress={() => {}} pending />);
+    expect(screen.getByText(note)).toBeTruthy();
+  });
 });

@@ -6,8 +6,8 @@ const FEED_CACHE_KEY = '@cairn:feed_cache';
 /**
  * Snapshot of the last Feed page, shown (with a stale banner) when a refresh
  * fails. Feed is online-only: this is deliberately not ArticleStore, so Feed
- * items never reach the offline Reads store, its prefetch or the outbox.
- * Cleared on logout like ArticleStore.
+ * items reach the offline Reads store and the outbox only through Save to
+ * Reads (ArticleMutations.saveToReads). Cleared on logout like ArticleStore.
  */
 export const FeedCache = {
   async save(articles: Article[]): Promise<void> {

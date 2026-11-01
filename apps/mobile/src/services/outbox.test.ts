@@ -176,4 +176,49 @@ describe('Outbox', () => {
       expect(remaining).toHaveLength(0);
     });
   });
+
+  describe('Save to Reads (list rows)', () => {
+    const stored = {
+      id: 'a1',
+      url: 'https://example.com/a1',
+      title: 'Saved',
+      tags: [],
+      isRead: false,
+      isFavorite: false,
+      list: 'reads' as const,
+      addedAt: 1000,
+    };
+
+    it('replays a queued list row through the same PATCH and keeps the stored article', async () => {
+      await ArticleStore.upsertMany([stored]);
+      await Outbox.enqueue('a1', 'list', { list: 'reads' });
+      mockedReadService.updateUserContent.mockResolvedValue(undefined as never);
+
+      await Outbox.drain();
+
+      expect(mockedReadService.updateUserContent).toHaveBeenCalledWith('a1', { list: 'reads' });
+      expect(await Outbox.pendingSaveIds()).toEqual(new Set());
+      expect(await ArticleStore.getById('a1')).not.toBeNull();
+    });
+
+    it('a rejected (definitive 4xx) save also removes the optimistically stored article', async () => {
+      await ArticleStore.upsertMany([stored]);
+      await Outbox.enqueue('a1', 'list', { list: 'reads' });
+      mockedReadService.updateUserContent.mockRejectedValue(new HttpError(404, 'Not found'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await Outbox.drain();
+
+      expect(await Outbox.pendingSaveIds()).toEqual(new Set());
+      expect(await ArticleStore.getById('a1')).toBeNull();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('pendingSaveIds lists only articles with a queued list row', async () => {
+      await Outbox.enqueue('a1', 'list', { list: 'reads' });
+      await Outbox.enqueue('a2', 'is_favorite', { is_favorite: true });
+
+      expect(await Outbox.pendingSaveIds()).toEqual(new Set(['a1']));
+    });
+  });
 });

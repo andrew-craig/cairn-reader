@@ -19,12 +19,14 @@ import { Article } from '../types';
 jest.mock('../services/read', () => ({
   ReadService: {
     listUserContents: jest.fn(),
+    transformToArticle: jest.requireActual('../services/read').ReadService.transformToArticle,
   },
 }));
 
 jest.mock('../services/articleStore', () => ({
   ArticleStore: {
     listRecent: jest.fn(),
+    listPendingSaves: jest.fn(),
     upsertMany: jest.fn(),
     remove: jest.fn(),
   },
@@ -64,6 +66,7 @@ describe('ReadsScreen offline-first render', () => {
     mockedArticleStore.upsertMany.mockResolvedValue(undefined);
     mockedArticleStore.remove.mockResolvedValue(undefined);
     mockedSyncTrigger.run.mockResolvedValue(undefined);
+    mockedArticleStore.listPendingSaves.mockResolvedValue([]);
   });
 
   it('renders stored articles before the network call resolves', async () => {
@@ -99,5 +102,73 @@ describe('ReadsScreen offline-first render', () => {
     const upsertOrder = mockedArticleStore.upsertMany.mock.invocationCallOrder[0];
     const syncTriggerOrder = mockedSyncTrigger.run.mock.invocationCallOrder[0];
     expect(syncTriggerOrder).toBeGreaterThan(upsertOrder);
+  });
+});
+
+// Saves queued offline (ArticleMutations.saveToReads) sit in ArticleStore with
+// an outbox `list` row until it drains. The server's Reads page doesn't list
+// them yet, so the screen keeps them above the page with a pending indicator.
+describe('ReadsScreen queued saves', () => {
+  const PENDING = 'Waiting to save — will sync when online';
+  const emptyPage = { contents: [], total_count: 0, limit: 20, cursor: '', has_more: false };
+  const serverPage = (id: string) => ({
+    ...emptyPage,
+    total_count: 1,
+    contents: [
+      {
+        id: `uc-${id}`,
+        user_id: 'u',
+        content_id: id,
+        status: 'unread' as const,
+        list: 'reads' as const,
+        scroll_position: 0,
+        is_favorite: false,
+        added_at: '2025-01-01T00:00:00Z',
+        updated_at: '2025-01-01T00:00:00Z',
+        content: {
+          id,
+          content_hash: id,
+          original_url: `https://example.com/${id}`,
+          title: `Server Article ${id}`,
+          source_type: 'rss',
+          created_at: '2025-01-01T00:00:00Z',
+          updated_at: '2025-01-01T00:00:00Z',
+        },
+      },
+    ],
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedArticleStore.upsertMany.mockResolvedValue(undefined);
+    mockedSyncTrigger.run.mockResolvedValue(undefined);
+    mockedArticleStore.listRecent.mockResolvedValue([]);
+  });
+
+  it('shows a queued save with the pending indicator and keeps it when the server page lacks it', async () => {
+    mockedArticleStore.listPendingSaves.mockResolvedValue([article('queued')]);
+    mockedReadService.listUserContents.mockResolvedValue(serverPage('s1'));
+
+    render(<ReadsScreen />);
+
+    expect(await screen.findByText('Server Article s1')).toBeTruthy();
+    expect(screen.getByText('Stored Article queued')).toBeTruthy();
+    expect(screen.getAllByText(PENDING)).toHaveLength(1);
+  });
+
+  it('keeps the item listed but drops the indicator once the outbox drains', async () => {
+    mockedArticleStore.listPendingSaves.mockResolvedValue([article('queued')]);
+    mockedReadService.listUserContents.mockResolvedValue(serverPage('s1'));
+    // The drain after the list sync sends the save; from then on nothing is pending.
+    mockedSyncTrigger.run.mockImplementation(async () => {
+      mockedArticleStore.listPendingSaves.mockResolvedValue([]);
+    });
+
+    render(<ReadsScreen />);
+
+    await screen.findByText('Server Article s1');
+    await waitFor(() => expect(screen.queryByText(PENDING)).toBeNull());
+    // This page was fetched before the drain, so it can't include the item yet.
+    expect(screen.getByText('Stored Article queued')).toBeTruthy();
   });
 });

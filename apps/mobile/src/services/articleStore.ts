@@ -43,7 +43,7 @@ interface ArticleRow {
 //   store the moment a sync ran, ahead of the queued PATCH reaching the
 //   backend.
 // - Any other pending outbox row for this article (status/is_favorite/
-//   scroll_position) freezes the four user-state columns at their current
+//   scroll_position/list) freezes the four user-state columns at their current
 //   stored value instead of accepting the server's — those are exactly the
 //   fields a queued write is waiting to change, and the server hasn't seen
 //   the new value yet. Keyed on article_id alone, not per field: simpler SQL,
@@ -188,6 +188,27 @@ export const ArticleStore = {
       return rows.map(rowToArticle);
     } catch (error) {
       console.error('Error loading favorite articles:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Stored articles with a queued Save to Reads (an outbox `list` row), most
+   * recently queued first: ReadsScreen keeps them in the list until the
+   * server's list includes them. Reads never reject — see `listRecent`.
+   */
+  async listPendingSaves(): Promise<Article[]> {
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<ArticleRow>(
+        `SELECT articles.* FROM articles
+         JOIN outbox ON outbox.article_id = articles.id AND outbox.field = 'list'
+         ORDER BY outbox.created_at DESC`,
+        {},
+      );
+      return rows.map(rowToArticle);
+    } catch (error) {
+      console.error('Error loading pending saves:', error);
       return [];
     }
   },

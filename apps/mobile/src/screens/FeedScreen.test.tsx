@@ -7,11 +7,14 @@ import { readsInvalidatedSince } from '../services/readsInvalidation';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
 import { ArticleStore } from '../services/articleStore';
+import { Outbox } from '../services/outbox';
 import { Article } from '../types';
+import { HttpError, NetworkError } from '@cairn/shared';
 
-// Feed is online-only: items are fetched with list=feed, the last page is kept
-// in FeedCache for a stale render, and nothing touches the offline Reads
-// store (ArticleStore), its prefetch or the outbox.
+// Feed is online-only: items are fetched with list=feed and the last page is
+// kept in FeedCache for a stale render. The one exception is Save to Reads,
+// which goes through the real ArticleMutations.saveToReads here (store +
+// outbox mocked) so the online/offline/rejected paths are exercised end to end.
 
 jest.mock('../services/read', () => ({
   ReadService: {
@@ -29,6 +32,11 @@ jest.mock('../services/articleStore', () => ({
   ArticleStore: { listRecent: jest.fn(), upsertMany: jest.fn(), remove: jest.fn() },
 }));
 
+jest.mock('../services/outbox', () => ({
+  ...jest.requireActual('../services/outbox'),
+  Outbox: { enqueue: jest.fn(), pendingSaveIds: jest.fn() },
+}));
+
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
@@ -40,6 +48,7 @@ jest.mock('@react-navigation/native', () => ({
 const mockedReadService = ReadService as jest.Mocked<typeof ReadService>;
 const mockedFeedCache = FeedCache as jest.Mocked<typeof FeedCache>;
 const mockedArticleStore = ArticleStore as jest.Mocked<typeof ArticleStore>;
+const mockedOutbox = Outbox as jest.Mocked<typeof Outbox>;
 
 const userContent = (id: string) => ({
   id: `uc-${id}`,
@@ -87,6 +96,10 @@ describe('FeedScreen', () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
     mockedFeedCache.save.mockResolvedValue(undefined);
     mockedFeedCache.load.mockResolvedValue([]);
+    mockedArticleStore.upsertMany.mockResolvedValue(undefined);
+    mockedArticleStore.remove.mockResolvedValue(undefined);
+    mockedOutbox.enqueue.mockResolvedValue(undefined);
+    mockedOutbox.pendingSaveIds.mockResolvedValue(new Set());
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -114,7 +127,7 @@ describe('FeedScreen', () => {
     expect(saved.map((a) => a.id)).toEqual(['a']);
   });
 
-  it('never touches the offline Reads store', async () => {
+  it('does not write fetched items to the offline Reads store', async () => {
     mockedReadService.listUserContents.mockResolvedValue(page(['a']));
 
     render(<FeedScreen />);
@@ -194,21 +207,57 @@ describe('FeedScreen', () => {
     await act(() => swipeFirstRow());
 
     expect(mockedReadService.moveToReads).toHaveBeenCalledWith('a');
+    expect(mockedArticleStore.upsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'a', list: 'reads' }),
+    ]);
+    expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     expect(screen.queryByText('Feed Item a')).toBeNull();
     expect(screen.getByText('Feed Item b')).toBeTruthy();
     expect(readsInvalidatedSince(before)).toBe(true);
   });
 
-  it('keeps the row and rejects (so it springs back) when Save to Reads fails', async () => {
+  it('offline: queues the save and drops the row from the Feed and its cache, without an alert', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    mockedReadService.listUserContents.mockResolvedValue(page(['a']));
-    mockedReadService.moveToReads.mockRejectedValue(new Error('offline'));
+    mockedReadService.listUserContents.mockResolvedValue(page(['a', 'b']));
+    mockedReadService.moveToReads.mockRejectedValue(new NetworkError());
 
     render(<FeedScreen />);
     await screen.findByText('Feed Item a');
-    await act(() => expect(swipeFirstRow()).rejects.toThrow('offline'));
+    await act(() => swipeFirstRow());
+
+    expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a', 'list', { list: 'reads' });
+    expect(mockedArticleStore.upsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'a', list: 'reads' }),
+    ]);
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText('Feed Item a')).toBeNull();
+    expect(mockedFeedCache.save).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'b' })]);
+  });
+
+  it('keeps the row and rejects (so it springs back) when Save to Reads is rejected', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockedReadService.listUserContents.mockResolvedValue(page(['a']));
+    mockedReadService.moveToReads.mockRejectedValue(new HttpError(404, 'gone'));
+
+    render(<FeedScreen />);
+    await screen.findByText('Feed Item a');
+    await act(() => expect(swipeFirstRow()).rejects.toThrow('gone'));
 
     expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to save to Reads');
+    expect(mockedArticleStore.remove).toHaveBeenCalledWith('a');
     expect(screen.getByText('Feed Item a')).toBeTruthy();
+  });
+
+  it('leaves out items with a queued Save to Reads, which the server still lists in Feed', async () => {
+    mockedOutbox.pendingSaveIds.mockResolvedValue(new Set(['a']));
+    mockedReadService.listUserContents.mockResolvedValue(page(['a', 'b']));
+
+    render(<FeedScreen />);
+
+    expect(await screen.findByText('Feed Item b')).toBeTruthy();
+    expect(screen.queryByText('Feed Item a')).toBeNull();
+    await waitFor(() =>
+      expect(mockedFeedCache.save).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })]),
+    );
   });
 });

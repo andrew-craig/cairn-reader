@@ -15,12 +15,14 @@ jest.mock('./articleStore', () => ({
   ArticleStore: {
     updateUserState: jest.fn(),
     remove: jest.fn(),
+    upsertMany: jest.fn(),
   },
 }));
 
 jest.mock('./read', () => ({
   ReadService: {
     updateUserContent: jest.fn(),
+    moveToReads: jest.fn(),
   },
 }));
 
@@ -40,6 +42,7 @@ describe('ArticleMutations', () => {
     jest.clearAllMocks();
     mockedArticleStore.updateUserState.mockResolvedValue(undefined);
     mockedArticleStore.remove.mockResolvedValue(undefined);
+    mockedArticleStore.upsertMany.mockResolvedValue(undefined);
     mockedOutbox.enqueue.mockResolvedValue(undefined);
   });
 
@@ -225,6 +228,58 @@ describe('ArticleMutations', () => {
       await expect(ArticleMutations.archive('a1')).resolves.toBeUndefined();
 
       expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'status', { status: 'archived' });
+    });
+  });
+
+  describe('saveToReads', () => {
+    const feedArticle = {
+      id: 'a1',
+      url: 'https://example.com/a1',
+      title: 'Feed Item',
+      tags: [],
+      isRead: false,
+      isFavorite: false,
+      list: 'feed' as const,
+      addedAt: 1,
+    };
+
+    it('stores the article as a Reads item stamped now, then moves it on the backend', async () => {
+      mockedReadService.moveToReads.mockResolvedValue(undefined as never);
+      const before = Date.now();
+
+      await ArticleMutations.saveToReads(feedArticle);
+
+      const [[stored]] = mockedArticleStore.upsertMany.mock.calls[0];
+      expect(stored).toEqual(expect.objectContaining({ id: 'a1', title: 'Feed Item', list: 'reads' }));
+      expect(stored.addedAt).toBeGreaterThanOrEqual(before);
+      expect(mockedReadService.moveToReads).toHaveBeenCalledWith('a1');
+      const storeOrder = mockedArticleStore.upsertMany.mock.invocationCallOrder[0];
+      const networkOrder = mockedReadService.moveToReads.mock.invocationCallOrder[0];
+      expect(storeOrder).toBeLessThan(networkOrder);
+      expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
+      expect(mockedArticleStore.remove).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['NetworkError', () => new NetworkError()],
+      ['HttpError 503', () => new HttpError(503, 'Service Unavailable')],
+    ])('queues the move on %s and keeps the stored article', async (_label, makeError) => {
+      mockedReadService.moveToReads.mockRejectedValue(makeError());
+
+      await expect(ArticleMutations.saveToReads(feedArticle)).resolves.toBeUndefined();
+
+      expect(mockedArticleStore.upsertMany).toHaveBeenCalled();
+      expect(mockedOutbox.enqueue).toHaveBeenCalledWith('a1', 'list', { list: 'reads' });
+      expect(mockedArticleStore.remove).not.toHaveBeenCalled();
+    });
+
+    it('rolls the store write back and rethrows a definitive 4xx', async () => {
+      mockedReadService.moveToReads.mockRejectedValue(new HttpError(404, 'gone'));
+
+      await expect(ArticleMutations.saveToReads(feedArticle)).rejects.toThrow('gone');
+
+      expect(mockedArticleStore.remove).toHaveBeenCalledWith('a1');
+      expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     });
   });
 });
