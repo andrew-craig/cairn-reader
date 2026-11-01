@@ -5,7 +5,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { ArticleRow } from '../components/common/ArticleRow';
-import { SwipeToArchive } from '../components/common/SwipeToArchive';
+import { SwipeAction } from '../components/common/SwipeAction';
+import { ArchiveIcon } from '../components/icons';
 import { AddLinkModal } from '../components/AddLinkModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
@@ -156,9 +157,9 @@ export const ReadsScreen: React.FC = () => {
         loading={loading}
         headerActions={headerActions}
         renderItem={(article) => (
-          <SwipeToArchive onArchive={() => handleSwipeArchive(article.id)}>
+          <SwipeAction direction="left" icon={ArchiveIcon} color="success" onAction={() => handleSwipeArchive(article.id)}>
             <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
-          </SwipeToArchive>
+          </SwipeAction>
         )}
         onRefresh={handleRefresh}
         refreshing={refreshing}

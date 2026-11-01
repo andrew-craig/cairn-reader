@@ -1,6 +1,9 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react-native';
 import { FeedScreen } from './FeedScreen';
+import { SwipeAction } from '../components/common/SwipeAction';
+import { readsInvalidatedSince } from '../services/readsInvalidation';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
 import { ArticleStore } from '../services/articleStore';
@@ -13,6 +16,7 @@ import { Article } from '../types';
 jest.mock('../services/read', () => ({
   ReadService: {
     listUserContents: jest.fn(),
+    moveToReads: jest.fn(),
     transformToArticle: jest.requireActual('../services/read').ReadService.transformToArticle,
   },
 }));
@@ -174,5 +178,37 @@ describe('FeedScreen', () => {
     expect(mockedFeedCache.save).toHaveBeenLastCalledWith(
       expect.arrayContaining([expect.objectContaining({ id: 'b' })]),
     );
+  });
+
+  // The gesture itself is covered by SwipeAction's tests; these drive its
+  // onAction for the first row directly.
+  const swipeFirstRow = () => screen.UNSAFE_getAllByType(SwipeAction)[0].props.onAction();
+
+  it('saves a row to Reads on swipe, then drops it from the Feed', async () => {
+    mockedReadService.listUserContents.mockResolvedValue(page(['a', 'b']));
+    mockedReadService.moveToReads.mockResolvedValue(userContent('a'));
+    const before = Date.now() - 1;
+
+    render(<FeedScreen />);
+    await screen.findByText('Feed Item a');
+    await act(() => swipeFirstRow());
+
+    expect(mockedReadService.moveToReads).toHaveBeenCalledWith('a');
+    expect(screen.queryByText('Feed Item a')).toBeNull();
+    expect(screen.getByText('Feed Item b')).toBeTruthy();
+    expect(readsInvalidatedSince(before)).toBe(true);
+  });
+
+  it('keeps the row and rejects (so it springs back) when Save to Reads fails', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockedReadService.listUserContents.mockResolvedValue(page(['a']));
+    mockedReadService.moveToReads.mockRejectedValue(new Error('offline'));
+
+    render(<FeedScreen />);
+    await screen.findByText('Feed Item a');
+    await act(() => expect(swipeFirstRow()).rejects.toThrow('offline'));
+
+    expect(alertSpy).toHaveBeenCalledWith('Error', 'Failed to save to Reads');
+    expect(screen.getByText('Feed Item a')).toBeTruthy();
   });
 });

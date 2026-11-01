@@ -1,11 +1,15 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
+import { ArticleRow } from '../components/common/ArticleRow';
+import { SwipeAction } from '../components/common/SwipeAction';
+import { ReadIcon } from '../components/icons';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
+import { invalidateReads } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 // Minimum ms between background refetches triggered by tab focus.
@@ -109,6 +113,22 @@ export const FeedScreen: React.FC = () => {
     [setArticles],
   );
 
+  // Awaited, like the reader's Save to Reads: the row only leaves the Feed once
+  // the server has moved it. Rethrowing makes SwipeAction spring the row back.
+  const handleSwipeSaveToReads = async (articleId: string) => {
+    try {
+      await ReadService.moveToReads(articleId);
+    } catch (error) {
+      console.error('Failed to save article to Reads:', error);
+      Alert.alert('Error', 'Failed to save to Reads');
+      throw error;
+    }
+    invalidateReads();
+    // Collapse the gap the swiped-away row leaves behind.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    handleLeftFeed(articleId);
+  };
+
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex((a) => a.id === article.id);
     navigation.navigate('ArticleDetail', {
@@ -124,7 +144,11 @@ export const FeedScreen: React.FC = () => {
       title="Feed"
       articles={articles}
       loading={loading}
-      onArticlePress={handleArticlePress}
+      renderItem={(article) => (
+        <SwipeAction direction="right" icon={ReadIcon} color="info" onAction={() => handleSwipeSaveToReads(article.id)}>
+          <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
+        </SwipeAction>
+      )}
       onRefresh={handleRefresh}
       refreshing={refreshing}
       emptyMessage={searchQuery ? 'No matching articles' : 'Your Feed is empty'}
