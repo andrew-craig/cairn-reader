@@ -8,6 +8,7 @@
   --color-border: #F1EFEE;
   --color-hover: #EDEAE9;
   --color-success: #34C759;
+  --color-info: #007AFF;
   --color-error: #C63E06;
   --color-warning: #FF9500;
   --color-on-accent: #FFFFFF;
@@ -27,6 +28,7 @@
     --color-border: #3D3A34;
     --color-hover: #302D27;
     --color-success: #30D158;
+    --color-info: #0A84FF;
     --color-error: #FF453A;
     --color-warning: #FF9F0A;
     --color-on-accent: #FFFFFF;

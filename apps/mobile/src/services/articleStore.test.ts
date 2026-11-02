@@ -76,6 +76,30 @@ describe('ArticleStore', () => {
     });
   });
 
+  describe('listPendingSaves', () => {
+    it('returns stored articles with a queued list row, most recently queued first', async () => {
+      await ArticleStore.upsertMany([
+        makeArticle({ id: 'first' }),
+        makeArticle({ id: 'second' }),
+        makeArticle({ id: 'not-queued' }),
+        makeArticle({ id: 'favorited' }),
+      ]);
+      const db = await getDb();
+      await db.runAsync(
+        "INSERT INTO outbox (article_id, field, payload, created_at, attempts) VALUES ('first', 'list', '{\"list\":\"reads\"}', 100, 0)",
+      );
+      await db.runAsync(
+        "INSERT INTO outbox (article_id, field, payload, created_at, attempts) VALUES ('second', 'list', '{\"list\":\"reads\"}', 200, 0)",
+      );
+      await Outbox.enqueue('favorited', 'is_favorite', { is_favorite: true });
+      // Queued but no longer stored (e.g. archived since): not listed.
+      await Outbox.enqueue('gone', 'list', { list: 'reads' });
+
+      const pending = await ArticleStore.listPendingSaves();
+      expect(pending.map((a) => a.id)).toEqual(['second', 'first']);
+    });
+  });
+
   describe('body round-tripping', () => {
     it('returns content undefined when no body has been saved', async () => {
       await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);

@@ -34,7 +34,7 @@ Decisions: dark mode uses the warm palette (web's values); border/hover/floating
 - Source of truth: `design/tokens/colors.json` (DTCG); `@cairn/tokens` workspace runs Style Dictionary 5 with two
   small custom formats (CSS with a `prefers-color-scheme: dark` block; TS `Colors` object). Build fails if light and
   dark define different token names. Generated files committed; `design-tokens.yml` CI fails on drift.
-- New tokens replacing literals: `onAccent`, `floating`, `overlay`, `shadow`, `shadowSoft`. Removed unused
+- New tokens: `info` (added on main during review, moved into the palette at merge); replacing literals: `onAccent`, `floating`, `overlay`, `shadow`, `shadowSoft`. Removed unused
   `tabIconDefault`/`tabIconSelected`, the web `#22863a`/`#c0392b` fallbacks, and the icon `#0F0C0B` defaults
   (`color` is now required; every caller already passed one).
 - Alignments: dark mode = web's warm palette (mobile changes visibly); dark border/hover/floating warmed

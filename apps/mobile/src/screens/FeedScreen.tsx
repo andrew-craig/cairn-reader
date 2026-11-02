@@ -1,11 +1,17 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Alert } from 'react-native';
+import { Alert, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
+import { ArticleRow } from '../components/common/ArticleRow';
+import { SwipeAction } from '../components/common/SwipeAction';
+import { ReadIcon } from '../components/icons';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
 import { FeedCache } from '../services/feedCache';
+import { ArticleMutations } from '../services/articleMutations';
+import { Outbox } from '../services/outbox';
+import { invalidateReads } from '../services/readsInvalidation';
 import { useCursorArticleList, PAGE_SIZE } from '../hooks/useCursorArticleList';
 
 // Minimum ms between background refetches triggered by tab focus.
@@ -15,9 +21,10 @@ type FeedScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTab
 
 /**
  * The Feed list: items from sources the user routed to Feed, to skim. Online
- * only — nothing here goes through ArticleStore, prefetch or the outbox. The
- * last page is kept in FeedCache purely so a failed refresh can still show
- * something (with a stale banner).
+ * only, except Save to Reads: that goes through ArticleMutations.saveToReads,
+ * which stores the item as a Reads item and queues the move in the outbox
+ * when offline. The last page is kept in FeedCache purely so a failed refresh
+ * can still show something (with a stale banner).
  */
 export const FeedScreen: React.FC = () => {
   const navigation = useNavigation<FeedScreenNavigationProp>();
@@ -67,10 +74,22 @@ export const FeedScreen: React.FC = () => {
     load,
     handleRefresh,
     handleLoadMore,
-  } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'feed' });
+  } = useCursorArticleList({
+    fetchPage,
+    onResetLoaded,
+    onLoadError,
+    list: 'feed',
+    // Until a queued Save to Reads drains, the server still lists the item in
+    // Feed; leave it out so a refetch or search doesn't bring it back.
+    exclude: Outbox.pendingSaveIds,
+  });
 
   const articlesRef = useRef<Article[]>(articles);
   articlesRef.current = articles;
+  // Read at call time: handleLeftFeed runs after an awaited save, by which
+  // point search may have opened.
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
 
   // On focus: refetch once the TTL has lapsed. If nothing is on screen yet,
   // prime from the cached last page first so a failed fetch isn't a blank tab.
@@ -104,10 +123,31 @@ export const FeedScreen: React.FC = () => {
     (articleId: string) => {
       const next = articlesRef.current.filter((a) => a.id !== articleId);
       setArticles(next);
-      FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
+      // While searching, `next` is a subset of search results, not the Feed
+      // page; the quiet refresh when search closes re-caches the page.
+      if (!searchQueryRef.current) {
+        FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
+      }
     },
     [setArticles],
   );
+
+  // Awaited, like the reader's Save to Reads: the row leaves the Feed once the
+  // server has moved it or the move is queued offline. Only a definitive
+  // rejection rethrows, which makes SwipeAction spring the row back.
+  const handleSwipeSaveToReads = async (article: Article) => {
+    try {
+      await ArticleMutations.saveToReads(article);
+    } catch (error) {
+      console.error('Failed to save article to Reads:', error);
+      Alert.alert('Error', 'Failed to save to Reads');
+      throw error;
+    }
+    invalidateReads();
+    // Collapse the gap the swiped-away row leaves behind.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    handleLeftFeed(article.id);
+  };
 
   const handleArticlePress = (article: Article) => {
     const currentIndex = articles.findIndex((a) => a.id === article.id);
@@ -124,7 +164,11 @@ export const FeedScreen: React.FC = () => {
       title="Feed"
       articles={articles}
       loading={loading}
-      onArticlePress={handleArticlePress}
+      renderItem={(article) => (
+        <SwipeAction direction="right" icon={ReadIcon} color="info" onAction={() => handleSwipeSaveToReads(article)}>
+          <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
+        </SwipeAction>
+      )}
       onRefresh={handleRefresh}
       refreshing={refreshing}
       emptyMessage={searchQuery ? 'No matching articles' : 'Your Feed is empty'}
