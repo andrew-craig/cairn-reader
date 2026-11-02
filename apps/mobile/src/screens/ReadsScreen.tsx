@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Alert, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ArticleListScreen } from '../components/ArticleListScreen';
 import { IconButton } from '../components/common/IconButton';
 import { ArticleRow } from '../components/common/ArticleRow';
-import { SwipeToArchive } from '../components/common/SwipeToArchive';
+import { SwipeAction } from '../components/common/SwipeAction';
+import { ArchiveIcon } from '../components/icons';
 import { AddLinkModal } from '../components/AddLinkModal';
 import { Article, RootStackParamList } from '../types';
 import { ReadService } from '../services/read';
@@ -23,6 +24,8 @@ const STORED_ARTICLES_LIMIT = 100;
 
 type ReadsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MainTabs'>;
 
+const idsOf = (articles: Article[]) => new Set(articles.map((a) => a.id));
+
 export const ReadsScreen: React.FC = () => {
   const navigation = useNavigation<ReadsScreenNavigationProp>();
   const [modalVisible, setModalVisible] = useState(false);
@@ -32,13 +35,22 @@ export const ReadsScreen: React.FC = () => {
   // Timestamp of the last successful network fetch (null = never fetched)
   const lastFetchedAtRef = useRef<number | null>(null);
 
-  const fetchPage = useCallback(
-    (cursor: string | undefined) =>
-      ReadService.listUserContents({ limit: PAGE_SIZE, cursor, list: 'reads' }),
-    [],
-  );
+  // Saves queued offline (ArticleMutations.saveToReads) are listed above the
+  // server's page until it includes them. `queued` is snapshotted just before
+  // each first-page fetch, so a save that drains after that fetch (the server
+  // page lacks it) stays listed until the next one. `pendingIds` drives the
+  // "waiting to save" indicator and is re-read after every outbox drain.
+  const [queued, setQueued] = useState<Article[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+  const queuedSnapshotRef = useRef<Article[]>([]);
+
+  const fetchPage = useCallback(async (cursor: string | undefined) => {
+    if (cursor === undefined) queuedSnapshotRef.current = await ArticleStore.listPendingSaves();
+    return ReadService.listUserContents({ limit: PAGE_SIZE, cursor, list: 'reads' });
+  }, []);
 
   const onResetLoaded = useCallback((next: Article[]) => {
+    setQueued(queuedSnapshotRef.current);
     // SyncTrigger.run() drains the outbox and then runs prefetch, in that
     // fixed order (task_ebf1) — prefetch reads the post-sync store state
     // (upsertMany already cleared any body whose hash changed), so it must
@@ -47,6 +59,8 @@ export const ReadsScreen: React.FC = () => {
     // triggers means the outbox gets a drain on every path, not only those.
     void ArticleStore.upsertMany(next)
       .then(() => SyncTrigger.run())
+      .then(() => ArticleStore.listPendingSaves())
+      .then((pending) => setPendingIds(idsOf(pending)))
       .catch((err) => console.error('Failed to sync articles to local store:', err));
     lastFetchedAtRef.current = Date.now();
     setIsStale(false);
@@ -103,7 +117,12 @@ export const ReadsScreen: React.FC = () => {
 
       if (!ttlExpired) return;
 
-      ArticleStore.listRecent(STORED_ARTICLES_LIMIT).then((stored) => {
+      Promise.all([
+        ArticleStore.listRecent(STORED_ARTICLES_LIMIT),
+        ArticleStore.listPendingSaves(),
+      ]).then(([stored, pending]) => {
+        setQueued(pending);
+        setPendingIds(idsOf(pending));
         if (stored.length > 0) {
           setArticles(stored);
           setLoading(false);
@@ -120,9 +139,17 @@ export const ReadsScreen: React.FC = () => {
       // The store row is removed by ArticleMutations.archive, which every
       // caller runs alongside this list update.
       setArticles(next);
+      setQueued((prev) => prev.filter((a) => a.id !== articleId));
     },
     [setArticles],
   );
+
+  // Search results stand alone; otherwise queued saves the page lacks go on top.
+  const listed = useMemo(() => {
+    if (searchQuery) return articles;
+    const onPage = idsOf(articles);
+    return [...queued.filter((a) => !onPage.has(a.id)), ...articles];
+  }, [searchQuery, queued, articles]);
 
   const handleSwipeArchive = (articleId: string) => {
     // Collapse the gap the swiped-away row leaves behind.
@@ -135,10 +162,10 @@ export const ReadsScreen: React.FC = () => {
   };
 
   const handleArticlePress = (article: Article) => {
-    const currentIndex = articles.findIndex((a) => a.id === article.id);
+    const currentIndex = listed.findIndex((a) => a.id === article.id);
     navigation.navigate('ArticleDetail', {
       article,
-      articles,
+      articles: listed,
       currentIndex,
       onArchived: handleArticleArchived,
     });
@@ -152,13 +179,17 @@ export const ReadsScreen: React.FC = () => {
     <>
       <ArticleListScreen
         title="Reads"
-        articles={articles}
+        articles={listed}
         loading={loading}
         headerActions={headerActions}
         renderItem={(article) => (
-          <SwipeToArchive onArchive={() => handleSwipeArchive(article.id)}>
-            <ArticleRow article={article} onPress={() => handleArticlePress(article)} />
-          </SwipeToArchive>
+          <SwipeAction direction="left" icon={ArchiveIcon} color="success" onAction={() => handleSwipeArchive(article.id)}>
+            <ArticleRow
+              article={article}
+              onPress={() => handleArticlePress(article)}
+              pending={pendingIds.has(article.id)}
+            />
+          </SwipeAction>
         )}
         onRefresh={handleRefresh}
         refreshing={refreshing}

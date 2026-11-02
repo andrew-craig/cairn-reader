@@ -129,6 +129,22 @@ describe('useCursorArticleList', () => {
     );
   });
 
+  it('leaves excluded ids out of both pages and search results', async () => {
+    const fetchPage = jest.fn().mockResolvedValue(page(['a', 'queued'], '', false));
+    jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1', 'queued'], '', false));
+    const exclude = jest.fn().mockResolvedValue(new Set(['queued']));
+
+    const { result } = renderHook(() => useCursorArticleList({ fetchPage, exclude }));
+
+    await act(async () => {
+      await result.current.load(true);
+    });
+    expect(result.current.articles.map((a) => a.id)).toEqual(['a']);
+
+    act(() => result.current.setQuery('term'));
+    await waitFor(() => expect(result.current.articles.map((a) => a.id)).toEqual(['s1']));
+  });
+
   it('clears the refreshing indicator after a pull-to-refresh during search', async () => {
     const fetchPage = jest.fn().mockResolvedValue(page([], '', false));
     jest.spyOn(ReadService, 'searchUserContents').mockResolvedValue(page(['s1'], '', false));

@@ -14,9 +14,11 @@ import { formatPublishedDate } from '@cairn/shared';
 interface ArticleRowProps {
   article: Article;
   onPress: () => void;
+  /** A Save to Reads still queued offline: shows a "waiting to save" note. */
+  pending?: boolean;
 }
 
-export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress }) => {
+export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, pending = false }) => {
   const colorScheme = useColorScheme();
   const colors = colorScheme === 'dark' ? Colors.dark : Colors.light;
 
@@ -63,6 +65,11 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress }) => {
           {article.author || 'Unknown'}
           {publishedDateLabel && ` | ${publishedDateLabel}`}
         </Text>
+        {pending && (
+          <Text style={[styles.pending, { color: colors.info }]} numberOfLines={1}>
+            Waiting to save — will sync when online
+          </Text>
+        )}
       </View>
       {renderRightContent()}
     </TouchableOpacity>
@@ -92,6 +99,10 @@ const styles = StyleSheet.create({
   author: {
     fontSize: 14,
     fontFamily: FontFamily.default,
+  },
+  pending: {
+    fontSize: 12,
+    fontFamily: FontFamily.defaultMedium,
   },
   imageFrame: {
     width: 48,

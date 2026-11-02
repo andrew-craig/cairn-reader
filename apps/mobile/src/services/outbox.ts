@@ -7,9 +7,10 @@ import { HttpError, NetworkError, UpdateUserContentRequest } from '@cairn/shared
  * the store's: the store's scroll column is `scroll_fraction`, and
  * `articles.scroll_position` is a separate legacy column — see
  * articleStore.ts. Payloads are `UpdateUserContentRequest` fragments and are
- * replayed as-is. An archive is a `status` row with `{ status: 'archived' }`.
+ * replayed as-is. An archive is a `status` row with `{ status: 'archived' }`;
+ * a Save to Reads is a `list` row with `{ list: 'reads' }`.
  */
-export type OutboxField = 'status' | 'is_favorite' | 'scroll_position';
+export type OutboxField = 'status' | 'is_favorite' | 'scroll_position' | 'list';
 
 interface OutboxRow {
   article_id: string;
@@ -127,6 +128,29 @@ export const Outbox = {
         $article_id: row.article_id,
         $field: row.field,
       });
+      // A rejected Save to Reads: undo the optimistic store write
+      // (ArticleMutations.saveToReads) so the article doesn't linger in Reads.
+      if (outcome === 'drop' && row.field === 'list') {
+        await db.runAsync('DELETE FROM articles WHERE id = $id', { $id: row.article_id });
+      }
+    }
+  },
+
+  /**
+   * Ids of articles with a queued Save to Reads (a `list` row). Never rejects
+   * (like ArticleStore's reads): on failure it resolves empty, so the Feed
+   * fetch it filters still succeeds.
+   */
+  async pendingSaveIds(): Promise<Set<string>> {
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<{ article_id: string }>(
+        "SELECT article_id FROM outbox WHERE field = 'list'",
+      );
+      return new Set(rows.map((r) => r.article_id));
+    } catch (error) {
+      console.error('Error loading pending save ids:', error);
+      return new Set();
     }
   },
 };

@@ -22,6 +22,20 @@ interface CursorArticleListSource {
   onLoadError?: (reset: boolean) => void;
   /** Scopes search to one list. `fetchPage` stays responsible for scoping the page fetch. */
   list?: ContentList;
+  /** Ids to leave out of both fetched pages and search results. */
+  exclude?: () => Promise<Set<string>>;
+}
+
+const NOTHING_EXCLUDED = Promise.resolve(new Set<string>());
+
+/** Fetches through `request` and drops the contents `exclude` names. */
+async function withoutExcluded(
+  request: Promise<UserContentsListResponse>,
+  exclude: (() => Promise<Set<string>>) | undefined,
+): Promise<UserContentsListResponse> {
+  const [response, excluded] = await Promise.all([request, exclude ? exclude() : NOTHING_EXCLUDED]);
+  if (excluded.size === 0) return response;
+  return { ...response, contents: response.contents.filter((c) => !excluded.has(c.content_id)) };
 }
 
 /**
@@ -44,6 +58,7 @@ export function useCursorArticleList({
   onResetLoaded,
   onLoadError,
   list,
+  exclude,
 }: CursorArticleListSource) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +97,10 @@ export function useCursorArticleList({
           setHasMore(true);
         }
 
-        const response = await fetchPage(reset ? undefined : cursorRef.current || undefined);
+        const response = await withoutExcluded(
+          fetchPage(reset ? undefined : cursorRef.current || undefined),
+          exclude,
+        );
         const page = response.contents.map((c) => ReadService.transformToArticle(c));
 
         // A reset that lands while search results are showing refreshes the
@@ -112,7 +130,7 @@ export function useCursorArticleList({
         if (reset && quiet) quietResetRef.current = false;
       }
     },
-    [fetchPage, onResetLoaded, onLoadError],
+    [fetchPage, onResetLoaded, onLoadError, exclude],
   );
 
   // Saves the list search results are about to replace, once per search.
@@ -129,7 +147,10 @@ export function useCursorArticleList({
   const runSearch = useCallback(
     async (q: string) => {
       try {
-        const response = await ReadService.searchUserContents({ q, limit: PAGE_SIZE, list });
+        const response = await withoutExcluded(
+          ReadService.searchUserContents({ q, limit: PAGE_SIZE, list }),
+          exclude,
+        );
         if (q !== searchQueryRef.current) return;
         setArticles(response.contents.map((c) => ReadService.transformToArticle(c)));
         cursorRef.current = '';
@@ -142,7 +163,7 @@ export function useCursorArticleList({
         if (q === searchQueryRef.current) setRefreshing(false);
       }
     },
-    [list],
+    [list, exclude],
   );
 
   useEffect(() => {

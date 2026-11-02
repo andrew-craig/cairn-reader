@@ -1,3 +1,4 @@
+import { Article } from '../types';
 import { ArticleStore } from './articleStore';
 import { ReadService } from './read';
 import { Outbox, OutboxField, isRetryable } from './outbox';
@@ -76,5 +77,24 @@ export const ArticleMutations = {
     await withOutboxOnRetryableError(articleId, 'status', { status: 'archived' }, () =>
       ReadService.updateUserContent(articleId, { status: 'archived' }),
     );
+  },
+
+  /**
+   * Save to Reads for a Feed item: stores it as a Reads item from the
+   * metadata already on hand (any body it carries is kept), stamped `addedAt`
+   * now as the server does on the move, then PATCHes `list`. Offline it stays
+   * queued and ReadsScreen shows it as pending until the outbox drains. A
+   * definitive rejection removes it from the store again and rethrows.
+   */
+  async saveToReads(article: Article): Promise<void> {
+    await ArticleStore.upsertMany([{ ...article, list: 'reads', addedAt: Date.now() }]);
+    try {
+      await withOutboxOnRetryableError(article.id, 'list', { list: 'reads' }, () =>
+        ReadService.moveToReads(article.id),
+      );
+    } catch (error) {
+      await ArticleStore.remove(article.id);
+      throw error;
+    }
   },
 };
