@@ -281,4 +281,33 @@ describe('FeedScreen', () => {
     expect(screen.queryByText('Feed Item b')).toBeNull();
     expect(mockedFeedCache.save).not.toHaveBeenCalled();
   });
+
+  it('does not cache search results when search opens while a swipe save is in flight', async () => {
+    mockedReadService.listUserContents.mockResolvedValue(page(['a', 'b']));
+    mockedReadService.searchUserContents.mockResolvedValue(page(['b']));
+    let resolveSave!: () => void;
+    mockedReadService.moveToReads.mockReturnValue(
+      new Promise((r) => (resolveSave = () => r(userContent('a')))),
+    );
+
+    render(<FeedScreen />);
+    await screen.findByText('Feed Item a');
+    await waitFor(() => expect(mockedFeedCache.save).toHaveBeenCalled());
+    mockedFeedCache.save.mockClear();
+
+    let swiped!: Promise<void>;
+    act(() => {
+      swiped = swipeFirstRow();
+    });
+    fireEvent.press(screen.getByLabelText('Search'));
+    fireEvent.changeText(screen.getByPlaceholderText('Search your feed'), 'b');
+    await waitFor(() => expect(mockedReadService.searchUserContents).toHaveBeenCalled(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByText('Feed Item a')).toBeNull());
+    await act(async () => {
+      resolveSave();
+      await swiped;
+    });
+
+    expect(mockedFeedCache.save).not.toHaveBeenCalled();
+  });
 });

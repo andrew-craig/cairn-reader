@@ -86,6 +86,10 @@ export const FeedScreen: React.FC = () => {
 
   const articlesRef = useRef<Article[]>(articles);
   articlesRef.current = articles;
+  // Read at call time: handleLeftFeed runs after an awaited save, by which
+  // point search may have opened.
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
 
   // On focus: refetch once the TTL has lapsed. If nothing is on screen yet,
   // prime from the cached last page first so a failed fetch isn't a blank tab.
@@ -121,11 +125,11 @@ export const FeedScreen: React.FC = () => {
       setArticles(next);
       // While searching, `next` is a subset of search results, not the Feed
       // page; the quiet refresh when search closes re-caches the page.
-      if (!searchQuery) {
+      if (!searchQueryRef.current) {
         FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
       }
     },
-    [setArticles, searchQuery],
+    [setArticles],
   );
 
   // Awaited, like the reader's Save to Reads: the row leaves the Feed once the
