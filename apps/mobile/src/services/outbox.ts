@@ -136,12 +136,21 @@ export const Outbox = {
     }
   },
 
-  /** Ids of articles with a queued Save to Reads (a `list` row). */
+  /**
+   * Ids of articles with a queued Save to Reads (a `list` row). Never rejects
+   * (like ArticleStore's reads): on failure it resolves empty, so the Feed
+   * fetch it filters still succeeds.
+   */
   async pendingSaveIds(): Promise<Set<string>> {
-    const db = await getDb();
-    const rows = await db.getAllAsync<{ article_id: string }>(
-      "SELECT article_id FROM outbox WHERE field = 'list'",
-    );
-    return new Set(rows.map((r) => r.article_id));
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<{ article_id: string }>(
+        "SELECT article_id FROM outbox WHERE field = 'list'",
+      );
+      return new Set(rows.map((r) => r.article_id));
+    } catch (error) {
+      console.error('Error loading pending save ids:', error);
+      return new Set();
+    }
   },
 };

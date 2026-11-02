@@ -34,15 +34,11 @@ export const FeedScreen: React.FC = () => {
   // Timestamp of the last successful network fetch (null = never fetched)
   const lastFetchedAtRef = useRef<number | null>(null);
 
-  // Until a queued Save to Reads drains, the server still lists the item in
-  // Feed; leave it out so a refetch doesn't bring it back.
-  const fetchPage = useCallback(async (cursor: string | undefined) => {
-    const [response, pendingSaves] = await Promise.all([
+  const fetchPage = useCallback(
+    (cursor: string | undefined) =>
       ReadService.listUserContents({ limit: PAGE_SIZE, cursor, list: 'feed' }),
-      Outbox.pendingSaveIds(),
-    ]);
-    return { ...response, contents: response.contents.filter((c) => !pendingSaves.has(c.content_id)) };
-  }, []);
+    [],
+  );
 
   const onResetLoaded = useCallback((next: Article[]) => {
     FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
@@ -78,7 +74,15 @@ export const FeedScreen: React.FC = () => {
     load,
     handleRefresh,
     handleLoadMore,
-  } = useCursorArticleList({ fetchPage, onResetLoaded, onLoadError, list: 'feed' });
+  } = useCursorArticleList({
+    fetchPage,
+    onResetLoaded,
+    onLoadError,
+    list: 'feed',
+    // Until a queued Save to Reads drains, the server still lists the item in
+    // Feed; leave it out so a refetch or search doesn't bring it back.
+    exclude: Outbox.pendingSaveIds,
+  });
 
   const articlesRef = useRef<Article[]>(articles);
   articlesRef.current = articles;
@@ -115,9 +119,13 @@ export const FeedScreen: React.FC = () => {
     (articleId: string) => {
       const next = articlesRef.current.filter((a) => a.id !== articleId);
       setArticles(next);
-      FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
+      // While searching, `next` is a subset of search results, not the Feed
+      // page; the quiet refresh when search closes re-caches the page.
+      if (!searchQuery) {
+        FeedCache.save(next).catch((err) => console.error('Failed to cache feed:', err));
+      }
     },
-    [setArticles],
+    [setArticles, searchQuery],
   );
 
   // Awaited, like the reader's Save to Reads: the row leaves the Feed once the

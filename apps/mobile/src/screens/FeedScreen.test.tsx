@@ -20,6 +20,7 @@ jest.mock('../services/read', () => ({
   ReadService: {
     listUserContents: jest.fn(),
     moveToReads: jest.fn(),
+    searchUserContents: jest.fn(),
     transformToArticle: jest.requireActual('../services/read').ReadService.transformToArticle,
   },
 }));
@@ -259,5 +260,25 @@ describe('FeedScreen', () => {
     await waitFor(() =>
       expect(mockedFeedCache.save).toHaveBeenCalledWith([expect.objectContaining({ id: 'b' })]),
     );
+  });
+
+  it('does not overwrite the cached Feed page with search results when swiping during search', async () => {
+    mockedReadService.listUserContents.mockResolvedValue(page(['a', 'b']));
+    mockedReadService.searchUserContents.mockResolvedValue(page(['b']));
+    mockedReadService.moveToReads.mockResolvedValue(userContent('b'));
+
+    render(<FeedScreen />);
+    await screen.findByText('Feed Item a');
+    await waitFor(() => expect(mockedFeedCache.save).toHaveBeenCalled());
+    mockedFeedCache.save.mockClear();
+
+    fireEvent.press(screen.getByLabelText('Search'));
+    fireEvent.changeText(screen.getByPlaceholderText('Search your feed'), 'b');
+    await waitFor(() => expect(mockedReadService.searchUserContents).toHaveBeenCalled(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByText('Feed Item a')).toBeNull());
+    await act(() => swipeFirstRow());
+
+    expect(screen.queryByText('Feed Item b')).toBeNull();
+    expect(mockedFeedCache.save).not.toHaveBeenCalled();
   });
 });

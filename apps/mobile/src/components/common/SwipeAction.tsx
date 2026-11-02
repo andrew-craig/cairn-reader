@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useRef } from 'react';
 import { Animated, StyleSheet, View, useColorScheme } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Colors, Spacing } from '../../constants';
@@ -71,8 +71,17 @@ export const SwipeAction: React.FC<SwipeActionProps> = ({
     );
   };
 
+  // An open row re-fires onSwipeableOpen on any further release, so ignore
+  // those while the previous action is still settling.
+  const inFlightRef = useRef(false);
   const handleOpen = (_side: 'left' | 'right', swipeable: Swipeable) => {
-    Promise.resolve(onAction()).catch(() => swipeable.close());
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    Promise.resolve(onAction())
+      .catch(() => swipeable.close())
+      .finally(() => {
+        inFlightRef.current = false;
+      });
   };
 
   return (

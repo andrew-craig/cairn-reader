@@ -214,6 +214,15 @@ describe('Outbox', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('pendingSaveIds resolves empty instead of rejecting when the read fails', async () => {
+      const db = await getDb();
+      jest.spyOn(db, 'getAllAsync').mockRejectedValueOnce(new Error('disk I/O error'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(Outbox.pendingSaveIds()).resolves.toEqual(new Set());
+      consoleErrorSpy.mockRestore();
+    });
+
     it('pendingSaveIds lists only articles with a queued list row', async () => {
       await Outbox.enqueue('a1', 'list', { list: 'reads' });
       await Outbox.enqueue('a2', 'is_favorite', { is_favorite: true });

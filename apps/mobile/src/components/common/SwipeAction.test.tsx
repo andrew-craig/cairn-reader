@@ -90,6 +90,20 @@ describe('SwipeAction', () => {
     expect(onAction).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores further releases while the action is still pending', async () => {
+    let resolve!: () => void;
+    const onAction = jest.fn(() => new Promise<void>((r) => (resolve = r)));
+    renderRow('right', onAction);
+
+    swipe(SWIPE_ACTION_THRESHOLD + 10);
+    swipe(10);
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolve());
+    swipe(10);
+    expect(onAction).toHaveBeenCalledTimes(2);
+  });
+
   it('stays open when the action resolves', async () => {
     const onAction = jest.fn().mockResolvedValue(undefined);
     renderRow('right', onAction);
