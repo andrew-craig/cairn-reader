@@ -51,7 +51,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'outline':
         return colors.primary;
       case 'danger':
-        return '#FFFFFF';
+        return colors.onAccent;
       default:
         return colors.background;
     }

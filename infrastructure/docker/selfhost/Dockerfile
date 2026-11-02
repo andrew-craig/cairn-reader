@@ -1,18 +1,19 @@
 # Lockfile stage — derive a web+shared-only view of the workspace lockfile.
-# apps/mobile is also a workspace member, so the shared root package-lock.json
-# changes on every mobile-only dependency bump. Feeding that straight into the
-# web install makes a mobile change bust the npm ci + vite build cache layers.
-# Dropping apps/mobile from the workspace list and regenerating the lockfile
+# apps/mobile and design/tokens (the color generator; its output is committed)
+# are also workspace members, so the shared root package-lock.json changes on
+# every mobile- or tokens-only dependency bump. Feeding that straight into the
+# web install makes such a change bust the npm ci + vite build cache layers.
+# Dropping them from the workspace list and regenerating the lockfile
 # offline (no network, no node_modules) yields output that is byte-identical
 # unless a dependency that web or shared actually uses changes — so the
-# COPY --from below is a BuildKit content-hash cache hit for mobile-only changes.
+# COPY --from below is a BuildKit content-hash cache hit for those changes.
 # npm 11+ prunes the orphaned workspace entry fully, hence node:24 here.
 FROM node:24-alpine AS lockfile
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/shared/package.json apps/shared/package.json
-RUN node -e "const fs=require('fs');const p=require('./package.json');p.workspaces=p.workspaces.filter(w=>w!=='apps/mobile');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" \
+RUN node -e "const fs=require('fs');const p=require('./package.json');p.workspaces=p.workspaces.filter(w=>w!=='apps/mobile'&&w!=='design/tokens');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')" \
     && npm install --package-lock-only --offline
 
 # Web build stage — compile the Vite SPA to static assets that the Go binary serves

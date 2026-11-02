@@ -3,12 +3,12 @@ import Svg, { Path } from 'react-native-svg';
 
 interface ArrowDownIconProps {
   size?: number;
-  color?: string;
+  color: string;
 }
 
 export const ArrowDownIcon: React.FC<ArrowDownIconProps> = ({
   size = 24,
-  color = '#0F0C0B'
+  color
 }) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

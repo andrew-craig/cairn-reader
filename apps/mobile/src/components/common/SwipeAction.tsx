@@ -13,7 +13,7 @@ interface SwipeActionProps {
   /** Direction of the swipe: 'left' is right-to-left, 'right' is left-to-right. */
   direction: 'left' | 'right';
   /** Icon revealed under the row; switches to its `filled` variant once a release would trigger. */
-  icon: React.ComponentType<{ size?: number; color?: string; filled?: boolean }>;
+  icon: React.ComponentType<{ size?: number; color: string; filled?: boolean }>;
   /** Theme colour revealed under the row. */
   color: keyof typeof Colors.light;
   /**
@@ -61,10 +61,10 @@ export const SwipeAction: React.FC<SwipeActionProps> = ({
       >
         <View style={styles.icon}>
           <Animated.View style={{ opacity: outlineOpacity }}>
-            <Icon size={ICON_SIZE} color="#FFFFFF" />
+            <Icon size={ICON_SIZE} color={colors.onAccent} />
           </Animated.View>
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: solidOpacity }]}>
-            <Icon size={ICON_SIZE} color="#FFFFFF" filled />
+            <Icon size={ICON_SIZE} color={colors.onAccent} filled />
           </Animated.View>
         </View>
       </View>

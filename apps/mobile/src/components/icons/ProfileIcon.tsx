@@ -3,13 +3,13 @@ import Svg, { Path } from 'react-native-svg';
 
 interface ProfileIconProps {
   size?: number;
-  color?: string;
+  color: string;
   filled?: boolean;
 }
 
 export const ProfileIcon: React.FC<ProfileIconProps> = ({
   size = 24,
-  color = '#0F0C0B',
+  color,
   filled = false
 }) => {
   return (

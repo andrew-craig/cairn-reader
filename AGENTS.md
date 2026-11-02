@@ -64,6 +64,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 - **Shared auth package** (JWT middleware used by all services): [pkg/auth/README.md](/pkg/auth/README.md)
 - **Selfhost** (single-container build): [infrastructure/docker/selfhost/README.md](/infrastructure/docker/selfhost/README.md)
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
+- **Color palette** (single source for web and mobile): [design/tokens/README.md](/design/tokens/README.md)
 - **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (epic_fefa)
 
 

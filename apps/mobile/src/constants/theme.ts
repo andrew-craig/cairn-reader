@@ -1,35 +1,5 @@
-export const Colors = {
-  light: {
-    primary: '#0F0C0B', // Figma: red/primary
-    background: '#FDFCFC', // Figma: red/background
-    card: '#FBFAF9', // Figma: red/floating
-    text: '#0F0C0B', // Figma: red/primary
-    textSecondary: '#696563', // Figma: red/secondary
-    border: '#F1EFEE', // Figma: red/line
-    hover: '#EDEAE9', // Figma: red/hover
-    success: '#34C759',
-    info: '#007AFF',
-    error: '#C63E06',
-    warning: '#FF9500',
-    tabIconDefault: '#696563',
-    tabIconSelected: '#0F0C0B',
-  },
-  dark: {
-    primary: '#FDFCFC',
-    background: '#0F0C0B',
-    card: '#1C1C1E',
-    text: '#FDFCFC',
-    textSecondary: '#8E8E93',
-    border: '#38383A',
-    hover: '#2C2C2E',
-    success: '#30D158',
-    info: '#0A84FF',
-    error: '#FF453A',
-    warning: '#FF9F0A',
-    tabIconDefault: '#8E8E93',
-    tabIconSelected: '#FDFCFC',
-  },
-};
+// Generated from design/tokens/colors.json (shared with the web app).
+export { Colors } from './colors';
 
 export const Spacing = {
   xs: 4,

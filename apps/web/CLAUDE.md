@@ -36,6 +36,12 @@ Run from the repo root with `-w @cairn/web` (npm workspace), or from `apps/web`:
 - Auth, server-URL config, API types and HTTP helpers come from `apps/shared` (`@cairn/shared`, consumed from source
   via the alias in `vite.config.ts`; no build step). Authenticated calls go through `AuthService.fetchWithAuth`.
 
+## Colors
+
+Never hardcode a color; use the `--color-*` variables. They are generated into `src/theme/colors.css` from
+[design/tokens/colors.json](/design/tokens/README.md), the palette shared with the mobile app; add or change a color
+there and regenerate.
+
 ## Testing
 
 Vitest with jsdom and Testing Library (`vitest.config.ts`, `vitest.setup.ts`); tests are colocated as `*.test.ts(x)`.

@@ -43,7 +43,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, 
           >
             <TouchableOpacity
               activeOpacity={1}
-              style={[styles.card, { backgroundColor: colors.hover }]}
+              style={[styles.card, { backgroundColor: colors.hover, shadowColor: colors.shadow }]}
               onPress={(e) => e.stopPropagation()}
             >
               {children}
@@ -68,7 +68,6 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     padding: Spacing.md,
     gap: Spacing.md,
-    shadowColor: 'rgba(15, 23, 42, 0.2)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 4,

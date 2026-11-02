@@ -30,7 +30,7 @@ apps/mobile/
     │   │                     #   SwipeAction, SyncTriggerEffect, TopBlurGradient, ...
     │   └── icons/            # SVG icons
     ├── config/               # init.ts (wires @cairn/shared at startup), storage.ts (AsyncStorage adapter + DEFAULT_SERVER_URL)
-    ├── constants/            # theme.ts (Colors, Spacing, FontSizes, FontFamily, BorderRadius, Layout), globalStyles.ts
+    ├── constants/            # theme.ts (Colors, Spacing, FontSizes, FontFamily, BorderRadius, Layout), colors.ts (generated), globalStyles.ts
     ├── contexts/AuthContext.tsx
     ├── hooks/                # useCursorArticleList, useNetworkStatus, useSyncTrigger
     ├── navigation/           # RootNavigator (stack), TabNavigator (tabs)
@@ -140,6 +140,7 @@ Testing uses `@testing-library/react-native`; native modules are mocked in `jest
 
 - TypeScript strict mode; type props and function signatures; avoid `any`.
 - Functional components with hooks; styles via `StyleSheet.create()` at the bottom of the file using theme constants (`Colors`, `Spacing`, `FontSizes`, `FontFamily`, `BorderRadius`, `Layout` from `src/constants/theme.ts`; get colors with `Colors[useColorScheme() ?? 'light']`). Test dark mode.
+- Colors: never hardcode one. `Colors` is generated from [design/tokens/colors.json](/design/tokens/README.md), shared with the web app; add or change a color there and regenerate.
 - Services: static classes/objects; log with `console.error`, show user-friendly messages, handle loading and error states, and throw `NetworkError`/`HttpError` (not bare `Error`) so offline logic can classify failures.
 - Adding a screen: create it in `src/screens/`, export from `src/screens/index.ts`, register it in `RootNavigator.tsx` (or `TabNavigator.tsx`) and add its params to `src/types/navigation.ts`.
 
