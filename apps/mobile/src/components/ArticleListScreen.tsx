@@ -188,6 +188,10 @@ export const ArticleListScreen: React.FC<ArticleListScreenProps> = ({
         // An element, not a component: a new component type each render would
         // remount the header and drop focus from the search field.
         ListHeaderComponent={renderHeader()}
+        // The search field lives in the header, inside this list: let taps on
+        // controls (e.g. close search) land while the keyboard is up instead
+        // of only dismissing it.
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}
