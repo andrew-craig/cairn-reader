@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, FlatList } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { ArticleListScreen } from './ArticleListScreen';
 import { Article } from '../types';
@@ -177,5 +177,15 @@ describe('ArticleListScreen error state', () => {
     );
 
     expect(screen.getByDisplayValue('whatever')).toBeTruthy();
+  });
+});
+
+describe('ArticleListScreen keyboard taps', () => {
+  it('lets taps on header controls through while the search keyboard is up', () => {
+    // The header (with the search field) is inside the FlatList; the default
+    // ('never') makes the first tap on close search only dismiss the keyboard.
+    render(<ArticleListScreen title="Read" articles={[article]} loading={false} />);
+
+    expect(screen.UNSAFE_getByType(FlatList).props.keyboardShouldPersistTaps).toBe('handled');
   });
 });
