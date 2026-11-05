@@ -1,40 +1,40 @@
 /* Generated from design/tokens/colors.json by `npm run build -w @cairn/tokens`. Do not edit. */
 :root {
-  --color-primary: #0F0C0B;
-  --color-background: #FDFCFC;
-  --color-card: #FBFAF9;
-  --color-text: #0F0C0B;
-  --color-text-secondary: #696563;
-  --color-border: #F1EFEE;
-  --color-hover: #EDEAE9;
+  --color-primary: #17100D;
+  --color-background: #FDFAF8;
+  --color-card: #FAF6F3;
+  --color-text: #17100D;
+  --color-text-secondary: #6E625B;
+  --color-border: #F0E9E4;
+  --color-hover: #E9E2DE;
   --color-success: #34C759;
   --color-info: #007AFF;
   --color-error: #C63E06;
   --color-warning: #FF9500;
   --color-on-accent: #FFFFFF;
-  --color-floating: #FBFAF9D9;
+  --color-floating: #FAF6F3D9;
   --color-overlay: #0000004D;
-  --color-shadow: #0F172A33;
-  --color-shadow-soft: #0F172A1F;
+  --color-shadow: #2B150D33;
+  --color-shadow-soft: #2B150D1F;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-primary: #FDFCFC;
-    --color-background: #1C1912;
-    --color-card: #25231D;
-    --color-text: #E7E3DA;
-    --color-text-secondary: #B1AEAA;
-    --color-border: #3D3A34;
-    --color-hover: #302D27;
+    --color-primary: #FDFAF8;
+    --color-background: #1D1714;
+    --color-card: #28201C;
+    --color-text: #EAE1DB;
+    --color-text-secondary: #B5AAA3;
+    --color-border: #41362F;
+    --color-hover: #312B27;
     --color-success: #30D158;
     --color-info: #0A84FF;
     --color-error: #FF453A;
     --color-warning: #FF9F0A;
     --color-on-accent: #FFFFFF;
-    --color-floating: #25231DD9;
+    --color-floating: #28201CD9;
     --color-overlay: #0000004D;
-    --color-shadow: #0F172A33;
-    --color-shadow-soft: #0F172A1F;
+    --color-shadow: #2B150D33;
+    --color-shadow-soft: #2B150D1F;
   }
 }

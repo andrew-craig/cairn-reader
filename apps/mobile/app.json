@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FDFCFC"
+      "backgroundColor": "#FDFAF8"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FDFCFC"
+        "backgroundColor": "#FDFAF8"
       },
       "package": "com.cairnapp.cairnreader"
     },
