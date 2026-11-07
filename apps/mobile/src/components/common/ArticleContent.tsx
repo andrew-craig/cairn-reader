@@ -14,7 +14,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import RenderHTML from 'react-native-render-html';
+import RenderHTML, { defaultSystemFonts } from 'react-native-render-html';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { Article } from '../../types';
@@ -168,9 +168,14 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   const topPadding = insets.top + Spacing.md;
   const bottomPadding = Layout.bottomActionMenuHeight + insets.bottom + Spacing.md;
 
-  // HTML rendering configuration
+  // HTML rendering configuration. Custom fonts are one file per weight/style,
+  // so bold and italic select their own family instead of relying on
+  // fontWeight/fontStyle (which would fall back to synthetic styling).
+  const boldStyle = { fontFamily: FontFamily.contentBold, fontWeight: 'normal' as const };
+  const italicStyle = { fontFamily: FontFamily.contentItalic, fontStyle: 'normal' as const };
   const tagsStyles = {
     body: {
+      fontFamily: FontFamily.content,
       color: colors.text,
       fontSize: FontSizes.md,
       lineHeight: 24,
@@ -183,34 +188,44 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
       color: colors.primary,
       textDecorationLine: 'underline' as const,
     },
+    strong: boldStyle,
+    b: boldStyle,
+    em: italicStyle,
+    i: italicStyle,
     h1: {
       fontSize: FontSizes.xl,
-      fontWeight: 'bold' as const,
+      fontFamily: FontFamily.defaultBold,
+      fontWeight: 'normal' as const,
       marginTop: Spacing.lg,
       marginBottom: Spacing.md,
       color: colors.text,
     },
     h2: {
       fontSize: FontSizes.lg,
-      fontWeight: 'bold' as const,
+      fontFamily: FontFamily.defaultBold,
+      fontWeight: 'normal' as const,
       marginTop: Spacing.lg,
       marginBottom: Spacing.sm,
       color: colors.text,
     },
     h3: {
       fontSize: FontSizes.md,
-      fontWeight: 'bold' as const,
+      fontFamily: FontFamily.defaultBold,
+      fontWeight: 'normal' as const,
       marginTop: Spacing.md,
       marginBottom: Spacing.sm,
       color: colors.text,
     },
+    h4: { fontFamily: FontFamily.defaultBold, fontWeight: 'normal' as const },
+    h5: { fontFamily: FontFamily.defaultBold, fontWeight: 'normal' as const },
+    h6: { fontFamily: FontFamily.defaultBold, fontWeight: 'normal' as const },
     blockquote: {
       borderLeftWidth: 4,
       borderLeftColor: colors.border,
       paddingLeft: Spacing.md,
       marginLeft: 0,
       marginVertical: Spacing.md,
-      fontStyle: 'italic' as const,
+      fontFamily: FontFamily.contentItalic,
       color: colors.textSecondary,
     },
     pre: {
@@ -290,6 +305,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
               contentWidth={width - (Spacing.md * 2)}
               source={{ html: article.content }}
               tagsStyles={tagsStyles}
+              systemFonts={contentFonts}
               defaultTextProps={{
                 selectable: true,
               }}
@@ -305,6 +321,15 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
     </ScrollView>
   );
 };
+
+// RenderHTML drops any fontFamily not listed here.
+const contentFonts = [
+  ...defaultSystemFonts,
+  FontFamily.content,
+  FontFamily.contentItalic,
+  FontFamily.contentBold,
+  FontFamily.defaultBold,
+];
 
 const styles = StyleSheet.create({
   scrollView: {
@@ -338,7 +363,7 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     fontSize: FontSizes.md,
-    fontFamily: FontFamily.default,
+    fontFamily: FontFamily.content,
     lineHeight: 22.4,
   },
 });

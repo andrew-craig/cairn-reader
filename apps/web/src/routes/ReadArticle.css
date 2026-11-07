@@ -82,7 +82,7 @@
 }
 
 .reader__body {
-  font-family: var(--font-body);
+  font-family: var(--font-content);
   font-size: var(--font-size-lg);
   line-height: 1.7;
   color: var(--color-text);
