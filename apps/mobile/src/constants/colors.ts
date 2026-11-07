@@ -2,6 +2,7 @@
 export const Colors = {
   light: {
     primary: '#17100D',
+    brand: '#6E2A22',
     background: '#FDFAF8',
     card: '#FAF6F3',
     text: '#17100D',
@@ -20,6 +21,7 @@ export const Colors = {
   },
   dark: {
     primary: '#FDFAF8',
+    brand: '#C94C3E',
     background: '#1D1714',
     card: '#28201C',
     text: '#EAE1DB',

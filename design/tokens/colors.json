@@ -3,6 +3,7 @@
   "$type": "color",
   "light": {
     "primary": { "$value": "#17100D", "$description": "Primary actions and selected states (Figma: red/primary)" },
+    "brand": { "$value": "#6E2A22", "$description": "Brand color: the Cairn wordmark and logo (oxblood). Large text and graphics only" },
     "background": { "$value": "#FDFAF8", "$description": "Screen background (Figma: red/background)" },
     "card": { "$value": "#FAF6F3", "$description": "Cards, sheets and inputs (Figma: red/floating)" },
     "text": { "$value": "#17100D", "$description": "Body text and icons (Figma: red/primary)" },
@@ -21,6 +22,7 @@
   },
   "dark": {
     "primary": { "$value": "#FDFAF8" },
+    "brand": { "$value": "#C94C3E" },
     "background": { "$value": "#1D1714" },
     "card": { "$value": "#28201C" },
     "text": { "$value": "#EAE1DB" },
