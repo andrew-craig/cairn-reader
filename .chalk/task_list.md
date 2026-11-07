@@ -8,6 +8,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
+- **feature_27cd** · P2 · open · Extraction feedback: let users report bad article extraction, keep raw source for reproduction
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
