@@ -15,6 +15,7 @@
       "**/*"
     ],
     "ios": {
+      "icon": "./assets/CairnIcon.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.cairnapp.cairnreader",
       "buildNumber": "1",
