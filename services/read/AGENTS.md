@@ -258,6 +258,41 @@ Changing a route only affects items delivered afterwards; existing items are nev
 from an RSS feed deletes its route. Moving a single item (`PATCH` with `list`) into `reads` re-stamps its
 `added_at`, so it appears at the top of Reads.
 
+**content_sources** table (1:1 with `contents`, migration `000007`; raw input kept for extraction-feedback reproduction):
+```sql
+content_id          UUID PRIMARY KEY REFERENCES contents(id) ON DELETE CASCADE
+raw_html            TEXT NOT NULL                 -- Original input HTML, unsanitized (5MB check)
+readability_failed  BOOLEAN NOT NULL              -- True when readability failed and the raw HTML was sanitized and stored as-is
+created_at          TIMESTAMP WITH TIME ZONE
+
+INDEX(created_at)
+```
+
+Written in the same transaction as the new `contents` row on every create path and replaced on content
+update; never written on a dedup hit. The cleanup job deletes rows older than `RAW_SOURCE_RETENTION`
+(default 30 days). The clock starts when the `contents` row is first created, so an item deduped against an
+older row (shared RSS article, repeated email) arrives with no source.
+
+**content_feedback** table (user reports of bad extraction, migration `000007`; no FK to `contents`, so a
+report survives content rewrites and deletion):
+```sql
+id, user_id, content_id
+categories        TEXT[] NOT NULL               -- >=1 of body_missing_content|body_extra_content|images|formatting|links|title|author|description|lead_image|other
+comment           TEXT                          -- Optional, <=2000 chars
+status            VARCHAR(10) NOT NULL          -- 'open'|'resolved'
+created_at, updated_at TIMESTAMP WITH TIME ZONE
+-- Evidence snapshot taken at submission
+original_url, title, author, description, image_url, cleaned_html, raw_html, readability_failed
+                                                -- raw_html + readability_failed are NULL if the source had expired
+
+UNIQUE(user_id, content_id)
+```
+
+Resubmitting updates the report, refreshes the snapshot and sets `status` back to `open`. Resolving a
+report sets `raw_html` and `cleaned_html` to NULL (private email bodies are kept only while a report is
+open). `raw_html` is unsanitized: no user-facing endpoint returns it or `cleaned_html` from this table;
+only the owner's triage tooling reads them.
+
 **Triggers**:
 - **trg_mark_orphaned**: Sets `contents.orphaned_at` when the last `user_contents` row for that content is deleted
 - **trg_clear_orphaned**: Clears `contents.orphaned_at` when a new `user_contents` row is inserted
@@ -452,6 +487,16 @@ DELETE /api/v1/content/user/{user_id}/{content_id}   → Remove from user's list
        Auth: Bearer <JWT token>
        Returns: 401 if missing/invalid token, 403 if accessing other user's content
 
+PUT    /api/v1/content/user/{user_id}/{content_id}/feedback → Report bad extraction (upsert; reopens a resolved report)
+       Auth: Bearer <JWT token>
+       Body: {"categories": ["images", "formatting"], "comment": "optional, max 2000 chars"}
+       Returns: 400 on empty/unknown category or over-long comment, 401 if missing/invalid token,
+                403 if accessing other user's content, 404 if the user doesn't have the content
+
+GET    /api/v1/content/user/{user_id}/{content_id}/feedback → The user's own report (no snapshot fields)
+       Auth: Bearer <JWT token>
+       Returns: 401 if missing/invalid token, 403 if accessing other user's content, 404 if no report
+
 GET    /api/v1/content/user/{user_id}/subscriptions  → List all subscriptions (RSS + email) for the user
        Auth: Bearer <JWT token>
        Note: Aggregates results from Ingest RSS and Email Ingest services. Each entry carries its
@@ -547,6 +592,8 @@ All routes under `/api/v1/content/user/{user_id}`, plus `/api/v1/content/detect`
 - `GET /api/v1/content/user/{user_id}/{content_id}` - Get a single user-content item
 - `PATCH /api/v1/content/user/{user_id}/{content_id}` - Update content metadata
 - `DELETE /api/v1/content/user/{user_id}/{content_id}` - Delete from user
+- `PUT /api/v1/content/user/{user_id}/{content_id}/feedback` - Report bad extraction
+- `GET /api/v1/content/user/{user_id}/{content_id}/feedback` - Get own extraction report
 - `GET /api/v1/content/user/{user_id}/subscriptions` - List all subscriptions
 - `PUT /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list` - Choose Feed or Reads for a source
 - `DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id}` - Unsubscribe from RSS feed
@@ -744,7 +791,8 @@ The Ingest RSS Service uses the outbox pattern to ensure reliable content delive
 **Cleanup Job**:
 - **Schedule**: Daily at 2 AM (`CLEANUP_CRON`)
 - **Purpose**: First delete Feed-list `user_contents` older than 30 days (by `added_at`) that are not
-  favorited, then delete content orphaned for 90+ days
+  favorited, then delete content orphaned for 90+ days, then delete `content_sources` rows older than
+  `RAW_SOURCE_RETENTION`
 - **Location**: `content/internal/jobs/cleanup_job.go`
 
 ### Ingest RSS Service
@@ -978,6 +1026,7 @@ JWT_PUBLIC_KEY_REFRESH_INTERVAL=5m     # Optional; how often the JWT public key 
 ```bash
 DB_*, LOG_LEVEL                        # Same discrete DB variables as the Content Service
 CLEANUP_CRON=0 2 * * *                 # Default; schedule of the Feed expiry + orphaned content cleanup
+RAW_SOURCE_RETENTION=720h              # Default (30 days); how long raw source HTML is kept for extraction feedback
 HEALTH_PORT=8082                       # Default; dev docker-compose overrides to 8084
 ```
 

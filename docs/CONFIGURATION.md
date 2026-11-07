@@ -378,11 +378,12 @@ The worker reads its own variables directly (not `pkg/config`). Unlike the API (
 | `DB_CONN_MAX_IDLE_TIME` | duration | No | `2m` | Maximum connection idle time |
 | `DB_STATEMENT_TIMEOUT` | duration | No | `30s` | Per-connection statement timeout |
 | `CLEANUP_CRON` | string | No | `0 2 * * *` | Cron schedule for the cleanup job (2 AM daily) |
+| `RAW_SOURCE_RETENTION` | duration | No | `720h` | How long raw source HTML (`content_sources`) is kept for extraction-feedback reproduction (30 days) |
 | `HEALTH_PORT` | string | No | `8082` | Health check server port |
 | `LOG_LEVEL` | string | No | `info` | Log level |
 | `LOG_FORMAT` | string | No | `text` | Log format |
 
-The cleanup job deletes non-favorited Feed items 30 days after they were added and orphaned content after 90 days, in batches of 1000 rows. The retention periods and batch size are constants in `content/internal/jobs/cleanup_job.go`, not environment variables.
+The cleanup job deletes non-favorited Feed items 30 days after they were added and orphaned content after 90 days, in batches of 1000 rows. It also deletes raw source HTML older than `RAW_SOURCE_RETENTION`. The feed and orphan retention periods and the batch size are constants in `content/internal/jobs/cleanup_job.go`, not environment variables; the raw-source retention is the only one configurable.
 
 #### Example `.env` File
 
@@ -403,6 +404,7 @@ INTERNAL_API_KEY=change-me
 
 # Content worker
 CLEANUP_CRON="0 2 * * *"
+RAW_SOURCE_RETENTION=720h
 HEALTH_PORT=8084
 ```
 

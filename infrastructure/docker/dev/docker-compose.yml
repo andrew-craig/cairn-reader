@@ -157,6 +157,7 @@ services:
       - DB_NAME=${POSTGRES_DB_CONTENT}
       - DB_SSLMODE=disable
       - CLEANUP_CRON=0 2 * * *
+      - RAW_SOURCE_RETENTION=720h
       - HEALTH_PORT=8084
     ports:
       - "8084:8084"

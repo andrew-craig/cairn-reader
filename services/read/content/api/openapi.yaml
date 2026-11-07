@@ -1402,6 +1402,148 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/content/user/{user_id}/{content_id}/feedback:
+    put:
+      tags:
+        - User Contents
+      summary: Report bad extraction
+      description: |
+        Flag an item whose article extraction went wrong. Upsert: one report per user and item.
+        Resubmitting replaces the categories and comment and sets `status` back to `open`.
+        The server keeps an evidence snapshot with the report for triage; it is never returned by the API.
+      operationId: putUserContentFeedback
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+        - name: content_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Content ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtractionFeedbackRequest'
+      responses:
+        '200':
+          description: Report saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExtractionFeedbackResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '400':
+          description: Bad request - invalid user ID or content ID format, empty or unknown category, or comment over 2000 characters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User-content relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - User Contents
+      summary: Get the user's extraction report
+      description: Retrieve the user's own report for an item (categories, comment, status, timestamps). Never includes the evidence snapshot.
+      operationId: getUserContentFeedback
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: User ID
+        - name: content_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Content ID
+      responses:
+        '200':
+          description: Report retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ExtractionFeedbackResponse'
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+        '400':
+          description: Bad request - invalid user ID or content ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - missing or invalid authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - user can only access their own content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No report for this item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/content/user/{user_id}/search:
     get:
       tags:
@@ -2164,6 +2306,47 @@ components:
           $ref: '#/components/schemas/Pagination'
         meta:
           $ref: '#/components/schemas/Meta'
+
+    ExtractionFeedbackRequest:
+      type: object
+      required: [categories]
+      properties:
+        categories:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [body_missing_content, body_extra_content, images, formatting, links, title, author, description, lead_image, other]
+          description: What went wrong with the extraction
+        comment:
+          type: string
+          maxLength: 2000
+          description: Optional free-text detail
+
+    ExtractionFeedbackResponse:
+      type: object
+      properties:
+        content_id:
+          type: string
+          format: uuid
+        categories:
+          type: array
+          items:
+            type: string
+            enum: [body_missing_content, body_extra_content, images, formatting, links, title, author, description, lead_image, other]
+        comment:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [open, resolved]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ErrorResponse:
       type: object

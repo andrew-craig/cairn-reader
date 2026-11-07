@@ -26,7 +26,7 @@ content/
 │   ├── api/                     # Router, handlers, middleware, DTOs
 │   ├── config/                  # Configuration
 │   ├── database/                # Connection pooling, migrations runner
-│   ├── jobs/                    # Cleanup job (Feed expiry + orphaned content)
+│   ├── jobs/                    # Cleanup job (Feed expiry, orphaned content, expired raw sources)
 │   ├── models/                  # Data models
 │   ├── processor/               # Readability, sanitization, hashing
 │   ├── repository/              # Database layer
@@ -98,7 +98,7 @@ Summary only; paths, parameters and schemas are in [api/openapi.yaml](api/openap
 table with auth requirements is in [../CLAUDE.md](/services/read/CLAUDE.md).
 
 - **JWT (`Authorization: Bearer`)**: `/api/v1/content/detect`, `/discover-feed`, `/api/v1/content/user/bulk`,
-  and everything under `/api/v1/content/user/{user_id}` (list, count, search, get, patch, delete, subscriptions)
+  and everything under `/api/v1/content/user/{user_id}` (list, count, search, get, patch, delete, subscriptions, extraction feedback)
 - **Internal (`X-Internal-API-Key`)**: `/api/v1/content` create/get/update, `/bulk`, `/check-duplicate`,
   and `/api/v1/internal/content/user/bulk`
 - **Unauthenticated**: `/health/live`, `/health/ready`, `/`
