@@ -5,6 +5,8 @@ import { ReadService } from '../services/read';
 import { sanitizeArticleHtml } from '../utils/sanitize';
 import { decodeEntities } from '../utils/decodeEntities';
 import FloatingActionBar from '../components/FloatingActionBar';
+import BugIcon from '../components/icons/BugIcon';
+import ReportIssueModal from '../components/ReportIssueModal';
 import './ReadArticle.css';
 
 // Scrolled this far through the article (fraction of scrollable height) marks it
@@ -57,6 +59,9 @@ export default function ReadArticle() {
   const [isFavorite, setIsFavorite] = useState(initialArticle?.isFavorite ?? false);
   const list = article?.list ?? urlList;
   const isFeed = list === 'feed';
+
+  const [showReport, setShowReport] = useState(false);
+  const [closingReport, setClosingReport] = useState(false);
 
   // Guards the awaited, online-only move so a double click can't send it twice.
   const savingToReadsRef = useRef(false);
@@ -258,6 +263,14 @@ export default function ReadArticle() {
     }
   }, [article, list, navigate]);
 
+  const handleCloseReport = useCallback(() => {
+    setClosingReport(true);
+    setTimeout(() => {
+      setShowReport(false);
+      setClosingReport(false);
+    }, 150);
+  }, []);
+
   const handleOpenOriginal = useCallback(() => {
     if (article?.url) {
       window.open(article.url, '_blank', 'noopener,noreferrer');
@@ -305,7 +318,16 @@ export default function ReadArticle() {
         ) : (
           <p className="reader__status">{error ?? 'No content available for this article.'}</p>
         )}
+        {sanitizedHtml && (
+          <button type="button" className="reader__report" onClick={() => setShowReport(true)}>
+            <BugIcon />
+            Report an issue with the article
+          </button>
+        )}
       </article>
+      {showReport && (
+        <ReportIssueModal contentId={article.id} onClose={handleCloseReport} closing={closingReport} />
+      )}
       <FloatingActionBar
         actions={[
           { icon: 'return', label: 'Back', onClick: () => navigate(`/${list}`) },

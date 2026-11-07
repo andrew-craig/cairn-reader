@@ -1,0 +1,45 @@
+/* ReportIssueModal — reuses the AddLinkModal overlay/card/button styles. */
+
+.report-modal__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.report-modal__reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: var(--font-size-sm);
+}
+
+.report-modal__legend {
+  padding: 0;
+  margin-bottom: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.report-modal__reason {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.report-modal__reason input {
+  margin-top: 2px;
+}
+
+.report-modal__comment {
+  min-height: 96px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.report-modal__sent {
+  margin: 0;
+  padding: var(--spacing-md) 0;
+  text-align: center;
+}

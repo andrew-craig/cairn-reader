@@ -153,3 +153,53 @@ describe('ReadService list routing', () => {
     await expect(ReadService.setSourceList('email', 's-1', 'reads')).rejects.toThrow('nope');
   });
 });
+
+describe('ReadService article feedback', () => {
+  const fetchWithAuth = vi.fn();
+
+  beforeEach(() => {
+    fetchWithAuth.mockReset();
+    vi.spyOn(AuthService, 'getUserId').mockResolvedValue('user-1');
+    vi.spyOn(AuthService, 'fetchWithAuth').mockImplementation(fetchWithAuth);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const report = { content_id: 'c-1', categories: ['title'], comment: null, status: 'open' };
+
+  it('GETs the own report and unwraps data', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: report }) });
+    await expect(ReadService.getArticleFeedback('c-1')).resolves.toEqual(report);
+    expect(fetchWithAuth.mock.calls[0][0]).toMatch(/\/api\/v1\/content\/user\/user-1\/c-1\/feedback$/);
+    expect(fetchWithAuth.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it('treats 404 as no report', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: false, status: 404, json: async () => ({ error: 'not_found' }) });
+    await expect(ReadService.getArticleFeedback('c-1')).resolves.toBeNull();
+  });
+
+  it('throws on other GET failures', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: false, status: 500, json: async () => ({ message: 'oops' }) });
+    await expect(ReadService.getArticleFeedback('c-1')).rejects.toThrow('oops');
+  });
+
+  it('PUTs categories and comment', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: true, status: 200, json: async () => ({ data: report }) });
+    const body = { categories: ['title', 'other'] as const, comment: 'hi' };
+    await expect(
+      ReadService.submitArticleFeedback('c-1', { categories: [...body.categories], comment: body.comment }),
+    ).resolves.toEqual(report);
+    const [url, init] = fetchWithAuth.mock.calls[0];
+    expect(url).toMatch(/\/api\/v1\/content\/user\/user-1\/c-1\/feedback$/);
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual(body);
+  });
+
+  it('throws the server message when the PUT fails', async () => {
+    fetchWithAuth.mockResolvedValue({ ok: false, status: 400, json: async () => ({ message: 'bad' }) });
+    await expect(ReadService.submitArticleFeedback('c-1', { categories: ['other'] })).rejects.toThrow('bad');
+  });
+});
