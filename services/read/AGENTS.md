@@ -269,7 +269,9 @@ INDEX(created_at)
 ```
 
 Written in the same transaction as the new `contents` row on every create path and replaced on content
-update; never written on a dedup hit. The cleanup job deletes rows older than `RAW_SOURCE_RETENTION`
+update; never written on a dedup hit. That includes the concurrent-duplicate race: when `ON CONFLICT`
+resolves an insert to another request's row (the returned ID differs from the one this request generated),
+no source is written. The cleanup job deletes rows older than `RAW_SOURCE_RETENTION`
 (default 30 days). The clock starts when the `contents` row is first created, so an item deduped against an
 older row (shared RSS article, repeated email) arrives with no source.
 
@@ -283,15 +285,18 @@ status            VARCHAR(20) NOT NULL          -- 'open'|'resolved'
 created_at, updated_at TIMESTAMP WITH TIME ZONE
 -- Evidence snapshot taken at submission
 original_url, title, author, description, image_url, cleaned_html, raw_html, readability_failed
+                                                -- image_url = image_urls[1] (NULL when empty)
                                                 -- raw_html + readability_failed are NULL if the source had expired
 
 UNIQUE(user_id, content_id)
 ```
 
-Resubmitting updates the report, refreshes the snapshot and sets `status` back to `open`. Resolving a
-report sets `raw_html` and `cleaned_html` to NULL (private email bodies are kept only while a report is
-open). `raw_html` is unsanitized: no user-facing endpoint returns it or `cleaned_html` from this table;
-only the owner's triage tooling reads them.
+Resubmitting updates the report, refreshes the snapshot and sets `status` back to `open`. If the source has
+expired by then, the `raw_html`/`readability_failed` captured earlier are kept, not overwritten with NULL.
+Resolving a report sets `raw_html` and `cleaned_html` to NULL, so private email bodies stay in the database
+only while a report is open. Open reports have no time limit, so stale ones need triaging. `raw_html` is
+unsanitized: no user-facing endpoint returns it or `cleaned_html` from this table; only the owner's triage
+tooling reads them.
 
 **Triggers**:
 - **trg_mark_orphaned**: Sets `contents.orphaned_at` when the last `user_contents` row for that content is deleted

@@ -65,8 +65,9 @@ func (r *contentFeedbackRepository) Upsert(ctx context.Context, feedback *models
 			description = EXCLUDED.description,
 			image_url = EXCLUDED.image_url,
 			cleaned_html = EXCLUDED.cleaned_html,
-			raw_html = EXCLUDED.raw_html,
-			readability_failed = EXCLUDED.readability_failed,
+			-- Once the source has expired, keep the evidence captured earlier.
+			raw_html = COALESCE(EXCLUDED.raw_html, content_feedback.raw_html),
+			readability_failed = COALESCE(EXCLUDED.readability_failed, content_feedback.readability_failed),
 			status = 'open',
 			updated_at = NOW()
 		RETURNING `+feedbackReportColumns,

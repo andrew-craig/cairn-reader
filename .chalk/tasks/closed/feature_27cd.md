@@ -30,9 +30,10 @@ Users can flag an article whose extraction went wrong (body, images, formatting,
 3. **`content_feedback`** (new table, no FK to `contents`, so it survives content deletion and rewrites):
    `id, user_id, content_id, categories TEXT[] (≥1, from a fixed set), comment (optional, ≤2000 chars), status ('open'|'resolved'), created_at, updated_at`,
    plus a snapshot taken when the report is submitted: `original_url, title, author, description, image_url, cleaned_html, raw_html, readability_failed`. `raw_html` and `readability_failed` are both nullable and both NULL when the `content_sources` row has already expired.
-   `UNIQUE(user_id, content_id)`: resubmitting updates the existing report, refreshes the snapshot and **sets status back to `open`**, so a re-report after a fix reaches triage.
-   **Snapshot retention:** resolving a report sets `raw_html` and `cleaned_html` to NULL. Only metadata, categories and comment are kept, so private email bodies are kept only while a report is open. Once resolved, the report was either fixed (the lasting evidence is the readability test fixture committed with the fix) or won't be fixed (no evidence needed).
+   `UNIQUE(user_id, content_id)`: resubmitting updates the existing report, refreshes the snapshot and **sets status back to `open`**, so a re-report after a fix reaches triage. If the source has expired, the previously captured `raw_html`/`readability_failed` are kept (`COALESCE` in the upsert). `image_url` is `image_urls[1]`, NULL when empty.
+   **Snapshot retention:** resolving a report sets `raw_html` and `cleaned_html` to NULL. Only metadata, categories and comment are kept, so private email bodies are kept in the database only while a report is open. Open reports have no time limit (accepted for now; see tradeoffs). Once resolved, the report was either fixed (the lasting evidence is the readability test fixture committed with the fix) or won't be fixed (no evidence needed).
    **Fixtures from email content** must be cut down to the markup that triggers the bug, with personal content removed, before they're committed.
+   **Export artifacts** (`raw.html`, `output.html`) are temporary files on the operator's machine: delete them once the fixture has been cut down.
    **Exposure:** `raw_html` is unsanitized input. No user-facing endpoint returns `raw_html` or `cleaned_html` from this table. Only the owner's triage CLI reads them.
 4. **Categories** (cover every extraction output): `body_missing_content`, `body_extra_content`, `images`, `formatting`, `links`, `title`, `author`, `description`, `lead_image`, `other`.
 5. **API** (under the existing `/api/v1/content/user/{user_id}` group, which already enforces that `{user_id}` matches the token):
@@ -57,6 +58,7 @@ Users can flag an article whose extraction went wrong (body, images, formatting,
 
 - Reports on items older than 30 days have no raw HTML (common for long-lived Reads items). Triage falls back to re-fetching `original_url`. The retention clock starts when the content row is first created, not when it reaches this user: an item deduped against a row another user created more than 30 days ago (a shared RSS article, or an email matched on hash + URL) arrives with no source row even though it's new to this user. A longer retention fixes that at the cost of storage and of keeping private email content longer.
 - Storage: raw HTML is usually a few times the size of the cleaned output. Postgres compresses large text automatically.
+- Open reports keep their snapshot until resolved, with no time limit. Fine while the owner triages regularly; an auto-resolve after N days could be added if reports go stale.
 - The fallback-path flag (`readability_failed`) is also useful on its own, e.g. `SELECT count(*) ... WHERE readability_failed`.
 
 ## Review

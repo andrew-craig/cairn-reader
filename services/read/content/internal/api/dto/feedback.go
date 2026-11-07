@@ -45,7 +45,7 @@ func uniqueCategories(value interface{}) error {
 	seen := make(map[string]struct{}, len(categories))
 	for _, c := range categories {
 		if _, dup := seen[c]; dup {
-			return errors.New("Categories must be unique")
+			return errors.New("categories must be unique")
 		}
 		seen[c] = struct{}{}
 	}

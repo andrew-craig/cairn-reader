@@ -94,7 +94,7 @@ func TestFeedbackService_Submit_Integration(t *testing.T) {
 		require.Nil(t, got)
 	})
 
-	t.Run("expired source leaves raw_html and readability_failed NULL", func(t *testing.T) {
+	t.Run("resubmit after the source expired keeps the captured evidence", func(t *testing.T) {
 		_, err := testDB.DB.Exec(`DELETE FROM content_sources WHERE content_id = $1`, content.ID)
 		require.NoError(t, err)
 
@@ -102,24 +102,28 @@ func TestFeedbackService_Submit_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		row := readFeedbackSnapshot(t, testDB.DB, userID, content.ID)
-		require.False(t, row.rawHTML.Valid)
-		require.False(t, row.readabilityFailed.Valid)
+		require.Equal(t, "<html>raw</html>", row.rawHTML.String)
+		require.True(t, row.readabilityFailed.Valid)
+		require.True(t, row.readabilityFailed.Bool)
 		require.Equal(t, "<p>cleaned</p>", row.cleanedHTML.String)
 	})
 
-	t.Run("absent image leaves image_url NULL", func(t *testing.T) {
-		noImage := &models.Content{
+	t.Run("no source leaves raw_html, readability_failed and absent image NULL", func(t *testing.T) {
+		noSource := &models.Content{
 			ContentHash: "h2", CleanedHTML: "<p>x</p>", OriginalURL: "https://example.com/b",
-			Title: "No image", SourceType: models.SourceTypeWeb,
+			Title: "No source", SourceType: models.SourceTypeWeb,
 		}
-		require.NoError(t, contentRepo.Create(ctx, noImage))
+		require.NoError(t, contentRepo.Create(ctx, noSource))
 		require.NoError(t, userContentRepo.Create(ctx, &models.UserContent{
-			UserID: userID, ContentID: noImage.ID, Status: models.StatusUnread, List: models.ListReads,
+			UserID: userID, ContentID: noSource.ID, Status: models.StatusUnread, List: models.ListReads,
 		}))
 
-		_, err := svc.Submit(ctx, userID, noImage.ID, []string{"other"}, nil)
+		_, err := svc.Submit(ctx, userID, noSource.ID, []string{"other"}, nil)
 		require.NoError(t, err)
-		require.False(t, readFeedbackSnapshot(t, testDB.DB, userID, noImage.ID).imageURL.Valid)
+		row := readFeedbackSnapshot(t, testDB.DB, userID, noSource.ID)
+		require.False(t, row.rawHTML.Valid)
+		require.False(t, row.readabilityFailed.Valid)
+		require.False(t, row.imageURL.Valid)
 	})
 }
 
