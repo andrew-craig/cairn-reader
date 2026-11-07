@@ -6,16 +6,19 @@ import {
   StyleSheet,
   useColorScheme,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { throttle } from '@cairn/shared';
 import { Article, RootStackParamList } from '../types';
 import { ArticleStore, ReadService, ArticleMutations, invalidateReads } from '../services';
-import { Colors, GlobalStyles } from '../constants';
+import { Colors, GlobalStyles, Spacing, FontSizes, FontFamily } from '../constants';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { ArticleContent, BottomActionMenu } from '../components/common';
 import type { ScrollProgressInfo } from '../components/common/ArticleContent';
+import { ReportIssueModal } from '../components/ReportIssueModal';
+import { BugIcon } from '../components/icons';
 
 const COMPLETED_PROGRESS_THRESHOLD = 0.95;
 // Throttle persisting scroll position while the user is actively scrolling,
@@ -41,6 +44,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
   const [article, setArticle] = useState<Article>(initialArticle);
   const [contentLoading, setContentLoading] = useState(!initialArticle.content);
   const { isOffline } = useNetworkStatus();
+  const [reportVisible, setReportVisible] = useState(false);
 
   useEffect(() => {
     // Gate on the currently displayed article's content, not the initial
@@ -325,6 +329,25 @@ export const ReadArticleDetailScreen: React.FC = () => {
         colors={colors}
         onScrollProgress={handleScrollProgress}
         initialScrollFraction={toFraction(article.scrollFraction) ?? toFraction(article.scrollPosition)}
+        footer={
+          <TouchableOpacity
+            style={styles.reportLink}
+            onPress={() => setReportVisible(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
+            <BugIcon size={18} color={colors.textSecondary} />
+            <Text style={[styles.reportLinkText, { color: colors.textSecondary }]}>
+              Report an issue with the article
+            </Text>
+          </TouchableOpacity>
+        }
+      />
+
+      <ReportIssueModal
+        visible={reportVisible}
+        articleId={article.id}
+        onClose={() => setReportVisible(false)}
       />
 
       <BottomActionMenu
@@ -362,5 +385,18 @@ const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reportLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  reportLinkText: {
+    fontSize: FontSizes.sm,
+    fontFamily: FontFamily.default,
   },
 });

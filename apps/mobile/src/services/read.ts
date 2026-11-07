@@ -25,6 +25,32 @@ import {
 
 const PAGE_SIZE_DEFAULT = 20;
 
+export type ExtractionFeedbackCategory =
+  | 'body_missing_content'
+  | 'body_extra_content'
+  | 'images'
+  | 'formatting'
+  | 'links'
+  | 'title'
+  | 'author'
+  | 'description'
+  | 'lead_image'
+  | 'other';
+
+export interface ExtractionFeedbackRequest {
+  categories: ExtractionFeedbackCategory[];
+  comment?: string;
+}
+
+export interface ExtractionFeedbackResponse {
+  content_id: string;
+  categories: ExtractionFeedbackCategory[];
+  comment: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+  updated_at: string;
+}
+
 export class ReadService {
   /**
    * List user's saved content
@@ -519,6 +545,59 @@ export class ReadService {
 
     if (!response.ok) {
       throw new Error(result.message || result.error || 'Failed to fetch content detail');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Get the user's own extraction report for an item, or null when none exists (404).
+   */
+  static async getExtractionFeedback(contentId: string): Promise<ExtractionFeedbackResponse | null> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await AuthService.fetchWithAuth(
+      `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}/feedback`,
+    );
+
+    if (response.status === 404) return null;
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to fetch report');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Report a bad extraction (upsert: resubmitting replaces the earlier report).
+   * Online-only; deliberately not routed through the offline outbox.
+   */
+  static async submitExtractionFeedback(
+    contentId: string,
+    feedback: ExtractionFeedbackRequest,
+  ): Promise<ExtractionFeedbackResponse> {
+    const userId = await AuthService.getUserId();
+
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await AuthService.fetchWithAuth(
+      `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}/feedback`,
+      { method: 'PUT', body: JSON.stringify(feedback) },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || result.error || 'Failed to send report');
     }
 
     return result.data;

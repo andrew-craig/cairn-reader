@@ -251,3 +251,60 @@ describe('ReadService list routing', () => {
     });
   });
 });
+
+describe('ReadService extraction feedback', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockedAuth.getUserId.mockResolvedValue('user-1');
+  });
+
+  const report = {
+    content_id: 'c-1',
+    categories: ['images'],
+    comment: 'broken',
+    status: 'open',
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+  };
+
+  it('GETs the report and unwraps data', async () => {
+    mockedAuth.fetchWithAuth.mockResolvedValue(okResponse({ data: report }));
+
+    await expect(ReadService.getExtractionFeedback('c-1')).resolves.toEqual(report);
+    expect(mockedAuth.fetchWithAuth).toHaveBeenCalledWith(
+      'https://api.test/api/v1/content/user/user-1/c-1/feedback',
+    );
+  });
+
+  it('treats 404 as no report', async () => {
+    mockedAuth.fetchWithAuth.mockResolvedValue(errorResponse(404, { error: 'not_found' }));
+
+    await expect(ReadService.getExtractionFeedback('c-1')).resolves.toBeNull();
+  });
+
+  it('throws on other GET failures', async () => {
+    mockedAuth.fetchWithAuth.mockResolvedValue(errorResponse(500, { message: 'boom' }));
+
+    await expect(ReadService.getExtractionFeedback('c-1')).rejects.toThrow('boom');
+  });
+
+  it('PUTs categories and comment', async () => {
+    mockedAuth.fetchWithAuth.mockResolvedValue(okResponse({ data: report }));
+
+    await expect(
+      ReadService.submitExtractionFeedback('c-1', { categories: ['images'], comment: 'broken' }),
+    ).resolves.toEqual(report);
+    expect(mockedAuth.fetchWithAuth).toHaveBeenCalledWith(
+      'https://api.test/api/v1/content/user/user-1/c-1/feedback',
+      { method: 'PUT', body: JSON.stringify({ categories: ['images'], comment: 'broken' }) },
+    );
+  });
+
+  it('throws the server message when the PUT fails', async () => {
+    mockedAuth.fetchWithAuth.mockResolvedValue(errorResponse(400, { message: 'bad category' }));
+
+    await expect(
+      ReadService.submitExtractionFeedback('c-1', { categories: ['images'] }),
+    ).rejects.toThrow('bad category');
+  });
+});

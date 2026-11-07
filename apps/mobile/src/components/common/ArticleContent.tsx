@@ -50,6 +50,8 @@ interface ArticleContentProps {
   colors: typeof Colors.light;
   onScrollProgress?: (info: ScrollProgressInfo) => void;
   initialScrollFraction?: number;
+  /** Rendered inside the scroll view, after the end of the article body. */
+  footer?: React.ReactNode;
 }
 
 export const ArticleContent: React.FC<ArticleContentProps> = ({
@@ -57,6 +59,7 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
   colors,
   onScrollProgress,
   initialScrollFraction,
+  footer,
 }) => {
   const { width } = useWindowDimensions();
   const publishedDateLabel = formatPublishedDate(article.publishedDate);
@@ -317,6 +320,8 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
             </Text>
           ) : null}
         </View>
+
+        {footer}
       </View>
     </ScrollView>
   );
