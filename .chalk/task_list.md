@@ -6,9 +6,9 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
+- **feature_27cd** · P2 · in_progress · Extraction feedback: let users report bad article extraction, keep raw source for reproduction
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
-- **feature_27cd** · P2 · open · Extraction feedback: let users report bad article extraction, keep raw source for reproduction
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
@@ -34,6 +34,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_9dba** · P3 · open · Article sharing via links
 - **feature_a849** · P3 · open · Enhanced article reader with adjustable fonts
 - **feature_b02e** · P3 · open · Import/export functionality
+- **feature_c5f6** · P3 · open · Extraction feedback triage CLI (list/export/resolve)
 - **feature_cf80** · P3 · open · Mobile: Add article status change UI
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)

@@ -2,14 +2,14 @@
 id: feature_27cd
 title: Extraction feedback: let users report bad article extraction, keep raw source for reproduction
 type: feature
-status: open
+status: in_progress
 priority: 2
 labels: []
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-11-07T20:22:32Z
-updated_at: 2026-11-07T20:22:32Z
+updated_at: 2026-11-07T20:31:54Z
 ---
 
 
@@ -31,7 +31,8 @@ Users can flag an article whose extraction went wrong (body, images, formatting,
    `id, user_id, content_id, categories TEXT[] (≥1, from a fixed set), comment (optional, ≤2000 chars), status ('open'|'resolved'), created_at, updated_at`,
    plus a snapshot taken when the report is submitted: `original_url, title, author, description, image_url, cleaned_html, raw_html, readability_failed`. `raw_html` and `readability_failed` are both nullable and both NULL when the `content_sources` row has already expired.
    `UNIQUE(user_id, content_id)`: resubmitting updates the existing report, refreshes the snapshot and **sets status back to `open`**, so a re-report after a fix reaches triage.
-   **Snapshot retention:** resolving a report sets `raw_html` and `cleaned_html` to NULL (the export has already written them to disk). Only metadata, categories and comment are kept. So private email bodies are kept only while a report is open.
+   **Snapshot retention:** resolving a report sets `raw_html` and `cleaned_html` to NULL. Only metadata, categories and comment are kept, so private email bodies are kept only while a report is open. Once resolved, the report was either fixed (the lasting evidence is the readability test fixture committed with the fix) or won't be fixed (no evidence needed).
+   **Fixtures from email content** must be cut down to the markup that triggers the bug, with personal content removed, before they're committed.
    **Exposure:** `raw_html` is unsanitized input. No user-facing endpoint returns `raw_html` or `cleaned_html` from this table. Only the owner's triage CLI reads them.
 4. **Categories** (cover every extraction output): `body_missing_content`, `body_extra_content`, `images`, `formatting`, `links`, `title`, `author`, `description`, `lead_image`, `other`.
 5. **API** (under the existing `/api/v1/content/user/{user_id}` group, which already enforces that `{user_id}` matches the token):
