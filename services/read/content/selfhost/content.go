@@ -30,6 +30,16 @@ func envInt(key string, fallback int) int {
 	return fallback
 }
 
+// envDuration returns the duration value of the given env var, or fallback if unset/invalid.
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+	}
+	return fallback
+}
+
 // ContentConfig holds configuration for the content service.
 type ContentConfig struct {
 	DBHost                string
@@ -85,7 +95,8 @@ func Mount(cfg ContentConfig, r chi.Router, authMiddleware *auth.Middleware, int
 
 	contentRepo := repository.NewContentRepository(db.DB)
 	userContentRepo := repository.NewUserContentRepository(db.DB)
-	cleanupJob := jobs.NewCleanupJob(contentRepo, userContentRepo, logger, 0)
+	cleanupJob := jobs.NewCleanupJob(contentRepo, userContentRepo, logger, 0,
+		envDuration("RAW_SOURCE_RETENTION", jobs.DefaultSourceRetention))
 
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
 	_, err = scheduler.AddFunc("0 2 * * *", cleanupJob.Run)

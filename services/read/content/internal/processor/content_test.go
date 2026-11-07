@@ -154,3 +154,40 @@ func TestContentProcessor_ContentSizeValidation(t *testing.T) {
 		t.Error("ProcessHTML(over limit) expected error, got nil")
 	}
 }
+
+func TestContentProcessor_ProcessHTML_KeepsRawSource(t *testing.T) {
+	processor := NewContentProcessor()
+	raw := `<html><body><article><h1>Title</h1><p>Body text.</p><script>alert(1)</script></article></body></html>`
+
+	result, err := processor.ProcessHTML("https://example.com/article", raw)
+	if err != nil {
+		t.Fatalf("ProcessHTML() error = %v", err)
+	}
+	if result.RawHTML != raw {
+		t.Errorf("RawHTML = %q, want the unmodified input", result.RawHTML)
+	}
+	if result.ReadabilityFailed {
+		t.Error("ReadabilityFailed = true, want false when readability succeeds")
+	}
+}
+
+func TestContentProcessor_ProcessHTML_ReadabilityFailureIsFlagged(t *testing.T) {
+	processor := NewContentProcessor()
+	raw := `<p>Fallback body</p><script>alert(1)</script>`
+
+	// An unparseable URL makes readability return an error, so the raw HTML
+	// is sanitized and stored as the content.
+	result, err := processor.ProcessHTML("http://[::1", raw)
+	if err != nil {
+		t.Fatalf("ProcessHTML() error = %v", err)
+	}
+	if !result.ReadabilityFailed {
+		t.Error("ReadabilityFailed = false, want true on the fallback path")
+	}
+	if result.RawHTML != raw {
+		t.Errorf("RawHTML = %q, want the unmodified input", result.RawHTML)
+	}
+	if !strings.Contains(result.CleanedHTML, "Fallback body") || strings.Contains(result.CleanedHTML, "<script") {
+		t.Errorf("CleanedHTML = %q, want sanitized raw HTML", result.CleanedHTML)
+	}
+}

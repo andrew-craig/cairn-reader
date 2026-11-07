@@ -54,6 +54,12 @@ type ProcessedContent struct {
 	Author       string
 	Description  string
 	ImageURL     string
+
+	// RawHTML is the unprocessed input, kept so a bad extraction can be
+	// reproduced. ReadabilityFailed is true when readability errored and the
+	// raw HTML was stored as the content instead.
+	RawHTML           string
+	ReadabilityFailed bool
 }
 
 // ProcessURL fetches and processes content from a URL
@@ -78,7 +84,8 @@ func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedCo
 	var title, author, description, imageURL string
 
 	result, err := p.readability.ParseString(url, rawHTML)
-	if err != nil {
+	readabilityFailed := err != nil
+	if readabilityFailed {
 		cleanedHTML = rawHTML
 	} else {
 		cleanedHTML = result.Content
@@ -105,6 +112,9 @@ func (p *ContentProcessor) ProcessHTML(url string, rawHTML string) (*ProcessedCo
 		Author:       author,
 		Description:  description,
 		ImageURL:     imageURL,
+
+		RawHTML:           rawHTML,
+		ReadabilityFailed: readabilityFailed,
 	}, nil
 }
 

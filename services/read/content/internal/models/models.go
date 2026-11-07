@@ -29,6 +29,19 @@ type Content struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 	OrphanedAt     *time.Time `json:"orphaned_at,omitempty"`
+
+	// Source is the raw extraction input. Repository writes persist it to
+	// content_sources in the same transaction as the content write when set;
+	// reads never populate it (use ContentRepository.GetSource).
+	Source *ContentSource `json:"-"`
+}
+
+// ContentSource is the raw input of a content's extraction (content_sources row).
+type ContentSource struct {
+	ContentID         uuid.UUID
+	RawHTML           string
+	ReadabilityFailed bool
+	CreatedAt         time.Time
 }
 
 // UserContent represents the junction table mapping users to content with user-specific metadata

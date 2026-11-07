@@ -51,6 +51,7 @@ func TestContentRepository_Create_Success(t *testing.T) {
 		SourceFeedID: &feedID,
 	}
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO contents`).
 		WithArgs(
 			sqlmock.AnyArg(), // id
@@ -72,6 +73,7 @@ func TestContentRepository_Create_Success(t *testing.T) {
 		).
 		WillReturnRows(contentRow(contentID, "hash123", "<p>Test content</p>", "https://example.com/article", nil,
 			"Test Article", nil, nil, nil, nil, "rss", &feedID, nil, now, now, nil))
+	mock.ExpectCommit()
 
 	err = repo.Create(ctx, content)
 	assert.NoError(t, err)
@@ -99,9 +101,11 @@ func TestContentRepository_Create_GeneratesUUID(t *testing.T) {
 		SourceType:  "web",
 	}
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO contents`).
 		WillReturnRows(contentRow(newID, "hash123", "<p>Test content</p>", "https://example.com/article", nil,
 			"Test Article", nil, nil, nil, nil, "web", nil, nil, now, now, nil))
+	mock.ExpectCommit()
 
 	err = repo.Create(ctx, content)
 	assert.NoError(t, err)
@@ -240,6 +244,7 @@ func TestContentRepository_Update_Success(t *testing.T) {
 		SourceType:  "rss",
 	}
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(`UPDATE contents SET`).
 		WithArgs(
 			contentID,
@@ -256,6 +261,7 @@ func TestContentRepository_Update_Success(t *testing.T) {
 			sqlmock.AnyArg(), // updated_at
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"updated_at"}).AddRow(now))
+	mock.ExpectCommit()
 
 	err = repo.Update(ctx, content)
 	assert.NoError(t, err)
@@ -280,8 +286,10 @@ func TestContentRepository_Update_NotFound(t *testing.T) {
 		SourceType:  "web",
 	}
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(`UPDATE contents SET`).
 		WillReturnError(sql.ErrNoRows)
+	mock.ExpectRollback()
 
 	err = repo.Update(ctx, content)
 	assert.Error(t, err)
@@ -355,11 +363,13 @@ func TestContentRepository_BulkCreate_Success(t *testing.T) {
 	}
 
 	now := time.Now()
+	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO contents`).
 		WillReturnRows(contentRow(uuid.New(), "hash1", "<p>1</p>", "https://example.com/1", nil,
 			"Title 1", nil, nil, nil, nil, "rss", nil, nil, now, now, nil).
 			AddRow(uuid.New(), "hash2", "<p>2</p>", "https://example.com/2", nil,
 				"Title 2", nil, nil, nil, nil, "rss", nil, nil, nil, now, now, nil))
+	mock.ExpectCommit()
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.NoError(t, err)
@@ -400,8 +410,10 @@ func TestContentRepository_BulkCreate_ExecError(t *testing.T) {
 		},
 	}
 
+	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO contents`).
 		WillReturnError(sql.ErrConnDone)
+	mock.ExpectRollback()
 
 	err = repo.BulkCreate(ctx, contents)
 	assert.Error(t, err)

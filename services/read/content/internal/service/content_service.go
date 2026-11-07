@@ -124,6 +124,7 @@ func (s *contentService) CreateFromURL(ctx context.Context, url string, sourceTy
 		SourceType:   sourceType,
 		SourceFeedID: sourceFeedID,
 		PublishedAt:  publishedAt,
+		Source:       &models.ContentSource{RawHTML: processed.RawHTML, ReadabilityFailed: processed.ReadabilityFailed},
 	}
 
 	// Set optional fields if they're not empty
@@ -190,6 +191,7 @@ func (s *contentService) CreateFromHTML(ctx context.Context, url string, html st
 		SourceType:   sourceType,
 		SourceFeedID: sourceFeedID,
 		PublishedAt:  publishedAt,
+		Source:       &models.ContentSource{RawHTML: processed.RawHTML, ReadabilityFailed: processed.ReadabilityFailed},
 	}
 
 	// Set optional fields if they're not empty
@@ -238,6 +240,7 @@ func (s *contentService) UpdateContent(ctx context.Context, id uuid.UUID, url st
 	existing.CanonicalURL = &processed.CanonicalURL
 	existing.Title = processed.Title
 	existing.PublishedAt = publishedAt
+	existing.Source = &models.ContentSource{RawHTML: processed.RawHTML, ReadabilityFailed: processed.ReadabilityFailed}
 
 	// Update optional fields
 	if processed.Author != "" {
@@ -334,6 +337,7 @@ func (s *contentService) BulkCreateFromHTML(ctx context.Context, items []BulkCon
 			SourceFeedID:   item.SourceFeedID,
 			SourceSenderID: item.SourceSenderID,
 			PublishedAt:    item.PublishedAt,
+			Source:         &models.ContentSource{RawHTML: processed.RawHTML, ReadabilityFailed: processed.ReadabilityFailed},
 		}
 
 		// Prefer caller-supplied author; fall back to readability output.

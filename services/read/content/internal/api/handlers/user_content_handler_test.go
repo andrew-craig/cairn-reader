@@ -180,6 +180,19 @@ func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan ti
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockContentRepository) GetSource(ctx context.Context, contentID uuid.UUID) (*models.ContentSource, error) {
+	args := m.Called(ctx, contentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.ContentSource), args.Error(1)
+}
+
+func (m *MockContentRepository) DeleteExpiredSources(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	args := m.Called(ctx, olderThan, batchSize)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 // TestListUserContents_Success tests successful listing of user contents
 func TestListUserContents_Success(t *testing.T) {
 	mockUserContentRepo := new(MockUserContentRepository)

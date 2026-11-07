@@ -52,7 +52,8 @@ func main() {
 	userContentRepo := repository.NewUserContentRepository(db.DB)
 
 	// Initialize jobs
-	cleanupJob := jobs.NewCleanupJob(contentRepo, userContentRepo, logger, 0)
+	sourceRetention := getEnvAsDuration("RAW_SOURCE_RETENTION", jobs.DefaultSourceRetention)
+	cleanupJob := jobs.NewCleanupJob(contentRepo, userContentRepo, logger, 0, sourceRetention)
 
 	// Create cron scheduler
 	scheduler := cron.New(cron.WithLogger(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))))
@@ -69,6 +70,7 @@ func main() {
 	scheduler.Start()
 	slog.Info("worker started successfully",
 		slog.String("cleanup_schedule", cleanupCron),
+		slog.Duration("raw_source_retention", sourceRetention),
 	)
 	slog.Info("background jobs")
 	slog.Info("- feed expiry (30 days) and orphaned content cleanup (runs daily at 2 AM)")
