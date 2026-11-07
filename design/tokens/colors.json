@@ -23,7 +23,7 @@
   "dark": {
     "primary": { "$value": "#FDFAF8" },
     "brand": { "$value": "#C94C3E" },
-    "background": { "$value": "#1D1714" },
+    "background": { "$value": "#171515" },
     "card": { "$value": "#28201C" },
     "text": { "$value": "#EAE1DB" },
     "textSecondary": { "$value": "#B5AAA3" },

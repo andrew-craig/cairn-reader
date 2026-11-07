@@ -36,6 +36,10 @@ export const FontFamily = {
   headingMedium: 'CrimsonPro_500Medium',
   headingSemiBold: 'CrimsonPro_600SemiBold',
   headingBold: 'CrimsonPro_700Bold',
+  // Article body text. Inter stays the font for UI and for headings in content.
+  content: 'AtkinsonHyperlegibleNext_400Regular',
+  contentItalic: 'AtkinsonHyperlegibleNext_400Regular_Italic',
+  contentBold: 'AtkinsonHyperlegibleNext_700Bold',
 };
 
 /**

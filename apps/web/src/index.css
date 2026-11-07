@@ -1,8 +1,9 @@
 /* Cairn design system. Light is the default; the dark palette is swapped in via
    prefers-color-scheme. Colors are generated from design/tokens/colors.json
    (shared with the mobile app) into theme/colors.css; never hardcode a color.
-   Fonts (Inter for body/UI, Crimson Pro for headings) are loaded from Google
-   Fonts in index.html. */
+   Fonts (Inter for UI and headings, Atkinson Hyperlegible Next for article
+   body text, Crimson Pro for the brand) are loaded from Google Fonts in
+   index.html. */
 @import './theme/colors.css';
 
 :root {
@@ -33,6 +34,8 @@
   --font-body:
     'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-content:
+    'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-brand: 'Crimson Pro', Georgia, 'Times New Roman', serif;
 
   /* Motion */

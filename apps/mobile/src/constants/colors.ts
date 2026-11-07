@@ -22,7 +22,7 @@ export const Colors = {
   dark: {
     primary: '#FDFAF8',
     brand: '#C94C3E',
-    background: '#1D1714',
+    background: '#171515',
     card: '#28201C',
     text: '#EAE1DB',
     textSecondary: '#B5AAA3',

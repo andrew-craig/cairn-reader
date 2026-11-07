@@ -17,6 +17,11 @@ import {
   CrimsonPro_600SemiBold,
   CrimsonPro_700Bold,
 } from '@expo-google-fonts/crimson-pro';
+import {
+  AtkinsonHyperlegibleNext_400Regular,
+  AtkinsonHyperlegibleNext_400Regular_Italic,
+  AtkinsonHyperlegibleNext_700Bold,
+} from '@expo-google-fonts/atkinson-hyperlegible-next';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { TopBlurGradient } from './src/components/common';
@@ -37,6 +42,9 @@ export default function App() {
     CrimsonPro_500Medium,
     CrimsonPro_600SemiBold,
     CrimsonPro_700Bold,
+    AtkinsonHyperlegibleNext_400Regular,
+    AtkinsonHyperlegibleNext_400Regular_Italic,
+    AtkinsonHyperlegibleNext_700Bold,
   });
 
   if (!fontsLoaded) {
