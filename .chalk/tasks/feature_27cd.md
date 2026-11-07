@@ -51,6 +51,7 @@ Users can flag an article whose extraction went wrong (body, images, formatting,
 - [ ] Docs: `content/api/openapi.yaml`, `services/read/CLAUDE.md`, `docs/CONFIGURATION.md` (new var), self-host and compose env forwarding for `RAW_SOURCE_RETENTION` (see bug_a701 drift)
 - [ ] `go test ./...` and integration tests green
 - [ ] Follow-up task: triage CLI (layer 2)
+- [ ] UI (web `ReadArticle.tsx` + mobile `ReadArticleDetailScreen.tsx`): at the end of the article, a link with the bug icon and the text "Report an issue with the article". It opens a dialog: multi-select reasons (one per category), optional details (≤2000 chars), Submit. Prefilled from GET when the user has already reported. Online-only on mobile (not routed through the outbox) → verify: service + dialog tests, lint, typecheck
 
 ## Tradeoffs / open points
 
