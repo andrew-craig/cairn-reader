@@ -1,6 +1,7 @@
 /* Generated from design/tokens/colors.json by `npm run build -w @cairn/tokens`. Do not edit. */
 :root {
   --color-primary: #17100D;
+  --color-brand: #6E2A22;
   --color-background: #FDFAF8;
   --color-card: #FAF6F3;
   --color-text: #17100D;
@@ -21,6 +22,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --color-primary: #FDFAF8;
+    --color-brand: #C94C3E;
     --color-background: #1D1714;
     --color-card: #28201C;
     --color-text: #EAE1DB;
