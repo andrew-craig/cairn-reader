@@ -20,6 +20,7 @@ import { getServerUrl, setServerUrl, HttpError } from '@cairn/shared';
 import { DEFAULT_SERVER_URL } from '../config/storage';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
+const LOGIN_LOGO_OFFSET_Y = 16;
 const LOGIN_FONT_SIZE_TITLE = 56;
 const LOGIN_FONT_SIZE_SUBTITLE = 26;
 const LOGIN_GAP_SECTIONS = 64;
@@ -165,8 +166,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <LogoMark size={90} />
-            <Text style={[styles.title, { color: colors.text }]}>Cairn</Text>
+            <View style={styles.logo}>
+              <LogoMark size={90} />
+            </View>
+            <Text style={[styles.title, { color: colors.brand }]}>Cairn</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Read and discover{'\n'}what you love
             </Text>
@@ -337,6 +340,9 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     maxWidth: LOGIN_MAX_WIDTH_HEADER,
     width: '100%',
+  },
+  logo: {
+    transform: [{ translateY: LOGIN_LOGO_OFFSET_Y }],
   },
   title: {
     fontSize: LOGIN_FONT_SIZE_TITLE,
