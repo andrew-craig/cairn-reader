@@ -279,7 +279,7 @@ report survives content rewrites and deletion):
 id, user_id, content_id
 categories        TEXT[] NOT NULL               -- >=1 of body_missing_content|body_extra_content|images|formatting|links|title|author|description|lead_image|other
 comment           TEXT                          -- Optional, <=2000 chars
-status            VARCHAR(10) NOT NULL          -- 'open'|'resolved'
+status            VARCHAR(20) NOT NULL          -- 'open'|'resolved'
 created_at, updated_at TIMESTAMP WITH TIME ZONE
 -- Evidence snapshot taken at submission
 original_url, title, author, description, image_url, cleaned_html, raw_html, readability_failed
