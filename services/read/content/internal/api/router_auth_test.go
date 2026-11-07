@@ -10,10 +10,13 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/andrew-craig/cairn-reader/pkg/auth"
 	"github.com/andrew-craig/cairn-reader/services/read/content/internal/database"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,6 +24,14 @@ import (
 // *sql.DB. The routes under test reject unauthenticated/unauthorized requests in
 // the auth middleware, before any query would run, so no live Postgres is needed.
 func newTestRouterHandler(t *testing.T) (http.Handler, *auth.Middleware, *auth.InternalAuthMiddleware) {
+	t.Helper()
+	router, authMiddleware, internalAuthMiddleware, _ := newTestRouterHandlerWithKey(t)
+	return router, authMiddleware, internalAuthMiddleware
+}
+
+// newTestRouterHandlerWithKey is newTestRouterHandler that also returns the
+// private key the router validates tokens against, so tests can mint JWTs.
+func newTestRouterHandlerWithKey(t *testing.T) (http.Handler, *auth.Middleware, *auth.InternalAuthMiddleware, *rsa.PrivateKey) {
 	t.Helper()
 
 	sqlDB, err := sql.Open("postgres", "postgres://user:pass@127.0.0.1:1/testdb?sslmode=disable")
@@ -35,7 +46,7 @@ func newTestRouterHandler(t *testing.T) (http.Handler, *auth.Middleware, *auth.I
 	internalAuthMiddleware := auth.NewInternalAuthMiddleware("test-internal-key")
 
 	router := NewRouter(&database.DB{DB: sqlDB}, "", "", "test-internal-key", authMiddleware, internalAuthMiddleware)
-	return router, authMiddleware, internalAuthMiddleware
+	return router, authMiddleware, internalAuthMiddleware, privateKey
 }
 
 // httpsRequest builds a request satisfying RequireHTTPS (X-Forwarded-Proto: https)
@@ -132,4 +143,40 @@ func TestRouterInventory_UnlistedRoutesRequireAuth(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+// TestFeedbackRoutes_RejectOtherUsersPath proves a valid token cannot read or
+// write another user's extraction report: the router answers 403 before any
+// query would run.
+func TestFeedbackRoutes_RejectOtherUsersPath(t *testing.T) {
+	router, _, _, key := newTestRouterHandlerWithKey(t)
+
+	tokenUser := uuid.New()
+	now := time.Now()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodRS256, &auth.Claims{
+		UserID: tokenUser,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "cairn-user-service",
+			Audience:  jwt.ClaimStrings{"cairn-api"},
+			Subject:   tokenUser.String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
+		},
+	}).SignedString(key)
+	require.NoError(t, err)
+
+	path := "/api/v1/content/user/" + uuid.New().String() + "/" + uuid.New().String() + "/feedback"
+	for _, tc := range []struct{ method, body string }{
+		{http.MethodPut, `{"categories":["images"]}`},
+		{http.MethodGet, ""},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			req := httpsRequest(tc.method, path, tc.body)
+			req.Header.Set("Authorization", "Bearer "+token)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+		})
+	}
 }
