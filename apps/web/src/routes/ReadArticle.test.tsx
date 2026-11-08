@@ -205,3 +205,17 @@ describe('ReadArticle Save to Reads double click', () => {
     expect(moveSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ReadArticle report an issue', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(ReadService, 'getArticleFeedback').mockResolvedValue(null);
+  });
+
+  it('opens the report dialog from the end of the article', async () => {
+    vi.spyOn(ReadService, 'getUserContent').mockResolvedValue(makeArticle({ content: '<p>Body</p>' }));
+    renderReader();
+    await userEvent.click(await screen.findByRole('button', { name: 'Report an issue with the article' }));
+    expect(screen.getByRole('dialog', { name: 'Report an issue' })).toBeTruthy();
+  });
+});

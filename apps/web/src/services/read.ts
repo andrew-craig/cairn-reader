@@ -26,6 +26,35 @@ import {
 
 const PAGE_SIZE_DEFAULT = 20;
 
+/** Why an article's extraction looked wrong (ExtractionFeedbackRequest.categories). */
+export const FEEDBACK_CATEGORIES = [
+  'body_missing_content',
+  'body_extra_content',
+  'images',
+  'formatting',
+  'links',
+  'title',
+  'author',
+  'description',
+  'lead_image',
+  'other',
+] as const;
+export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
+
+export interface ArticleFeedbackRequest {
+  categories: FeedbackCategory[];
+  comment?: string;
+}
+
+export interface ArticleFeedback {
+  content_id: string;
+  categories: FeedbackCategory[];
+  comment: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+  updated_at: string;
+}
+
 /** Reading-list page size, mirroring mobile's PAGE_SIZE. */
 export const PAGE_SIZE = 20;
 
@@ -441,5 +470,54 @@ export class ReadService {
     }
 
     return this.transformDetailToArticle(result.data as UserContentDetailResponse);
+  }
+
+  /**
+   * The user's own "report an issue" for an article, or null when none exists.
+   * GET /api/v1/content/user/{userId}/{contentId}/feedback (404 = no report).
+   */
+  static async getArticleFeedback(contentId: string): Promise<ArticleFeedback | null> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}/feedback`;
+    const response = await AuthService.fetchWithAuth(url);
+    if (response.status === 404) return null;
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result?.data) {
+      throw new Error(result?.message || result?.error || 'Failed to fetch report');
+    }
+
+    return result.data;
+  }
+
+  /**
+   * Create or replace the user's report for an article.
+   * PUT /api/v1/content/user/{userId}/{contentId}/feedback.
+   */
+  static async submitArticleFeedback(
+    contentId: string,
+    feedback: ArticleFeedbackRequest,
+  ): Promise<ArticleFeedback> {
+    const userId = await AuthService.getUserId();
+    if (!userId) {
+      throw new Error('Not authenticated');
+    }
+
+    const url = `${getServerUrl()}/api/v1/content/user/${userId}/${contentId}/feedback`;
+    const response = await AuthService.fetchWithAuth(url, {
+      method: 'PUT',
+      body: JSON.stringify(feedback),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result?.data) {
+      throw new Error(result?.message || result?.error || 'Failed to send report');
+    }
+
+    return result.data;
   }
 }

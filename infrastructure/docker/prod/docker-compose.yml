@@ -278,6 +278,7 @@ services:
       - DB_SSLMODE=disable
       - DB_MAX_OPEN_CONNS=5
       - CLEANUP_CRON=0 2 * * *
+      - RAW_SOURCE_RETENTION=720h
       - HEALTH_PORT=8084
     depends_on:
       cairn-db:

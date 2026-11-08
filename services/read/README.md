@@ -297,7 +297,7 @@ curl http://localhost:8085/health/ready
 
 ### Content Service
 
-- **Cleanup Job** (`content-worker`): Runs daily at 2 AM (`CLEANUP_CRON`); first deletes non-favorited Feed items older than 30 days, then content orphaned for 90+ days
+- **Cleanup Job** (`content-worker`): Runs daily at 2 AM (`CLEANUP_CRON`); first deletes non-favorited Feed items older than 30 days, then content orphaned for 90+ days, then raw source HTML older than `RAW_SOURCE_RETENTION` (default 30 days)
 
 ### Ingest RSS Service
 

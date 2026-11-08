@@ -173,6 +173,14 @@ func (m *mockContentRepo) DeleteOrphaned(ctx context.Context, olderThan time.Dur
 	return 0, nil
 }
 
+func (m *mockContentRepo) GetSource(ctx context.Context, contentID uuid.UUID) (*models.ContentSource, error) {
+	return nil, nil
+}
+
+func (m *mockContentRepo) DeleteExpiredSources(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockContentRepo) GetByContentHashesAndFeedID(ctx context.Context, contentHashes []string, feedID uuid.UUID) (map[string]*models.Content, error) {
 	return nil, nil
 }

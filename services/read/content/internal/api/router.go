@@ -33,6 +33,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	contentRepo := repository.NewContentRepository(db.DB)
 	userContentRepo := repository.NewUserContentRepository(db.DB)
 	sourceRouteRepo := repository.NewSourceRouteRepository(db.DB)
+	feedbackRepo := repository.NewContentFeedbackRepository(db.DB)
 
 	// Initialize services
 	contentService := service.NewContentService(contentRepo, db.DB)
@@ -43,6 +44,7 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 	// Initialize handlers
 	contentHandler := handlers.NewContentHandler(contentService)
 	userContentHandler := handlers.NewUserContentHandler(userContentRepo, contentRepo, sourceRouteRepo, contentService, urlDetector, ingestRSSClient)
+	feedbackHandler := handlers.NewFeedbackHandler(service.NewFeedbackService(userContentRepo, contentRepo, feedbackRepo), feedbackRepo)
 	bulkHandler := handlers.NewBulkHandler(contentService, userContentRepo, contentRepo)
 	detectionHandler := handlers.NewDetectionHandler(urlDetector)
 	subscriptionAggregator := handlers.NewSubscriptionAggregatorHandler(ingestRSSClient, emailIngestClient, sourceRouteRepo)
@@ -113,6 +115,8 @@ func NewRouter(db *database.DB, ingestRSSServiceURL string, emailIngestServiceUR
 			r.Get("/{content_id}", userContentHandler.GetUserContent)
 			r.Patch("/{content_id}", userContentHandler.UpdateUserContent)
 			r.Delete("/{content_id}", userContentHandler.DeleteUserContent)
+			r.Put("/{content_id}/feedback", feedbackHandler.PutFeedback)
+			r.Get("/{content_id}/feedback", feedbackHandler.GetFeedback)
 
 			// Subscription aggregation endpoint - returns unified list from all sources
 			r.Get("/subscriptions", subscriptionAggregator.ListAllSubscriptions)

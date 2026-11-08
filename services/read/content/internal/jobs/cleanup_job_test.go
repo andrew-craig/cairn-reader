@@ -91,10 +91,30 @@ func (m *MockContentRepository) DeleteOrphaned(ctx context.Context, olderThan ti
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockContentRepository) GetSource(ctx context.Context, contentID uuid.UUID) (*models.ContentSource, error) {
+	args := m.Called(ctx, contentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.ContentSource), args.Error(1)
+}
+
+// DeleteExpiredSources reports nothing to delete unless a test registers an
+// expectation, so tests unrelated to source expiry need no setup.
+func (m *MockContentRepository) DeleteExpiredSources(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "DeleteExpiredSources" {
+			args := m.Called(ctx, olderThan, batchSize)
+			return args.Get(0).(int64), args.Error(1)
+		}
+	}
+	return 0, nil
+}
+
 func TestCleanupJob_Run_Success(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
 
 	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
 		Return(int64(5), nil).Once()
@@ -109,7 +129,7 @@ func TestCleanupJob_Run_Success(t *testing.T) {
 func TestCleanupJob_Run_NoContentToDelete(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
 
 	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
 		Return(int64(0), nil).Once()
@@ -123,7 +143,7 @@ func TestCleanupJob_Run_NoContentToDelete(t *testing.T) {
 func TestCleanupJob_Run_Error(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
 
 	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
 		Return(int64(0), errors.New("database connection error")).Once()
@@ -140,7 +160,7 @@ func TestCleanupJob_Run_Error(t *testing.T) {
 func TestCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
 
 	// First batch: delete 1000 rows (a full batch, so there may be more)
 	// Second batch: delete 500 rows (a full batch, so there may be more)
@@ -161,7 +181,7 @@ func TestCleanupJob_Run_BatchesUntilExhausted(t *testing.T) {
 func TestCleanupJob_Run_ErrorInMiddleOfBatching(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
 
 	// First batch succeeds, second batch fails
 	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
@@ -198,7 +218,7 @@ func TestCleanupJob_Run_ExpiresFeedItemsInBatches(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	feedRepo := new(MockUserContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, feedRepo, logger, 1000)
+	job := NewCleanupJob(mockRepo, feedRepo, logger, 1000, 0)
 
 	feedRepo.On("DeleteExpiredFeed", mock.Anything, 30*24*time.Hour, 1000).
 		Return(int64(1000), nil).Once()
@@ -217,7 +237,7 @@ func TestCleanupJob_Run_FeedErrorDoesNotSkipOrphanCleanup(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	feedRepo := new(MockUserContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	job := NewCleanupJob(mockRepo, feedRepo, logger, 1000)
+	job := NewCleanupJob(mockRepo, feedRepo, logger, 1000, 0)
 
 	feedRepo.On("DeleteExpiredFeed", mock.Anything, 30*24*time.Hour, 1000).
 		Return(int64(0), errors.New("db down")).Once()
@@ -234,7 +254,7 @@ func TestCleanupJob_NewCleanupJob(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 500)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 500, 0)
 
 	assert.NotNil(t, job)
 	assert.Equal(t, mockRepo, job.contentRepo)
@@ -246,7 +266,44 @@ func TestCleanupJob_NewCleanupJob_DefaultsBatchSize(t *testing.T) {
 	mockRepo := new(MockContentRepository)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 0)
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 0, 0)
 
 	assert.Equal(t, defaultCleanupBatchSize, job.batchSize)
+	assert.Equal(t, DefaultSourceRetention, job.sourceRetention)
+}
+
+func TestCleanupJob_Run_ExpiresSourcesInBatches(t *testing.T) {
+	mockRepo := new(MockContentRepository)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	retention := 10 * 24 * time.Hour
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, retention)
+
+	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
+		Return(int64(0), nil).Once()
+	mockRepo.On("DeleteExpiredSources", mock.Anything, retention, 1000).
+		Return(int64(1000), nil).Once()
+	mockRepo.On("DeleteExpiredSources", mock.Anything, retention, 1000).
+		Return(int64(3), nil).Once()
+	mockRepo.On("DeleteExpiredSources", mock.Anything, retention, 1000).
+		Return(int64(0), nil).Once()
+
+	job.Run()
+
+	mockRepo.AssertExpectations(t)
+	mockRepo.AssertNumberOfCalls(t, "DeleteExpiredSources", 3)
+}
+
+func TestCleanupJob_Run_SourceExpiryErrorDoesNotPanic(t *testing.T) {
+	mockRepo := new(MockContentRepository)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	job := NewCleanupJob(mockRepo, newEmptyFeedRepo(), logger, 1000, 0)
+
+	mockRepo.On("DeleteOrphaned", mock.Anything, 90*24*time.Hour, 1000).
+		Return(int64(0), nil).Once()
+	mockRepo.On("DeleteExpiredSources", mock.Anything, DefaultSourceRetention, 1000).
+		Return(int64(0), errors.New("db down")).Once()
+
+	job.Run()
+
+	mockRepo.AssertExpectations(t)
 }

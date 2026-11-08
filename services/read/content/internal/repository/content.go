@@ -13,7 +13,9 @@ import (
 
 // ContentRepository defines the interface for content database operations
 type ContentRepository interface {
-	// Create creates a new content record
+	// Create creates a new content record. When content.Source is set and the
+	// row is actually inserted (not a dedup hit), the source is stored in the
+	// same transaction.
 	Create(ctx context.Context, content *models.Content) error
 
 	// CreateWithTx creates a new content record within a transaction
@@ -28,7 +30,8 @@ type ContentRepository interface {
 	// GetByContentHashAndURL retrieves non-RSS content by hash and original URL (for email/manual deduplication)
 	GetByContentHashAndURL(ctx context.Context, contentHash string, originalURL string) (*models.Content, error)
 
-	// Update updates an existing content record
+	// Update updates an existing content record. When content.Source is set,
+	// the stored source is replaced in the same transaction.
 	Update(ctx context.Context, content *models.Content) error
 
 	// UpdateWithTx updates an existing content record within a transaction
@@ -45,6 +48,13 @@ type ContentRepository interface {
 
 	// BulkCreate creates multiple content records in a transaction
 	BulkCreate(ctx context.Context, contents []*models.Content) error
+
+	// GetSource returns the raw extraction input for a content, or nil if it
+	// was never stored or has expired.
+	GetSource(ctx context.Context, contentID uuid.UUID) (*models.ContentSource, error)
+
+	// DeleteExpiredSources deletes up to batchSize content_sources rows older than the specified duration
+	DeleteExpiredSources(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error)
 }
 
 // contentRepository implements ContentRepository
@@ -133,50 +143,9 @@ func scanContent(s rowScanner) (*models.Content, error) {
 // resolves to the already-persisted row instead of erroring, so a
 // concurrent duplicate delivery is idempotent at the DB level.
 func (r *contentRepository) Create(ctx context.Context, content *models.Content) error {
-	if content.ID == uuid.Nil {
-		content.ID = uuid.New()
-	}
-	now := time.Now()
-	content.CreatedAt = now
-	content.UpdatedAt = now
-
-	query := `
-		INSERT INTO contents (
-			id, content_hash, cleaned_html, original_url, canonical_url,
-			title, author, published_at, description, image_urls,
-			source_type, source_feed_id, source_sender_id, metadata, created_at, updated_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-		)
-		ON CONFLICT ` + conflictTargetFor(content.SourceType) + `
-		DO UPDATE SET updated_at = contents.updated_at
-		RETURNING ` + contentColumns
-
-	persisted, err := scanContent(r.db.QueryRowContext(
-		ctx, query,
-		content.ID,
-		content.ContentHash,
-		content.CleanedHTML,
-		content.OriginalURL,
-		content.CanonicalURL,
-		content.Title,
-		content.Author,
-		content.PublishedAt,
-		content.Description,
-		content.ImageURLs,
-		content.SourceType,
-		content.SourceFeedID,
-		content.SourceSenderID,
-		content.Metadata,
-		content.CreatedAt,
-		content.UpdatedAt,
-	))
-	if err != nil {
-		return fmt.Errorf("failed to create content: %w", err)
-	}
-
-	*content = *persisted
-	return nil
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		return r.CreateWithTx(ctx, tx, content)
+	})
 }
 
 // CreateWithTx creates a new content record within a transaction. See
@@ -188,6 +157,7 @@ func (r *contentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, conten
 	now := time.Now()
 	content.CreatedAt = now
 	content.UpdatedAt = now
+	candidateID, source := content.ID, content.Source
 
 	query := `
 		INSERT INTO contents (
@@ -222,6 +192,14 @@ func (r *contentRepository) CreateWithTx(ctx context.Context, tx *sql.Tx, conten
 	))
 	if err != nil {
 		return fmt.Errorf("failed to create content with transaction: %w", err)
+	}
+
+	// A different ID means a dedup conflict resolved to an existing row,
+	// whose source must not be overwritten.
+	if source != nil && persisted.ID == candidateID {
+		if err := saveSource(ctx, tx, persisted.ID, source); err != nil {
+			return err
+		}
 	}
 
 	*content = *persisted
@@ -334,51 +312,9 @@ func (r *contentRepository) GetByContentHashAndURL(ctx context.Context, contentH
 
 // Update updates an existing content record
 func (r *contentRepository) Update(ctx context.Context, content *models.Content) error {
-	query := `
-		UPDATE contents
-		SET
-			content_hash = $2,
-			cleaned_html = $3,
-			original_url = $4,
-			canonical_url = $5,
-			title = $6,
-			author = $7,
-			published_at = $8,
-			description = $9,
-			image_urls = $10,
-			metadata = $11,
-			updated_at = $12
-		WHERE id = $1
-		RETURNING updated_at
-	`
-
-	// Update timestamp
-	content.UpdatedAt = time.Now()
-
-	err := r.db.QueryRowContext(
-		ctx, query,
-		content.ID,
-		content.ContentHash,
-		content.CleanedHTML,
-		content.OriginalURL,
-		content.CanonicalURL,
-		content.Title,
-		content.Author,
-		content.PublishedAt,
-		content.Description,
-		content.ImageURLs,
-		content.Metadata,
-		content.UpdatedAt,
-	).Scan(&content.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		return fmt.Errorf("content not found for update: %w", err)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to update content: %w", err)
-	}
-
-	return nil
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		return r.UpdateWithTx(ctx, tx, content)
+	})
 }
 
 // UpdateWithTx updates an existing content record within a transaction
@@ -425,6 +361,10 @@ func (r *contentRepository) UpdateWithTx(ctx context.Context, tx *sql.Tx, conten
 	}
 	if err != nil {
 		return fmt.Errorf("failed to update content with transaction: %w", err)
+	}
+
+	if content.Source != nil {
+		return saveSource(ctx, tx, content.ID, content.Source)
 	}
 
 	return nil
@@ -594,18 +534,19 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 		}
 	}
 
-	if len(rssItems) > 0 {
-		if err := r.bulkInsertGroup(ctx, rssItems, rssConflictTarget); err != nil {
-			return err
+	return r.inTx(ctx, func(tx *sql.Tx) error {
+		if len(rssItems) > 0 {
+			if err := r.bulkInsertGroup(ctx, tx, rssItems, rssConflictTarget); err != nil {
+				return err
+			}
 		}
-	}
-	if len(otherItems) > 0 {
-		if err := r.bulkInsertGroup(ctx, otherItems, nonRSSConflictTarget); err != nil {
-			return err
+		if len(otherItems) > 0 {
+			if err := r.bulkInsertGroup(ctx, tx, otherItems, nonRSSConflictTarget); err != nil {
+				return err
+			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // bulkInsertGroup inserts a batch of contents that all share the same ON
@@ -614,13 +555,20 @@ func (r *contentRepository) BulkCreate(ctx context.Context, contents []*models.C
 // duplicates within the batch (e.g. a bulk request that redundantly repeats
 // an item) are collapsed to a single VALUES row before inserting, then the
 // resolved row is fanned back out to every content struct that shares the key.
-func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models.Content, conflict string) error {
+// Sources are stored only for rows this call actually inserted.
+func (r *contentRepository) bulkInsertGroup(ctx context.Context, tx *sql.Tx, group []*models.Content, conflict string) error {
 	now := time.Now()
 
 	const colsPerRow = 16
 	keys := make([]string, len(group))
 	seen := make(map[string]bool, len(group))
 	var toInsert []*models.Content
+
+	type pendingSource struct {
+		contentID uuid.UUID
+		source    *models.ContentSource
+	}
+	var sources []pendingSource
 
 	for i, content := range group {
 		if content.ID == uuid.Nil {
@@ -634,6 +582,9 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 		if !seen[key] {
 			seen[key] = true
 			toInsert = append(toInsert, content)
+			if content.Source != nil {
+				sources = append(sources, pendingSource{content.ID, content.Source})
+			}
 		}
 	}
 
@@ -676,7 +627,7 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 	DO UPDATE SET updated_at = contents.updated_at
 	RETURNING ` + contentColumns
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to bulk create contents: %w", err)
 	}
@@ -694,6 +645,22 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 		return fmt.Errorf("error iterating bulk-created rows: %w", err)
 	}
 
+	// rows must be drained before the next statement on the same connection.
+	_ = rows.Close()
+
+	inserted := make(map[uuid.UUID]bool, len(byKey))
+	for _, persisted := range byKey {
+		inserted[persisted.ID] = true
+	}
+	for _, p := range sources {
+		if !inserted[p.contentID] {
+			continue // dedup conflict: an existing row won, keep its source
+		}
+		if err := saveSource(ctx, tx, p.contentID, p.source); err != nil {
+			return err
+		}
+	}
+
 	for i, content := range group {
 		persisted, ok := byKey[keys[i]]
 		if !ok {
@@ -703,4 +670,80 @@ func (r *contentRepository) bulkInsertGroup(ctx context.Context, group []*models
 	}
 
 	return nil
+}
+
+// inTx runs fn in a transaction, committing on success and rolling back on error.
+func (r *contentRepository) inTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+// saveSource inserts or replaces the content_sources row for a content.
+// Replacing restarts the retention clock (created_at).
+func saveSource(ctx context.Context, tx *sql.Tx, contentID uuid.UUID, source *models.ContentSource) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO content_sources (content_id, raw_html, readability_failed)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (content_id) DO UPDATE
+		SET raw_html = EXCLUDED.raw_html,
+			readability_failed = EXCLUDED.readability_failed,
+			created_at = NOW()
+	`, contentID, source.RawHTML, source.ReadabilityFailed)
+	if err != nil {
+		return fmt.Errorf("failed to save content source: %w", err)
+	}
+	return nil
+}
+
+// GetSource returns the raw extraction input for a content, or nil if absent.
+func (r *contentRepository) GetSource(ctx context.Context, contentID uuid.UUID) (*models.ContentSource, error) {
+	source := &models.ContentSource{}
+	err := r.db.QueryRowContext(ctx, `
+		SELECT content_id, raw_html, readability_failed, created_at
+		FROM content_sources
+		WHERE content_id = $1
+	`, contentID).Scan(&source.ContentID, &source.RawHTML, &source.ReadabilityFailed, &source.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get content source: %w", err)
+	}
+	return source, nil
+}
+
+// DeleteExpiredSources deletes up to batchSize content_sources rows older than the specified duration
+func (r *contentRepository) DeleteExpiredSources(ctx context.Context, olderThan time.Duration, batchSize int) (int64, error) {
+	query := `
+		DELETE FROM content_sources
+		WHERE content_id IN (
+			SELECT content_id FROM content_sources
+			WHERE created_at < $1
+			ORDER BY created_at
+			LIMIT $2
+		)
+	`
+
+	result, err := r.db.ExecContext(ctx, query, time.Now().Add(-olderThan), batchSize)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete expired content sources: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected, nil
 }

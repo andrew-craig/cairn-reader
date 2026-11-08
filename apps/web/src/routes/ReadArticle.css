@@ -139,3 +139,29 @@
   margin: 0 0 var(--spacing-md);
   color: var(--color-error);
 }
+
+/* Quiet link-style "Report an issue" at the end of the article body. */
+.reader__report {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xl);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reader__report:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
+}
+
+.reader__report:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

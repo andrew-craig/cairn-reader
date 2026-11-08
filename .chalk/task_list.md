@@ -33,6 +33,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_9dba** · P3 · open · Article sharing via links
 - **feature_a849** · P3 · open · Enhanced article reader with adjustable fonts
 - **feature_b02e** · P3 · open · Import/export functionality
+- **feature_c5f6** · P3 · open · Extraction feedback triage CLI (list/export/resolve)
 - **feature_cf80** · P3 · open · Mobile: Add article status change UI
 - **feature_d8e7** · P3 · open · Add Vault connection retry with exponential backoff  (parent: epic_7c9e)
 - **feature_e001** · P3 · open · Add JTI claim for JWT token revocation  (parent: epic_7c9e)

@@ -29,6 +29,60 @@ type Content struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 	OrphanedAt     *time.Time `json:"orphaned_at,omitempty"`
+
+	// Source is the raw extraction input. Repository writes persist it to
+	// content_sources in the same transaction as the content write when set;
+	// reads never populate it (use ContentRepository.GetSource).
+	Source *ContentSource `json:"-"`
+}
+
+// ContentSource is the raw input of a content's extraction (content_sources row).
+type ContentSource struct {
+	ContentID         uuid.UUID
+	RawHTML           string
+	ReadabilityFailed bool
+	CreatedAt         time.Time
+}
+
+// Extraction feedback statuses.
+const (
+	FeedbackStatusOpen     = "open"
+	FeedbackStatusResolved = "resolved"
+)
+
+// FeedbackCategories are the extraction outputs a user can flag. Mirrors the
+// chk_feedback_categories constraint in migration 000007.
+var FeedbackCategories = []string{
+	"body_missing_content", "body_extra_content", "images", "formatting", "links",
+	"title", "author", "description", "lead_image", "other",
+}
+
+// ContentFeedback is a user's report of a bad extraction (content_feedback row).
+// Snapshot is only set when writing; reads never populate it.
+type ContentFeedback struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	ContentID  uuid.UUID
+	Categories pq.StringArray
+	Comment    *string
+	Status     string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Snapshot   *FeedbackSnapshot
+}
+
+// FeedbackSnapshot is the evidence copied from contents and content_sources
+// when a report is submitted. RawHTML and ReadabilityFailed are nil when the
+// content_sources row had expired.
+type FeedbackSnapshot struct {
+	OriginalURL       string
+	Title             string
+	Author            *string
+	Description       *string
+	ImageURL          *string
+	CleanedHTML       string
+	RawHTML           *string
+	ReadabilityFailed *bool
 }
 
 // UserContent represents the junction table mapping users to content with user-specific metadata

@@ -12,6 +12,10 @@ import (
 // holds a long, WAL-heavy lock on the contents table.
 const defaultCleanupBatchSize = 1000
 
+// DefaultSourceRetention is how long raw extraction sources are kept when
+// RAW_SOURCE_RETENTION is unset.
+const DefaultSourceRetention = 30 * 24 * time.Hour
+
 const (
 	orphanedRetention = 90 * 24 * time.Hour
 	feedRetention     = 30 * 24 * time.Hour
@@ -23,25 +27,33 @@ type CleanupJob struct {
 	userContentRepo repository.UserContentRepository
 	logger          *slog.Logger
 	batchSize       int
+	sourceRetention time.Duration
 }
 
 // NewCleanupJob creates a new CleanupJob instance. batchSize caps the number
 // of rows deleted per transaction; values <= 0 fall back to defaultCleanupBatchSize.
-func NewCleanupJob(contentRepo repository.ContentRepository, userContentRepo repository.UserContentRepository, logger *slog.Logger, batchSize int) *CleanupJob {
+// sourceRetention is how long raw extraction sources are kept; values <= 0 fall
+// back to DefaultSourceRetention.
+func NewCleanupJob(contentRepo repository.ContentRepository, userContentRepo repository.UserContentRepository, logger *slog.Logger, batchSize int, sourceRetention time.Duration) *CleanupJob {
 	if batchSize <= 0 {
 		batchSize = defaultCleanupBatchSize
+	}
+	if sourceRetention <= 0 {
+		sourceRetention = DefaultSourceRetention
 	}
 	return &CleanupJob{
 		contentRepo:     contentRepo,
 		userContentRepo: userContentRepo,
 		logger:          logger,
 		batchSize:       batchSize,
+		sourceRetention: sourceRetention,
 	}
 }
 
 // Run first deletes Feed items older than 30 days that aren't favorited, then
-// deletes content orphaned for more than 90 days. Feed expiry runs first so the
-// contents it orphans are picked up by later runs. Both delete in bounded
+// deletes content orphaned for more than 90 days, then deletes raw extraction
+// sources past their retention. Feed expiry runs first so the contents it
+// orphans are picked up by later runs. All delete in bounded
 // batches so no single transaction locks the whole table.
 func (j *CleanupJob) Run() {
 	ctx := context.Background()
@@ -53,6 +65,9 @@ func (j *CleanupJob) Run() {
 	})
 	j.drain("orphaned content", orphanedRetention, func() (int64, error) {
 		return j.contentRepo.DeleteOrphaned(ctx, orphanedRetention, j.batchSize)
+	})
+	j.drain("expired content sources", j.sourceRetention, func() (int64, error) {
+		return j.contentRepo.DeleteExpiredSources(ctx, j.sourceRetention, j.batchSize)
 	})
 }
 
