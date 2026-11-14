@@ -12,14 +12,15 @@ created_at: 2026-11-14T02:33:16Z
 updated_at: 2026-11-14T02:33:16Z
 ---
 ## Goal
-Replace the React Native/Expo iOS app (`apps/mobile`) with a native Swift app (`apps/ios`) that uses system components for navigation and chrome, keeps custom views to a minimum, and behaves the same against the unchanged backend. Android is out of scope.
+Move iOS from the React Native/Expo app (`apps/mobile`) to a native Swift app (`apps/ios`) that uses system components for navigation and chrome, keeps custom views to a minimum, and behaves the same against the unchanged backend. Android is out of scope: `apps/mobile` is kept and Expo continues to be used for Android.
 
 ## Principles
 - **System containers only for navigation:** `TabView`, `NavigationStack`, `.sheet`, `.toolbar`, `.searchable`, `.swipeActions`, `.refreshable`, `.confirmationDialog`, `Form`, `List`, `ContentUnavailableView`.
 - **Custom view budget:** `ArticleRow` (list row content), the offline/status banner, and the reader's HTML template. Anything else custom needs a reason in its PR.
 - **Port behaviour, not code structure.** The service layer (auth refresh, store, outbox, sync) carries the app's hard-won rules; its jest suites are the specification and are ported case for case. The UI layer is rewritten idiomatically.
 - **No backend change, no compatibility layer.** Same REST API, same bundle id (`com.cairnapp.cairnreader`), no migration of on-device RN data.
-- **`apps/mobile` stays shippable until cutover**, then is deleted in one task.
+- **Brand fonts are kept** (Inter, Crimson Pro, Atkinson Hyperlegible Next), applied from one typography file at the root and through bar appearances, so system components are still used unmodified.
+- **`apps/mobile` keeps shipping iOS until cutover.** Cutover then removes only its iOS side; it stays as the Expo Android app.
 
 ## What the review found
 - ~19k lines in `apps/mobile` (about half tests). 10 screens, a service layer of ~1.7k lines, and 15 common components.
@@ -35,10 +36,11 @@ Replace the React Native/Expo iOS app (`apps/mobile`) with a native Swift app (`
 | `HeaderPopover`, `AddLinkModal`, `ReportIssueModal` | `.sheet` + `Form` |
 | `ListToggle`, `ListChoice` | `Picker` |
 | `Button`, `IconButton`, `QuickAccessButton`, `icons/*` | `Button`, `NavigationLink`, SF Symbols |
+| `FontFamily` constants on every `Text` | root `.font` + bar appearances from one `Typography.swift` |
 | `ErrorBoundary`, safe-area constants, `globalStyles` | nothing |
 
 - Native API replacements: AsyncStorage tokens to Keychain; `expo-sqlite` to GRDB; `expo-network` to `NWPathMonitor`; `react-native-render-html` to a web view; `expo-application` device id to `identifierForVendor`; `expo-haptics`/`expo-clipboard` to UIKit feedback generators / `UIPasteboard`; AppState to `scenePhase`.
-- `design/tokens` already anticipates a Swift output; `apps/shared` (TypeScript) cannot be shared with Swift, so its auth state machine, error types and transforms are ported and web becomes its only consumer.
+- `design/tokens` already anticipates a Swift output; `apps/shared` (TypeScript) cannot be shared with Swift, so its auth state machine, error types and transforms are ported; it stays shared by web and the Expo Android app.
 - The committed `apps/mobile/ios` project is Expo-generated (CocoaPods, deployment target 15.1) and is not a starting point; only the icon, privacy manifest and fastlane configuration carry over.
 
 ## Constraints and risks
@@ -46,9 +48,10 @@ Replace the React Native/Expo iOS app (`apps/mobile`) with a native Swift app (`
 - **Reader scroll restore and completion tracking** (task 12) is the riskiest port: web-view content height settles late (images), and the rule "do not persist the pre-restore offset" must hold.
 - **Existing installs sign in again** and lose unsynced queued edits at the update (decision 4).
 - **Minimum iOS rises from 15.1 to 26** under the recommended decision 1.
+- **Two mobile codebases after cutover** (Swift for iOS, Expo for Android): every later mobile feature is implemented twice, and service-layer rules (outbox, sync) can drift between them.
 
 ## Decisions
-Open, with recommended defaults, in decision_1686. Tasks are written against the defaults; task 01 is blocked on it.
+Decisions 5 (keep the brand fonts) and 6 (keep `apps/mobile` for Android) were made by the owner on 2026-11-14. The rest are open, with recommended defaults, in decision_1686. Tasks are written against the defaults; task 01 is blocked on it.
 
 ## Tasks (in dependency order)
 Foundation
@@ -77,9 +80,9 @@ UI
 Ship
 - task_4713: 17 fastlane and TestFlight workflows (parallel, needs only 01)
 - task_fe45: 18 Parity and platform QA pass
-- chore_c364: 19 Cutover: delete `apps/mobile`, switch CI, update docs
+- chore_c364: 19 Cutover: retire the iOS side of `apps/mobile`, switch release, update docs
 
 Parallel tracks after 03: {04, 05} and {06} can proceed side by side and meet at 07. After 10: 11, 12 and 14 are independent. 15 needs only 09 and 05.
 
 ## Done when
-- The native app is the only mobile client in the repo, released through TestFlight, with every item in task 18's checklist passing.
+- iOS is released only from `apps/ios` through TestFlight with every item in task 18's checklist passing, and `apps/mobile` is an Android-only Expo app that still passes its checks.

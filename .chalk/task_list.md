@@ -3,7 +3,7 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **chore_c364** · P1 · open · [iOS native 19] Cutover: delete apps/mobile, switch CI and release, update docs  (parent: epic_bc48)
+- **chore_c364** · P1 · open · [iOS native 19] Cutover: retire the iOS side of apps/mobile (Expo stays for Android), switch release, update docs  (parent: epic_bc48)
 - **decision_1686** · P1 · open · [iOS native 00] Confirm migration decisions (min iOS, reader, persistence, cutover)  (parent: epic_bc48)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_bc48** · P1 · open · Native iOS app: migrate the mobile client from React Native to Swift/SwiftUI
@@ -35,7 +35,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
-- **task_a13d** · P2 · open · [iOS native 02] Colours and typography: asset-catalog output from design tokens  (parent: epic_bc48)
+- **task_a13d** · P2 · open · [iOS native 02] Colours and typography: design-token colorsets and bundled brand fonts  (parent: epic_bc48)
 - **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_ed6a** · P2 · open · Web: morph the round search button into a pill search field

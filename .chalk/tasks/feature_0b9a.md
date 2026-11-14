@@ -32,6 +32,7 @@ The navigation skeleton, built only from system containers. First task that prod
 - [ ] A `Route` enum per stack (article, bookmarks, account, about, rss, newsletters) so destinations are typed in one place.
 - [ ] `LoginView` as a `Form`: continue with this device (login, falling back to register as today), email sign in / create account with `.textContentType` set for password autofill, and a server URL field under an "Advanced" disclosure. Errors shown inline in the form footer.
 - [ ] Offline indicator: one small banner view attached with `.safeAreaInset(edge: .top)` on the root, shown in all three root states. This is one of the few custom views.
+- [ ] Root font and bar appearances from `Typography.swift` applied here (decision 5); the Login wordmark/heading uses Crimson Pro as in the RN screen.
 - [ ] Placeholder views for the three tabs.
 
 ## Verify

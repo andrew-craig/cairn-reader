@@ -1,6 +1,6 @@
 ---
 id: chore_c364
-title: [iOS native 19] Cutover: delete apps/mobile, switch CI and release, update docs
+title: [iOS native 19] Cutover: retire the iOS side of apps/mobile (Expo stays for Android), switch release, update docs
 type: chore
 status: open
 priority: 1
@@ -12,18 +12,24 @@ created_at: 2026-11-14T02:35:53Z
 updated_at: 2026-11-14T02:35:53Z
 ---
 ## Goal
-One mobile client in the repo. No compatibility layer left behind (root CLAUDE.md: remove obsolete paths).
+iOS ships only from `apps/ios`. `apps/mobile` remains as the Expo app for Android (decision 6) with its iOS-specific parts removed, so there is one owner per platform and no dead iOS path left in the Expo app (root CLAUDE.md: remove obsolete paths).
 
 ## Plan
-- [ ] Delete `apps/mobile` entirely (decision 6: this removes the Expo Android target too).
-- [ ] Root `package.json`: drop the `apps/mobile` workspace; regenerate `package-lock.json`.
-- [ ] `design/tokens/build.js`: remove the `mobile` (TypeScript) platform; update `design-tokens.yml` and `design/tokens/README.md`.
-- [ ] Delete `.github/workflows/mobile-checks.yml` and the two RN TestFlight workflows; the native workflows become the only ones. Update `.github/workflows/README.md`.
-- [ ] `apps/shared` now has a single consumer (web). Leave it in place and file a follow-up chore to decide whether to fold it into `apps/web`; do not do it here.
-- [ ] Docs: root `CLAUDE.md` (overview, architecture, service links), finish `apps/ios/CLAUDE.md` to replace `apps/mobile/CLAUDE.md` and `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`, `docs/CONFIGURATION.md`, `apps/web/CLAUDE.md` references to mobile.
-- [ ] Backlog: close `chore_3ea1` and `chore_88f9` if the mobile lockfile churn they describe is gone; re-read the open "Mobile:" feature tasks (`feature_2920`, `feature_cf80`, `feature_d632`, `feature_e3b4`, `feature_ec3e`, `feature_753f`, `feature_a85d`, `feature_a849`) and reword them for the native app.
+- [ ] Delete the committed Expo iOS project `apps/mobile/ios` (including its fastlane directory, which task 17 re-created under `apps/ios`).
+- [ ] Delete the RN iOS workflows `.github/workflows/ios-testflight-fastlane.yml` and `ios-testflight-local-build.yml` (the `mobile-v*` tag trigger goes with them); the `apps/ios` workflows are the only iOS release path. Update `.github/workflows/README.md`.
+- [ ] `apps/mobile/app.json`: remove the `ios` block and the `CairnIcon.icon` asset reference; `package.json`: remove the `ios` script.
+- [ ] Remove iOS-only branches from the Expo code so it is plainly Android-only: `Platform.OS === 'ios'` paths and `ActionSheetIOS` in `ArticleContent.tsx`, `getIosIdForVendorAsync` in `services/auth.ts`, and the platform switches in `App.tsx`, `LoginScreen`, `AccountScreen`, `AddArticleScreen`, `HeaderPopover`, `CustomTabBar`, `BottomActionMenu`, `TopBlurGradient`. Update the affected tests.
+- [ ] `.github/workflows/mobile-checks.yml`: the bundle job exports `--platform android` instead of `ios`. The other jobs stay.
+- [ ] Keep unchanged: the `apps/mobile` npm workspace, `apps/shared` (still consumed by web and the Expo app), and the `mobile` TypeScript platform in `design/tokens/build.js` alongside the new `ios` platform.
+- [ ] Docs: root `CLAUDE.md` (overview and architecture now list a native iOS app, an Expo Android app and the web app; add the `apps/ios/CLAUDE.md` link), finish `apps/ios/CLAUDE.md`, rewrite `apps/mobile/CLAUDE.md` and `AGENTS.md` as Android-only, and update `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`, `docs/CONFIGURATION.md`, `design/tokens/README.md`.
+- [ ] Backlog: go through the open "Mobile:" feature tasks (`feature_2920`, `feature_cf80`, `feature_d632`, `feature_e3b4`, `feature_ec3e`, `feature_753f`, `feature_a85d`, `feature_a849`) and state on each whether it applies to iOS, Android or both. `chore_3ea1` and `chore_88f9` stay valid (the Expo lockfile churn remains).
 - [ ] Release the native build to all TestFlight testers with a note that they will need to sign in again.
 
+## Notes
+- No `android/` directory or Android release workflow is committed today; adding one is out of scope for this epic.
+- After this task every user-facing change has two mobile implementations (Swift for iOS, Expo for Android). Record that in the root `CLAUDE.md` so future tasks say which platforms they cover.
+
 ## Verify
-- `grep -ri "apps/mobile\|expo\|react native"` over the repo (excluding `.chalk/tasks/closed` and `docs/archive`) returns nothing unexpected.
+- `apps/mobile`: `npm run type-check`, `npm run lint`, `npm test`, knip and the Android bundle export are green.
+- `grep -rn "Platform.OS\|ActionSheetIOS\|IosIdForVendor" apps/mobile/src apps/mobile/App.tsx` returns nothing.
 - Web checks, selfhost build and `ios-checks` are green.
