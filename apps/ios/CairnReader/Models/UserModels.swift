@@ -21,3 +21,26 @@ nonisolated struct AuthResponse: Codable, Sendable {
     /// Access token lifetime in seconds.
     let expiresIn: Int
 }
+
+/// Body of `POST /auth/login` and `POST /auth/register`.
+nonisolated struct EmailCredentials: Encodable, Sendable {
+    let email: String
+    let password: String
+}
+
+/// Body of `POST /auth/login/mobile` and `POST /auth/register/mobile`. The field keeps its Expo
+/// name on the wire (`expo_device_id`); the iOS value is `identifierForVendor`.
+nonisolated struct DeviceCredentials: Encodable, Sendable {
+    let expoDeviceId: String
+}
+
+/// Body of `POST /auth/refresh` and `POST /auth/logout`.
+nonisolated struct RefreshTokenRequest: Encodable, Sendable {
+    let refreshToken: String
+}
+
+/// Body of `PUT /user/{id}/password`.
+nonisolated struct ChangePasswordRequest: Encodable, Sendable {
+    let currentPassword: String
+    let newPassword: String
+}
