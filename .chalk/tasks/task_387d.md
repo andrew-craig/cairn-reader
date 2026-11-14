@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [ios,offline]
-blocked_by: [task_ec50,task_c194]
+blocked_by: [task_c194]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-14T20:26:51Z
 ---
 ## Goal
 Reader and list edits succeed offline and replay on reconnect, with the same coalescing and failure rules as today.
