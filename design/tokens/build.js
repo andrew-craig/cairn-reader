@@ -1,7 +1,6 @@
 // Generates each app's color file from colors.json (the single source of the
 // palette). Output files are committed; CI fails if they drift from the source.
-// A native Swift app would add a platform here (e.g. an asset-catalog colorset
-// format) without touching colors.json.
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import StyleDictionary from 'style-dictionary';
 
 const HEADER = 'Generated from design/tokens/colors.json by `npm run build -w @cairn/tokens`. Do not edit.';
@@ -50,6 +49,48 @@ export const Colors = ${JSON.stringify(byMode(dictionary), null, 2).replace(/"(\
 `,
 });
 
+// Xcode's asset-catalog JSON: two-space indent and " : " separators.
+const xcodeJSON = (value) => `${JSON.stringify(value, null, 2).replace(/": /g, '" : ')}\n`;
+const XCODE_INFO = { author: 'xcode', version: 1 };
+
+// '#RRGGBB' or '#RRGGBBAA' to an sRGB colorset entry.
+function colorsetColor(hex) {
+  const [red, green, blue] = [1, 3, 5].map((i) => `0x${hex.slice(i, i + 2)}`);
+  const alpha = hex.length === 9 ? parseInt(hex.slice(7, 9), 16) / 255 : 1;
+  return { 'color-space': 'srgb', components: { alpha: alpha.toFixed(3), blue, green, red } };
+}
+
+// One <token>.colorset per token with a light (any) and dark appearance. The catalog is
+// wholly generated, so it is recreated each build and removed tokens disappear.
+StyleDictionary.registerAction({
+  name: 'ios/colorsets',
+  do: (dictionary, platform) => {
+    const catalog = platform.buildPath;
+    rmSync(catalog, { recursive: true, force: true });
+    mkdirSync(catalog, { recursive: true });
+    writeFileSync(`${catalog}/Contents.json`, xcodeJSON({ info: XCODE_INFO }));
+    const { light, dark } = byMode(dictionary);
+    for (const name of Object.keys(light)) {
+      mkdirSync(`${catalog}/${name}.colorset`);
+      writeFileSync(
+        `${catalog}/${name}.colorset/Contents.json`,
+        xcodeJSON({
+          colors: [
+            { color: colorsetColor(light[name]), idiom: 'universal' },
+            {
+              appearances: [{ appearance: 'luminosity', value: 'dark' }],
+              color: colorsetColor(dark[name]),
+              idiom: 'universal',
+            },
+          ],
+          info: XCODE_INFO,
+        }),
+      );
+    }
+  },
+  undo: () => {},
+});
+
 const sd = new StyleDictionary({
   source: [new URL('./colors.json', import.meta.url).pathname],
   log: { verbosity: 'silent' },
@@ -61,6 +102,11 @@ const sd = new StyleDictionary({
     mobile: {
       buildPath: new URL('../../apps/mobile/src/constants/', import.meta.url).pathname,
       files: [{ destination: 'colors.ts', format: 'typescript/color-schemes' }],
+    },
+    ios: {
+      buildPath: new URL('../../apps/ios/CairnReader/Resources/Colors.xcassets', import.meta.url).pathname,
+      files: [],
+      actions: ['ios/colorsets'],
     },
   },
 });

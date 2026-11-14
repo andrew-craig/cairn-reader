@@ -15,10 +15,24 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Inter_400Regular.ttf</string>
+		<string>Inter_500Medium.ttf</string>
+		<string>Inter_600SemiBold.ttf</string>
+		<string>Inter_700Bold.ttf</string>
+		<string>CrimsonPro_400Regular.ttf</string>
+		<string>CrimsonPro_500Medium.ttf</string>
+		<string>CrimsonPro_600SemiBold.ttf</string>
+		<string>CrimsonPro_700Bold.ttf</string>
+		<string>AtkinsonHyperlegibleNext_400Regular.ttf</string>
+		<string>AtkinsonHyperlegibleNext_400Regular_Italic.ttf</string>
+		<string>AtkinsonHyperlegibleNext_700Bold.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
-		<string>LaunchBackground</string>
+		<string>background</string>
 	</dict>
 </dict>
 </plist>
