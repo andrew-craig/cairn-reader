@@ -30,7 +30,8 @@ nonisolated final class StubServer: Sendable {
         self.respond = respond
     }
 
-    /// Answers requests in order with `replies`; a request beyond the last is a test failure.
+    /// Answers requests in order with `replies`. A request beyond the last gets a transport failure
+    /// (`NetworkError.unreachable`), so assert on `requests` or `paths` to catch extra requests.
     convenience init(replies: [Reply]) {
         let queue = Mutex(replies)
         self.init { request in

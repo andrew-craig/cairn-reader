@@ -61,8 +61,12 @@ nonisolated struct KeychainSessionStorage: SessionStorage {
     }
 
     func save(_ session: StoredSession) {
+        guard let data = try? JSONEncoder().encode(session) else {
+            Self.logger.error("Encoding the session failed")
+            return
+        }
         let attributes: [String: Any] = [
-            kSecValueData as String: (try? JSONEncoder().encode(session)) ?? Data(),
+            kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
         var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
