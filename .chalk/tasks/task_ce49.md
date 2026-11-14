@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [ios]
-blocked_by: [task_8792]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-14T07:15:57Z
 ---
 ## Goal
 The typed foundation every service uses: backend DTOs, the `Article` domain model, the two error types offline logic keys off, and one place that performs requests.
