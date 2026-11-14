@@ -2,9 +2,14 @@ import SwiftUI
 
 @main
 struct CairnReaderApp: App {
+    init() {
+        Typography.applyBarAppearance()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
+                .font(Typography.body)
         }
     }
 }
