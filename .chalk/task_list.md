@@ -3,8 +3,10 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
+- **epic_381e** · P1 · open · Move to a cloud-hosted instance for beta customers  (parent: epic_7c9e)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **task_f489** · P1 · open · Build per-service container images for linux/amd64 (Intel)  (parent: epic_381e)
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
