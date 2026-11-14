@@ -3,12 +3,31 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
+- **chore_c364** · P1 · open · [iOS native 19] Cutover: retire the iOS side of apps/mobile (Expo stays for Android), switch release, update docs  (parent: epic_bc48)
+- **decision_1686** · P1 · open · [iOS native 00] Confirm migration decisions (min iOS, reader, persistence, cutover)  (parent: epic_bc48)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
+- **epic_bc48** · P1 · open · Native iOS app: migrate the mobile client from React Native to Swift/SwiftUI
 - **epic_fefa** · P1 · open · Code quality remediation program
+- **feature_0b9a** · P1 · open · [iOS native 09] App shell: auth gate, TabView, per-tab NavigationStack, Login  (parent: epic_bc48)
+- **feature_33bc** · P1 · open · [iOS native 10] Article list model, ArticleRow and the Reads tab  (parent: epic_bc48)
+- **feature_4e37** · P1 · open · [iOS native 12] Reader: web-view article, progress tracking, toolbar actions  (parent: epic_bc48)
+- **task_387d** · P1 · open · [iOS native 07] Outbox and ArticleMutations: offline write queue  (parent: epic_bc48)
+- **task_5092** · P1 · open · [iOS native 04] AuthService: Keychain session, token refresh, device and email login  (parent: epic_bc48)
+- **task_8792** · P1 · open · [iOS native 01] Scaffold apps/ios Xcode project and macOS CI  (parent: epic_bc48)
+- **task_c194** · P1 · open · [iOS native 06] Local database and ArticleStore (GRDB)  (parent: epic_bc48)
+- **task_ce49** · P1 · open · [iOS native 03] Models, errors, server URL config and HTTP client  (parent: epic_bc48)
+- **task_ec50** · P1 · open · [iOS native 05] ReadService and SystemService: content, subscription and feedback endpoints  (parent: epic_bc48)
+- **task_fe45** · P1 · open · [iOS native 18] Parity and platform QA pass on device  (parent: epic_bc48)
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
+- **feature_704f** · P2 · open · [iOS native 14] Add link / subscribe sheet  (parent: epic_bc48)
+- **feature_75bc** · P2 · open · [iOS native 11] Feed tab and Bookmarks  (parent: epic_bc48)
+- **feature_983c** · P2 · open · [iOS native 16] Subscriptions: RSS and Newsletters with per-source Feed/Reads routing  (parent: epic_bc48)
+- **feature_b604** · P2 · open · [iOS native 15] You tab, Account and About  (parent: epic_bc48)
+- **task_4713** · P2 · open · [iOS native 17] Release pipeline: fastlane and TestFlight workflows for apps/ios  (parent: epic_bc48)
+- **task_4e17** · P2 · open · [iOS native 08] Connectivity, SyncTrigger, article prefetch and FeedCache  (parent: epic_bc48)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)
@@ -16,6 +35,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_652a** · P2 · open · Set up alerting system for pre-go-live  (parent: epic_7c9e)
 - **task_6fe1** · P2 · open · [Audit/Tier 3] Collapse the triplicated content create pipeline in content_service.go  (parent: epic_fefa)
 - **task_8392** · P2 · open · Implement load testing for pre-go-live  (parent: epic_7c9e)
+- **task_a13d** · P2 · open · [iOS native 02] Colours and typography: design-token colorsets and bundled brand fonts  (parent: epic_bc48)
 - **task_b99b** · P2 · open · Align token lifetime and rate-limit defaults across standalone, self-host and dev compose
 - **task_dbca** · P2 · open · [Fetch dedup] Collapse the 4+ HTTP fetch+size-cap copies onto pkg/rss/fetch  (parent: epic_fefa)
 - **task_ed6a** · P2 · open · Web: morph the round search button into a pill search field
@@ -29,6 +49,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_2920** · P3 · open · Mobile: Add filter/sort controls to ReadScreen
 - **feature_34cc** · P3 · open · Reading analytics and statistics  (parent: epic_7c9e)
 - **feature_4524** · P3 · open · Save read progress for Feed items on web and mobile
+- **feature_65dc** · P3 · open · [iOS native 13] Report extraction issue sheet  (parent: epic_bc48)
 - **feature_714e** · P3 · open · Web + mobile: re-enable disabled RSS feeds
 - **feature_9d64** · P3 · open · Image hosting and optimization
 - **feature_9dba** · P3 · open · Article sharing via links
