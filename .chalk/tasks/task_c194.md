@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [ios,offline]
-blocked_by: [task_ce49]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-14T10:08:43Z
 ---
 ## Goal
 The on-device store of Reads articles that makes the Reads tab render instantly and work offline.
