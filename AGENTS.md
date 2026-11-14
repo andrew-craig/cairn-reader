@@ -37,6 +37,7 @@ Read the following documentation as necessary for each task. do not read a docum
 ### Service documentation
 - [Mobile App](/apps/mobile/CLAUDE.md) - React Native/Expo mobile application
 - [Web App](/apps/web/CLAUDE.md) - React/Vite browser client
+- [iOS App](/apps/ios/CLAUDE.md) - Native Swift/SwiftUI iOS application (replacing the mobile app's iOS build)
 - [Read Service](/services/read/CLAUDE.md) - Article storage, RSS feed management, and Feed/Reads routing
 - [User Service](/services/users/CLAUDE.md) - Authentication and user management
 - [Email Ingest Service](/services/read/email/CLAUDE.md) - Email-to-article ingestion
