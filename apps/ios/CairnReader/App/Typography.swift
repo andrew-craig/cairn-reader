@@ -21,10 +21,10 @@ enum BrandFont: String, CaseIterable {
         .custom(rawValue, size: size, relativeTo: style)
     }
 
-    /// A UIKit font that scales with Dynamic Type like `style`, for the bar appearances.
-    func uiFont(size: CGFloat, relativeTo style: UIFont.TextStyle) -> UIFont {
+    /// A fixed-size UIKit font, for the bar appearances.
+    func uiFont(size: CGFloat) -> UIFont {
         // Every case is bundled; CairnReaderTests fails if one does not load.
-        UIFontMetrics(forTextStyle: style).scaledFont(for: UIFont(name: rawValue, size: size)!)
+        UIFont(name: rawValue, size: size)!
     }
 }
 
@@ -48,11 +48,23 @@ enum Typography {
     static let contentBold = BrandFont.atkinsonBold.font(size: 16, relativeTo: .body)
 
     /// Navigation bar titles and tab bar items, which SwiftUI's `.font` does not reach.
+    /// Like the system bars, the inline title and tab items keep a fixed size (the Large
+    /// Content Viewer covers large Dynamic Type sizes) and the large title scales. It gets one
+    /// appearance per content size category, so UIKit re-applies it when the size changes.
     static func applyBarAppearance() {
-        let navigationBar = UINavigationBar.appearance()
-        navigationBar.titleTextAttributes = [.font: BrandFont.interSemiBold.uiFont(size: 17, relativeTo: .headline)]
-        navigationBar.largeTitleTextAttributes = [.font: BrandFont.crimsonProBold.uiFont(size: 34, relativeTo: .largeTitle)]
-        UITabBarItem.appearance().setTitleTextAttributes(
-            [.font: BrandFont.interMedium.uiFont(size: 10, relativeTo: .caption2)], for: .normal)
+        UINavigationBar.appearance().titleTextAttributes = [.font: BrandFont.interSemiBold.uiFont(size: 17)]
+        UITabBarItem.appearance().setTitleTextAttributes([.font: BrandFont.interMedium.uiFont(size: 10)], for: .normal)
+
+        let largeTitle = BrandFont.crimsonProBold.uiFont(size: 34)
+        let categories: [UIContentSizeCategory] = [
+            .extraSmall, .small, .medium, .large, .extraLarge, .extraExtraLarge, .extraExtraExtraLarge,
+            .accessibilityMedium, .accessibilityLarge, .accessibilityExtraLarge,
+            .accessibilityExtraExtraLarge, .accessibilityExtraExtraExtraLarge,
+        ]
+        for category in categories {
+            let traits = UITraitCollection(preferredContentSizeCategory: category)
+            let font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: largeTitle, compatibleWith: traits)
+            UINavigationBar.appearance(for: traits).largeTitleTextAttributes = [.font: font]
+        }
     }
 }
