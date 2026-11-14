@@ -5,11 +5,11 @@ type: feature
 status: open
 priority: 1
 labels: [ios,ui]
-blocked_by: [task_5092]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T08:51:16Z
+updated_at: 2026-11-14T10:42:35Z
 ---
 ## Goal
 The navigation skeleton, built only from system containers. First task that produces something the owner can run and sign in to.
