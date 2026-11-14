@@ -14,16 +14,21 @@ nonisolated struct HTTPRequest: Sendable {
     var body: (any Encodable & Sendable)?
     /// Extra headers, e.g. `Authorization`.
     var headers: [String: String]
+    /// Idle timeout in seconds (`URLRequest.timeoutInterval`): the request fails with
+    /// `NetworkError.timeout` when no data arrives for this long. Not a hard deadline. nil uses the
+    /// session's.
+    var timeout: TimeInterval?
 
     init(
         _ method: Method = .get, _ path: String, query: [URLQueryItem] = [],
-        body: (any Encodable & Sendable)? = nil, headers: [String: String] = [:]
+        body: (any Encodable & Sendable)? = nil, headers: [String: String] = [:], timeout: TimeInterval? = nil
     ) {
         self.method = method
         self.path = path
         self.query = query
         self.body = body
         self.headers = headers
+        self.timeout = timeout
     }
 }
 
@@ -103,6 +108,9 @@ nonisolated struct HTTPClient: Sendable {
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
+        if let timeout = request.timeout {
+            urlRequest.timeoutInterval = timeout
+        }
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body = request.body {
             urlRequest.httpBody = try Self.encoder.encode(body)

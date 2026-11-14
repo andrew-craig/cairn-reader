@@ -192,3 +192,26 @@ nonisolated struct ExtractionFeedbackResponse: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
 }
+
+/// A partial update to an item: fields left nil are not sent.
+nonisolated struct UpdateUserContentRequest: Codable, Sendable, Equatable {
+    var status: ContentStatus?
+    /// Fraction of the article scrolled (0–1).
+    var scrollPosition: Double?
+    var isFavorite: Bool?
+    /// Moves the item to this list (Save to Reads); the backend re-stamps `addedAt`.
+    var list: ContentList?
+}
+
+nonisolated struct ContentCountResponse: Codable, Sendable {
+    let count: Int
+}
+
+nonisolated struct SetSourceListRequest: Codable, Sendable {
+    let list: ContentList
+}
+
+/// The user's newsletter address (email ingest service).
+nonisolated struct EmailAddressResponse: Codable, Sendable {
+    let emailAddress: String
+}
