@@ -24,6 +24,8 @@ Never hardcode a color in an app. If no token fits, add one here.
 
 - `apps/mobile/app.json` (`backgroundColor` for the splash and Android icon) is static Expo config and cannot import
   tokens. It holds a copy of `light.background`; update it by hand if that changes.
+- `apps/ios/CairnReader/Resources/Assets.xcassets/LaunchBackground.colorset` (iOS launch screen) holds a copy of
+  `light.background` and `dark.background`; update it by hand if those change.
 
 ## Native Swift
 

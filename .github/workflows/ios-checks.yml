@@ -1,0 +1,55 @@
+name: iOS App Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/ios/**'
+      - '.github/workflows/ios-checks.yml'
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Pick an iOS 26 simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | test("iOS-26")) | .value[] | select(.name | startswith("iPhone"))][0].udid')
+          if [ -z "$udid" ] || [ "$udid" = "null" ]; then
+            echo "No iOS 26 iPhone simulator available" >&2
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project CairnReader.xcodeproj \
+            -scheme CairnReader \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES
+
+      - name: Test
+        run: |
+          xcodebuild test \
+            -project CairnReader.xcodeproj \
+            -scheme CairnReader \
+            -destination "id=$SIM_UDID" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            GCC_TREAT_WARNINGS_AS_ERRORS=YES
