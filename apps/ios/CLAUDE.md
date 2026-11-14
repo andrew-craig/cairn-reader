@@ -38,7 +38,7 @@ Add a Swift file by creating it in the right folder; the synchronized groups pic
 
 ## Build and test
 
-Verify through CI. Cloud agent sessions run on Linux and cannot build or test this app: push and read the **iOS App Checks** workflow (`.github/workflows/ios-checks.yml`, `macos-26`), which builds and tests on an iOS 26 simulator with warnings as errors. On-device checks are the owner's.
+Verify through CI. Cloud agent sessions run on Linux and cannot build or test this app: push and read the **iOS App Checks** workflow (`.github/workflows/ios-checks.yml`, `macos-26`), which builds and tests on an iOS 26 simulator. Warnings are errors through the project-level build settings (`SWIFT_TREAT_WARNINGS_AS_ERRORS`, `GCC_TREAT_WARNINGS_AS_ERRORS`), so local builds match CI; never pass them as `xcodebuild` overrides, which also reach package targets and conflict with their `-suppress-warnings`. On-device checks are the owner's.
 
 On a Mac (Xcode 26):
 
