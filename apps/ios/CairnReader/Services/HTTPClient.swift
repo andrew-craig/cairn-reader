@@ -97,6 +97,8 @@ nonisolated struct HTTPClient: Sendable {
     private func makeURLRequest(_ request: HTTPRequest) throws -> URLRequest {
         var url = server.url.appending(path: request.path)
         if !request.query.isEmpty {
+            // Encodes `+` as `%2B` (base64 cursors contain it); `URLComponents.queryItems` would
+            // leave it raw and Go would read it as a space. Covered by HTTPClientTests.
             url.append(queryItems: request.query)
         }
         var urlRequest = URLRequest(url: url)

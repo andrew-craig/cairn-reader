@@ -29,6 +29,16 @@ struct HTTPClientTests {
         #expect(response.data.contentId == "content-1")
     }
 
+    /// Base64 cursors contain `+`, which Go decodes as a space unless it is sent as `%2B`.
+    @Test func plusInQueryIsPercentEncoded() async throws {
+        let client = client { request in
+            #expect(request.url?.query(percentEncoded: true) == "cursor=eyJ0Ijoi%2B%2F%3D&q=a%2Bb%20c")
+            return (200, Data())
+        }
+        let query = [URLQueryItem(name: "cursor", value: "eyJ0Ijoi+/="), URLQueryItem(name: "q", value: "a+b c")]
+        try await client.send(HTTPRequest(.get, "/x", query: query))
+    }
+
     @Test func usesSavedServer() async throws {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         let server = ServerConfig(defaults: defaults)
