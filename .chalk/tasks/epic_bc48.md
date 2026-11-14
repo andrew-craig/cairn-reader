@@ -47,11 +47,18 @@ Move iOS from the React Native/Expo app (`apps/mobile`) to a native Swift app (`
 - **Verification needs macOS.** Cloud agent sessions run on Linux and cannot build or test the app. Task 01 sets up a macOS CI job that every later task verifies through; on-device checks are the owner's.
 - **Reader scroll restore and completion tracking** (task 12) is the riskiest port: web-view content height settles late (images), and the rule "do not persist the pre-restore offset" must hold.
 - **Existing installs sign in again** and lose unsynced queued edits at the update (decision 4).
-- **Minimum iOS rises from 15.1 to 26** under the recommended decision 1.
+- **Minimum iOS rises from 15.1 to 26** (decision 1). Devices that cannot run iOS 26 stay on the last RN build.
 - **Two mobile codebases after cutover** (Swift for iOS, Expo for Android): every later mobile feature is implemented twice, and service-layer rules (outbox, sync) can drift between them.
 
 ## Decisions
-Decisions 5 (keep the brand fonts) and 6 (keep `apps/mobile` for Android) were made by the owner on 2026-11-14. The rest are open, with recommended defaults, in decision_1686. Tasks are written against the defaults; task 01 is blocked on it.
+All seven decisions in decision_1686 were made by the owner on 2026-11-14:
+1. Minimum iOS 26.
+2. The reader is a web view showing `cleaned_html` in a bundled HTML/CSS template.
+3. GRDB (SQLite) for the on-device store and outbox.
+4. No migration of on-device RN data: existing installs sign in again, device-ID accounts return through the unchanged `identifierForVendor`, unsynced queued edits are lost.
+5. Brand fonts are kept.
+6. `apps/mobile` is kept as the Expo Android app.
+7. Platform look wins over the RN app's custom chrome; the colour palette is kept.
 
 ## Tasks (in dependency order)
 Foundation
