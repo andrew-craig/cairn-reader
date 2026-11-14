@@ -30,7 +30,7 @@ The reusable list pieces (paging model, row) and the offline-first Reads tab on 
 
 ## Plan
 - [ ] `ArticleListModel` (`@Observable`): cursor pagination with load-more when the last row appears, refresh, debounced live search (`searchUserContents`) that replaces the list while a query is held and restores plus quietly refreshes the pre-search list when cleared, an `exclude` id set, and stale-response protection (a slow earlier response must not overwrite a newer one).
-- [ ] `ArticleRow`: title, source/domain, relative date, reading time, thumbnail via `AsyncImage`, optional `pending` note. A plain view used as `List` row content.
+- [ ] `ArticleRow`: title, source/domain, relative date, reading time, thumbnail via `AsyncImage`, optional `pending` note. A plain view used as `List` row content. The title is muted (`textSecondary`) for a partially read article, using the same rule as `isPartiallyRead` in `@cairn/shared` (added in #452); port that predicate with its tests.
 - [ ] `ArticleListView`: generic list taking a model and row swipe configuration; reused by Feed and Bookmarks.
 - [ ] Reads tab: render `ArticleStore.listRecent` first, then fetch `list=reads`; on fetch failure keep the stored rows and show "Showing cached data". Every list sync (including pull-to-refresh) calls `ArticleStore.upsertMany` then `SyncTrigger.run`.
 - [ ] Queued saves (`ArticleStore.listPendingSaves`) listed above the server page until it includes them, with the "Waiting to save — will sync when online" note. Keep the snapshot rule: the merged set is taken before each first-page fetch; the pending indicator is re-read after every `SyncTrigger.run`.

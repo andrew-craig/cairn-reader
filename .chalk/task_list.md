@@ -48,6 +48,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_1d5d** · P3 · open · Export/import subscription list and likes
 - **feature_2920** · P3 · open · Mobile: Add filter/sort controls to ReadScreen
 - **feature_34cc** · P3 · open · Reading analytics and statistics  (parent: epic_7c9e)
+- **feature_4524** · P3 · open · Save read progress for Feed items on web and mobile
 - **feature_65dc** · P3 · open · [iOS native 13] Report extraction issue sheet  (parent: epic_bc48)
 - **feature_714e** · P3 · open · Web + mobile: re-enable disabled RSS feeds
 - **feature_9d64** · P3 · open · Image hosting and optimization
