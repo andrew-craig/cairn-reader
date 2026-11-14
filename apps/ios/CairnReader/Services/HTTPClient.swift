@@ -14,7 +14,9 @@ nonisolated struct HTTPRequest: Sendable {
     var body: (any Encodable & Sendable)?
     /// Extra headers, e.g. `Authorization`.
     var headers: [String: String]
-    /// Seconds before the request fails with `NetworkError.timeout`; nil uses the session's.
+    /// Idle timeout in seconds (`URLRequest.timeoutInterval`): the request fails with
+    /// `NetworkError.timeout` when no data arrives for this long. Not a hard deadline. nil uses the
+    /// session's.
     var timeout: TimeInterval?
 
     init(

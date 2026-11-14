@@ -5,8 +5,7 @@ import Foundation
 /// when the server could not be reached, `HttpError` for its answer, `AuthError.sessionExpired`
 /// when there is no session.
 nonisolated struct ReadService: Sendable {
-    /// Detection and discovery give up after these many seconds (discovery matches the
-    /// backend's own timeout).
+    /// Idle timeouts for detection and discovery (discovery matches the backend's own timeout).
     static let detectTimeout: TimeInterval = 10
     static let discoverTimeout: TimeInterval = 15
 

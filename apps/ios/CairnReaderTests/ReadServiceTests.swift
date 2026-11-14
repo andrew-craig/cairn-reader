@@ -209,7 +209,7 @@ struct ReadServiceSubscriptionTests {
     }
 
     @Test func unsubscribeDeletesFeed() async throws {
-        let server = StubServer(replies: [.json(204, "")])
+        let server = StubServer(replies: [.json(200, #"{ "data": { "success": true, "message": "unsubscribed" } }"#)])
         try await makeRead(server).unsubscribeFromRSSFeed("feed-1")
 
         #expect(server.requests.first?.httpMethod == "DELETE")
