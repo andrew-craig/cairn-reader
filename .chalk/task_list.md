@@ -3,7 +3,6 @@
 
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
-- **task_c194** · P1 · in_progress · [iOS native 06] Local database and ArticleStore (GRDB)  (parent: epic_bc48)
 - **chore_c364** · P1 · open · [iOS native 19] Cutover: retire the iOS side of apps/mobile (Expo stays for Android), switch release, update docs  (parent: epic_bc48)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_bc48** · P1 · open · Native iOS app: migrate the mobile client from React Native to Swift/SwiftUI
