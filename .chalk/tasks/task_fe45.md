@@ -23,7 +23,7 @@ Confirm the native app can replace the RN app. Agents cannot run a simulator fro
 - [ ] Reader: position restore after relaunch; completion at the end; next article; link dialog; share; report issue.
 - [ ] Add link (article, feed, Find feed) and feed-only mode from RSS.
 - [ ] Subscriptions: route change affects only new items; unsubscribe; newsletter address copy.
-- [ ] Brand fonts render everywhere (list rows, forms, navigation titles, tab labels, reader) with no system-font fallback.
+- [ ] Brand fonts render everywhere (list rows, forms, navigation titles, tab labels, reader) with no system-font fallback, including the system bars and the search field at the largest Dynamic Type size (decisions 5 and 7).
 - [ ] Dark mode, largest Dynamic Type size, VoiceOver labels on toolbar and swipe actions, iPad layout, landscape on iPad.
 - [ ] Every RN test file has a ported counterpart or a written reason it does not apply (component tests for controls that are now system-provided).
 
