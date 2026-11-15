@@ -1,7 +1,7 @@
 import Foundation
 
 /// An item in the user's Feed or Reads, as the app shows it.
-nonisolated struct Article: Identifiable, Hashable, Sendable {
+nonisolated struct Article: Identifiable, Hashable, Sendable, Codable {
     /// The content ID (not the user-content ID).
     let id: String
     var url: String

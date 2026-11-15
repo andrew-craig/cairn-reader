@@ -12,7 +12,7 @@ private final class SessionFactory {
     func make(_ user: User, _ auth: AuthService) -> UserSession {
         let url = try! temporaryDatabaseURL()
         urls.append(url)
-        return UserSession(user: user, auth: auth, database: AppDatabase(url: url))
+        return UserSession(user: user, auth: auth, isOnline: { true }, database: AppDatabase(url: url))
     }
 }
 
@@ -74,6 +74,21 @@ struct SessionModelTests {
         await model.login()
 
         #expect(model.user?.email == "a@b.com")
+    }
+
+    /// After a device account is upgraded, `login()` shows its email and keeps the session (and
+    /// its data): the user id is unchanged.
+    @Test func loginPicksUpAnUpgradedAccountInTheSameSession() async throws {
+        let model = makeModel(
+            StubServer(replies: [.json(200, AuthFixtures.userBody(email: "a@b.com"))]), session: AuthFixtures.valid)
+        await model.start()
+        let session = try #require(model.session)
+
+        _ = try await model.auth.upgradeAccount(email: "a@b.com", password: "password1")
+        await model.login()
+
+        #expect(model.user?.email == "a@b.com")
+        #expect(model.session === session)
     }
 
     @Test func startCreatesASessionForTheRestoredUser() async {

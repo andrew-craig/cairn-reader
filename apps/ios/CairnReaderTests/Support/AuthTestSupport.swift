@@ -86,6 +86,18 @@ nonisolated enum AuthFixtures {
         """
     }
 
+    /// A `{ data: user }` body for `user-1`, as the upgrade endpoint answers.
+    static func userBody(email: String) -> String {
+        """
+        {
+          "data": {
+            "id": "user-1", "email": "\(email)", "email_verified": false,
+            "created_at": "2020-01-01T00:00:00Z", "updated_at": "2020-01-01T00:00:00Z"
+          }
+        }
+        """
+    }
+
     static func errorBody(_ message: String) -> String {
         #"{ "error": "error", "message": "\#(message)" }"#
     }
