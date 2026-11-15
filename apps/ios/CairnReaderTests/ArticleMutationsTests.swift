@@ -94,7 +94,10 @@ struct ArticleMutationsTests {
 
         let article = try #require(try await harness.store.getById("a1"))
         #expect(article.list == .reads)
-        #expect(article.addedAt >= before && article.addedAt <= Date())
+        // The store keeps `added_at` as seconds since 1970, so the round trip can shift it by a
+        // fraction of a microsecond either way.
+        #expect(article.addedAt.timeIntervalSince(before) > -0.001)
+        #expect(article.addedAt.timeIntervalSinceNow < 0.001)
         #expect(article.content == "<p>Body</p>")
         #expect(try harness.rows().map(\.field) == ["list"])
         #expect(try harness.rows().map(\.payload) == [#"{"list":"reads"}"#])
