@@ -1,34 +1,30 @@
 import Foundation
-import Synchronization
 import Testing
 @testable import CairnReader
 
 // Port of apps/mobile/src/contexts/AuthContext.test.tsx.
 
-private nonisolated final class RecordingStore: UserDataStore {
-    struct Failure: Error {}
-    private let cleared = Mutex(false)
-    private let fails: Bool
+/// Sessions whose databases live in temporary files, so a test can check the file is erased.
+@MainActor
+private final class SessionFactory {
+    private(set) var urls: [URL] = []
 
-    init(fails: Bool = false) { self.fails = fails }
-
-    var wasCleared: Bool { cleared.withLock { $0 } }
-
-    func clear() async throws {
-        cleared.withLock { $0 = true }
-        if fails { throw Failure() }
+    func make(_ user: User) -> UserSession {
+        let url = try! temporaryDatabaseURL()
+        urls.append(url)
+        return UserSession(user: user, database: AppDatabase(url: url))
     }
 }
 
 @MainActor
 private func makeModel(
-    _ server: StubServer, session: StoredSession?, userData: [any UserDataStore] = []
+    _ server: StubServer, session: StoredSession?, sessions: SessionFactory = SessionFactory()
 ) -> SessionModel {
     let auth = AuthService(
         client: HTTPClient(
             server: ServerConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), session: server.session()),
         storage: InMemorySessionStorage(session), deviceID: { "device-1" }, sleep: { _ in })
-    return SessionModel(auth: auth, userData: userData)
+    return SessionModel(auth: auth, makeSession: sessions.make)
 }
 
 @MainActor
@@ -71,7 +67,7 @@ struct SessionModelTests {
                 server: ServerConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!),
                 session: StubServer(replies: [.json(200, AuthFixtures.authBody(email: "a@b.com"))]).session()),
             storage: InMemorySessionStorage())
-        let model = SessionModel(auth: auth)
+        let model = SessionModel(auth: auth, makeSession: SessionFactory().make)
         await model.start()
 
         _ = try await auth.loginWithEmail(email: "a@b.com", password: "pw")
@@ -80,45 +76,47 @@ struct SessionModelTests {
         #expect(model.user?.email == "a@b.com")
     }
 
-    @Test func logoutClearsUserData() async {
-        let stores = [RecordingStore(), RecordingStore()]
-        let model = makeModel(StubServer(replies: [.json(200, "{}")]), session: AuthFixtures.valid, userData: stores)
+    @Test func startCreatesASessionForTheRestoredUser() async {
+        let model = makeModel(StubServer(replies: []), session: AuthFixtures.valid)
         await model.start()
+        #expect(model.session?.user == AuthFixtures.user)
+    }
+
+    @Test func logoutClosesTheSessionAndErasesItsDatabase() async throws {
+        let sessions = SessionFactory()
+        let model = makeModel(StubServer(replies: [.json(200, "{}")]), session: AuthFixtures.valid, sessions: sessions)
+        await model.start()
+        try await model.session?.articles.upsertMany([storedArticle("a1")])
+        let url = try #require(sessions.urls.first)
+        #expect(FileManager.default.fileExists(atPath: url.path()))
 
         await model.logout()
 
-        #expect(model.user == nil)
-        #expect(stores.allSatisfy { $0.wasCleared })
+        #expect(model.session == nil)
+        #expect(!FileManager.default.fileExists(atPath: url.path()))
     }
 
-    @Test func logoutSucceedsWhenAStoreFailsToClear() async {
-        let stores = [RecordingStore(fails: true), RecordingStore()]
-        let model = makeModel(StubServer(replies: [.json(200, "{}")]), session: AuthFixtures.valid, userData: stores)
-        await model.start()
-
-        await model.logout()
-
-        #expect(model.user == nil)
-        #expect(stores[1].wasCleared)
-    }
-
-    /// A refresh rejected during a background request signs the UI out too.
+    /// A refresh rejected during a background request signs the UI out too and erases the data.
     @Test func followsSignOutByTheService() async throws {
         let server = StubServer(replies: [.json(401, "{}"), .json(401, AuthFixtures.errorBody("invalid refresh token"))])
         let auth = AuthService(
             client: HTTPClient(
                 server: ServerConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), session: server.session()),
             storage: InMemorySessionStorage(AuthFixtures.valid))
-        let model = SessionModel(auth: auth)
+        let sessions = SessionFactory()
+        let model = SessionModel(auth: auth, makeSession: sessions.make)
         await model.start()
         #expect(model.isAuthenticated)
+        try await model.session?.articles.upsertMany([storedArticle("a1")])
+        let url = try #require(sessions.urls.first)
 
         await #expect(throws: AuthError.sessionExpired) { try await auth.authorizedRequest(HTTPRequest(.get, "/x")) }
 
         let deadline = ContinuousClock.now + .seconds(2)
-        while model.isAuthenticated && ContinuousClock.now < deadline {
+        while FileManager.default.fileExists(atPath: url.path()) && ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(!model.isAuthenticated)
+        #expect(!FileManager.default.fileExists(atPath: url.path()))
     }
 }
