@@ -10,9 +10,12 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_0b9a** · P1 · open · [iOS native 09] App shell: auth gate, TabView, per-tab NavigationStack, Login  (parent: epic_bc48)
 - **feature_33bc** · P1 · open · [iOS native 10] Article list model, ArticleRow and the Reads tab  (parent: epic_bc48)
 - **feature_4e37** · P1 · open · [iOS native 12] Reader: web-view article, progress tracking, toolbar actions  (parent: epic_bc48)
-- **task_387d** · P1 · open · [iOS native 07] Outbox and ArticleMutations: offline write queue  (parent: epic_bc48)
+- **task_1162** · P1 · open · [iOS native 05a] App Group container and shared Keychain group (groundwork for a share extension)  (parent: epic_bc48)
+- **task_288e** · P1 · open · [iOS native 06b] Rework the store for decisions 8, 10 and 11: App Group database, observations, page sync, UserSession  (parent: epic_bc48)
+- **task_387d** · P1 · open · [iOS native 07] Outbox as the only write path, ArticleMutations  (parent: epic_bc48)
 - **task_fe45** · P1 · open · [iOS native 18] Parity and platform QA pass on device  (parent: epic_bc48)
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
+- **bug_2140** · P2 · open · Mobile (Expo): a queued offline edit can overwrite a newer live edit of the same field
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
 - **chore_f890** · P2 · open · Docs cleanup: fix stale references, add mermaid diagrams for frontend/webapp/backend services
 - **feature_4970** · P2 · open · Reading time: compute word_count in backend, surface across all apps
@@ -21,7 +24,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_983c** · P2 · open · [iOS native 16] Subscriptions: RSS and Newsletters with per-source Feed/Reads routing  (parent: epic_bc48)
 - **feature_b604** · P2 · open · [iOS native 15] You tab, Account and About  (parent: epic_bc48)
 - **task_4713** · P2 · open · [iOS native 17] Release pipeline: fastlane and TestFlight workflows for apps/ios  (parent: epic_bc48)
-- **task_4e17** · P2 · open · [iOS native 08] Connectivity, SyncTrigger, article prefetch and FeedCache  (parent: epic_bc48)
+- **task_4e17** · P2 · open · [iOS native 08] Connectivity, Sync (drain, Reads page sync, prefetch), FeedCache  (parent: epic_bc48)
 - **task_4f8a** · P2 · open · [P2-C4] Decide the prod deploy story: fix infrastructure/docker/prod or delete it (needs owner decision)  (parent: epic_fefa)
 - **task_5bda** · P2 · open · Identify true root cause of 2026-09-20 13:17 self-host Postgres auth incident  (parent: epic_fefa)
 - **task_5dcb** · P2 · open · Add database backup script and cron container  (parent: epic_7c9e)

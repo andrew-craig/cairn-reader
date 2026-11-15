@@ -12,16 +12,18 @@ created_at: 2026-11-14T02:35:53Z
 updated_at: 2026-11-14T02:35:53Z
 ---
 ## Goal
-The online-only skim list and the favourites list, both on `ArticleListView`.
+The online-only skim list and the favourites list, both on `ArticleListView` and `ArticleListModel`.
 
 ## Source
 `apps/mobile/src/screens/{FeedScreen,BookmarksScreen}.tsx`; tests `FeedScreen.test.tsx`, `BookmarksScreen.test.tsx`.
 
 ## Plan
 - [ ] Feed: `list=feed`. Pages are never written to `ArticleStore` and never prefetched. Keep the last first page in `FeedCache`; when a refresh fails show the cached page with a stale banner.
-- [ ] Leading full-swipe "Save to Reads" (`info` colour) through `ArticleMutations.saveToReads`. The row leaves the Feed and `FeedCache` once the server has moved it or the move is queued; only a definitive rejection alerts and puts the row back. Bump the Reads invalidation flag on success.
-- [ ] Fetched pages and search results exclude ids with a queued save (`Outbox.pendingSaveIds` into the model's `exclude`).
+- [ ] The model's `exclude` set is `ArticleStore.observeStoredIDs()`: the store only holds Reads, so an id in it has been saved (decision 8). This one rule hides a row the moment it is saved from the swipe or from the reader, keeps it hidden in later pages and search results while the save is queued, and brings it back if the save is rejected and the store row is deleted. No `pendingSaveIds`, no invalidation flag, no put-back code.
+- [ ] Leading full-swipe "Save to Reads" (`info` colour) calls `ArticleMutations.saveToReads`.
+- [ ] `FeedCache` is written from the list after exclusion, so a saved row is not in the cached page.
 - [ ] Bookmarks: favourites filter, search, pushed from You. No swipe action unless the RN screen has one (check and match).
 
 ## Verify
-- Ported tests: offline save removes the row and queues; definitive rejection restores it; pending ids excluded from pages and search; stale banner on failed refresh.
+- `FeedScreen.test.tsx` re-expressed: an offline save hides the row and queues it; a rejected save (drain drops the `list` row) shows it again; stored ids are excluded from pages and search; stale banner on failed refresh; the cached page omits saved rows.
+- `BookmarksScreen.test.tsx` ported.

@@ -12,7 +12,7 @@ created_at: 2026-11-14T02:35:53Z
 updated_at: 2026-11-14T10:42:35Z
 ---
 ## Goal
-The navigation skeleton, built only from system containers. First task that produces something the owner can run and sign in to.
+The navigation skeleton, built only from system containers, and the app's composition root. First task that produces something the owner can run and sign in to.
 
 ## Source
 `apps/mobile/App.tsx`, `src/navigation/{RootNavigator,TabNavigator}.tsx`, `src/screens/LoginScreen.tsx`, `src/components/common/{CustomTabBar,OfflineBanner}.tsx`; tests `RootNavigator.test.tsx`, `TabNavigator.test.tsx`, `LoginScreen.test.tsx`.
@@ -25,16 +25,19 @@ The navigation skeleton, built only from system containers. First task that prod
 | stack navigator with `headerShown: false` + `ScreenHeader` | one `NavigationStack` per tab with typed `navigationDestination(for:)`, system navigation bar and back gesture |
 | `ErrorBoundary` | none (no equivalent needed) |
 | `GestureHandlerRootView`, safe-area maths, `StatusBar` setup | none |
+| service modules imported as singletons | one composition root; per-user objects reached through `UserSession` |
 
 ## Plan
-- [ ] Root view: progress view while `SessionModel.isLoading`, `LoginView` when signed out, `MainTabs` when signed in.
+- [ ] Composition root in `CairnReaderApp`: build `HTTPClient`, `AuthService`, `SessionModel` and `Connectivity` once and put them in the environment. No service is constructed inside a view and none is a global.
+- [ ] Root view: progress view while `SessionModel.isLoading`, `LoginView` when signed out, `MainTabs` when signed in. `MainTabs` receives the `UserSession`, puts it in the environment, and is given `.id(user.id)` so navigation state and screen models never outlive an account (decision 10).
 - [ ] `MainTabs`: Feed, Reads, You; opens on Reads; selection held in `@State` (or `@SceneStorage`) of an enum.
-- [ ] A `Route` enum per stack (article, bookmarks, account, about, rss, newsletters) so destinations are typed in one place.
+- [ ] A `Route` enum per stack (article, bookmarks, account, about, rss, newsletters) so destinations are typed in one place. The article route carries the `Article` value only, never a list or an index (decision 8).
 - [ ] `LoginView` as a `Form`: continue with this device (login, falling back to register as today), email sign in / create account with `.textContentType` set for password autofill, and a server URL field under an "Advanced" disclosure. Errors shown inline in the form footer.
 - [ ] Offline indicator: one small banner view attached with `.safeAreaInset(edge: .top)` on the root, shown in all three root states. This is one of the few custom views.
+- [ ] `MainTabs` consumes `Outbox.rejections` (once task 07 has landed) and shows one alert for a rejected archive or Save to Reads; other dropped fields are silent.
 - [ ] Root font and bar appearances from `Typography.swift` applied here (decision 5); the Login wordmark/heading uses Crimson Pro as in the RN screen.
 - [ ] Placeholder views for the three tabs.
 
 ## Verify
 - Tests for `SessionModel`-driven root switching and the login view model (device login falls back to register on the "not found" response; server URL change clears the session).
-- Owner: sign in with device and with email against the self-host stack on `http://localhost:8099`, switch tabs, sign out via a temporary button.
+- Owner: sign in with device and with email against the self-host stack on `http://localhost:8099`, switch tabs, sign out via a temporary button, sign in as a different account and see no state from the first.
