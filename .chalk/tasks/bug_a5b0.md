@@ -21,4 +21,7 @@ updated_at: 2026-11-15T10:09:25Z
 - [x] `ArticlePrefetch` fetch closure returns body and hash; pass both
 - [x] `ReaderModel.loadBody` passes `detail.contentHash`
 - [x] `ArticleStoreTests`: a body saved with a new hash survives a `syncPage` carrying that hash; existing hash tests save with the row's hash
-- [ ] iOS App Checks green on the PR
+- [x] iOS App Checks green on the PR
+
+## Review
+PR andrew-craig/cairn-reader#469 (into feature/ios-native-migration). The store, prefetch and reader tests passed in every run. Two runs went red on unrelated tests: run 52 on the three `StubURLProtocol` timeout tests seen on #468, run 53 on Feed/Reader tests while the runner stalled (18–88 s per test). The re-run of 53 is green. The suite is still unstable on CI; the suspected cause is `StubURLProtocol` calling back only in `commonModes`.
