@@ -19,8 +19,8 @@ struct ReaderView: View {
 
     var body: some View {
         ReaderScreen(
-            article: article, session: session, next: nextArticle.map { $0(article.id) },
-            onNext: nextArticle == nil ? nil : { article = $0 }
+            article: article, session: session, showsNext: nextArticle != nil, next: nextArticle?(article.id),
+            current: $article
         )
         .id(article.id)
     }
@@ -36,13 +36,17 @@ private struct ReaderScreen: View {
     @State private var model: ReaderModel
     /// The link whose dialog is showing.
     @State private var link: URL?
+    /// Whether the presenter has an order to follow (the Next button shows).
+    let showsNext: Bool
     let next: Article?
-    let onNext: (@MainActor (Article) -> Void)?
+    /// The article `ReaderView` shows; Next replaces it.
+    @Binding var current: Article
 
-    init(article: Article, session: UserSession, next: Article?, onNext: (@MainActor (Article) -> Void)?) {
+    init(article: Article, session: UserSession, showsNext: Bool, next: Article?, current: Binding<Article>) {
         _model = State(initialValue: ReaderModel(article: article, session: session))
+        self.showsNext = showsNext
         self.next = next
-        self.onNext = onNext
+        _current = current
     }
 
     var body: some View {
@@ -103,9 +107,9 @@ private struct ReaderScreen: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
-            if let onNext {
+            if showsNext {
                 Button("Next Article", systemImage: "forward") {
-                    if let next { onNext(next) }
+                    if let next { current = next }
                 }
                 .disabled(next == nil)
                 Spacer()

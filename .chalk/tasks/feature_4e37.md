@@ -80,6 +80,6 @@ Not done:
 - "Report an issue with the article" entry (plan box left open): task 13 (feature_65dc) is blocked by this task, and a menu item that opens nothing would be dead UI (task 10 made the same call for add-link). Task 13 adds a toolbar `Menu` item in `ReaderScreen` and its `.sheet`.
 
 Risks:
-- Compile risks: the async `WKNavigationDelegate.webView(_:decidePolicyFor:)` and the scheme handler's conformance under Swift 6 default MainActor isolation; the KVO closure (`MainActor.assumeIsolated`); `UIContentSizeCategory(dynamicTypeSize)`; `UIColor(resource: .primary)`; the `@MainActor` closure types for `nextArticle`/`onNext`.
+- Compile risks: the async `WKNavigationDelegate.webView(_:decidePolicyFor:)` and the scheme handler's conformance under Swift 6 default MainActor isolation; the KVO closure (`MainActor.assumeIsolated`); `UIContentSizeCategory(dynamicTypeSize)`; `UIColor(resource: .primary)`; the `@MainActor` closure type for `nextArticle` (Next replaces the article through a binding, not a closure).
 - Restore on device (owner): check that `adjustedContentInset` matches what WebKit uses under the iOS 26 bars, and that late image loads trigger the content-size KVO.
 - Timing-based tests: the held-detail tests poll a `Mutex` from the URL-loading thread; the throttle test uses a 300 ms interval; several cases sleep 50 ms to show that nothing was written.
