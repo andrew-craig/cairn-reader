@@ -140,6 +140,16 @@ struct ArticleWebView: UIViewRepresentable {
             return isPage && navigationAction.targetFrame?.isMainFrame == true ? .allow : .cancel
         }
 
+        /// The page and its images have loaded, so the content will not grow further: a saved
+        /// position it still cannot reach (an article shorter than the screen, or one whose content
+        /// changed) ends the restore here, and readings count again, completion included.
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard !hasRestored else { return }
+            contentSizeChanged()
+            hasRestored = true
+            report(webView.scrollView)
+        }
+
         /// The content process was killed (e.g. memory pressure): load the page again.
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
             guard let html = loadedHTML else { return }

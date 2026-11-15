@@ -45,6 +45,7 @@ final class ReaderModel {
     private var isOnline = true
     /// Archived or saved to Reads: the screen pops.
     private(set) var isFinished = false
+    @ObservationIgnored private var isSavingToReads = false
     /// The alert to show (a link save's outcome or a store failure); set to nil to dismiss.
     var alert: (title: String, message: String)?
     /// Bumped by each saved link, for the success haptic.
@@ -130,8 +131,8 @@ final class ReaderModel {
         }
         let id = route.id
         do {
-            let stored = try await session.articles.getById(id)
-            if stored?.content != nil, let hash = stored?.contentHash, hash == route.contentHash {
+            let snapshot = try await session.articles.getById(id)
+            if snapshot?.content != nil, let hash = snapshot?.contentHash, hash == route.contentHash {
                 bodyIsCurrent = true
                 return
             }
@@ -204,15 +205,17 @@ final class ReaderModel {
         await mutate("Archiving") { try await $0.archive(id) }
     }
 
-    /// Saves a Feed item to Reads, then pops. A store failure keeps the reader open.
+    /// Saves a Feed item to Reads, then pops. A store failure keeps the reader open; a second tap
+    /// while the write runs is ignored.
     func saveToReads() async {
-        guard !isFinished else { return }
-        isFinished = true
+        guard !isFinished, !isSavingToReads else { return }
+        isSavingToReads = true
+        defer { isSavingToReads = false }
         do {
             try await session.mutations.saveToReads(article)
+            isFinished = true
         } catch {
             logger.error("Saving to Reads failed: \(String(describing: error))")
-            isFinished = false
             alert = ("Error", "Failed to save to Reads")
         }
     }
