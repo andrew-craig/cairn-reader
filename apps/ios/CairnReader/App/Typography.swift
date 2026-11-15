@@ -31,6 +31,8 @@ enum BrandFont: String, CaseIterable {
 /// One font per text role. Inter is the UI font, Crimson Pro the heading font and Atkinson
 /// Hyperlegible Next the article body font. Sizes follow `FontSizes` in `theme.ts`.
 enum Typography {
+    /// The Login wordmark, as in the React Native screen.
+    static let wordmark = BrandFont.crimsonProBold.font(size: 56, relativeTo: .largeTitle)
     static let largeTitle = BrandFont.crimsonProBold.font(size: 32, relativeTo: .largeTitle)
     static let title = BrandFont.crimsonProSemiBold.font(size: 24, relativeTo: .title2)
     static let heading = BrandFont.crimsonPro.font(size: 18, relativeTo: .title3)
