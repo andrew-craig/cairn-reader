@@ -21,25 +21,38 @@ nonisolated final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// The handler runs on its own queue, not the URL loading thread: that thread is shared by
+    /// every session in the process, so a handler that holds a request (a test waiting on a
+    /// pending fetch) would otherwise stall every other test's requests. The client is still
+    /// called on the loading thread's run loop, as `URLProtocol` requires; callbacks from another
+    /// thread are sometimes lost, leaving the request to time out.
     override func startLoading() {
         let id = request.value(forHTTPHeaderField: Self.idHeader) ?? ""
         guard let handler = Self.handlers.withLock({ $0[id] }) else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
             return
         }
-        do {
-            var request = request
-            // URLSession moves the body into a stream before it reaches a protocol.
-            if request.httpBody == nil, let stream = request.httpBodyStream {
-                request.httpBody = Self.read(stream)
+        var request = request
+        // URLSession moves the body into a stream before it reaches a protocol.
+        if request.httpBody == nil, let stream = request.httpBodyStream {
+            request.httpBody = Self.read(stream)
+        }
+        let loadingRunLoop = LoadingRunLoop(CFRunLoopGetCurrent())
+        DispatchQueue.global().async { [self, request] in
+            let result = Result { try handler(request) }
+            CFRunLoopPerformBlock(loadingRunLoop.runLoop, CFRunLoopMode.commonModes.rawValue) { [self] in
+                switch result {
+                case let .success((status, data)):
+                    let response = HTTPURLResponse(
+                        url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+                    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                    client?.urlProtocol(self, didLoad: data)
+                    client?.urlProtocolDidFinishLoading(self)
+                case let .failure(error):
+                    client?.urlProtocol(self, didFailWithError: error)
+                }
             }
-            let (status, data) = try handler(request)
-            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
+            CFRunLoopWakeUp(loadingRunLoop.runLoop)
         }
     }
 
@@ -57,4 +70,11 @@ nonisolated final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         }
         return data
     }
+}
+
+/// The URL loading thread's run loop, carried to the handler's queue to call back on it. A run
+/// loop accepts blocks from any thread.
+private nonisolated struct LoadingRunLoop: @unchecked Sendable {
+    let runLoop: CFRunLoop
+    init(_ runLoop: CFRunLoop) { self.runLoop = runLoop }
 }

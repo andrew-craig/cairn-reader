@@ -386,3 +386,21 @@ before staging anything — do not assume it is yours or stale. Stage explicit p
 never `git add -A`. For a file holding both your change and theirs, rebuild it from
 `HEAD`, re-apply only your edit, `git add` it, then restore their version to the
 working tree so their work survives as an unstaged change.
+
+## iOS tests: never block the URL loading thread in a stub
+
+**What happened:** on PR #468 (iOS tasks 10–12), unrelated tests timed out at random and
+took 70–86 s each. `StubURLProtocol` called each handler synchronously in
+`startLoading`, on the URL loading thread that every `URLSession` in the process shares.
+Tests that hold a request (polling `Thread.sleep` in the handler) stalled every other
+test's requests. Raising the `eventually` timeout only hid it.
+
+**How to apply:** stub handlers run on their own queue, while the `URLProtocolClient`
+callbacks go back to the loading thread's run loop (both now done in `StubURLProtocol`;
+calling the client from another thread sometimes lost the response and the request timed
+out). When parallel tests time out together with inflated durations, look
+for shared, blocked infrastructure before raising timeouts. Two related lessons from
+the same PR: the app builds with `MemberImportVisibility`, so iterating a GRDB
+`AsyncValueObservation` needs `import GRDB` in that file; and a test that asserts
+"nothing happened yet" inside a time window needs a window far wider than the runner's
+scheduling jitter (seconds, not 300 ms).

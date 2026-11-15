@@ -19,10 +19,10 @@ struct MainTabs: View {
     var body: some View {
         TabView(selection: $selection) {
             Tab("Feed", systemImage: "newspaper", value: MainTab.feed) {
-                NavigationStack { FeedPlaceholder() }
+                NavigationStack { FeedView(session: session) }
             }
             Tab("Reads", systemImage: "book", value: MainTab.reads) {
-                NavigationStack { ReadsPlaceholder() }
+                NavigationStack { ReadsView(session: session) }
             }
             Tab("You", systemImage: "person.crop.circle", value: MainTab.you) {
                 NavigationStack { YouView(read: session.read) }

@@ -148,6 +148,14 @@ nonisolated final class ArticleStore: Sendable {
         }
     }
 
+    /// The stored favourites, newest first, which Bookmarks shows before its first page lands.
+    func listFavorites() async throws -> [Article] {
+        try await database.writer().read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM articles WHERE is_favorite = 1 ORDER BY added_at DESC")
+                .map(Self.article(from:))
+        }
+    }
+
     /// The stored article, or nil when it is not stored.
     func getById(_ id: String) async throws -> Article? {
         try await database.writer().read { db in
@@ -157,9 +165,10 @@ nonisolated final class ArticleStore: Sendable {
 
     // MARK: - Observations
 
-    /// The `limit` most recently added articles, newest first, each with its pending-save flag;
-    /// emits again after every change to `articles` or `outbox`.
-    func observeReads(limit: Int) throws -> AsyncValueObservation<[ReadsEntry]> {
+    /// The stored articles added at or after `addedSince`, newest first, at most `limit` of them
+    /// (nil: no bound), each with its pending-save flag; emits again after every change to
+    /// `articles` or `outbox`.
+    func observeReads(limit: Int? = nil, addedSince: Date? = nil) throws -> AsyncValueObservation<[ReadsEntry]> {
         ValueObservation.tracking { db in
             try Row.fetchAll(
                 db,
@@ -167,9 +176,11 @@ nonisolated final class ArticleStore: Sendable {
                     SELECT articles.*, EXISTS (
                       SELECT 1 FROM outbox WHERE outbox.article_id = articles.id AND outbox.field = 'list'
                     ) AS pending_save
-                    FROM articles ORDER BY added_at DESC LIMIT :limit
+                    FROM articles
+                    WHERE (:since IS NULL OR added_at >= :since)
+                    ORDER BY added_at DESC LIMIT COALESCE(:limit, -1)
                     """,
-                arguments: ["limit": limit]
+                arguments: ["limit": limit, "since": addedSince?.timeIntervalSince1970]
             ).map { ReadsEntry(article: Self.article(from: $0), pendingSave: $0["pending_save"]) }
         }
         .values(in: try database.writer())
