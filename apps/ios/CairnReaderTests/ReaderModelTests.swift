@@ -248,6 +248,26 @@ struct ReaderModelTests {
         #expect(try outbox() == ["list": #"{"list":"reads"}"#])
     }
 
+    @Test func aFailedSaveToReadsKeepsTheReaderOpenAndCanBeRetried() async throws {
+        server.online.withLock { $0 = false }
+        let model = makeModel(article(list: .feed))
+        try await harness.session.database.writer().write { db in
+            try db.execute(sql: "CREATE TRIGGER fail BEFORE INSERT ON outbox BEGIN SELECT RAISE(ABORT, 'full'); END")
+        }
+
+        await model.saveToReads()
+
+        #expect(!model.isFinished)
+        #expect(model.alert?.title == "Error")
+        #expect(model.alert?.message == "Failed to save to Reads")
+
+        try await harness.session.database.writer().write { db in try db.execute(sql: "DROP TRIGGER fail") }
+        await model.saveToReads()
+
+        #expect(model.isFinished)
+        #expect(try outbox() == ["list": #"{"list":"reads"}"#])
+    }
+
     // MARK: - Progress
 
     @Test func progressIsNotTrackedForFeedItems() async throws {
