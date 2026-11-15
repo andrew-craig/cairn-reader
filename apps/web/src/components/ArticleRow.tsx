@@ -1,4 +1,4 @@
-import { formatPublishedDate, type Article } from '@cairn/shared';
+import { formatPublishedDate, isPartiallyRead, type Article } from '@cairn/shared';
 import { decodeEntities } from '../utils/decodeEntities';
 import './ArticleRow.css';
 
@@ -13,12 +13,17 @@ interface ArticleRowProps {
 // so all lists render identically.
 export default function ArticleRow({ article, onSelect }: ArticleRowProps) {
   const publishedDate = formatPublishedDate(article.publishedDate);
+  const stateClass = article.isRead
+    ? ' article-row__button--read'
+    : isPartiallyRead(article)
+      ? ' article-row__button--in-progress'
+      : '';
 
   return (
     <li className="article-row">
       <button
         type="button"
-        className={`article-row__button${article.isRead ? ' article-row__button--read' : ''}`}
+        className={`article-row__button${stateClass}`}
         onClick={() => onSelect(article)}
       >
         <div className="article-row__text">

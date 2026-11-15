@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Article } from '../../types';
 import { Colors, FontFamily } from '../../constants';
-import { formatPublishedDate } from '@cairn/shared';
+import { formatPublishedDate, isPartiallyRead } from '@cairn/shared';
 
 interface ArticleRowProps {
   article: Article;
@@ -52,7 +52,7 @@ export const ArticleRow: React.FC<ArticleRowProps> = ({ article, onPress, pendin
             styles.title,
             article.isRead
               ? { color: colors.textSecondary, fontFamily: FontFamily.default }
-              : { color: colors.text },
+              : { color: isPartiallyRead(article) ? colors.textSecondary : colors.text },
           ]}
           numberOfLines={2}
         >

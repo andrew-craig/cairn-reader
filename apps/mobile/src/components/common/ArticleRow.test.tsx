@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 import { ArticleRow } from './ArticleRow';
-import { FontFamily } from '../../constants';
+import { Colors, FontFamily } from '../../constants';
 import { Article } from '../../types';
 
 const baseArticle: Article = {
@@ -28,6 +28,13 @@ describe('ArticleRow', () => {
     render(<ArticleRow article={{ ...baseArticle, isRead: true }} onPress={() => {}} />);
     const flat = StyleSheet.flatten(screen.getByText(baseArticle.title).props.style);
     expect(flat.fontFamily).toBe(FontFamily.default);
+  });
+
+  it('renders partially read titles in the secondary colour at the unread weight', () => {
+    render(<ArticleRow article={{ ...baseArticle, scrollFraction: 0.4 }} onPress={() => {}} />);
+    const flat = StyleSheet.flatten(screen.getByText(baseArticle.title).props.style);
+    expect(flat.fontFamily).toBe(FontFamily.defaultBold);
+    expect(flat.color).toBe(Colors.light.textSecondary);
   });
 
   it('shows the waiting-to-save note only for a pending row', () => {

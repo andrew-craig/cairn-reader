@@ -81,6 +81,11 @@
   font-weight: 500;
 }
 
+/* Started but unfinished: muted colour, unread weight. */
+.article-row__button--in-progress .article-row__title {
+  color: var(--color-text-secondary);
+}
+
 .article-row__image-frame {
   flex-shrink: 0;
   width: 96px;
