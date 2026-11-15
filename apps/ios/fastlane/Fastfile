@@ -60,7 +60,9 @@ platform :ios do
       key_content: ENV["ASC_KEY_CONTENT"],
       in_house: false
     )
-    match(type: "appstore", app_identifier: APP_ID, force: options[:force] || false)
+    force = options[:force] || false
+    # setup_ci makes match read-only on CI; forcing has to write the new profile.
+    match(type: "appstore", app_identifier: APP_ID, force: force, readonly: is_ci && !force)
   end
 
   desc "Signed release build without uploading"
