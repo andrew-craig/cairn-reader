@@ -187,9 +187,12 @@ final class ReaderModel {
     /// from here; nothing if it was never scrolled, so the pre-restore offset is never saved.
     /// (Every save is skipped when the fraction is the one last saved.)
     func leave() async {
-        // A leading save still queued would land after this one with an older reading.
-        leadingSave?.cancel()
+        // A leading save still queued would land after this one with an older reading: cancel it
+        // if it has not started, and wait for it if it has, so this save is the last write.
+        let leading = leadingSave
         leadingSave = nil
+        leading?.cancel()
+        await leading?.value
         trailingSave?.cancel()
         trailingSave = nil
         guard hasScrolled, !isFinished else { return }
