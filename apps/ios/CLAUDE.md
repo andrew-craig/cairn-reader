@@ -49,3 +49,9 @@ cd apps/ios
 xcodebuild test -project CairnReader.xcodeproj -scheme CairnReader \
   -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
+
+## Release
+
+`.github/workflows/ios-native-testflight.yml` runs `bundle exec fastlane beta` (`apps/ios/fastlane`) on a pushed `ios-v*` tag or manually: match (read-only) signing, build number = latest TestFlight + 1, upload to TestFlight. The marketing version is `MARKETING_VERSION` in the project (1.1.0, above the RN app's 1.0.0 so the first build installs as an update). Lanes: `beta`, `certificates`, `build_only` (signed build, no upload). Secrets are the same as the RN TestFlight workflow.
+
+One-time provisioning: enable the App Group on the App ID, then regenerate the profiles with `bundle exec fastlane match appstore --force` from `apps/ios` (CI never forces). See `.github/workflows/README.md`.

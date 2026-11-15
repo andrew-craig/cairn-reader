@@ -1,0 +1,70 @@
+default_platform(:ios)
+
+APP_ID = "com.cairnapp.cairnreader"
+PROFILE = "match AppStore #{APP_ID}"
+
+# Signs the app target manually with the match profile and sets the build number to latest TestFlight + 1.
+# The project is hand-written with automatic signing, so this only changes the CI checkout.
+def prepare_build
+  setup_ci if ENV["CI"]
+
+  app_store_connect_api_key(
+    key_id: ENV["ASC_KEY_ID"],
+    issuer_id: ENV["ASC_ISSUER_ID"],
+    key_content: ENV["ASC_KEY_CONTENT"],
+    in_house: false
+  )
+
+  match(type: "appstore", readonly: is_ci, app_identifier: APP_ID)
+
+  update_code_signing_settings(
+    use_automatic_signing: false,
+    path: "CairnReader.xcodeproj",
+    targets: ["CairnReader"],
+    team_id: ENV["TEAM_ID"],
+    bundle_identifier: APP_ID,
+    code_sign_identity: "iPhone Distribution",
+    profile_name: ENV["sigh_#{APP_ID}_appstore_profile-name"]
+  )
+
+  increment_build_number(
+    xcodeproj: "CairnReader.xcodeproj",
+    build_number: latest_testflight_build_number(app_identifier: APP_ID) + 1
+  )
+end
+
+def build_signed_app
+  build_app(
+    project: "CairnReader.xcodeproj",
+    scheme: "CairnReader",
+    export_method: "app-store",
+    export_options: { provisioningProfiles: { APP_ID => PROFILE } }
+  )
+end
+
+platform :ios do
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    prepare_build
+    build_signed_app
+    # verbose: true is required for Xcode 26 to detect silent altool failures
+    upload_to_testflight(skip_waiting_for_build_processing: true, verbose: true)
+  end
+
+  desc "Download certificates and profiles"
+  lane :certificates do
+    app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      in_house: false
+    )
+    match(type: "appstore", app_identifier: APP_ID)
+  end
+
+  desc "Signed release build without uploading"
+  lane :build_only do
+    prepare_build
+    build_signed_app
+  end
+end

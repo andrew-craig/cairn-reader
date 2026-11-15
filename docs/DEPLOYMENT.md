@@ -1019,7 +1019,7 @@ After deployment:
 
 ## Mobile App Releases
 
-The iOS app is not deployed by the compose stacks. Fastlane lanes live in `apps/mobile/ios/fastlane/Fastfile`: `beta` (build and upload to TestFlight), `certificates` (fetch signing certificates and profiles via match) and `build_only` (local build without uploading). The `iOS TestFlight (Fastlane)` and `iOS TestFlight (Local Build)` workflows in `.github/workflows/` are manually triggered (`workflow_dispatch`). See [apps/mobile/CLAUDE.md](../apps/mobile/CLAUDE.md) for mobile build details.
+The iOS app is not deployed by the compose stacks. Fastlane lanes live in `apps/mobile/ios/fastlane/Fastfile`: `beta` (build and upload to TestFlight), `certificates` (fetch signing certificates and profiles via match) and `build_only` (local build without uploading). The `iOS TestFlight (Fastlane)` and `iOS TestFlight (Local Build)` workflows in `.github/workflows/` are manually triggered (`workflow_dispatch`). See [apps/mobile/CLAUDE.md](../apps/mobile/CLAUDE.md) for mobile build details. The native iOS app (`apps/ios`) has its own lanes in `apps/ios/fastlane/Fastfile` and ships through the `iOS Native TestFlight` workflow on `ios-v*` tags; see [apps/ios/CLAUDE.md](../apps/ios/CLAUDE.md).
 
 ---
 
