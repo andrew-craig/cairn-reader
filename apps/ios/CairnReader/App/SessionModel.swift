@@ -15,10 +15,13 @@ final class SessionModel {
     var isAuthenticated: Bool { session != nil }
 
     @ObservationIgnored private let auth: AuthService
-    @ObservationIgnored private let makeSession: (User) -> UserSession
+    @ObservationIgnored private let makeSession: (User, AuthService) -> UserSession
     @ObservationIgnored private let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "auth")
 
-    init(auth: AuthService, makeSession: @escaping (User) -> UserSession = { UserSession(user: $0) }) {
+    init(
+        auth: AuthService,
+        makeSession: @escaping (User, AuthService) -> UserSession = { UserSession(user: $0, auth: $1) }
+    ) {
         self.auth = auth
         self.makeSession = makeSession
         Task { [weak self, signOuts = auth.signOuts] in
@@ -62,7 +65,7 @@ final class SessionModel {
     private func setUser(_ user: User?) async {
         guard user?.id != session?.user.id else { return }
         let old = session
-        session = user.map(makeSession)
+        session = user.map { makeSession($0, auth) }
         await old?.close()
     }
 }

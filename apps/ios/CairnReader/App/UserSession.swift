@@ -2,13 +2,17 @@ import Foundation
 import OSLog
 import Synchronization
 
-/// Everything that belongs to one signed-in user (decision 10): the database and the article
-/// store, and the work started on them. `SessionModel` creates one at sign-in and closes it at
+/// Everything that belongs to one signed-in user (decision 10): the database, the article store,
+/// the outbox and mutations on them, a `ReadService` bound to the user, and the work started on
+/// them. `SessionModel` creates one at sign-in and closes it at
 /// sign-out, which erases the user's on-device data.
 nonisolated final class UserSession: Sendable {
     let user: User
     let database: AppDatabase
     let articles: ArticleStore
+    let read: ReadService
+    let outbox: Outbox
+    let mutations: ArticleMutations
 
     private struct Work {
         var closed = false
@@ -19,10 +23,14 @@ nonisolated final class UserSession: Sendable {
     private let work = Mutex(Work())
     private let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "session")
 
-    init(user: User, database: AppDatabase? = nil) {
+    init(user: User, auth: AuthService, database: AppDatabase? = nil) {
         self.user = user
-        self.database = database ?? AppDatabase(url: AppDatabase.url(forUser: user.id))
-        articles = ArticleStore(database: self.database)
+        let database = database ?? AppDatabase(url: AppDatabase.url(forUser: user.id))
+        self.database = database
+        articles = ArticleStore(database: database)
+        read = ReadService(auth: auth, userID: user.id)
+        outbox = Outbox(database: database, read: read)
+        mutations = ArticleMutations(database: database, outbox: outbox)
     }
 
     /// Runs `operation` as work of this session, cancelled and awaited by `close()`. Does nothing
@@ -39,7 +47,7 @@ nonisolated final class UserSession: Sendable {
         }
     }
 
-    /// Cancels the session's work, waits for it, then erases the database.
+    /// Cancels the session's work and the outbox drain, waits for them, then erases the database.
     func close() async {
         let tasks = work.withLock { work in
             work.closed = true
@@ -48,6 +56,7 @@ nonisolated final class UserSession: Sendable {
         }
         for task in tasks { task.cancel() }
         for task in tasks { await task.value }
+        await outbox.stop()
         do {
             try database.erase()
         } catch {
