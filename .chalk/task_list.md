@@ -4,6 +4,7 @@
 _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/._
 
 - **chore_c364** · P1 · open · [iOS native 19] Cutover: retire the iOS side of apps/mobile (Expo stays for Android), switch release, update docs  (parent: epic_bc48)
+- **epic_381e** · P1 · open · Move to a cloud-hosted instance for beta customers  (parent: epic_7c9e)
 - **epic_6e4d** · P1 · open · Feed vs Reads: user-chosen destination per source
 - **epic_bc48** · P1 · open · Native iOS app: migrate the mobile client from React Native to Swift/SwiftUI
 - **epic_fefa** · P1 · open · Code quality remediation program
@@ -16,6 +17,7 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **task_c194** · P1 · open · [iOS native 06] Local database and ArticleStore (GRDB)  (parent: epic_bc48)
 - **task_ce49** · P1 · open · [iOS native 03] Models, errors, server URL config and HTTP client  (parent: epic_bc48)
 - **task_ec50** · P1 · open · [iOS native 05] ReadService and SystemService: content, subscription and feedback endpoints  (parent: epic_bc48)
+- **task_f489** · P1 · open · Build per-service container images for linux/amd64 (Intel)  (parent: epic_381e)
 - **task_fe45** · P1 · open · [iOS native 18] Parity and platform QA pass on device  (parent: epic_bc48)
 - **chore_ae2a** · P2 · in_progress · Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
 - **bug_a701** · P2 · open · Self-host and read-service config drift (env forwarding, DB names, Makefile)
