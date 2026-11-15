@@ -9,10 +9,10 @@ import Testing
 private final class SessionFactory {
     private(set) var urls: [URL] = []
 
-    func make(_ user: User) -> UserSession {
+    func make(_ user: User, _ auth: AuthService) -> UserSession {
         let url = try! temporaryDatabaseURL()
         urls.append(url)
-        return UserSession(user: user, database: AppDatabase(url: url))
+        return UserSession(user: user, auth: auth, database: AppDatabase(url: url))
     }
 }
 

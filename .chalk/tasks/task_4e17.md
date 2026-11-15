@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 2
 labels: [ios,offline]
-blocked_by: [task_387d]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T00:01:49Z
+updated_at: 2026-11-15T03:40:23Z
 ---
 ## Goal
 The background machinery around the store: know when the device is offline, sync Reads pages into the store, drain and prefetch at the right moments, and keep the last Feed page for the stale banner. All of it owned by `UserSession` (decision 10).

@@ -219,6 +219,30 @@ The workflows use GitHub Actions cache to speed up builds:
 - ⚙️ **Maximum control** over every build step
 - 🛠️ **Manual** certificate management required
 
+### Native iOS app (`apps/ios`)
+
+**File:** `ios-native-testflight.yml`
+
+**Triggers:**
+- Manual: Actions tab → "iOS Native TestFlight" → Run workflow
+- Automatic: Push a tag like `ios-v1.1.0` (the RN workflows above stay on `mobile-v*`)
+
+**What it does:**
+- Runs `bundle exec fastlane beta` in `apps/ios` (no Node, `expo prebuild` or CocoaPods)
+- Downloads signing certificates and profiles via Fastlane Match (read-only)
+- Builds `CairnReader.xcodeproj`, build number = latest TestFlight + 1
+- Uploads to TestFlight
+
+Uses the same secrets as the Fastlane workflow. The marketing version is `MARKETING_VERSION` in the Xcode project. The `build_only` lane does the signed build without uploading.
+
+**One-time provisioning:** the App Group `group.com.cairnapp.cairnreader` must be enabled on the App ID `com.cairnapp.cairnreader` in the Apple Developer portal. Then regenerate the Match profiles once, from a Mac with the Match secrets exported (`MATCH_GIT_URL`, `MATCH_PASSWORD`, `FASTLANE_APPLE_ID`, `ASC_*`):
+
+```bash
+cd apps/ios && bundle install && bundle exec fastlane match appstore --force
+```
+
+CI runs Match read-only, so `beta` fails to sign until this is done.
+
 ### Comparison of iOS Options
 
 See [BUILD_OPTIONS.md](BUILD_OPTIONS.md) for a detailed comparison of all iOS build approaches.

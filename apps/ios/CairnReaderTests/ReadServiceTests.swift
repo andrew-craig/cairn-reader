@@ -12,7 +12,7 @@ private func makeRead(_ server: StubServer, session: StoredSession? = AuthFixtur
     let auth = AuthService(
         client: HTTPClient(server: config, session: server.session()), storage: InMemorySessionStorage(session),
         deviceID: { "device-1" }, sleep: { _ in })
-    return ReadService(auth: auth)
+    return ReadService(auth: auth, userID: AuthFixtures.user.id)
 }
 
 private func query(_ request: URLRequest?) -> [String: String] {

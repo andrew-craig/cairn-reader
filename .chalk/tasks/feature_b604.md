@@ -5,11 +5,11 @@ type: feature
 status: open
 priority: 2
 labels: [ios,ui]
-blocked_by: [feature_0b9a]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T20:26:51Z
+updated_at: 2026-11-15T03:40:24Z
 ---
 ## Goal
 The profile hub and its two settings screens as standard grouped lists and forms.

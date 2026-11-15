@@ -92,6 +92,23 @@ nonisolated final class ArticleStore: Sendable {
         id: String, isRead: Bool? = nil, isFavorite: Bool? = nil, scrollPosition: Double? = nil,
         readAt: Date? = nil
     ) async throws {
+        try await database.writer().write { db in
+            try Self.updateUserState(
+                db, id: id, isRead: isRead, isFavorite: isFavorite, scrollPosition: scrollPosition, readAt: readAt)
+        }
+    }
+
+    /// Removes one article, e.g. on archive.
+    func remove(id: String) async throws {
+        try await database.writer().write { db in try Self.remove(db, id: id) }
+    }
+
+    // The statics are the store writes `ArticleMutations` joins with an outbox upsert in one transaction.
+
+    static func updateUserState(
+        _ db: Database, id: String, isRead: Bool? = nil, isFavorite: Bool? = nil, scrollPosition: Double? = nil,
+        readAt: Date? = nil
+    ) throws {
         var sets: [String] = []
         var arguments: StatementArguments = ["id": id]
         if let isRead {
@@ -111,18 +128,11 @@ nonisolated final class ArticleStore: Sendable {
             arguments += ["read_at": readAt.timeIntervalSince1970]
         }
         guard !sets.isEmpty else { return }
-
-        let sql = "UPDATE articles SET \(sets.joined(separator: ", ")) WHERE id = :id"
-        try await database.writer().write { [arguments] db in
-            try db.execute(sql: sql, arguments: arguments)
-        }
+        try db.execute(sql: "UPDATE articles SET \(sets.joined(separator: ", ")) WHERE id = :id", arguments: arguments)
     }
 
-    /// Removes one article, e.g. on archive.
-    func remove(id: String) async throws {
-        try await database.writer().write { db in
-            try db.execute(sql: "DELETE FROM articles WHERE id = :id", arguments: ["id": id])
-        }
+    static func remove(_ db: Database, id: String) throws {
+        try db.execute(sql: "DELETE FROM articles WHERE id = :id", arguments: ["id": id])
     }
 
     // MARK: - Reads
@@ -181,7 +191,7 @@ nonisolated final class ArticleStore: Sendable {
         try Row.fetchOne(db, sql: "SELECT * FROM articles WHERE id = :id", arguments: ["id": id]).map(article(from:))
     }
 
-    private static func upsert(_ articles: [Article], _ db: Database) throws {
+    static func upsert(_ articles: [Article], _ db: Database) throws {
         for article in articles {
             try db.execute(sql: upsertSQL, arguments: arguments(for: article))
         }

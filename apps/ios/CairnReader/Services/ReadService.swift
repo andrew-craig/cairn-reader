@@ -1,7 +1,8 @@
 import Foundation
 
 /// The read service's user endpoints (content, subscriptions, extraction feedback) and the email
-/// address endpoint, sent through `AuthService`. Errors pass through unchanged: `NetworkError`
+/// address endpoint, sent through `AuthService` for one user (decision 10: bound at init, owned by
+/// that user's `UserSession`). Errors pass through unchanged: `NetworkError`
 /// when the server could not be reached, `HttpError` for its answer, `AuthError.sessionExpired`
 /// when there is no session.
 nonisolated struct ReadService: Sendable {
@@ -10,6 +11,7 @@ nonisolated struct ReadService: Sendable {
     static let discoverTimeout: TimeInterval = 15
 
     let auth: AuthService
+    let userID: String
 
     // MARK: Contents
 
@@ -19,7 +21,7 @@ nonisolated struct ReadService: Sendable {
         cursor: String? = nil
     ) async throws -> Page<UserContentResponse> {
         let query = Self.filters(list: list, status: status, isFavorite: isFavorite) + Self.paging(limit, cursor)
-        let request = HTTPRequest(.get, try await userPath(), query: query)
+        let request = HTTPRequest(.get, userPath(), query: query)
         return try await auth.authorizedRequestWithRetry(request, as: Page<UserContentResponse>.self)
     }
 
@@ -27,7 +29,7 @@ nonisolated struct ReadService: Sendable {
     func countUserContents(list: ContentList? = nil, status: ContentStatus? = nil, isFavorite: Bool? = nil)
         async throws -> Int
     {
-        let path = try await userPath("count")
+        let path = userPath("count")
         let request = HTTPRequest(.get, path, query: Self.filters(list: list, status: status, isFavorite: isFavorite))
         return try await auth.authorizedRequestWithRetry(request, as: Envelope<ContentCountResponse>.self).data.count
     }
@@ -36,26 +38,26 @@ nonisolated struct ReadService: Sendable {
         async throws -> Page<UserContentResponse>
     {
         let query = [URLQueryItem(name: "q", value: text)] + Self.filters(list: list) + Self.paging(limit, cursor)
-        let request = HTTPRequest(.get, try await userPath("search"), query: query)
+        let request = HTTPRequest(.get, userPath("search"), query: query)
         return try await auth.authorizedRequestWithRetry(request, as: Page<UserContentResponse>.self)
     }
 
     /// The item with the article body (`content.cleanedHtml`).
     func getContentById(_ contentID: String) async throws -> UserContentResponse {
-        let request = HTTPRequest(.get, try await userPath(contentID))
+        let request = HTTPRequest(.get, userPath(contentID))
         return try await auth.authorizedRequest(request, as: Envelope<UserContentResponse>.self).data
     }
 
     /// Saves a page or subscribes to a feed. Also how a link tapped in an article is saved.
     func addURL(_ body: AddURLRequest) async throws -> AddURLResponse {
-        let request = HTTPRequest(.post, try await userPath(), body: body)
+        let request = HTTPRequest(.post, userPath(), body: body)
         return try await auth.authorizedRequest(request, as: Envelope<AddURLResponse>.self).data
     }
 
     func updateUserContent(_ contentID: String, _ update: UpdateUserContentRequest) async throws
         -> UserContentResponse
     {
-        let request = HTTPRequest(.patch, try await userPath(contentID), body: update)
+        let request = HTTPRequest(.patch, userPath(contentID), body: update)
         return try await auth.authorizedRequest(request, as: Envelope<UserContentResponse>.self).data
     }
 
@@ -97,13 +99,13 @@ nonisolated struct ReadService: Sendable {
 
     /// RSS and email subscriptions together, each with the list its new items go to.
     func listAllSubscriptions() async throws -> UnifiedSubscriptionsResponse {
-        let request = HTTPRequest(.get, try await userPath("subscriptions"))
+        let request = HTTPRequest(.get, userPath("subscriptions"))
         return try await auth.authorizedRequestWithRetry(request, as: Envelope<UnifiedSubscriptionsResponse>.self).data
     }
 
     /// Stops future deliveries from the feed; items already in the user's lists stay.
     func unsubscribeFromRSSFeed(_ feedID: String) async throws {
-        let request = HTTPRequest(.delete, try await userPath("subscriptions/rss/\(feedID)"))
+        let request = HTTPRequest(.delete, userPath("subscriptions/rss/\(feedID)"))
         try await auth.authorizedRequest(request)
     }
 
@@ -112,14 +114,13 @@ nonisolated struct ReadService: Sendable {
     func setSourceList(_ type: SubscriptionType, key: String, list: ContentList) async throws
         -> SetSourceListResponse
     {
-        let path = try await userPath("subscriptions/\(type.rawValue)/\(key)/list")
+        let path = userPath("subscriptions/\(type.rawValue)/\(key)/list")
         let request = HTTPRequest(.put, path, body: SetSourceListRequest(list: list))
         return try await auth.authorizedRequest(request, as: Envelope<SetSourceListResponse>.self).data
     }
 
     /// The user's newsletter address, created on first request.
     func getOrCreateEmailAddress() async throws -> String {
-        let userID = try await userID()
         let request = HTTPRequest(.post, "/api/v1/source/email/user/\(userID)/address")
         return try await auth.authorizedRequest(request, as: Envelope<EmailAddressResponse>.self).data.emailAddress
     }
@@ -128,7 +129,7 @@ nonisolated struct ReadService: Sendable {
 
     /// The user's report on the item, or nil when there is none.
     func getExtractionFeedback(_ contentID: String) async throws -> ExtractionFeedbackResponse? {
-        let request = HTTPRequest(.get, try await userPath("\(contentID)/feedback"))
+        let request = HTTPRequest(.get, userPath("\(contentID)/feedback"))
         do {
             return try await auth.authorizedRequest(request, as: Envelope<ExtractionFeedbackResponse>.self).data
         } catch let error as HttpError where error.status == 404 {
@@ -140,7 +141,7 @@ nonisolated struct ReadService: Sendable {
     func submitExtractionFeedback(_ contentID: String, _ feedback: ExtractionFeedbackRequest) async throws
         -> ExtractionFeedbackResponse
     {
-        let request = HTTPRequest(.put, try await userPath("\(contentID)/feedback"), body: feedback)
+        let request = HTTPRequest(.put, userPath("\(contentID)/feedback"), body: feedback)
         return try await auth.authorizedRequest(request, as: Envelope<ExtractionFeedbackResponse>.self).data
     }
 
@@ -150,14 +151,8 @@ nonisolated struct ReadService: Sendable {
         let url: String
     }
 
-    private func userID() async throws -> String {
-        guard let id = await auth.user?.id else { throw AuthError.sessionExpired }
-        return id
-    }
-
     /// `/api/v1/content/user/{userID}`, followed by `suffix` when given.
-    private func userPath(_ suffix: String? = nil) async throws -> String {
-        let userID = try await userID()
+    private func userPath(_ suffix: String? = nil) -> String {
         let base = "/api/v1/content/user/\(userID)"
         return suffix.map { "\(base)/\($0)" } ?? base
     }
