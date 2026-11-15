@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [ios,offline]
-blocked_by: [task_1162]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T00:05:27Z
-updated_at: 2026-11-15T00:05:27Z
+updated_at: 2026-11-15T00:17:01Z
 ---
 
 ## Goal
