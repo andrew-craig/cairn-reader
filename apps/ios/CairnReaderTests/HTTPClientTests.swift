@@ -108,6 +108,17 @@ struct ServerConfigTests {
         #expect(ServerConfig.normalize(input).absoluteString == expected)
     }
 
+    @Test func defaultStorageIsTheAppGroupSuite() {
+        let group = UserDefaults(suiteName: AppGroup.identifier)!
+        let server = ServerConfig()
+        defer { _ = server.setURL("") }
+
+        _ = server.setURL("cairn.example.com")
+        #expect(group.string(forKey: "serverURL") == "https://cairn.example.com")
+        group.set("https://other.example.com", forKey: "serverURL")
+        #expect(server.url.absoluteString == "https://other.example.com")
+    }
+
     @Test func savingReportsChangesAndPersists() {
         let server = ServerConfig(defaults: defaults)
         #expect(server.setURL("cairn.example.com"))

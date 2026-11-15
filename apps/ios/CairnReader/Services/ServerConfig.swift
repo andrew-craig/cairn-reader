@@ -1,7 +1,7 @@
 import Foundation
 
 /// The backend the app talks to: `defaultURL` unless the user saved another server, which is
-/// kept in `UserDefaults`.
+/// kept in the App Group's `UserDefaults` so a share extension sees the same server.
 nonisolated struct ServerConfig: Sendable {
     static let defaultURL = URL(string: "https://cairn.seatrain.net")!
     private static let key = "serverURL"
@@ -9,7 +9,7 @@ nonisolated struct ServerConfig: Sendable {
     // UserDefaults is documented as thread-safe but not marked Sendable.
     nonisolated(unsafe) private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = UserDefaults(suiteName: AppGroup.identifier)!) {
         self.defaults = defaults
     }
 

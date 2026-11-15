@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 import UIKit
 @testable import CairnReader
@@ -477,5 +478,23 @@ struct KeychainSessionStorageTests {
 
         storage.clear()
         #expect(storage.load() == nil)
+    }
+
+    @Test func storesInTheAppGroupAccessGroup() throws {
+        let service = "test-\(UUID().uuidString)"
+        let storage = KeychainSessionStorage(service: service)
+        defer { storage.clear() }
+        storage.save(AuthFixtures.valid)
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        #expect(SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess)
+        let attributes = try #require(result as? [String: Any])
+        #expect(attributes[kSecAttrAccessGroup as String] as? String == AppGroup.identifier)
     }
 }
