@@ -66,7 +66,8 @@ nonisolated final class ArticleStore: Sendable {
     }
 
     /// Caches a freshly fetched body (cleaned HTML) with the `content_hash` it was fetched at, so a
-    /// later page sync carrying that hash keeps it.
+    /// later page sync carrying that hash keeps it. Nil clears the stored hash: a body is never kept
+    /// next to a hash it was not fetched at.
     func saveBody(id: String, body: String, contentHash: String?) async throws {
         try await database.writer().write { db in
             try db.execute(
