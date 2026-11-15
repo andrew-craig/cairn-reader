@@ -2,14 +2,14 @@
 id: feature_0b9a
 title: [iOS native 09] App shell: auth gate, TabView, per-tab NavigationStack, Login
 type: feature
-status: open
+status: closed
 priority: 1
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T10:42:35Z
+updated_at: 2026-11-15T03:40:24Z
 ---
 ## Goal
 The navigation skeleton, built only from system containers, and the app's composition root. First task that produces something the owner can run and sign in to.

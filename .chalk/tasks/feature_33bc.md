@@ -5,11 +5,11 @@ type: feature
 status: open
 priority: 1
 labels: [ios,ui]
-blocked_by: [task_4e17,feature_0b9a]
+blocked_by: [task_4e17]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-15T03:40:24Z
 ---
 ## Goal
 The reusable list pieces (network paging model, row, list view) and the Reads tab, which shows the store and nothing else (decision 8).

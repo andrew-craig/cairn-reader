@@ -2,14 +2,14 @@
 id: task_387d
 title: [iOS native 07] Outbox as the only write path, ArticleMutations
 type: task
-status: open
+status: closed
 priority: 1
 labels: [ios,offline]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T03:13:43Z
+updated_at: 2026-11-15T03:40:23Z
 ---
 ## Goal
 Reader and list edits are written locally and queued in one step, and the outbox is the only thing that sends them (decision 9). Same coalescing and failure classification as today.
