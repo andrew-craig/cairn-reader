@@ -144,9 +144,9 @@ final class ReadsModel {
     /// Archives through the outbox. The row leaves when the store row does; a search result is
     /// taken out of the results. A refusal is the root's alert (`Outbox.rejections`).
     func archive(_ article: Article) async {
-        search.remove(article.id)
         do {
             try await session.mutations.archive(article.id)
+            search.remove(article.id)
         } catch {
             logger.error("Archiving failed: \(String(describing: error))")
         }
