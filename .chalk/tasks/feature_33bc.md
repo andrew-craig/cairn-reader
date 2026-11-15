@@ -71,5 +71,5 @@ Notes and follow-ups:
 - The article route already existed (`Route.article(Article)`, placeholder in `RouteDestination`); rows push it. Task 12 replaces the placeholder and wires "next article" from the presenting model's `article(after:)`.
 - An archive from the reader of a search result leaves the result row until the search reruns (only `ReadsModel.archive` calls `search.remove`); store rows need nothing.
 - A first-page sync (appear after the TTL, pull-to-refresh) narrows the window back to the first page, as the RN reset did.
-- Timing-based tests: `ReadsModelTests` and the search tests poll with `eventually` (2 s timeout); `aRefreshInsideTheDebounceStillRestoresTheList` sleeps 50 ms past a 20 ms debounce.
+- Timing-based tests: `ReadsModelTests` and the search tests poll with `eventually` (10 s timeout); `aRefreshInsideTheDebounceStillRestoresTheList` sleeps 50 ms past a 20 ms debounce.
 - CI: iOS App Checks green on PR #468 (3451253). Close after merge and on-device check.
