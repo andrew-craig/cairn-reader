@@ -189,7 +189,7 @@ final class ReaderModel {
         trailingSave?.cancel()
         trailingSave = nil
         guard hasScrolled, !isFinished else { return }
-        await saveScrollPosition()
+        await saveScrollPosition(restoreFraction)
     }
 
     // MARK: - Actions
@@ -249,17 +249,19 @@ final class ReaderModel {
                 guard !Task.isCancelled, let self else { return }
                 trailingSave = nil
                 self.lastSave = .now
-                await saveScrollPosition()
+                await saveScrollPosition(restoreFraction)
             }
             return
         }
         lastSave = now
-        Task { await saveScrollPosition() }
+        // The leading save writes the reading that triggered it; later readings in the window
+        // are the trailing save's.
+        let fraction = restoreFraction
+        Task { await saveScrollPosition(fraction) }
     }
 
-    private func saveScrollPosition() async {
+    private func saveScrollPosition(_ fraction: Double) async {
         let id = route.id
-        let fraction = restoreFraction
         guard fraction != savedFraction else { return }
         savedFraction = fraction
         await mutate("Saving the scroll position") { try await $0.saveScrollPosition(id, fraction: fraction) }

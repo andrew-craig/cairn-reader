@@ -347,18 +347,19 @@ struct ReaderModelTests {
     @Test func scrollSavesAreThrottledWithATrailingSave() async throws {
         server.online.withLock { $0 = false }
         try await store(article())
-        // Long enough that the check below runs inside the window even on a loaded CI runner.
-        let model = makeModel(article(), saveInterval: .seconds(2))
+        // The readings arrive in one main-actor turn, so no scheduling delay can fall between
+        // them; the window only has to outlast the leading save's write.
+        let model = makeModel(article(), saveInterval: .seconds(5))
 
         model.scrolled(scroll(100))
-        await eventually { (try? outbox()["scroll_position"]) == #"{"scroll_position":0.1}"# }
-
         model.scrolled(scroll(200))
         model.scrolled(scroll(300))
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(try outbox()["scroll_position"] == #"{"scroll_position":0.1}"#)
 
-        await eventually { (try? outbox()["scroll_position"]) == #"{"scroll_position":0.3}"# }
+        // The leading save writes the first reading; the rest wait for the trailing save.
+        await eventually { (try? outbox()["scroll_position"]) == #"{"scroll_position":0.1}"# }
+        await eventually(timeout: .seconds(20)) {
+            (try? outbox()["scroll_position"]) == #"{"scroll_position":0.3}"#
+        }
         #expect(try await harness.session.articles.getById("a1")?.scrollPosition == 0.3)
     }
 
