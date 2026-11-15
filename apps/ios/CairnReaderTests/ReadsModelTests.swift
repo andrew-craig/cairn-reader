@@ -71,9 +71,9 @@ private func follow(_ model: ReadsModel) -> Task<Void, Never> {
 
 @MainActor
 struct ReadsModelTests {
-    let server = ReadsServer()
+    fileprivate let server = ReadsServer()
     let harness: SyncHarness
-    let clock = Clock()
+    fileprivate let clock = Clock()
     let model: ReadsModel
 
     init() {
