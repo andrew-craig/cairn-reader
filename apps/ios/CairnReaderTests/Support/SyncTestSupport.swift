@@ -14,7 +14,10 @@ nonisolated struct SyncHarness {
             client: HTTPClient(
                 server: ServerConfig(defaults: UserDefaults(suiteName: UUID().uuidString)!), session: server.session()),
             storage: InMemorySessionStorage(AuthFixtures.valid), deviceID: { "device-1" }, sleep: { _ in })
-        session = UserSession(user: AuthFixtures.user, auth: auth, isOnline: { online }, database: AppDatabase.inMemory())
+        session = UserSession(
+            user: AuthFixtures.user, auth: auth, isOnline: { online }, database: AppDatabase.inMemory(),
+            feedCache: FeedCache(
+                url: FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString)/feed.json")))
     }
 
     /// Each request as "METHOD last-path-component", e.g. "GET user-1" for a list page,
@@ -33,13 +36,17 @@ nonisolated struct SyncHarness {
 }
 
 nonisolated enum SyncFixtures {
-    /// A Reads list page of `ids`, newest first, one second apart, starting `skip` seconds below
-    /// the newest time (pass the earlier pages' row count for a later page).
+    /// A list page of `ids` (Reads unless `list` says otherwise), newest first, one second apart,
+    /// starting `skip` seconds below the newest time (pass the earlier pages' row count for a later
+    /// page).
     static func readsPage(
-        _ ids: [String], hasMore: Bool = false, cursor: String? = nil, isFavorite: Bool = false, skip: Int = 0
+        _ ids: [String], hasMore: Bool = false, cursor: String? = nil, isFavorite: Bool = false, skip: Int = 0,
+        list: ContentList = .reads
     ) -> String {
         let items = ids.enumerated().map { index, id in
-            userContent(id, addedAt: String(format: "2025-01-15T10:00:%02dZ", 59 - skip - index), isFavorite: isFavorite)
+            userContent(
+                id, addedAt: String(format: "2025-01-15T10:00:%02dZ", 59 - skip - index), isFavorite: isFavorite,
+                list: list)
         }
         let cursor = cursor.map { "\"\($0)\"" } ?? "null"
         return """
@@ -61,12 +68,12 @@ nonisolated enum SyncFixtures {
 
     static let ok = StubServer.Reply.json(200, detail("any"))
 
-    private static func userContent(_ id: String, addedAt: String, isFavorite: Bool = false, body: String? = nil)
-        -> String
-    {
+    private static func userContent(
+        _ id: String, addedAt: String, isFavorite: Bool = false, body: String? = nil, list: ContentList = .reads
+    ) -> String {
         """
         {
-          "id": "uc-\(id)", "user_id": "user-1", "content_id": "\(id)", "status": "unread", "list": "reads",
+          "id": "uc-\(id)", "user_id": "user-1", "content_id": "\(id)", "status": "unread", "list": "\(list.rawValue)",
           "is_favorite": \(isFavorite), "added_at": "\(addedAt)", "updated_at": "\(addedAt)",
           "content": {
             "id": "\(id)", "content_hash": "hash-\(id)", "original_url": "https://example.com/\(id)",

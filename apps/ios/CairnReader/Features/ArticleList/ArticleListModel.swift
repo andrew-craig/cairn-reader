@@ -38,6 +38,9 @@ final class ArticleListModel {
     private(set) var resetFailed = false
     /// A failed search or load-more, for an alert; set to nil to dismiss.
     var alertMessage: String?
+    /// Called after each first page that lands: from `refresh()` and from the quiet refresh after
+    /// a search is cleared.
+    @ObservationIgnored var onReset: (@MainActor () -> Void)?
 
     /// The list's pages.
     private var items: [Article] = []
@@ -117,6 +120,12 @@ final class ArticleListModel {
         }
     }
 
+    /// Shows `articles` (e.g. a cached copy) until the first page lands.
+    func prime(_ articles: [Article]) {
+        items = articles
+        isLoading = false
+    }
+
     /// Takes a row out of the list and the results, e.g. after an archive from search results.
     func remove(_ id: String) {
         items.removeAll { $0.id == id }
@@ -144,6 +153,7 @@ final class ArticleListModel {
             items = page.data.map { Article($0) }
             apply(page.pagination)
             resetFailed = false
+            onReset?()
         } catch {
             guard generation == self.generation, !(error is CancellationError) else { return }
             logger.error("Loading articles failed: \(String(describing: error))")
