@@ -1,5 +1,6 @@
 import Dispatch
 import Foundation
+import GRDB
 import Synchronization
 import Testing
 @testable import CairnReader
