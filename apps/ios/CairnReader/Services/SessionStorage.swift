@@ -22,7 +22,8 @@ nonisolated protocol SessionStorage: Sendable {
 /// are always written together.
 ///
 /// `AfterFirstUnlock` keeps the item readable while the device is locked, so a sync that starts
-/// in the background (or as the app returns to the foreground) still has a session.
+/// in the background (or as the app returns to the foreground) still has a session. The item is
+/// in the App Group's access group so a share extension can read it.
 nonisolated struct KeychainSessionStorage: SessionStorage {
     private let service: String
     private static let account = "session"
@@ -37,6 +38,7 @@ nonisolated struct KeychainSessionStorage: SessionStorage {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: Self.account,
+            kSecAttrAccessGroup as String: AppGroup.identifier,
         ]
     }
 

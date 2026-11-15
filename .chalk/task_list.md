@@ -10,7 +10,6 @@ _Active tasks, highest priority first. Closed tasks live in .chalk/tasks/closed/
 - **feature_0b9a** · P1 · open · [iOS native 09] App shell: auth gate, TabView, per-tab NavigationStack, Login  (parent: epic_bc48)
 - **feature_33bc** · P1 · open · [iOS native 10] Article list model, ArticleRow and the Reads tab  (parent: epic_bc48)
 - **feature_4e37** · P1 · open · [iOS native 12] Reader: web-view article, progress tracking, toolbar actions  (parent: epic_bc48)
-- **task_1162** · P1 · open · [iOS native 05a] App Group container and shared Keychain group (groundwork for a share extension)  (parent: epic_bc48)
 - **task_288e** · P1 · open · [iOS native 06b] Rework the store for decisions 8, 10 and 11: App Group database, observations, page sync, UserSession  (parent: epic_bc48)
 - **task_387d** · P1 · open · [iOS native 07] Outbox as the only write path, ArticleMutations  (parent: epic_bc48)
 - **task_fe45** · P1 · open · [iOS native 18] Parity and platform QA pass on device  (parent: epic_bc48)
