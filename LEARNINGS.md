@@ -395,8 +395,10 @@ took 70–86 s each. `StubURLProtocol` called each handler synchronously in
 Tests that hold a request (polling `Thread.sleep` in the handler) stalled every other
 test's requests. Raising the `eventually` timeout only hid it.
 
-**How to apply:** stub handlers run on their own queue (now done in
-`StubURLProtocol`). When parallel tests time out together with inflated durations, look
+**How to apply:** stub handlers run on their own queue, while the `URLProtocolClient`
+callbacks go back to the loading thread's run loop (both now done in `StubURLProtocol`;
+calling the client from another thread sometimes lost the response and the request timed
+out). When parallel tests time out together with inflated durations, look
 for shared, blocked infrastructure before raising timeouts. Two related lessons from
 the same PR: the app builds with `MemberImportVisibility`, so iterating a GRDB
 `AsyncValueObservation` needs `import GRDB` in that file; and a test that asserts
