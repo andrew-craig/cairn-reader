@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct CairnReaderApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         Typography.applyBarAppearance()
     }
@@ -10,6 +12,9 @@ struct CairnReaderApp: App {
         WindowGroup {
             RootView()
                 .font(Typography.body)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            AppDatabase.setSuspended(phase == .background)
         }
     }
 }

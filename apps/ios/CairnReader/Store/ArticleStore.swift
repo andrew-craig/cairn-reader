@@ -1,38 +1,73 @@
 import Foundation
 import GRDB
-import os
+
+/// One stored Reads article as the Reads list shows it.
+nonisolated struct ReadsEntry: Identifiable, Hashable, Sendable {
+    var article: Article
+    /// A Save to Reads is queued (an outbox `list` row) and the server has not confirmed it yet.
+    var pendingSave: Bool
+    var id: String { article.id }
+}
 
 /// The on-device store of Reads articles: metadata, user state, and an opportunistically cached
-/// body diffed by `content_hash`. A read-through cache for the Reads tab's first render and for
-/// offline reading, not a query engine: lists still paginate against the network.
+/// body diffed by `content_hash`. The source of truth for the Reads list (decision 8): network
+/// pages are written in with `syncPage`, and screens follow the store through its observations.
 ///
-/// Sync is upsert-only; rows leave by `remove` (archive) or `clear` (sign-out). Reads never throw:
-/// a store failure degrades to "nothing cached" (logged), so a caller's network refresh always
-/// runs. Writes throw.
+/// Every method throws a store failure: a broken database breaks Reads (there is no network-only
+/// fallback list).
 nonisolated final class ArticleStore: Sendable {
-    private static let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "store")
-
     private let database: AppDatabase
 
-    init(database: AppDatabase = .shared) {
+    init(database: AppDatabase) {
         self.database = database
     }
 
     // MARK: - Writes
 
-    /// Upserts a page of articles from the server. Never deletes existing rows.
+    /// Upserts articles from the server. Never deletes existing rows.
     func upsertMany(_ articles: [Article]) async throws {
         guard !articles.isEmpty else { return }
-        try await database.queue().write { db in
-            for article in articles {
-                try db.execute(sql: Self.upsertSQL, arguments: Self.arguments(for: article))
-            }
+        try await database.writer().write { db in
+            try Self.upsert(articles, db)
+        }
+    }
+
+    /// Writes one Reads page from the server, newest first, in one transaction: upserts it, then
+    /// deletes the stored rows strictly inside the page's `added_at` window that the page did not
+    /// return (archived or moved elsewhere) and that have no outbox row.
+    ///
+    /// The window runs from `previousPageLast` (the previous page's last `added_at`; nil for the
+    /// first page) down to this page's last `added_at` (unbounded when `hasMore` is false). Rows
+    /// on a boundary are kept: a row with the same `added_at` as a page's last may be on the
+    /// neighbouring page.
+    func syncPage(_ articles: [Article], olderThan previousPageLast: Date?, hasMore: Bool) async throws {
+        let pageLast = articles.map(\.addedAt).min()
+        // A page with more to come but no rows has no lower bound: delete nothing.
+        let deletes = !(hasMore && pageLast == nil)
+        let ids = String(decoding: try JSONEncoder().encode(articles.map(\.id)), as: UTF8.self)
+        let arguments: StatementArguments = [
+            "upper": previousPageLast?.timeIntervalSince1970,
+            "lower": hasMore ? pageLast?.timeIntervalSince1970 : nil,
+            "ids": ids,
+        ]
+        try await database.writer().write { db in
+            try Self.upsert(articles, db)
+            guard deletes else { return }
+            try db.execute(
+                sql: """
+                    DELETE FROM articles
+                    WHERE (:upper IS NULL OR added_at < :upper)
+                      AND (:lower IS NULL OR added_at > :lower)
+                      AND id NOT IN (SELECT value FROM json_each(:ids))
+                      AND NOT EXISTS (SELECT 1 FROM outbox WHERE article_id = articles.id)
+                    """,
+                arguments: arguments)
         }
     }
 
     /// Caches a freshly fetched body (cleaned HTML).
     func saveBody(id: String, body: String) async throws {
-        try await database.queue().write { db in
+        try await database.writer().write { db in
             try db.execute(sql: "UPDATE articles SET body = :body WHERE id = :id", arguments: ["id": id, "body": body])
         }
     }
@@ -40,7 +75,7 @@ nonisolated final class ArticleStore: Sendable {
     /// Drops cached bodies for rows outside the `limit` most recently added, so the store never
     /// keeps more bodies than the prefetch cap.
     func evictBodiesOutsideCap(_ limit: Int) async throws {
-        try await database.queue().write { db in
+        try await database.writer().write { db in
             try db.execute(
                 sql: """
                     UPDATE articles SET body = NULL WHERE id NOT IN (
@@ -78,79 +113,83 @@ nonisolated final class ArticleStore: Sendable {
         guard !sets.isEmpty else { return }
 
         let sql = "UPDATE articles SET \(sets.joined(separator: ", ")) WHERE id = :id"
-        try await database.queue().write { [arguments] db in
+        try await database.writer().write { [arguments] db in
             try db.execute(sql: sql, arguments: arguments)
         }
     }
 
     /// Removes one article, e.g. on archive.
     func remove(id: String) async throws {
-        try await database.queue().write { db in
+        try await database.writer().write { db in
             try db.execute(sql: "DELETE FROM articles WHERE id = :id", arguments: ["id": id])
         }
     }
 
-    /// Drops every stored article and every queued outbox row, e.g. on sign-out: a queued write
-    /// must never replay against a different account.
-    func clear() async throws {
-        try await database.queue().write { db in
-            try db.execute(sql: "DELETE FROM articles")
-            try db.execute(sql: "DELETE FROM outbox")
-        }
-    }
-
-    // MARK: - Reads (never throw)
-
-    /// The most recently added articles, for the Reads tab's first render.
-    func listRecent(limit: Int) async -> [Article] {
-        await fetch("recent articles", "SELECT * FROM articles ORDER BY added_at DESC LIMIT :limit", ["limit": limit])
-    }
-
-    /// Stored favorites, for the Bookmarks screen's first render.
-    func listFavorites() async -> [Article] {
-        await fetch("favorite articles", "SELECT * FROM articles WHERE is_favorite = 1 ORDER BY added_at DESC")
-    }
-
-    /// Stored articles with a queued Save to Reads (an outbox `list` row), most recently queued
-    /// first: the Reads tab keeps them listed until the server's list includes them.
-    func listPendingSaves() async -> [Article] {
-        await fetch(
-            "pending saves",
-            """
-            SELECT articles.* FROM articles
-            JOIN outbox ON outbox.article_id = articles.id AND outbox.field = 'list'
-            ORDER BY outbox.created_at DESC
-            """)
-    }
+    // MARK: - Reads
 
     /// Unread articles with no cached body, newest first, for prefetch. `upsertMany` already
     /// clears a body whose `content_hash` changed, so this is the full selection.
-    func listPrefetchCandidates(limit: Int) async -> [Article] {
-        await fetch(
-            "prefetch candidates",
-            "SELECT * FROM articles WHERE is_read = 0 AND body IS NULL ORDER BY added_at DESC LIMIT :limit",
-            ["limit": limit])
+    func listPrefetchCandidates(limit: Int) async throws -> [Article] {
+        try await database.writer().read { db in
+            try Row.fetchAll(
+                db, sql: "SELECT * FROM articles WHERE is_read = 0 AND body IS NULL ORDER BY added_at DESC LIMIT :limit",
+                arguments: ["limit": limit]
+            ).map(Self.article(from:))
+        }
     }
 
-    /// The stored article, or nil when it is not stored or the store failed.
-    func getById(_ id: String) async -> Article? {
-        await fetch("article by id", "SELECT * FROM articles WHERE id = :id", ["id": id]).first
+    /// The stored article, or nil when it is not stored.
+    func getById(_ id: String) async throws -> Article? {
+        try await database.writer().read { db in
+            try Self.fetchArticle(id, db)
+        }
     }
 
-    private func fetch(_ what: String, _ sql: String, _ arguments: StatementArguments = []) async -> [Article] {
-        do {
-            return try await database.queue().read { db in
-                try Row.fetchAll(db, sql: sql, arguments: arguments).map(Self.article(from:))
-            }
-        } catch {
-            Self.logger.error("Error loading \(what, privacy: .public): \(String(describing: error))")
-            return []
+    // MARK: - Observations
+
+    /// The `limit` most recently added articles, newest first, each with its pending-save flag;
+    /// emits again after every change to `articles` or `outbox`.
+    func observeReads(limit: Int) throws -> AsyncValueObservation<[ReadsEntry]> {
+        ValueObservation.tracking { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT articles.*, EXISTS (
+                      SELECT 1 FROM outbox WHERE outbox.article_id = articles.id AND outbox.field = 'list'
+                    ) AS pending_save
+                    FROM articles ORDER BY added_at DESC LIMIT :limit
+                    """,
+                arguments: ["limit": limit]
+            ).map { ReadsEntry(article: Self.article(from: $0), pendingSave: $0["pending_save"]) }
+        }
+        .values(in: try database.writer())
+    }
+
+    /// One stored article, for the reader; nil while it is not stored.
+    func observeArticle(id: String) throws -> AsyncValueObservation<Article?> {
+        ValueObservation.tracking { db in try Self.fetchArticle(id, db) }
+            .values(in: try database.writer())
+    }
+
+    /// The ids of every stored article: the Feed leaves out items already in Reads.
+    func observeStoredIDs() throws -> AsyncValueObservation<Set<String>> {
+        ValueObservation.tracking { db in try Set(String.fetchAll(db, sql: "SELECT id FROM articles")) }
+            .values(in: try database.writer())
+    }
+
+    private static func fetchArticle(_ id: String, _ db: Database) throws -> Article? {
+        try Row.fetchOne(db, sql: "SELECT * FROM articles WHERE id = :id", arguments: ["id": id]).map(article(from:))
+    }
+
+    private static func upsert(_ articles: [Article], _ db: Database) throws {
+        for article in articles {
+            try db.execute(sql: upsertSQL, arguments: arguments(for: article))
         }
     }
 
     // MARK: - Mapping
 
-    // A list page upserts its rows; existing rows are updated, never bulk-deleted. Ported from
+    // A list page upserts its rows; existing rows are updated (`syncPage` deletes separately). Ported from
     // the RN store's UPSERT_SQL, with its three guards:
     // - A queued archive (a `status` outbox row with `{"status":"archived"}`) skips the row
     //   entirely: the WHERE on the SELECT yields no row, so ON CONFLICT never fires. Otherwise the

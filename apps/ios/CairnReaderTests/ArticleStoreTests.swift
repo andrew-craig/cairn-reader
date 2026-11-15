@@ -1,13 +1,13 @@
 import Foundation
 import GRDB
-import Synchronization
 import Testing
 @testable import CairnReader
 
 // Port of apps/mobile/src/services/articleStore.test.ts against a real in-memory database.
 // Not ported: the v1 -> v2 migration cases (there is no RN migration ladder here; the schema is
 // created in one migration, epic_bc48 decision 4). Outbox rows are inserted directly until the
-// outbox itself is ported (task_387d).
+// outbox itself is ported (task_387d). The list methods and `clear` were replaced by the
+// observations and `UserSession.close()` (task_288e), so their cases moved there.
 
 private func makeArticle(
     _ id: String = "a1", title: String = "Article One", isRead: Bool = false, isFavorite: Bool = false,
@@ -21,10 +21,17 @@ private func makeArticle(
 private func enqueue(
     _ database: AppDatabase, _ articleID: String, _ field: String, _ payload: String, createdAt: Int = 0
 ) async throws {
-    try await database.queue().write { db in
+    try await database.writer().write { db in
         try db.execute(
             sql: "INSERT INTO outbox (article_id, field, payload, created_at) VALUES (?, ?, ?, ?)",
             arguments: [articleID, field, payload, createdAt])
+    }
+}
+
+/// Every stored id, newest first.
+private func storedIDs(_ database: AppDatabase) async throws -> [String] {
+    try await database.writer().read { db in
+        try String.fetchAll(db, sql: "SELECT id FROM articles ORDER BY added_at DESC, id")
     }
 }
 
@@ -37,22 +44,22 @@ struct ArticleStoreTests {
     @Test func insertsNewArticles() async throws {
         try await store.upsertMany([makeArticle("a1"), makeArticle("a2")])
 
-        #expect(await store.listRecent(limit: 10).count == 2)
+        #expect(try await storedIDs(database).count == 2)
     }
 
     @Test func updatesAnExistingRowInsteadOfDuplicatingIt() async throws {
         try await store.upsertMany([makeArticle("a1", title: "Old Title")])
         try await store.upsertMany([makeArticle("a1", title: "New Title")])
 
-        let recent = await store.listRecent(limit: 10)
-        #expect(recent.map(\.title) == ["New Title"])
+        #expect(try await storedIDs(database) == ["a1"])
+        #expect(try await store.getById("a1")?.title == "New Title")
     }
 
     @Test func doesNotDeleteRowsAbsentFromTheIncomingPage() async throws {
         try await store.upsertMany([makeArticle("a1")])
         try await store.upsertMany([makeArticle("a2")])
 
-        #expect(await store.listRecent(limit: 10).map(\.id).sorted() == ["a1", "a2"])
+        #expect(try await storedIDs(database).sorted() == ["a1", "a2"])
     }
 
     @Test func roundTripsEveryField() async throws {
@@ -68,45 +75,7 @@ struct ArticleStoreTests {
 
         try await store.upsertMany([article])
 
-        #expect(await store.getById("a1") == article)
-    }
-
-    // MARK: listRecent
-
-    @Test func listRecentOrdersByAddedAtDescendingAndRespectsTheLimit() async throws {
-        try await store.upsertMany([
-            makeArticle("old", addedAt: 100),
-            makeArticle("newest", addedAt: 300),
-            makeArticle("middle", addedAt: 200),
-        ])
-
-        #expect(await store.listRecent(limit: 2).map(\.id) == ["newest", "middle"])
-    }
-
-    // MARK: listFavorites
-
-    @Test func listFavoritesReturnsOnlyFavorites() async throws {
-        try await store.upsertMany([
-            makeArticle("fav", isFavorite: true, addedAt: 100),
-            makeArticle("not-fav", isFavorite: false, addedAt: 200),
-        ])
-
-        #expect(await store.listFavorites().map(\.id) == ["fav"])
-    }
-
-    // MARK: listPendingSaves
-
-    @Test func listPendingSavesReturnsQueuedSavesMostRecentlyQueuedFirst() async throws {
-        try await store.upsertMany([
-            makeArticle("first"), makeArticle("second"), makeArticle("not-queued"), makeArticle("favorited"),
-        ])
-        try await enqueue(database, "first", "list", #"{"list":"reads"}"#, createdAt: 100)
-        try await enqueue(database, "second", "list", #"{"list":"reads"}"#, createdAt: 200)
-        try await enqueue(database, "favorited", "is_favorite", #"{"is_favorite":true}"#, createdAt: 300)
-        // Queued but no longer stored (e.g. archived since): not listed.
-        try await enqueue(database, "gone", "list", #"{"list":"reads"}"#, createdAt: 400)
-
-        #expect(await store.listPendingSaves().map(\.id) == ["second", "first"])
+        #expect(try await store.getById("a1") == article)
     }
 
     // MARK: body round-tripping
@@ -114,14 +83,14 @@ struct ArticleStoreTests {
     @Test func contentIsNilWhenNoBodyHasBeenSaved() async throws {
         try await store.upsertMany([makeArticle("a1")])
 
-        #expect(await store.getById("a1")?.content == nil)
+        #expect(try await store.getById("a1")?.content == nil)
     }
 
     @Test func roundTripsASavedBodyThroughGetById() async throws {
         try await store.upsertMany([makeArticle("a1")])
         try await store.saveBody(id: "a1", body: "<p>Hello</p>")
 
-        #expect(await store.getById("a1")?.content == "<p>Hello</p>")
+        #expect(try await store.getById("a1")?.content == "<p>Hello</p>")
     }
 
     @Test func preservesAnExistingBodyWhenALaterListSyncHasNoContent() async throws {
@@ -131,7 +100,7 @@ struct ArticleStoreTests {
         // A list-page refresh never carries the body.
         try await store.upsertMany([makeArticle("a1", title: "Refreshed")])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.title == "Refreshed")
         #expect(stored?.content == "<p>Hello</p>")
     }
@@ -144,7 +113,7 @@ struct ArticleStoreTests {
 
         try await store.upsertMany([makeArticle("a1", title: "Refreshed", contentHash: "h1")])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.title == "Refreshed")
         #expect(stored?.content == "<p>Hello</p>")
         #expect(stored?.contentHash == "h1")
@@ -156,7 +125,7 @@ struct ArticleStoreTests {
 
         try await store.upsertMany([makeArticle("a1", contentHash: "h2")])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.content == nil)
         #expect(stored?.contentHash == "h2")
     }
@@ -167,7 +136,7 @@ struct ArticleStoreTests {
 
         try await store.upsertMany([makeArticle("a1", contentHash: nil)])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.content == "<p>Hello</p>")
         #expect(stored?.contentHash == "h1")
     }
@@ -183,7 +152,7 @@ struct ArticleStoreTests {
         ])
         try await store.saveBody(id: "has-body", body: "<p>already cached</p>")
 
-        #expect(await store.listPrefetchCandidates(limit: 10).map(\.id) == ["newer-no-body", "no-body"])
+        #expect(try await store.listPrefetchCandidates(limit: 10).map(\.id) == ["newer-no-body", "no-body"])
     }
 
     @Test func prefetchCandidatesRespectTheLimit() async throws {
@@ -191,7 +160,7 @@ struct ArticleStoreTests {
             makeArticle("a", addedAt: 100), makeArticle("b", addedAt: 200), makeArticle("c", addedAt: 300),
         ])
 
-        #expect(await store.listPrefetchCandidates(limit: 2).map(\.id) == ["c", "b"])
+        #expect(try await store.listPrefetchCandidates(limit: 2).map(\.id) == ["c", "b"])
     }
 
     // MARK: evictBodiesOutsideCap
@@ -203,8 +172,8 @@ struct ArticleStoreTests {
 
         try await store.evictBodiesOutsideCap(1)
 
-        #expect(await store.getById("old")?.content == nil)
-        #expect(await store.getById("newer")?.content == "<p>newer</p>")
+        #expect(try await store.getById("old")?.content == nil)
+        #expect(try await store.getById("newer")?.content == "<p>newer</p>")
     }
 
     @Test func evictionTouchesOnlyTheBody() async throws {
@@ -213,7 +182,7 @@ struct ArticleStoreTests {
 
         try await store.evictBodiesOutsideCap(0)
 
-        let old = await store.getById("old")
+        let old = try await store.getById("old")
         #expect(old?.title == "Old")
         #expect(old?.content == nil)
     }
@@ -224,25 +193,25 @@ struct ArticleStoreTests {
         try await store.upsertMany([makeArticle("a1")])
 
         try await store.updateUserState(id: "a1", isFavorite: true)
-        var stored = await store.getById("a1")
+        var stored = try await store.getById("a1")
         #expect(stored?.isFavorite == true)
         #expect(stored?.isRead == false)
 
         try await store.updateUserState(id: "a1", isRead: true, readAt: Date(timeIntervalSince1970: 500))
-        stored = await store.getById("a1")
+        stored = try await store.getById("a1")
         #expect(stored?.isRead == true)
         #expect(stored?.readAt == Date(timeIntervalSince1970: 500))
         #expect(stored?.isFavorite == true)
 
         try await store.updateUserState(id: "a1", scrollPosition: 0.42)
-        stored = await store.getById("a1")
+        stored = try await store.getById("a1")
         #expect(stored?.scrollPosition == 0.42)
     }
 
     @Test func updateUserStateDoesNothingWhenTheIdIsNotFound() async throws {
         try await store.updateUserState(id: "missing", isRead: true)
 
-        #expect(await store.getById("missing") == nil)
+        #expect(try await store.getById("missing") == nil)
     }
 
     // MARK: remove
@@ -252,31 +221,7 @@ struct ArticleStoreTests {
 
         try await store.remove(id: "a1")
 
-        #expect(await store.listRecent(limit: 10).map(\.id) == ["a2"])
-    }
-
-    // MARK: clear
-
-    @Test func clearRemovesAllStoredArticles() async throws {
-        try await store.upsertMany([makeArticle("a1"), makeArticle("a2")])
-
-        try await store.clear()
-
-        #expect(await store.listRecent(limit: 10).isEmpty)
-    }
-
-    /// A queued write must never replay against a different account.
-    @Test func clearAlsoClearsQueuedOutboxRows() async throws {
-        try await store.upsertMany([makeArticle("a1", isFavorite: true)])
-        try await enqueue(database, "a1", "is_favorite", #"{"is_favorite":true}"#)
-
-        try await store.clear()
-
-        // If the outbox row had survived, the guard would freeze isFavorite on the second upsert.
-        try await store.upsertMany([makeArticle("a1", isFavorite: true)])
-        try await store.upsertMany([makeArticle("a1", isFavorite: false)])
-
-        #expect(await store.getById("a1")?.isFavorite == false)
+        #expect(try await storedIDs(database) == ["a2"])
     }
 
     // MARK: outbox guard on upsertMany
@@ -290,7 +235,7 @@ struct ArticleStoreTests {
         // A list sync arrives before the outbox drains, carrying the server's stale value.
         try await store.upsertMany([makeArticle("a1", title: "Refreshed", isFavorite: false)])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.isFavorite == true)
         #expect(stored?.title == "Refreshed")
     }
@@ -303,7 +248,7 @@ struct ArticleStoreTests {
 
         try await store.upsertMany([makeArticle("a1")])
 
-        let stored = await store.getById("a1")
+        let stored = try await store.getById("a1")
         #expect(stored?.isRead == true)
         #expect(stored?.isFavorite == true)
         #expect(stored?.scrollPosition == 0.5)
@@ -318,7 +263,7 @@ struct ArticleStoreTests {
         // The next list sync still sees the article server-side.
         try await store.upsertMany([makeArticle("a1")])
 
-        #expect(await store.getById("a1") == nil)
+        #expect(try await store.getById("a1") == nil)
     }
 
     @Test func resumesNormalSyncingOnceTheOutboxRowIsGone() async throws {
@@ -326,58 +271,134 @@ struct ArticleStoreTests {
         try await enqueue(database, "a1", "is_favorite", #"{"is_favorite":true}"#)
 
         // The drain succeeded and removed its row.
-        try await database.queue().write { db in
+        try await database.writer().write { db in
             try db.execute(sql: "DELETE FROM outbox WHERE article_id = 'a1'")
         }
 
         try await store.upsertMany([makeArticle("a1", isFavorite: false)])
 
-        #expect(await store.getById("a1")?.isFavorite == false)
-    }
-}
-
-/// Reads degrade to "nothing cached"; writes still throw; a failed open is retried.
-struct ArticleStoreFailureTests {
-    struct OpenFailure: Error {}
-
-    final class Attempts: Sendable {
-        private let count = Mutex(0)
-
-        func next() -> Int {
-            count.withLock { count in
-                count += 1
-                return count
-            }
-        }
+        #expect(try await store.getById("a1")?.isFavorite == false)
     }
 
-    @Test func readsNeverThrow() async {
-        let store = ArticleStore(database: AppDatabase { throw OpenFailure() })
+    // MARK: syncPage
 
-        #expect(await store.listRecent(limit: 10).isEmpty)
-        #expect(await store.listFavorites().isEmpty)
-        #expect(await store.listPendingSaves().isEmpty)
-        #expect(await store.listPrefetchCandidates(limit: 10).isEmpty)
-        #expect(await store.getById("a1") == nil)
+    /// Stores a1 (300), a2 (200), a3 (100), a4 (50).
+    private func storeFour() async throws {
+        try await store.upsertMany([
+            makeArticle("a1", addedAt: 300), makeArticle("a2", addedAt: 200),
+            makeArticle("a3", addedAt: 100), makeArticle("a4", addedAt: 50),
+        ])
     }
 
-    @Test func writesThrow() async {
-        let store = ArticleStore(database: AppDatabase { throw OpenFailure() })
+    @Test func syncPageDeletesARowTheServerDropped() async throws {
+        try await storeFour()
 
-        await #expect(throws: OpenFailure.self) { try await store.upsertMany([makeArticle("write-fails")]) }
+        // First page: a1 and a3; a2 was archived elsewhere.
+        try await store.syncPage(
+            [makeArticle("a1", addedAt: 300), makeArticle("a3", addedAt: 100)], olderThan: nil, hasMore: true)
+
+        #expect(try await storedIDs(database) == ["a1", "a3", "a4"])
     }
 
-    @Test func retriesAfterAFailedOpen() async throws {
-        let attempts = Attempts()
-        let store = ArticleStore(
-            database: AppDatabase {
-                if attempts.next() == 1 { throw OpenFailure() }
-                return try DatabaseQueue()
-            })
+    @Test func syncPageKeepsADroppedRowWithAnOutboxRow() async throws {
+        try await storeFour()
+        try await enqueue(database, "a2", "list", #"{"list":"reads"}"#)
 
-        await #expect(throws: OpenFailure.self) { try await store.upsertMany([makeArticle("retry-1")]) }
-        try await store.upsertMany([makeArticle("retry-1")])
+        try await store.syncPage(
+            [makeArticle("a1", addedAt: 300), makeArticle("a3", addedAt: 100)], olderThan: nil, hasMore: true)
 
-        #expect(await store.listRecent(limit: 10).map(\.id) == ["retry-1"])
+        #expect(try await storedIDs(database) == ["a1", "a2", "a3", "a4"])
+    }
+
+    @Test func syncPageKeepsRowsOutsideTheWindowAndOnItsBoundaries() async throws {
+        try await storeFour()
+        try await store.upsertMany([makeArticle("upper-tie", addedAt: 300), makeArticle("lower-tie", addedAt: 100)])
+
+        // A middle page: newer than a3 (100), older than the previous page's last (300).
+        try await store.syncPage(
+            [makeArticle("a2", addedAt: 200), makeArticle("a3", addedAt: 100)], olderThan: Date(timeIntervalSince1970: 300),
+            hasMore: true)
+
+        #expect(try await storedIDs(database) == ["a1", "upper-tie", "a2", "a3", "lower-tie", "a4"])
+    }
+
+    @Test func syncPageWindowIsUnboundedBelowOnTheLastPage() async throws {
+        try await storeFour()
+
+        try await store.syncPage([makeArticle("a2", addedAt: 200)], olderThan: Date(timeIntervalSince1970: 300), hasMore: false)
+
+        #expect(try await storedIDs(database) == ["a1", "a2"])
+    }
+
+    @Test func syncPageWithAnEmptyLastPageDeletesEverythingWithoutAnOutboxRow() async throws {
+        try await storeFour()
+        try await enqueue(database, "a4", "is_favorite", #"{"is_favorite":true}"#)
+
+        try await store.syncPage([], olderThan: nil, hasMore: false)
+
+        #expect(try await storedIDs(database) == ["a4"])
+    }
+
+    @Test func syncPageAppliesTheUpsertGuards() async throws {
+        try await store.upsertMany([makeArticle("a1", isFavorite: true, addedAt: 300)])
+        try await enqueue(database, "a1", "is_favorite", #"{"is_favorite":true}"#)
+        try await enqueue(database, "gone", "status", #"{"status":"archived"}"#)
+
+        try await store.syncPage(
+            [makeArticle("a1", isFavorite: false, addedAt: 300), makeArticle("gone", addedAt: 200)], olderThan: nil,
+            hasMore: false)
+
+        #expect(try await storedIDs(database) == ["a1"])
+        #expect(try await store.getById("a1")?.isFavorite == true)
+    }
+
+    // MARK: observations
+
+    @Test func observeReadsListsNewestFirstWithinTheLimitAndFlagsPendingSaves() async throws {
+        try await storeFour()
+        try await enqueue(database, "a2", "list", #"{"list":"reads"}"#)
+        try await enqueue(database, "a1", "is_favorite", #"{"is_favorite":true}"#)
+
+        var reads = try store.observeReads(limit: 3).makeAsyncIterator()
+        let entries = try await reads.next()
+
+        #expect(entries?.map(\.id) == ["a1", "a2", "a3"])
+        #expect(entries?.map(\.pendingSave) == [false, true, false])
+    }
+
+    @Test func observeReadsEmitsAfterUpsertRemoveAndAnOutboxChange() async throws {
+        var reads = try store.observeReads(limit: 10).makeAsyncIterator()
+        #expect(try await reads.next() == [])
+
+        try await store.upsertMany([makeArticle("a1")])
+        #expect(try await reads.next()?.map(\.id) == ["a1"])
+
+        try await enqueue(database, "a1", "list", #"{"list":"reads"}"#)
+        #expect(try await reads.next()?.map(\.pendingSave) == [true])
+
+        try await store.remove(id: "a1")
+        #expect(try await reads.next() == [])
+    }
+
+    @Test func observeArticleFollowsOneArticle() async throws {
+        var article = try store.observeArticle(id: "a1").makeAsyncIterator()
+        #expect(try await article.next() == .some(nil))
+
+        try await store.upsertMany([makeArticle("a1")])
+        #expect(try await article.next()??.id == "a1")
+
+        try await store.updateUserState(id: "a1", isFavorite: true)
+        #expect(try await article.next()??.isFavorite == true)
+    }
+
+    @Test func observeStoredIDsFollowsInsertsAndDeletes() async throws {
+        var ids = try store.observeStoredIDs().makeAsyncIterator()
+        #expect(try await ids.next() == [])
+
+        try await store.upsertMany([makeArticle("a1"), makeArticle("a2")])
+        #expect(try await ids.next() == ["a1", "a2"])
+
+        try await store.remove(id: "a1")
+        #expect(try await ids.next() == ["a2"])
     }
 }
