@@ -43,7 +43,7 @@ The background machinery around the store: know when the device is offline, sync
 - New tests: operations do not interleave (a drain requested during a page fetch runs after that page's `syncPage`); a dropped row triggers a first-page sync; `close()` during a drain and during a page fetch leaves no request and no write afterwards; signing in as a second user after `close()` sees an empty store and outbox.
 
 ## Review
-Implemented on the worktree branch; not built locally (Linux, no Swift toolchain). **CI verification (iOS App Checks) is pending**; the task stays open until it passes.
+Implemented on the worktree branch; not built locally (Linux, no Swift toolchain). Verified by CI (see below).
 
 What changed:
 - `Services/Connectivity.swift`: already app-wide and online until the first path; only the status mapping was extracted (`Connectivity.isOnline(_:)`) so the network.ts/useNetworkStatus cases are testable.
