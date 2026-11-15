@@ -27,7 +27,8 @@ nonisolated final class UserSession: Sendable {
 
     /// `isOnline` is the app's `Connectivity`; prefetch skips its run offline.
     init(
-        user: User, auth: AuthService, isOnline: @escaping @Sendable () async -> Bool, database: AppDatabase? = nil
+        user: User, auth: AuthService, isOnline: @escaping @Sendable () async -> Bool, database: AppDatabase? = nil,
+        feedCache: FeedCache? = nil
     ) {
         self.user = user
         let database = database ?? AppDatabase(url: AppDatabase.url(forUser: user.id))
@@ -43,7 +44,7 @@ nonisolated final class UserSession: Sendable {
             prefetch: ArticlePrefetch(articles: articles, read: read, isOnline: isOnline))
         self.sync = sync
         mutations = ArticleMutations(database: database) { sync.requestDrain() }
-        feedCache = FeedCache(url: FeedCache.url(forUser: user.id))
+        self.feedCache = feedCache ?? FeedCache(url: FeedCache.url(forUser: user.id))
     }
 
     /// Runs `operation` as work of this session, cancelled and awaited by `close()`. Does nothing

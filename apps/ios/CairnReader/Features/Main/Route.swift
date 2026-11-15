@@ -15,6 +15,7 @@ enum Route: Hashable {
 /// show a stand-in; each is replaced by its own feature task.
 struct RouteDestination: View {
     @Environment(SessionModel.self) private var sessionModel
+    @Environment(\.userSession) private var session
     let route: Route
 
     init(_ route: Route) {
@@ -26,7 +27,7 @@ struct RouteDestination: View {
         case let .article(article):
             ContentUnavailableView(article.title, systemImage: "doc.text")
         case .bookmarks:
-            ContentUnavailableView("Bookmarks", systemImage: "bookmark")
+            if let session { BookmarksView(session: session) }
         case .account:
             AccountView(sessionModel: sessionModel)
         case .about:

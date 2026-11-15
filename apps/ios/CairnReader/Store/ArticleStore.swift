@@ -148,6 +148,14 @@ nonisolated final class ArticleStore: Sendable {
         }
     }
 
+    /// The stored favourites, newest first, which Bookmarks shows before its first page lands.
+    func listFavorites() async throws -> [Article] {
+        try await database.writer().read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM articles WHERE is_favorite = 1 ORDER BY added_at DESC")
+                .map(Self.article(from:))
+        }
+    }
+
     /// The stored article, or nil when it is not stored.
     func getById(_ id: String) async throws -> Article? {
         try await database.writer().read { db in
