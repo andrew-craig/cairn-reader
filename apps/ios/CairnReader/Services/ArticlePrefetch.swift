@@ -13,11 +13,11 @@ nonisolated struct ArticlePrefetch: Sendable {
 
     private let articles: ArticleStore
     private let isOnline: @Sendable () async -> Bool
-    private let fetchBody: @Sendable (String) async throws -> String?
+    private let fetchBody: @Sendable (String) async throws -> (body: String, contentHash: String?)?
 
     init(
         articles: ArticleStore, isOnline: @escaping @Sendable () async -> Bool,
-        fetchBody: @escaping @Sendable (String) async throws -> String?
+        fetchBody: @escaping @Sendable (String) async throws -> (body: String, contentHash: String?)?
     ) {
         self.articles = articles
         self.isOnline = isOnline
@@ -27,8 +27,8 @@ nonisolated struct ArticlePrefetch: Sendable {
     /// Fetches bodies through `read`'s content detail.
     init(articles: ArticleStore, read: ReadService, isOnline: @escaping @Sendable () async -> Bool) {
         self.init(articles: articles, isOnline: isOnline) { id in
-            let detail = try await read.getContentById(id)
-            return Article(detail).content
+            let detail = Article(try await read.getContentById(id))
+            return detail.content.map { ($0, detail.contentHash) }
         }
     }
 
@@ -64,8 +64,8 @@ nonisolated struct ArticlePrefetch: Sendable {
     /// which ends the batch.
     private func prefetch(_ id: String) async -> Bool {
         do {
-            if let body = try await fetchBody(id) {
-                try await articles.saveBody(id: id, body: body)
+            if let fetched = try await fetchBody(id) {
+                try await articles.saveBody(id: id, body: fetched.body, contentHash: fetched.contentHash)
             }
             return false
         } catch is NetworkError {
