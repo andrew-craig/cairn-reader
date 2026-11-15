@@ -22,7 +22,7 @@ struct MainTabs: View {
                 NavigationStack { FeedPlaceholder() }
             }
             Tab("Reads", systemImage: "book", value: MainTab.reads) {
-                NavigationStack { ReadsPlaceholder() }
+                NavigationStack { ReadsView(session: session) }
             }
             Tab("You", systemImage: "person.crop.circle", value: MainTab.you) {
                 NavigationStack { YouView(read: session.read) }

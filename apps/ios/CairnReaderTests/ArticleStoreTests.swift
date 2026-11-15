@@ -366,6 +366,16 @@ struct ArticleStoreTests {
         #expect(entries?.map(\.pendingSave) == [false, true, false])
     }
 
+    @Test func observeReadsListsEveryRowAddedSinceADateOrEveryRow() async throws {
+        try await storeFour()
+
+        var since = try store.observeReads(addedSince: Date(timeIntervalSince1970: 100)).makeAsyncIterator()
+        #expect(try await since.next()?.map(\.id) == ["a1", "a2", "a3"])
+
+        var all = try store.observeReads().makeAsyncIterator()
+        #expect(try await all.next()?.map(\.id) == ["a1", "a2", "a3", "a4"])
+    }
+
     @Test func observeReadsEmitsAfterUpsertRemoveAndAnOutboxChange() async throws {
         var reads = try store.observeReads(limit: 10).makeAsyncIterator()
         #expect(try await reads.next() == [])

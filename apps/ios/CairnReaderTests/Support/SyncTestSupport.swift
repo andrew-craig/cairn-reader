@@ -33,12 +33,13 @@ nonisolated struct SyncHarness {
 }
 
 nonisolated enum SyncFixtures {
-    /// A Reads list page of `ids`, newest first, one second apart.
-    static func readsPage(_ ids: [String], hasMore: Bool = false, cursor: String? = nil, isFavorite: Bool = false)
-        -> String
-    {
+    /// A Reads list page of `ids`, newest first, one second apart, starting `skip` seconds below
+    /// the newest time (pass the earlier pages' row count for a later page).
+    static func readsPage(
+        _ ids: [String], hasMore: Bool = false, cursor: String? = nil, isFavorite: Bool = false, skip: Int = 0
+    ) -> String {
         let items = ids.enumerated().map { index, id in
-            userContent(id, addedAt: String(format: "2025-01-15T10:00:%02dZ", 59 - index), isFavorite: isFavorite)
+            userContent(id, addedAt: String(format: "2025-01-15T10:00:%02dZ", 59 - skip - index), isFavorite: isFavorite)
         }
         let cursor = cursor.map { "\"\($0)\"" } ?? "null"
         return """

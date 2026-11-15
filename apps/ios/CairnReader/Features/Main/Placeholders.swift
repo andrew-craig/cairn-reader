@@ -9,11 +9,3 @@ struct FeedPlaceholder: View {
             .navigationDestination(for: Route.self, destination: RouteDestination.init)
     }
 }
-
-struct ReadsPlaceholder: View {
-    var body: some View {
-        ContentUnavailableView("Reads", systemImage: "book")
-            .navigationTitle("Reads")
-            .navigationDestination(for: Route.self, destination: RouteDestination.init)
-    }
-}

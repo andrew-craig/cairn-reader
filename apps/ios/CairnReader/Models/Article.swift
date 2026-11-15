@@ -60,3 +60,14 @@ extension Article {
             scrollPosition: scrollPosition)
     }
 }
+
+extension Article {
+    /// Started but not finished: some scroll progress is saved and the article is not read. The
+    /// rule of `isPartiallyRead` in `@cairn/shared`; a value above 1 is a legacy pixel offset, not
+    /// a fraction, and carries no progress. (The RN app's separate local `scrollFraction` is the
+    /// stored `scrollPosition` here: the reader's saves go through the store.)
+    nonisolated var isPartiallyRead: Bool {
+        guard !isRead, let scrollPosition, scrollPosition <= 1 else { return false }
+        return scrollPosition > 0
+    }
+}
