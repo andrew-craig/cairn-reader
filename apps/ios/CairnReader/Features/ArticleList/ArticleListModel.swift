@@ -126,6 +126,12 @@ final class ArticleListModel {
         isLoading = false
     }
 
+    /// Takes a row out of the list and the results, e.g. after an archive from search results.
+    func remove(_ id: String) {
+        items.removeAll { $0.id == id }
+        results?.removeAll { $0.id == id }
+    }
+
     // MARK: - Private
 
     /// Loads the first page. The cursor is kept until the page lands, so a failed reset leaves

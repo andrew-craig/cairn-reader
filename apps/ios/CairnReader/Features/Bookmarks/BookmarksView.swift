@@ -12,7 +12,7 @@ struct BookmarksView: View {
     var body: some View {
         @Bindable var list = model.list
         ArticleListView(
-            articles: list.articles, isLoadingMore: list.isLoadingMore,
+            articles: list.articles, notice: model.notice, isLoadingMore: list.isLoadingMore,
             onLastRowAppear: { Task { await list.loadMore() } }
         ) { _ in
             EmptyView()

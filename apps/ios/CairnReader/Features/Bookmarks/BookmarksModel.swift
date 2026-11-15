@@ -22,6 +22,12 @@ final class BookmarksModel {
         }
     }
 
+    /// The banner over stored favourites or the last page after a failed refresh.
+    var notice: String? {
+        list.resetFailed && !list.articles.isEmpty && !list.isShowingResults
+            ? "Showing cached data — pull to refresh" : nil
+    }
+
     /// The error state with Retry: a failed refresh with nothing to show.
     var showsError: Bool {
         list.resetFailed && list.articles.isEmpty && !list.isShowingResults

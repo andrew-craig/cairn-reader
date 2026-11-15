@@ -105,7 +105,7 @@ final class FeedModel {
     private func saveCache() {
         guard !list.isShowingResults else { return }
         do {
-            try session.feedCache.save(list.articles)
+            try session.feedCache.save(Array(list.articles.prefix(ArticleListModel.pageSize)))
         } catch {
             logger.error("Caching the Feed failed: \(String(describing: error))")
         }
