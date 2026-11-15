@@ -26,7 +26,7 @@ struct ReadsView: View {
         .searchable(text: $search.query, prompt: "Search your reads")
         .refreshable { await model.refresh() }
         .navigationTitle("Reads")
-        .navigationDestination(for: Route.self, destination: RouteDestination.init)
+        .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
         .task(id: model.window) { await model.observe(model.window) }
         // Not `.task`: leaving the tab mid-sync would cancel the wait and read as a failure.
         .onAppear {

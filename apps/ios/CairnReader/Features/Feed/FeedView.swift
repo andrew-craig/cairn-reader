@@ -26,7 +26,7 @@ struct FeedView: View {
         .searchable(text: $list.query, prompt: "Search your feed")
         .refreshable { await list.refresh() }
         .navigationTitle("Feed")
-        .navigationDestination(for: Route.self, destination: RouteDestination.init)
+        .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
         .task { await model.observeSaved() }
         // Not `.task`: leaving the tab mid-refresh would cancel it and read as a failure.
         .onAppear {
