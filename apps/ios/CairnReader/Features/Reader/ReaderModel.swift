@@ -136,6 +136,8 @@ final class ReaderModel {
                 bodyIsCurrent = true
                 return
             }
+        } catch is CancellationError {
+            return
         } catch {
             logger.error("Reading the stored article failed: \(String(describing: error))")
         }
@@ -146,6 +148,8 @@ final class ReaderModel {
             fetched = (content, detail.contentHash)
             bodyIsCurrent = true
             try await session.articles.saveBody(id: id, body: content)
+        } catch is CancellationError {
+            return
         } catch {
             logger.error("Loading the article body failed: \(String(describing: error))")
         }

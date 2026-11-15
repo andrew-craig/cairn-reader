@@ -55,6 +55,10 @@ struct ArticleWebView: UIViewRepresentable {
         private var restoreFraction = 0.0
         /// The saved position has been restored (or there was none), or the user took over.
         private var hasRestored = true
+        /// The page and its images have loaded (`didFinish`), or the user took over. Until then the
+        /// content may still grow, so no reading is confirmed: a fresh article whose text loads
+        /// before its images must not read as finished on open.
+        private var hasSettled = true
         private var contentSizeObservation: NSKeyValueObservation?
 
         init(_ parent: ArticleWebView) {
@@ -74,6 +78,7 @@ struct ArticleWebView: UIViewRepresentable {
             loadedHTML = html
             restoreFraction = parent.restoreFraction()
             hasRestored = restoreFraction <= 0
+            hasSettled = false
             webView.loadHTMLString(html, baseURL: ReaderResources.baseURL)
         }
 
@@ -106,10 +111,11 @@ struct ArticleWebView: UIViewRepresentable {
         /// Once the user drags, the restore stops: they are never pulled away from where they went.
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
             hasRestored = true
+            hasSettled = true
         }
 
         private func report(_ scrollView: UIScrollView) {
-            let scroll = Self.scroll(of: scrollView, isRestoring: !hasRestored)
+            let scroll = Self.scroll(of: scrollView, isRestoring: !hasRestored || !hasSettled)
             guard scroll.viewport > 0, scroll.contentHeight > 0 else { return }
             parent.onScroll(scroll)
         }
@@ -140,13 +146,13 @@ struct ArticleWebView: UIViewRepresentable {
             return isPage && navigationAction.targetFrame?.isMainFrame == true ? .allow : .cancel
         }
 
-        /// The page and its images have loaded, so the content will not grow further: a saved
-        /// position it still cannot reach (an article shorter than the screen, or one whose content
-        /// changed) ends the restore here, and readings count again, completion included.
+        /// The page and its images have loaded, so the content will not grow further: readings are
+        /// confirmed from here, and a saved position it still cannot reach (an article shorter than
+        /// the screen, or one whose content changed) ends the restore, completion included.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            guard !hasRestored else { return }
-            contentSizeChanged()
+            if !hasRestored { contentSizeChanged() }
             hasRestored = true
+            hasSettled = true
             report(webView.scrollView)
         }
 
