@@ -226,6 +226,22 @@ struct ReadsModelTests {
         await eventually { harness.requests.contains("PATCH a1") }
     }
 
+    @Test func archivingASearchResultTakesItOutOfTheResults() async throws {
+        try await harness.session.articles.upsertMany([storedArticle("a1"), storedArticle("a2")])
+        server.results.withLock { $0 = SyncFixtures.readsPage(["a1", "a2"]) }
+        let following = follow(model)
+        defer { following.cancel() }
+
+        model.search.query = "term"
+        await eventually { model.search.isShowingResults && ids(model) == ["a1", "a2"] }
+
+        let first = try #require(model.articles.first)
+        await model.archive(first)
+
+        #expect(ids(model) == ["a2"])
+        await eventually { harness.requests.contains("PATCH a1") }
+    }
+
     @Test func searchResultsReplaceTheStoredRowsWhileAQueryIsHeld() async throws {
         try await harness.session.articles.upsertMany([storedArticle("a1")])
         server.results.withLock { $0 = SyncFixtures.readsPage(["s1"]) }
