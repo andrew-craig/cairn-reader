@@ -347,7 +347,8 @@ struct ReaderModelTests {
     @Test func scrollSavesAreThrottledWithATrailingSave() async throws {
         server.online.withLock { $0 = false }
         try await store(article())
-        let model = makeModel(article(), saveInterval: .milliseconds(300))
+        // Long enough that the check below runs inside the window even on a loaded CI runner.
+        let model = makeModel(article(), saveInterval: .seconds(2))
 
         model.scrolled(scroll(100))
         await eventually { (try? outbox()["scroll_position"]) == #"{"scroll_position":0.1}"# }
