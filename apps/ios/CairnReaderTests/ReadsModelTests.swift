@@ -235,7 +235,7 @@ struct ReadsModelTests {
 
         model.search.query = "term"
         await eventually { ids(model) == ["s1"] }
-        let search = try #require(server.requests.last?.url?.query())
+        let search = try #require(harness.server.requests.last?.url?.query())
         #expect(search.contains("list=reads"))
 
         model.search.query = ""
