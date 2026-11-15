@@ -65,6 +65,7 @@ final class ReaderModel {
     @ObservationIgnored private var loadGeneration = 0
     @ObservationIgnored private var lastSave: ContinuousClock.Instant?
     @ObservationIgnored private var trailingSave: Task<Void, Never>?
+    @ObservationIgnored private var leadingSave: Task<Void, Never>?
     @ObservationIgnored private let session: UserSession
     @ObservationIgnored private let saveInterval: Duration
     @ObservationIgnored private let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "reader")
@@ -186,6 +187,9 @@ final class ReaderModel {
     /// from here; nothing if it was never scrolled, so the pre-restore offset is never saved.
     /// (Every save is skipped when the fraction is the one last saved.)
     func leave() async {
+        // A leading save still queued would land after this one with an older reading.
+        leadingSave?.cancel()
+        leadingSave = nil
         trailingSave?.cancel()
         trailingSave = nil
         guard hasScrolled, !isFinished else { return }
@@ -257,7 +261,10 @@ final class ReaderModel {
         // The leading save writes the reading that triggered it; later readings in the window
         // are the trailing save's.
         let fraction = restoreFraction
-        Task { await saveScrollPosition(fraction) }
+        leadingSave = Task { [weak self] in
+            guard !Task.isCancelled, let self else { return }
+            await saveScrollPosition(fraction)
+        }
     }
 
     private func saveScrollPosition(_ fraction: Double) async {
