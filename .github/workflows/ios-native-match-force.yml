@@ -1,0 +1,39 @@
+name: iOS Native Regenerate Profiles
+
+# Temporary: regenerates the match App Store profile once so it includes the App Group
+# (task_4713). Triggered by pushing a tag `ios-match-force-*`; delete this workflow afterwards.
+
+on:
+  push:
+    tags:
+      - 'ios-match-force-*'
+
+jobs:
+  match:
+    name: match appstore --force
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: apps/ios
+
+      - name: Regenerate profiles
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          FASTLANE_APPLE_ID: ${{ secrets.FASTLANE_APPLE_ID }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: bundle exec fastlane certificates force:true
