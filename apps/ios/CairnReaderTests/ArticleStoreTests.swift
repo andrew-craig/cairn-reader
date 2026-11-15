@@ -88,14 +88,14 @@ struct ArticleStoreTests {
 
     @Test func roundTripsASavedBodyThroughGetById() async throws {
         try await store.upsertMany([makeArticle("a1")])
-        try await store.saveBody(id: "a1", body: "<p>Hello</p>")
+        try await store.saveBody(id: "a1", body: "<p>Hello</p>", contentHash: nil)
 
         #expect(try await store.getById("a1")?.content == "<p>Hello</p>")
     }
 
     @Test func preservesAnExistingBodyWhenALaterListSyncHasNoContent() async throws {
         try await store.upsertMany([makeArticle("a1")])
-        try await store.saveBody(id: "a1", body: "<p>Hello</p>")
+        try await store.saveBody(id: "a1", body: "<p>Hello</p>", contentHash: nil)
 
         // A list-page refresh never carries the body.
         try await store.upsertMany([makeArticle("a1", title: "Refreshed")])
@@ -109,7 +109,7 @@ struct ArticleStoreTests {
 
     @Test func keepsTheBodyWhenARefreshedRowCarriesTheSameContentHash() async throws {
         try await store.upsertMany([makeArticle("a1", contentHash: "h1")])
-        try await store.saveBody(id: "a1", body: "<p>Hello</p>")
+        try await store.saveBody(id: "a1", body: "<p>Hello</p>", contentHash: "h1")
 
         try await store.upsertMany([makeArticle("a1", title: "Refreshed", contentHash: "h1")])
 
@@ -121,7 +121,7 @@ struct ArticleStoreTests {
 
     @Test func clearsTheBodyWhenARefreshedRowCarriesADifferentContentHash() async throws {
         try await store.upsertMany([makeArticle("a1", contentHash: "h1")])
-        try await store.saveBody(id: "a1", body: "<p>Hello</p>")
+        try await store.saveBody(id: "a1", body: "<p>Hello</p>", contentHash: "h1")
 
         try await store.upsertMany([makeArticle("a1", contentHash: "h2")])
 
@@ -132,13 +132,25 @@ struct ArticleStoreTests {
 
     @Test func keepsTheBodyWhenARefreshedRowCarriesNoContentHash() async throws {
         try await store.upsertMany([makeArticle("a1", contentHash: "h1")])
-        try await store.saveBody(id: "a1", body: "<p>Hello</p>")
+        try await store.saveBody(id: "a1", body: "<p>Hello</p>", contentHash: "h1")
 
         try await store.upsertMany([makeArticle("a1", contentHash: nil)])
 
         let stored = try await store.getById("a1")
         #expect(stored?.content == "<p>Hello</p>")
         #expect(stored?.contentHash == "h1")
+    }
+
+    @Test func aBodySavedWithANewContentHashSurvivesAPageSyncCarryingThatHash() async throws {
+        try await store.upsertMany([makeArticle("a1", contentHash: "h1")])
+        // The server's content changed since the row was stored; the body fetched is for h2.
+        try await store.saveBody(id: "a1", body: "<p>Current</p>", contentHash: "h2")
+
+        try await store.syncPage([makeArticle("a1", contentHash: "h2")], olderThan: nil, hasMore: false)
+
+        let stored = try await store.getById("a1")
+        #expect(stored?.content == "<p>Current</p>")
+        #expect(stored?.contentHash == "h2")
     }
 
     // MARK: listPrefetchCandidates
@@ -150,7 +162,7 @@ struct ArticleStoreTests {
             makeArticle("has-body", addedAt: 200),
             makeArticle("read", isRead: true, addedAt: 400),
         ])
-        try await store.saveBody(id: "has-body", body: "<p>already cached</p>")
+        try await store.saveBody(id: "has-body", body: "<p>already cached</p>", contentHash: nil)
 
         #expect(try await store.listPrefetchCandidates(limit: 10).map(\.id) == ["newer-no-body", "no-body"])
     }
@@ -167,8 +179,8 @@ struct ArticleStoreTests {
 
     @Test func evictionClearsBodiesOutsideTheCapKeepingTheMostRecent() async throws {
         try await store.upsertMany([makeArticle("old", addedAt: 100), makeArticle("newer", addedAt: 200)])
-        try await store.saveBody(id: "old", body: "<p>old</p>")
-        try await store.saveBody(id: "newer", body: "<p>newer</p>")
+        try await store.saveBody(id: "old", body: "<p>old</p>", contentHash: nil)
+        try await store.saveBody(id: "newer", body: "<p>newer</p>", contentHash: nil)
 
         try await store.evictBodiesOutsideCap(1)
 
@@ -178,7 +190,7 @@ struct ArticleStoreTests {
 
     @Test func evictionTouchesOnlyTheBody() async throws {
         try await store.upsertMany([makeArticle("old", title: "Old", addedAt: 100)])
-        try await store.saveBody(id: "old", body: "<p>old</p>")
+        try await store.saveBody(id: "old", body: "<p>old</p>", contentHash: nil)
 
         try await store.evictBodiesOutsideCap(0)
 

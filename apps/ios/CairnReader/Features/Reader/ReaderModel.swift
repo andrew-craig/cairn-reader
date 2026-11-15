@@ -148,7 +148,7 @@ final class ReaderModel {
             guard let content = detail.content else { return }
             fetched = (content, detail.contentHash)
             bodyIsCurrent = true
-            try await session.articles.saveBody(id: id, body: content)
+            try await session.articles.saveBody(id: id, body: content, contentHash: detail.contentHash)
         } catch is CancellationError {
             return
         } catch {

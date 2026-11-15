@@ -65,10 +65,13 @@ nonisolated final class ArticleStore: Sendable {
         }
     }
 
-    /// Caches a freshly fetched body (cleaned HTML).
-    func saveBody(id: String, body: String) async throws {
+    /// Caches a freshly fetched body (cleaned HTML) with the `content_hash` it was fetched at, so a
+    /// later page sync carrying that hash keeps it.
+    func saveBody(id: String, body: String, contentHash: String?) async throws {
         try await database.writer().write { db in
-            try db.execute(sql: "UPDATE articles SET body = :body WHERE id = :id", arguments: ["id": id, "body": body])
+            try db.execute(
+                sql: "UPDATE articles SET body = :body, content_hash = :content_hash WHERE id = :id",
+                arguments: ["id": id, "body": body, "content_hash": contentHash])
         }
     }
 

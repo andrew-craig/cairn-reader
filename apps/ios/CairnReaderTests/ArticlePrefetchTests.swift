@@ -25,7 +25,7 @@ private func prefetch(
 ) -> ArticlePrefetch {
     ArticlePrefetch(articles: store, isOnline: { online }) { id in
         attempts.record(id)
-        return try await fetch(id)
+        return try await fetch(id).map { ($0, nil) }
     }
 }
 
