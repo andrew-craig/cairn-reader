@@ -13,18 +13,32 @@ enum Route: Hashable {
 
 /// The screen for each route, shared by every tab's stack. Routes whose screen has not landed yet
 /// show a stand-in; each is replaced by its own feature task.
+///
+/// A screen whose rows the reader can step through (Next article) declares the stack's
+/// destinations with `nextArticle`, its model's `article(after:)`. Only the destinations declared
+/// closest to the stack's root are used, so this works for a tab's root screen.
 struct RouteDestination: View {
     @Environment(SessionModel.self) private var sessionModel
+    @Environment(\.userSession) private var session
     let route: Route
+    let nextArticle: (@MainActor (String) -> Article?)?
 
     init(_ route: Route) {
         self.route = route
+        nextArticle = nil
+    }
+
+    init(_ route: Route, nextArticle: @escaping @MainActor (String) -> Article?) {
+        self.route = route
+        self.nextArticle = nextArticle
     }
 
     var body: some View {
         switch route {
         case let .article(article):
-            ContentUnavailableView(article.title, systemImage: "doc.text")
+            if let session {
+                ReaderView(article: article, session: session, nextArticle: nextArticle)
+            }
         case .bookmarks:
             ContentUnavailableView("Bookmarks", systemImage: "bookmark")
         case .account:
