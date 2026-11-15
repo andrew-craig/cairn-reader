@@ -109,7 +109,7 @@ nonisolated final class Outbox: Sendable {
             return state.running
         }
         task?.cancel()
-        await task?.value
+        _ = await task?.value
         continuation.finish()
     }
 

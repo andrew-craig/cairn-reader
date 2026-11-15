@@ -69,8 +69,10 @@ nonisolated final class UserSession: Sendable {
             return Array(work.tasks.values)
         }
         for task in tasks { task.cancel() }
-        for task in tasks { await task.value }
+        // Stop `Sync` first: session work awaiting a queued operation cannot be cancelled
+        // through its own task, only by cancelling the operation.
         await sync.stop()
+        for task in tasks { await task.value }
         feedCache.clear()
         do {
             try database.erase()
