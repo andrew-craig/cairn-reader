@@ -2,14 +2,14 @@
 id: feature_75bc
 title: [iOS native 11] Feed tab and Bookmarks
 type: feature
-status: open
+status: in_progress
 priority: 2
 labels: [ios,ui]
 blocked_by: [feature_33bc]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-15T08:17:38Z
 ---
 ## Goal
 The online-only skim list and the favourites list, both on `ArticleListView` and `ArticleListModel`.

@@ -2,14 +2,14 @@
 id: feature_4e37
 title: [iOS native 12] Reader: web-view article, progress tracking, toolbar actions
 type: feature
-status: open
+status: in_progress
 priority: 1
 labels: [ios,ui]
 blocked_by: [feature_33bc]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-15T08:17:38Z
 ---
 ## Goal
 The reading screen. The highest-risk UI task: scroll restore and completion tracking must behave as they do today.
