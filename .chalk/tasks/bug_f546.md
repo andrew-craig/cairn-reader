@@ -14,7 +14,7 @@ updated_at: 2026-11-15T22:06:46Z
 ## Feedback (owner, TestFlight testing of task 12)
 Scroll position persistence doesn't seem to work. Opening an article and scrolling part way leaves the list row styled as fully read.
 ## What "fully read" means in code
-`ArticleRow`: regular weight + `textSecondary` only when `isRead` (`status == .completed`). A partly read article is bold + `textSecondary`. So the reader most likely queued `markCompleted` (`ReaderModel.scrolled`, `completedThreshold` 0.95). Once an article is completed, the restore is pointless, so both symptoms may share one cause. Confirm with the owner that the row was in Reads: Feed items don't track progress (`tracksProgress`).
+`ArticleRow`: regular weight + `textSecondary` only when `isRead` (`status == .completed`). A partly read article is bold + `textSecondary`. So the reader most likely queued `markCompleted` (`ReaderModel.scrolled`, `completedThreshold` 0.95). Once an article is completed, the restore is pointless, so both symptoms may share one cause. The owner confirmed (2026-11-15) the article was in Reads, so progress tracking was on.
 ## Leading hypothesis (not reproduced; needs a device or simulator)
 `ArticleWebView` reports scroll readings before the HTML has laid out. At that point `scrollView.contentSize.height` is about the frame height, so `(offset + viewport) / contentHeight` is about 1. For an article with no saved position (`restoreFraction == 0`), the restore counts as done at once, so `isRestoring` is false and the first `scrollViewDidScroll` (inset adjustment at load) marks the article completed and saves fraction 0. Check also:
 - `adjustedContentInset` under the iOS 26 bars versus the offset/viewport sums (`ArticleWebView.swift` ~L125).
