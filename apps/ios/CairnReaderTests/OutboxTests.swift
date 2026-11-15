@@ -120,6 +120,15 @@ struct OutboxDrainOutcomeTests {
         #expect(try harness.rows().count == 1)
     }
 
+    @Test func drainReportsADroppedRow() async throws {
+        let harness = OutboxHarness(StubServer(replies: [OutboxHarness.ok, .json(422, AuthFixtures.errorBody("nope"))]))
+        try harness.seed("a1", "is_favorite", #"{"is_favorite":true}"#, createdAt: 1)
+        #expect(await harness.outbox.drain() == false)
+
+        try harness.seed("a2", "is_favorite", #"{"is_favorite":true}"#, createdAt: 2)
+        #expect(await harness.outbox.drain() == true)
+    }
+
     @Test func aSecondDrainRetriesAHaltedRow() async throws {
         let harness = OutboxHarness(StubServer(replies: [.failure(.notConnectedToInternet), OutboxHarness.ok]))
         try harness.enqueue("a1", .isFavorite, favoriteTrue)
@@ -215,23 +224,24 @@ struct OutboxWritePathTests {
         #expect(try await harness.store.getById("a1")?.isFavorite == false)
     }
 
-    /// An edit coalesced into a row while its old payload is in flight is sent by the next pass.
+    /// An edit coalesced into a row while its old payload is in flight stays queued and is sent
+    /// by the next drain.
     @Test func aPayloadReplacedMidRequestIsNotLost() async throws {
         let first = Mutex(true)
         let harnessBox = Mutex<OutboxHarness?>(nil)
         let harness = OutboxHarness(
             StubServer { _ in
                 if first.withLock({ let was = $0; $0 = false; return was }) {
-                    // What a mutation does: queue the edit, then ask for a drain.
                     let harness = harnessBox.withLock { $0 }!
                     try! harness.enqueue("a1", .isFavorite, UpdateUserContentRequest(isFavorite: false))
-                    harness.outbox.requestDrain()
                 }
                 return OutboxHarness.ok
             })
         harnessBox.withLock { $0 = harness }
         try harness.enqueue("a1", .isFavorite, favoriteTrue)
 
+        await harness.outbox.drain()
+        #expect(try harness.rows().map(\.payload) == [#"{"is_favorite":false}"#])
         await harness.outbox.drain()
 
         #expect(harness.patches.map { $0.body as? [String: Bool] } == [["is_favorite": true], ["is_favorite": false]])
@@ -243,7 +253,6 @@ struct OutboxWritePathTests {
         try harness.enqueue("a1", .isFavorite, favoriteTrue)
         await harness.outbox.stop()
 
-        harness.outbox.requestDrain()
         await harness.outbox.drain()
 
         #expect(harness.server.requests.isEmpty)

@@ -3,8 +3,8 @@ import OSLog
 import Synchronization
 
 /// Everything that belongs to one signed-in user (decision 10): the database, the article store,
-/// the outbox and mutations on them, a `ReadService` bound to the user, and the work started on
-/// them. `SessionModel` creates one at sign-in and closes it at
+/// the outbox and mutations on them, a `ReadService` bound to the user, `Sync`, the Feed cache,
+/// and the work started on them. `SessionModel` creates one at sign-in and closes it at
 /// sign-out, which erases the user's on-device data.
 nonisolated final class UserSession: Sendable {
     let user: User
@@ -13,6 +13,8 @@ nonisolated final class UserSession: Sendable {
     let read: ReadService
     let outbox: Outbox
     let mutations: ArticleMutations
+    let sync: Sync
+    let feedCache: FeedCache
 
     private struct Work {
         var closed = false
@@ -23,14 +25,25 @@ nonisolated final class UserSession: Sendable {
     private let work = Mutex(Work())
     private let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "session")
 
-    init(user: User, auth: AuthService, database: AppDatabase? = nil) {
+    /// `isOnline` is the app's `Connectivity`; prefetch skips its run offline.
+    init(
+        user: User, auth: AuthService, isOnline: @escaping @Sendable () async -> Bool, database: AppDatabase? = nil
+    ) {
         self.user = user
         let database = database ?? AppDatabase(url: AppDatabase.url(forUser: user.id))
         self.database = database
-        articles = ArticleStore(database: database)
-        read = ReadService(auth: auth, userID: user.id)
-        outbox = Outbox(database: database, read: read)
-        mutations = ArticleMutations(database: database, outbox: outbox)
+        let articles = ArticleStore(database: database)
+        self.articles = articles
+        let read = ReadService(auth: auth, userID: user.id)
+        self.read = read
+        let outbox = Outbox(database: database, read: read)
+        self.outbox = outbox
+        let sync = Sync(
+            outbox: outbox, articles: articles, read: read,
+            prefetch: ArticlePrefetch(articles: articles, read: read, isOnline: isOnline))
+        self.sync = sync
+        mutations = ArticleMutations(database: database) { sync.requestDrain() }
+        feedCache = FeedCache(url: FeedCache.url(forUser: user.id))
     }
 
     /// Runs `operation` as work of this session, cancelled and awaited by `close()`. Does nothing
@@ -47,7 +60,8 @@ nonisolated final class UserSession: Sendable {
         }
     }
 
-    /// Cancels the session's work and the outbox drain, waits for them, then erases the database.
+    /// Cancels the session's work and `Sync` (with the outbox drain), waits for them, then erases
+    /// the Feed cache and the database.
     func close() async {
         let tasks = work.withLock { work in
             work.closed = true
@@ -56,7 +70,8 @@ nonisolated final class UserSession: Sendable {
         }
         for task in tasks { task.cancel() }
         for task in tasks { await task.value }
-        await outbox.stop()
+        await sync.stop()
+        feedCache.clear()
         do {
             try database.erase()
         } catch {

@@ -6,7 +6,7 @@ import SwiftUI
 struct CairnReaderApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var sessionModel: SessionModel
-    @State private var connectivity = Connectivity()
+    @State private var connectivity: Connectivity
     @State private var loginModel: LoginModel
     private let systemService: SystemService
 
@@ -16,7 +16,11 @@ struct CairnReaderApp: App {
         let client = HTTPClient(server: server)
         let auth = AuthService(client: client)
         systemService = SystemService(client: client)
-        let sessionModel = SessionModel(auth: auth)
+        let connectivity = Connectivity()
+        _connectivity = State(initialValue: connectivity)
+        let sessionModel = SessionModel(auth: auth) { user, auth in
+            UserSession(user: user, auth: auth, isOnline: { @MainActor in connectivity.isOnline })
+        }
         _sessionModel = State(initialValue: sessionModel)
         _loginModel = State(
             initialValue: LoginModel(auth: auth, server: server) { await sessionModel.login() })
@@ -38,7 +42,8 @@ struct CairnReaderApp: App {
 }
 
 /// Progress while the saved session is checked, Login when signed out, the tabs when signed in.
-/// The offline banner sits above all three.
+/// The offline banner sits above all three. Runs the signed-in user's `Sync` when the device
+/// comes back online and when the app comes back to the foreground.
 struct RootView: View {
     /// What the root shows for the session's state.
     enum Screen {
@@ -59,7 +64,19 @@ struct RootView: View {
 
     @Environment(SessionModel.self) private var sessionModel
     @Environment(Connectivity.self) private var connectivity
+    @Environment(\.scenePhase) private var scenePhase
     let loginModel: LoginModel
+
+    /// Sync runs on a transition to online, never because the device merely is online.
+    static func runsSync(wasOnline: Bool, isOnline: Bool) -> Bool {
+        !wasOnline && isOnline
+    }
+
+    /// Sync runs on a transition to active (from inactive or background, as the React Native
+    /// app's AppState trigger), never because the app merely is active.
+    static func runsSync(from old: ScenePhase, to new: ScenePhase) -> Bool {
+        new == .active && old != .active
+    }
 
     var body: some View {
         Group {
@@ -82,5 +99,16 @@ struct RootView: View {
             }
         }
         .animation(.default, value: connectivity.isOnline)
+        .onChange(of: connectivity.isOnline) { wasOnline, isOnline in
+            if Self.runsSync(wasOnline: wasOnline, isOnline: isOnline) { runSync() }
+        }
+        .onChange(of: scenePhase) { old, new in
+            if Self.runsSync(from: old, to: new) { runSync() }
+        }
+    }
+
+    private func runSync() {
+        guard let session = sessionModel.session else { return }
+        session.start { await session.sync.run() }
     }
 }

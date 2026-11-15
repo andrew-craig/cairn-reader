@@ -155,8 +155,7 @@ struct ArticleMutationsAtomicityTests {
 
 struct ArticleMutationsSendingTests {
     @Test func aMutationSendsNothingItself() async throws {
-        let harness = OutboxHarness(always: OutboxHarness.ok)
-        await harness.outbox.stop()  // no drain can run, so any request would come from the mutation
+        let harness = OutboxHarness(always: OutboxHarness.ok)  // its mutations never start a drain
         try await stored(harness)
 
         try await harness.mutations.setFavorite("a1", isFavorite: true)
@@ -171,6 +170,7 @@ struct ArticleMutationsSendingTests {
         try await stored(harness)
 
         try await harness.mutations.setFavorite("a1", isFavorite: true)
+        #expect(harness.drainRequests.count == 1)
         await harness.outbox.drain()
 
         #expect(harness.patches.map(\.id) == ["a1"])

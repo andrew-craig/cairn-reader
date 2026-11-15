@@ -34,7 +34,7 @@ nonisolated final class Outbox: Sendable {
     }
 
     private struct State {
-        var running: Task<Void, Never>?
+        var running: Task<Bool, Never>?
         var rerun = false
         var stopped = false
     }
@@ -92,15 +92,14 @@ nonisolated final class Outbox: Sendable {
 
     // MARK: - Draining
 
-    /// Asks for a drain and returns at once. Does nothing once stopped.
-    func requestDrain() {
-        _ = start()
-    }
-
-    /// Drains and returns when the queue is empty or a row cannot be sent. Joins a drain already
-    /// running, which then runs again so edits made before this call are included.
-    func drain() async {
-        await start()?.value
+    /// Drains and returns when the queue is empty or a row cannot be sent; true when a row was
+    /// dropped, so the store may hold an edit the server refused. Joins a drain already running,
+    /// which then runs again so edits made before this call are included. Does nothing once
+    /// stopped. Drains are requested through `Sync`.
+    @discardableResult
+    func drain() async -> Bool {
+        guard let task = start() else { return false }
+        return await task.value
     }
 
     /// Cancels the drain, waits for it, and ends `rejections`.
@@ -115,7 +114,7 @@ nonisolated final class Outbox: Sendable {
     }
 
     /// One drain at a time: a request made while one runs sets `rerun`.
-    private func start() -> Task<Void, Never>? {
+    private func start() -> Task<Bool, Never>? {
         state.withLock { state in
             guard !state.stopped else { return nil }
             if let running = state.running {
@@ -128,9 +127,10 @@ nonisolated final class Outbox: Sendable {
         }
     }
 
-    private func run() async {
+    private func run() async -> Bool {
+        var dropped = false
         repeat {
-            await pass()
+            if await pass() { dropped = true }
         } while state.withLock { state in
             if state.rerun && !state.stopped {
                 state.rerun = false
@@ -139,12 +139,14 @@ nonisolated final class Outbox: Sendable {
             state.running = nil
             return false
         }
+        return dropped
     }
 
     /// Replays the rows in `created_at` order (rowid breaks ties), stopping at the first that
     /// cannot succeed so a later row never reaches the server ahead of an earlier one. No backoff
-    /// and no drop-after-N: the next request tries again.
-    private func pass() async {
+    /// and no drop-after-N: the next request tries again. True when a row was dropped.
+    private func pass() async -> Bool {
+        var dropped = false
         do {
             let rows = try await database.writer().read { db in
                 try GRDB.Row.fetchAll(
@@ -152,18 +154,31 @@ nonisolated final class Outbox: Sendable {
                 ).map { Row(articleID: $0["article_id"], field: $0["field"], payload: $0["payload"]) }
             }
             for row in rows {
-                if Task.isCancelled { return }
-                guard try await send(row) else { return }
+                if Task.isCancelled { break }
+                switch try await send(row) {
+                case .sent: break
+                case .dropped: dropped = true
+                case .halted: return dropped
+                }
             }
         } catch {
             Self.logger.error("Draining the outbox failed: \(String(describing: error))")
         }
+        return dropped
     }
 
-    /// Sends one row. True when the drain may continue: the row was sent, or dropped because the
-    /// server definitively refused it. A refused `list` row also deletes the article, undoing the
-    /// optimistic Save to Reads.
-    private func send(_ row: Row) async throws -> Bool {
+    private enum Outcome {
+        /// Sent; the drain continues.
+        case sent
+        /// The server definitively refused it; the drain continues.
+        case dropped
+        /// It cannot succeed now; the drain stops.
+        case halted
+    }
+
+    /// Sends one row. A refused `list` row also deletes the article, undoing the optimistic Save
+    /// to Reads.
+    private func send(_ row: Row) async throws -> Outcome {
         let request = try Self.request(from: row.payload)
         do {
             _ = try await read.updateUserContent(row.articleID, request)
@@ -173,13 +188,13 @@ nonisolated final class Outbox: Sendable {
             if row.field == .list || request.status == .archived {
                 continuation.yield(Rejection(articleID: row.articleID, field: row.field))
             }
-            return true
+            return .dropped
         } catch {
             Self.logger.info("Outbox halted at \(row.field.rawValue) edit of \(row.articleID): \(String(describing: error))")
-            return false
+            return .halted
         }
         try await remove(row, deletingArticle: false)
-        return true
+        return .sent
     }
 
     /// Deletes the row only if it still holds the payload that was sent: an edit made during the

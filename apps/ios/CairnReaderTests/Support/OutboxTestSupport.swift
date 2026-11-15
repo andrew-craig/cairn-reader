@@ -1,8 +1,17 @@
 import Foundation
 import GRDB
+import Synchronization
 @testable import CairnReader
 
-/// A user's database, outbox and mutations against a fake server.
+/// Counts calls, e.g. the drain requests a mutation makes.
+nonisolated final class CallCounter: Sendable {
+    private let calls = Mutex(0)
+    var count: Int { calls.withLock { $0 } }
+    func record() { calls.withLock { $0 += 1 } }
+}
+
+/// A user's database, outbox and mutations against a fake server. Mutations only count their
+/// drain requests (`Sync` is not here), so a test drains when it chooses.
 nonisolated struct OutboxHarness {
     struct StoredRow: Equatable {
         let articleID: String
@@ -16,6 +25,7 @@ nonisolated struct OutboxHarness {
     let store: ArticleStore
     let outbox: Outbox
     let mutations: ArticleMutations
+    let drainRequests: CallCounter
 
     init(session: StoredSession? = AuthFixtures.valid, _ server: StubServer) {
         self.server = server
@@ -25,7 +35,9 @@ nonisolated struct OutboxHarness {
             storage: InMemorySessionStorage(session), deviceID: { "device-1" }, sleep: { _ in })
         store = ArticleStore(database: database)
         outbox = Outbox(database: database, read: ReadService(auth: auth, userID: AuthFixtures.user.id))
-        mutations = ArticleMutations(database: database, outbox: outbox)
+        let drainRequests = CallCounter()
+        self.drainRequests = drainRequests
+        mutations = ArticleMutations(database: database) { drainRequests.record() }
     }
 
     /// A server that answers every request with `reply`.
