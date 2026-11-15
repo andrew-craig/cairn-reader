@@ -68,3 +68,5 @@ Risks and follow-ups:
 - `Outbox`'s own one-drain-at-a-time/rerun guard is now redundant with `Sync`'s queue (only tests call `drain` concurrently); left as is.
 - Timing-based tests: `aRunRequestedDuringARunJoinsIt` (100 ms for the second run to join), `neverStartsACandidateBeyondTheFirstWaveOnceAborted` (100 ms delay of a2/a3), and the close tests (blocking/sleeping stub handlers).
 
+
+- CI: iOS App Checks green on PR #467 (85c43fb). Close after merge and on-device check.

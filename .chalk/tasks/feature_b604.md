@@ -41,3 +41,5 @@ The profile hub and its two settings screens as standard grouped lists and forms
 - Tests: `YouModelTests` (all counts, each partial failure, both failing, TTL, partial failure not starting the clock), `AccountModelTests` (save and change-password validation tables, success, server message, offline message), `AboutViewTests`, and a `SessionModelTests` case for the upgraded user keeping its session.
 - Known, not changed (task 04 territory, same as RN): a wrong current password gets a 401 from `PUT /user/{id}/password`, which `AuthService.authorizedRequest` treats as an expired token (refresh, retry, then sign out on the second 401).
 - **CI verification pending**: written on Linux; not yet built or tested on the iOS App Checks workflow.
+
+- CI: iOS App Checks green on PR #467 (85c43fb). Close after merge and on-device check.
