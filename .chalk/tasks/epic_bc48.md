@@ -80,7 +80,8 @@ Foundation
 Services (ported with their tests)
 - task_5092: 04 AuthService (Keychain, refresh, device and email login)
 - task_ec50: 05 ReadService and SystemService
-- task_c194: 06 Local database, ArticleStore as source of truth for Reads, UserSession
+- task_c194: 06 Local database and ArticleStore (merged against the earlier plan)
+- task_288e: 06b Rework the store for decisions 8, 10 and 11: App Group database, observations, page sync, UserSession
 - task_387d: 07 Outbox as the only write path, ArticleMutations
 - task_4e17: 08 Connectivity, Sync (drain, Reads page sync, prefetch), FeedCache
 
@@ -99,7 +100,7 @@ Ship
 - task_fe45: 18 Parity and platform QA pass
 - chore_c364: 19 Cutover: retire the iOS side of `apps/mobile`, switch release, update docs
 
-Parallel tracks after 03: {04, 05} and {06} can proceed side by side and meet at 07; 06 now also waits for 05a. After 10: 11, 12 and 14 are independent. 15 needs only 09 and 05.
+Parallel tracks after 03: {04, 05} and {06} can proceed side by side and meet at 07; 06b waits for 05a and blocks 07. After 10: 11, 12 and 14 are independent. 15 needs only 09 and 05.
 
 ## Done when
 - iOS is released only from `apps/ios` through TestFlight with every item in task 18's checklist passing, and `apps/mobile` is an Android-only Expo app that still passes its checks.

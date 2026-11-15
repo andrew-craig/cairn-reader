@@ -33,6 +33,9 @@ jobs:
           fi
           echo "SIM_UDID=$udid" >> "$GITHUB_ENV"
 
+      # Warnings are errors through the project's own build settings, not command-line overrides:
+      # an override also reaches package targets (GRDB), which build with -suppress-warnings, and
+      # the two flags conflict.
       # Simulator builds use the project's default "Sign to Run Locally" (ad hoc, no certificate).
       # Do not pass CODE_SIGNING_ALLOWED=NO: an unsigned test host has no entitlements, and the
       # Keychain (AuthService's session storage) refuses it.
@@ -42,9 +45,7 @@ jobs:
             -project CairnReader.xcodeproj \
             -scheme CairnReader \
             -destination "id=$SIM_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-            GCC_TREAT_WARNINGS_AS_ERRORS=YES
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
 
       - name: Test
         run: |
@@ -52,6 +53,4 @@ jobs:
             -project CairnReader.xcodeproj \
             -scheme CairnReader \
             -destination "id=$SIM_UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-            GCC_TREAT_WARNINGS_AS_ERRORS=YES
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
