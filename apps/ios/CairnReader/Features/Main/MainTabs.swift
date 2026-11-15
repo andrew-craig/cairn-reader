@@ -25,7 +25,7 @@ struct MainTabs: View {
                 NavigationStack { ReadsPlaceholder() }
             }
             Tab("You", systemImage: "person.crop.circle", value: MainTab.you) {
-                NavigationStack { YouPlaceholder() }
+                NavigationStack { YouView(read: session.read) }
             }
         }
         .environment(\.userSession, session)

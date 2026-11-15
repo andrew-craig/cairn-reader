@@ -11,10 +11,12 @@ final class SessionModel {
     private(set) var isLoading = true
     /// The signed-in user's session; nil when signed out.
     private(set) var session: UserSession?
-    var user: User? { session?.user }
+    /// The signed-in user as last read from `AuthService`; can be newer than `session.user` (an
+    /// upgraded device account has an email).
+    private(set) var user: User?
     var isAuthenticated: Bool { session != nil }
 
-    @ObservationIgnored private let auth: AuthService
+    @ObservationIgnored let auth: AuthService
     @ObservationIgnored private let makeSession: (User, AuthService) -> UserSession
     @ObservationIgnored private let logger = Logger(subsystem: "com.cairnapp.cairnreader", category: "auth")
 
@@ -49,7 +51,8 @@ final class SessionModel {
         isLoading = false
     }
 
-    /// Picks up the session after signing in through `AuthService`.
+    /// Picks up the session after signing in through `AuthService`, or the user's new details
+    /// after an account change (upgrading a device account).
     func login() async {
         await setUser(await auth.user)
     }
@@ -60,9 +63,10 @@ final class SessionModel {
         await setUser(nil)
     }
 
-    /// Replaces the session when the signed-in user changed, closing the old one (which erases
-    /// its data) after the UI has stopped showing it.
+    /// Records the user, and replaces the session when the signed-in user changed, closing the
+    /// old one (which erases its data) after the UI has stopped showing it.
     private func setUser(_ user: User?) async {
+        self.user = user
         guard user?.id != session?.user.id else { return }
         let old = session
         session = user.map { makeSession($0, auth) }

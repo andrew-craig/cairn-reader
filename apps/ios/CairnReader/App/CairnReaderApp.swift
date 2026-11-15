@@ -8,11 +8,14 @@ struct CairnReaderApp: App {
     @State private var sessionModel: SessionModel
     @State private var connectivity = Connectivity()
     @State private var loginModel: LoginModel
+    private let systemService: SystemService
 
     init() {
         Typography.applyBarAppearance()
         let server = ServerConfig()
-        let auth = AuthService(client: HTTPClient(server: server))
+        let client = HTTPClient(server: server)
+        let auth = AuthService(client: client)
+        systemService = SystemService(client: client)
         let sessionModel = SessionModel(auth: auth)
         _sessionModel = State(initialValue: sessionModel)
         _loginModel = State(
@@ -24,6 +27,7 @@ struct CairnReaderApp: App {
             RootView(loginModel: loginModel)
                 .environment(sessionModel)
                 .environment(connectivity)
+                .environment(\.systemService, systemService)
                 .font(Typography.body)
                 .task { await sessionModel.start() }
         }
