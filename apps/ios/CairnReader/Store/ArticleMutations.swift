@@ -2,16 +2,16 @@ import Foundation
 import GRDB
 
 /// The reader's and the lists' edits (decision 9). Each is one transaction, the store change plus
-/// the outbox row, then a request to drain that the caller does not wait for. Nothing is sent
-/// from here, so a throw means the database failed, never that the backend said no: a refusal
-/// comes back later through `Outbox.rejections`.
+/// the outbox row, then a request to drain (`Sync.requestDrain`) that the caller does not wait
+/// for. Nothing is sent from here, so a throw means the database failed, never that the backend
+/// said no: a refusal comes back later through `Outbox.rejections`.
 nonisolated final class ArticleMutations: Sendable {
     private let database: AppDatabase
-    private let outbox: Outbox
+    private let requestDrain: @Sendable () -> Void
 
-    init(database: AppDatabase, outbox: Outbox) {
+    init(database: AppDatabase, requestDrain: @escaping @Sendable () -> Void) {
         self.database = database
-        self.outbox = outbox
+        self.requestDrain = requestDrain
     }
 
     func markCompleted(_ id: String, readAt: Date) async throws {
@@ -62,6 +62,6 @@ nonisolated final class ArticleMutations: Sendable {
             try store(db)
             try Outbox.enqueue(db, articleID: id, field: field, request)
         }
-        outbox.requestDrain()
+        requestDrain()
     }
 }

@@ -12,7 +12,7 @@ private final class SessionFactory {
     func make(_ user: User, _ auth: AuthService) -> UserSession {
         let url = try! temporaryDatabaseURL()
         urls.append(url)
-        return UserSession(user: user, auth: auth, database: AppDatabase(url: url))
+        return UserSession(user: user, auth: auth, isOnline: { true }, database: AppDatabase(url: url))
     }
 }
 

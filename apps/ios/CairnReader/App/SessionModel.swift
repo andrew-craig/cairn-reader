@@ -20,7 +20,7 @@ final class SessionModel {
 
     init(
         auth: AuthService,
-        makeSession: @escaping (User, AuthService) -> UserSession = { UserSession(user: $0, auth: $1) }
+        makeSession: @escaping (User, AuthService) -> UserSession
     ) {
         self.auth = auth
         self.makeSession = makeSession

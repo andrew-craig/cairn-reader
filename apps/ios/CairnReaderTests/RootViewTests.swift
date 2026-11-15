@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import CairnReader
 
@@ -11,7 +12,7 @@ struct RootViewTests {
             storage: InMemorySessionStorage(session), deviceID: { "device-1" }, sleep: { _ in })
         return SessionModel(
             auth: auth,
-            makeSession: { UserSession(user: $0, auth: $1, database: AppDatabase.inMemory()) })
+            makeSession: { UserSession(user: $0, auth: $1, isOnline: { true }, database: AppDatabase.inMemory()) })
     }
 
     @Test func rootFollowsTheSession() async {
@@ -30,6 +31,28 @@ struct RootViewTests {
         let model = model(nil)
         await model.start()
         guard case .signedOut = RootView.Screen(model) else { Issue.record("expected signed out"); return }
+    }
+
+    // Port of apps/mobile/src/hooks/useSyncTrigger.test.ts: `RootView` hands each change to
+    // these through `onChange`, which never fires for the initial value or an unchanged one.
+
+    @Test func syncRunsOnAnOfflineToOnlineTransition() {
+        #expect(RootView.runsSync(wasOnline: false, isOnline: true))
+    }
+
+    @Test func syncDoesNotRunForAnUnchangedOrLostConnection() {
+        #expect(!RootView.runsSync(wasOnline: true, isOnline: true))
+        #expect(!RootView.runsSync(wasOnline: true, isOnline: false))
+    }
+
+    @Test func syncRunsOnABackgroundOrInactiveToActiveTransition() {
+        #expect(!RootView.runsSync(from: .active, to: .background))
+        #expect(RootView.runsSync(from: .background, to: .active))
+        #expect(RootView.runsSync(from: .inactive, to: .active))
+    }
+
+    @Test func syncDoesNotRunOnActiveToActive() {
+        #expect(!RootView.runsSync(from: .active, to: .active))
     }
 
     @Test func rejectionWording() {
