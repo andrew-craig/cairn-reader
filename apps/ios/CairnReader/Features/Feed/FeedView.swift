@@ -59,7 +59,7 @@ struct FeedView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("Your Feed is empty", image: "feed")
+                EmptyState(title: "Your Feed is empty", image: .feed)
             }
         }
     }

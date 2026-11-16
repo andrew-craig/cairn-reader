@@ -9,8 +9,9 @@ extension View {
 
 /// Ported from the React Native `HeaderSearch` (which mirrors the web list header): a round
 /// search button in the navigation bar opens a pill field. A bar item cannot host it (it keeps
-/// its first width, and a custom view holding an image is shown as that image), so the field is a
-/// bar beneath the navigation bar, and the bar button hides while it is open.
+/// its first width, and a custom view holding an image is shown as that image), so the field is an
+/// inset beneath the navigation bar, and the bar button hides while it is open. Not a
+/// `safeAreaBar`: its content never reports focus to `@FocusState`, so the ring stayed unfocused.
 private struct HeaderSearch: ViewModifier {
     @Binding var query: String
     let prompt: String
@@ -26,7 +27,7 @@ private struct HeaderSearch: ViewModifier {
                     }
                 }
             }
-            .safeAreaBar(edge: .top) {
+            .safeAreaInset(edge: .top) {
                 if isOpen {
                     Pill(query: $query, prompt: prompt) { isOpen = false }
                         .padding(.horizontal)

@@ -59,7 +59,7 @@ struct ReadsView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("No saved articles yet", image: "read")
+                EmptyState(title: "No saved articles yet", image: .read)
             }
         }
     }
