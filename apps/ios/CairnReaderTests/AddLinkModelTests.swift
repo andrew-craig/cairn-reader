@@ -346,6 +346,25 @@ struct AddLinkModelTests {
         #expect(model.summary == "RSS feed: Example")
     }
 
+    @Test func aDiscoveryForAURLSinceEditedIsDropped() async {
+        let source = Source()
+        let pending = Pending<[DiscoveredFeed]>()
+        source.discover = { _ in try await pending.wait() }
+        let model = source.model()
+        await enter("https://example.com", in: model)
+
+        let finding = Task { await model.findFeed() }
+        await eventually { pending.isWaiting }
+        model.url = "https://example.org"
+
+        pending.resolve([DiscoveredFeed(url: "https://example.com/rss", title: "Example")])
+        await finding.value
+        #expect(model.url == "https://example.org")
+        #expect(model.feedChoices == nil)
+        #expect(model.error == nil)
+        #expect(!model.isDiscovering)
+    }
+
     @Test func severalFoundFeedsAreOfferedToPickFrom() async {
         let source = Source()
         let feeds = [

@@ -145,6 +145,8 @@ final class AddLinkModel {
         let feeds = (try? await discover(normalized)) ?? []
         guard !isClosed else { return }
         isDiscovering = false
+        // An edit during the discovery makes its result stale.
+        guard Self.normalized(url) == normalized else { return }
         switch feeds.count {
         case 0: error = "No RSS feed found for this site"
         case 1: url = feeds[0].url

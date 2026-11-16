@@ -98,8 +98,11 @@ struct AddLinkSheet: View {
             } message: { _ in
                 Text("Select a feed to use:")
             }
-            .alert("Success", isPresented: .constant(model.successMessage != nil)) {
-                Button("OK") { dismiss() }
+            .alert(
+                "Success",
+                isPresented: Binding(get: { model.successMessage != nil }, set: { if !$0 { dismiss() } })
+            ) {
+                Button("OK") {}
             } message: {
                 Text(model.successMessage ?? "")
             }
