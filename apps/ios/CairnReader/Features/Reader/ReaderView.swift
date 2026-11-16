@@ -107,18 +107,17 @@ private struct ReaderScreen: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .bottomBar) {
+            Spacer()
             if showsNext {
                 Button("Next Article", systemImage: "forward") {
                     if let next { current = next }
                 }
                 .disabled(next == nil)
-                Spacer()
             }
             let isFavorite = model.article.isFavorite
             Button(isFavorite ? "Remove from Favorites" : "Favorite", systemImage: isFavorite ? "bookmark.fill" : "bookmark") {
                 Task { await model.toggleFavorite() }
             }
-            Spacer()
             if model.article.list == .feed {
                 Button("Save to Reads", systemImage: "tray.and.arrow.down") {
                     Task { await model.saveToReads() }
@@ -129,7 +128,6 @@ private struct ReaderScreen: View {
                 }
             }
             if let url = ReaderTemplate.webURL(model.article.url) {
-                Spacer()
                 ShareLink(item: url)
             }
         }
