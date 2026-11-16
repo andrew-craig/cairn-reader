@@ -3,7 +3,7 @@ import SwiftUI
 /// The plain article `List` of Reads, Feed and Bookmarks: an optional notice row, one
 /// `ArticleRow` per article pushing `Route.article`, full-swipe row actions on one edge, and
 /// paging when the last row appears. Empty, loading and error states are the screen's
-/// (`ContentUnavailableView` overlays), as are `.searchable` and `.refreshable`.
+/// (`ContentUnavailableView` overlays), as are `.headerSearch` and `.refreshable`.
 struct ArticleListView<RowActions: View>: View {
     let articles: [Article]
     /// Ids whose row shows the pending-save note.

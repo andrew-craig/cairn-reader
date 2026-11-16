@@ -18,12 +18,12 @@ struct ReadsView: View {
             Button {
                 Task { await model.archive(article) }
             } label: {
-                Label("Archive", systemImage: "archivebox")
+                Label("Archive", image: .archive)
             }
             .tint(Color(.success))
         }
         .overlay { emptyState }
-        .searchable(text: $search.query, prompt: "Search your reads")
+        .headerSearch(query: $search.query, prompt: "Search your reads")
         .refreshable { await model.refresh() }
         .navigationTitle("Reads")
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
@@ -59,7 +59,7 @@ struct ReadsView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("No saved articles yet", systemImage: "book")
+                EmptyState(title: "No saved articles yet", image: .read)
             }
         }
     }

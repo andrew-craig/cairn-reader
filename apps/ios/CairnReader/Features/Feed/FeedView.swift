@@ -18,12 +18,12 @@ struct FeedView: View {
             Button {
                 Task { await model.saveToReads(article) }
             } label: {
-                Label("Save to Reads", systemImage: "book")
+                Label("Save to Reads", image: .read)
             }
             .tint(Color(.info))
         }
         .overlay { emptyState }
-        .searchable(text: $list.query, prompt: "Search your feed")
+        .headerSearch(query: $list.query, prompt: "Search your feed")
         .refreshable { await list.refresh() }
         .navigationTitle("Feed")
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
@@ -59,7 +59,7 @@ struct FeedView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("Your Feed is empty", systemImage: "newspaper")
+                EmptyState(title: "Your Feed is empty", image: .feed)
             }
         }
     }
