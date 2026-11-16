@@ -29,7 +29,7 @@ struct AddLinkSheet: View {
                             .onSubmit { Task { await model.submit() } }
                         // The payload can arrive off the main thread, so the closure is not
                         // main-actor isolated and hops there itself.
-                        PasteButton(payloadType: String.self) { [model] @Sendable strings in
+                        PasteButton(payloadType: String.self) { @Sendable [model] strings in
                             guard let text = strings.first else { return }
                             Task { @MainActor in model.url = text }
                         }
