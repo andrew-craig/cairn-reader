@@ -2,14 +2,14 @@
 id: bug_eb92
 title: [iOS native] Feed and Reads tab icons are wrong
 type: bug
-status: open
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T21:51:10Z
-updated_at: 2026-11-15T21:51:10Z
+updated_at: 2026-11-16T10:52:06Z
 ---
 ## Feedback (owner, TestFlight testing)
 The Feed and Reads icons are incorrect.

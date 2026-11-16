@@ -2,14 +2,14 @@
 id: bug_719b
 title: [iOS native] Reader: link options dialog always appears at the top of the page
 type: bug
-status: open
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T22:06:46Z
-updated_at: 2026-11-15T22:06:46Z
+updated_at: 2026-11-16T10:52:06Z
 ---
 ## Feedback (owner, TestFlight testing of task 12)
 Tapping a link correctly shows the options (Save to Reads, Open in Browser, Copy Link), but they always appear at the top of the page. If the position is fixed, it should be the middle of the page.

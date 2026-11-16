@@ -2,14 +2,14 @@
 id: feature_ab01
 title: [iOS native] Use the app's own icons instead of SF Symbols
 type: feature
-status: open
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T21:51:10Z
-updated_at: 2026-11-15T21:51:10Z
+updated_at: 2026-11-16T10:52:07Z
 ---
 ## Feedback (owner, TestFlight testing)
 Switch from the iOS system icons to the app's own icons.

@@ -2,14 +2,14 @@
 id: feature_d81e
 title: [iOS native] Search: port the web/Expo header search instead of always-visible .searchable
 type: feature
-status: open
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T21:51:10Z
-updated_at: 2026-11-15T21:51:10Z
+updated_at: 2026-11-16T10:52:07Z
 ---
 ## Feedback (owner, TestFlight testing)
 Implement the same search bar behaviour as web/Expo. Don't use the native always-shown search.
