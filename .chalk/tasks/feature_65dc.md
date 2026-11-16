@@ -2,14 +2,14 @@
 id: feature_65dc
 title: [iOS native 13] Report extraction issue sheet
 type: feature
-status: open
+status: in_progress
 priority: 3
 labels: [ios,ui]
 blocked_by: [feature_4e37]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-14T02:35:53Z
+updated_at: 2026-11-16T21:06:13Z
 ---
 ## Goal
 Let the reader report a badly extracted article.
