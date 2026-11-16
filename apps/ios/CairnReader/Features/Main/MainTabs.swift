@@ -15,6 +15,12 @@ struct MainTabs: View {
 
     @State private var selection = MainTab.reads
     @State private var rejectionMessage: String?
+    @State private var you: YouModel
+
+    init(session: UserSession) {
+        self.session = session
+        _you = State(initialValue: YouModel(read: session.read))
+    }
 
     var body: some View {
         TabView(selection: $selection) {
@@ -25,7 +31,7 @@ struct MainTabs: View {
                 NavigationStack { ReadsView(session: session) }
             }
             Tab("You", systemImage: "person.crop.circle", value: MainTab.you) {
-                NavigationStack { YouView(read: session.read) }
+                NavigationStack { YouView(model: you) }
             }
         }
         .environment(\.userSession, session)
@@ -34,6 +40,8 @@ struct MainTabs: View {
                 rejectionMessage = Self.message(for: rejection)
             }
         }
+        // Here, not in `YouView`: a favourite sent while You is hidden must still mark it stale.
+        .task { await you.followFavoriteChanges(session.outbox.favoriteChanges) }
         .alert(
             "Error", isPresented: Binding(get: { rejectionMessage != nil }, set: { if !$0 { rejectionMessage = nil } })
         ) {

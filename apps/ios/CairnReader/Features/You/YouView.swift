@@ -3,10 +3,11 @@ import SwiftUI
 /// The profile hub: the account name, the counted lists, then Account and About.
 struct YouView: View {
     @Environment(SessionModel.self) private var sessionModel
-    @State private var model: YouModel
+    /// Owned by `MainTabs`, which follows the outbox's favourite changes into it.
+    let model: YouModel
 
-    init(read: ReadService) {
-        _model = State(initialValue: YouModel(read: read))
+    init(model: YouModel) {
+        self.model = model
     }
 
     var body: some View {
@@ -40,8 +41,10 @@ struct YouView: View {
         .navigationDestination(for: Route.self, destination: RouteDestination.init)
         // Not `.task`: leaving the tab mid-fetch would cancel it and show a failure.
         .onAppear {
+            model.isVisible = true
             Task { await model.refreshIfStale() }
         }
+        .onDisappear { model.isVisible = false }
     }
 
     @ViewBuilder

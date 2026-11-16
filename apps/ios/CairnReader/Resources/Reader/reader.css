@@ -92,7 +92,7 @@ figure { margin: 1rem 0; }
 figcaption { color: var(--text-secondary); font-size: 0.875rem; }
 
 table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1rem 0; }
-th, td { border: 1px solid var(--border); padding: 0.25rem 0.5rem; text-align: left; }
+th, td { text-align: left; }
 
 ul, ol { margin: 0 0 1rem; padding-left: 1.5rem; }
 li { margin-bottom: 0.25rem; }

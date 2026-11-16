@@ -30,9 +30,13 @@ final class ReaderModel {
         var offset: Double
         var viewport: Double
         var contentHeight: Double
-        /// The saved position has not been restored yet and the user has not scrolled: `offset`
-        /// is not where the reader is, and must not be saved.
-        var isRestoring: Bool
+        /// The page and its images have loaded (`didFinish`); before that the content still grows.
+        var hasLoaded: Bool
+        /// The user has dragged the page. Before that every reading is the web view's own (the
+        /// layout at load, the insets, the restore), not where the reader went: one taken before
+        /// the page's layout reaches the scroll view has a content height of about the viewport,
+        /// which reads as the end of the article, and an offset that is not the saved one.
+        var hasDragged: Bool
     }
 
     /// The route's value with the reader's own edits, for an article the store does not hold.
@@ -167,11 +171,11 @@ final class ReaderModel {
         }
     }
 
-    /// Takes a reading of the scroll geometry. A position confirmed by a scroll (not while the
-    /// saved one is still being restored) is saved, at most once per `saveInterval`, and marks
-    /// the article completed once `completedThreshold` of it has been read.
+    /// Takes a reading of the scroll geometry. Only a reading taken once the page has loaded and
+    /// the user has dragged counts: it is saved, at most once per `saveInterval`, and marks the
+    /// article completed once `completedThreshold` of it has been read.
     func scrolled(_ scroll: Scroll) {
-        guard tracksProgress, !scroll.isRestoring, scroll.contentHeight > 0 else { return }
+        guard tracksProgress, scroll.hasLoaded, scroll.hasDragged, scroll.contentHeight > 0 else { return }
         let fraction = min(max(scroll.offset / scroll.contentHeight, 0), 1)
         restoreFraction = fraction
         hasScrolled = true

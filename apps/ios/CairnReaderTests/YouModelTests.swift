@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import CairnReader
 
@@ -99,5 +100,120 @@ struct YouModelTests {
 
         #expect(server.requests.count == 4)
         #expect(model.rssCount == 1)
+    }
+}
+
+/// One user's server for the favourite tests: subscriptions, and a bookmarks count that each
+/// accepted favourite PATCH raises by one; everything fails as unreachable while offline.
+private final class BookmarksServer: Sendable {
+    let online = Mutex(true)
+    let count = Mutex(5)
+
+    func stub() -> StubServer {
+        StubServer { [self] request in
+            guard online.withLock({ $0 }) else { return .failure(.notConnectedToInternet) }
+            switch (request.httpMethod, request.url?.lastPathComponent) {
+            case ("PATCH"?, _):
+                if request.jsonBody["is_favorite"] as? Bool == true { count.withLock { $0 += 1 } }
+                return SyncFixtures.ok
+            case ("GET"?, "count"?):
+                return .json(200, #"{ "data": { "count": \#(count.withLock { $0 }) } }"#)
+            default:
+                return subscriptionsOK
+            }
+        }
+    }
+}
+
+/// The Bookmarks count after a favourite edit, through the session's outbox and `Sync` (bug_3e3d):
+/// the edit is only queued, so the count can change once the drain has sent it.
+@MainActor
+struct YouModelFavoriteTests {
+    fileprivate let server = BookmarksServer()
+    let harness: SyncHarness
+    fileprivate let clock = Clock()
+    let model: YouModel
+
+    init() {
+        harness = SyncHarness(server.stub())
+        model = YouModel(read: harness.session.read) { [clock] in clock.now }
+    }
+
+    /// Follows the outbox's favourite changes as `MainTabs`' `.task` does.
+    private func followingFavoriteChanges() -> Task<Void, Never> {
+        Task { await model.followFavoriteChanges(harness.session.outbox.favoriteChanges) }
+    }
+
+    /// Stops `Sync`, which ends `favoriteChanges`, and waits until `following` has taken every
+    /// change the drains announced.
+    private func settle(_ following: Task<Void, Never>) async {
+        await harness.sync.stop()
+        await following.value
+    }
+
+    @Test func favoriteSentByTheDrainIsCountedWhenYouAppearsWithinTheInterval() async throws {
+        let following = followingFavoriteChanges()
+        await model.refreshIfStale()
+        #expect(model.bookmarksCount == 5)
+
+        try await harness.session.mutations.setFavorite("a1", isFavorite: true)
+        await harness.sync.drain()
+        #expect(harness.requests.contains("PATCH a1"))
+        await settle(following)
+
+        clock.now += 1
+        await model.refreshIfStale()
+        #expect(model.bookmarksCount == 6)
+    }
+
+    @Test func favoriteMadeOfflineIsCountedOnceSentAfterComingBackOnline() async throws {
+        let following = followingFavoriteChanges()
+        await model.refreshIfStale()
+
+        server.online.withLock { $0 = false }
+        try await harness.session.mutations.setFavorite("a1", isFavorite: true)
+        await harness.sync.drain()
+        clock.now += 1
+        await model.refreshIfStale()
+        // Not adjusted on the device: the server has not seen the edit.
+        #expect(model.bookmarksCount == 5)
+        #expect(try harness.outboxCount() == 1)
+
+        server.online.withLock { $0 = true }
+        await harness.sync.run()
+        #expect(try harness.outboxCount() == 0)
+        await settle(following)
+
+        clock.now += 1
+        await model.refreshIfStale()
+        #expect(model.bookmarksCount == 6)
+    }
+
+    @Test func favoriteSentWhileYouIsVisibleRefetchesAtOnce() async throws {
+        let following = followingFavoriteChanges()
+        defer { following.cancel() }
+        await model.refreshIfStale()
+        model.isVisible = true
+
+        try await harness.session.mutations.setFavorite("a1", isFavorite: true)
+        await harness.sync.drain()
+
+        await eventually { model.bookmarksCount == 6 }
+    }
+
+    @Test func otherEditsDoNotMakeTheCountsStale() async throws {
+        let following = followingFavoriteChanges()
+        await model.refreshIfStale()
+
+        try await harness.session.mutations.saveScrollPosition("a1", fraction: 0.5)
+        await harness.sync.drain()
+        await settle(following)
+
+        #expect(harness.requests.contains("PATCH a1"))
+        server.count.withLock { $0 = 6 }
+
+        clock.now += 1
+        await model.refreshIfStale()
+        #expect(model.bookmarksCount == 5)
     }
 }

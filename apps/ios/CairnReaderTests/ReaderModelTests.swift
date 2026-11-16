@@ -52,8 +52,8 @@ private func article(
 }
 
 @MainActor
-private func scroll(_ offset: Double, isRestoring: Bool = false) -> ReaderModel.Scroll {
-    ReaderModel.Scroll(offset: offset, viewport: 100, contentHeight: 1000, isRestoring: isRestoring)
+private func scroll(_ offset: Double, hasDragged: Bool = true) -> ReaderModel.Scroll {
+    ReaderModel.Scroll(offset: offset, viewport: 100, contentHeight: 1000, hasLoaded: true, hasDragged: hasDragged)
 }
 
 /// Runs `operation` as the view's `.task` does. Cancel the returned task at the end of the test.
@@ -327,15 +327,16 @@ struct ReaderModelTests {
         #expect(try await harness.session.articles.getById("a1")?.readAt == readAt)
     }
 
-    /// The rule "do not persist the pre-restore offset": readings taken while restoring neither
-    /// save nor complete, and leaving without a confirmed position saves nothing.
+    /// The rule "do not persist the pre-restore offset": readings taken before the user drags
+    /// (the web view's restore) neither save nor complete, and leaving without a confirmed
+    /// position saves nothing.
     @Test func thePreRestoreOffsetIsNeverSaved() async throws {
         server.online.withLock { $0 = false }
         try await store(article(scrollPosition: 0.5))
         let model = makeModel(article(scrollPosition: 0.5))
 
-        model.scrolled(scroll(0, isRestoring: true))
-        model.scrolled(scroll(900, isRestoring: true))
+        model.scrolled(scroll(0, hasDragged: false))
+        model.scrolled(scroll(900, hasDragged: false))
         await model.leave()
 
         try await Task.sleep(for: .milliseconds(50))
@@ -374,31 +375,50 @@ struct ReaderModelTests {
 
         #expect(try await harness.session.articles.getById("a1")?.scrollPosition == 0.4)
     }
-}
 
-/// The restore-reachability rule, ported from ArticleContent.test.tsx.
-struct ScrollTargetReachabilityTests {
-    @Test func unreachableWhileTheContentIsTooShort() {
-        // Target 640, largest offset 800 - 600 = 200.
-        #expect(!ArticleWebView.isScrollTargetReachable(contentHeight: 800, viewport: 600, fraction: 0.8))
+    /// bug_f546: the web view reports readings at load, before the page's layout reaches the
+    /// scroll view, when the content height is about the viewport's and the reading looks like
+    /// the end of the article. Until the page has loaded and the user has dragged, no reading
+    /// completes the article or saves a position.
+    @Test func aPreLayoutReadingNeitherCompletesNorSaves() async throws {
+        server.online.withLock { $0 = false }
+        try await store(article())
+        let model = makeModel(article())
+
+        for (hasLoaded, hasDragged) in [(false, false), (true, false), (false, true)] {
+            model.scrolled(
+                ReaderModel.Scroll(
+                    offset: 0, viewport: 700, contentHeight: 701, hasLoaded: hasLoaded, hasDragged: hasDragged))
+        }
+        await model.leave()
+
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(try outbox().isEmpty)
+        let stored = try await harness.session.articles.getById("a1")
+        #expect(stored?.isRead == false)
+        #expect(stored?.scrollPosition == nil)
+        #expect(model.restoreFraction == 0)
     }
 
-    @Test func reachableOnceTheContentHasGrown() {
-        // Target 1300, largest offset 2600 - 600 = 2000.
-        #expect(ArticleWebView.isScrollTargetReachable(contentHeight: 2600, viewport: 600, fraction: 0.5))
-    }
+    /// bug_f546: a part scroll saves its fraction without completing the article (the row shows
+    /// it started), and reopening the article restores that fraction.
+    @Test func aPartScrollIsSavedAndReopeningRestoresIt() async throws {
+        server.online.withLock { $0 = false }
+        try await store(article())
+        let model = makeModel(article())
 
-    @Test func unreachableBeforeTheViewportIsMeasured() {
-        #expect(!ArticleWebView.isScrollTargetReachable(contentHeight: 5000, viewport: 0, fraction: 0.5))
-    }
+        // The page's load reports first, then the user drags to 40%.
+        model.scrolled(
+            ReaderModel.Scroll(offset: 0, viewport: 700, contentHeight: 700, hasLoaded: true, hasDragged: false))
+        model.scrolled(scroll(400))
+        await model.leave()
 
-    @Test func theExactLargestOffsetIsReachable() {
-        #expect(ArticleWebView.isScrollTargetReachable(contentHeight: 1200, viewport: 600, fraction: 0.5))
-        #expect(!ArticleWebView.isScrollTargetReachable(contentHeight: 1200, viewport: 600, fraction: 0.51))
-    }
-
-    @Test func zeroIsReachable() {
-        #expect(ArticleWebView.isScrollTargetReachable(contentHeight: 2000, viewport: 600, fraction: 0))
+        let stored = try await harness.session.articles.getById("a1")
+        let saved = try #require(stored)
+        #expect(saved.scrollPosition == 0.4)
+        #expect(saved.isPartiallyRead)
+        #expect(try outbox()["status"] == nil)
+        #expect(makeModel(saved).restoreFraction == 0.4)
     }
 }
 

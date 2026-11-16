@@ -26,6 +26,9 @@ nonisolated final class Outbox: Sendable {
 
     /// Dropped archives and saves. One consumer.
     let rejections: AsyncStream<Rejection>
+    /// A favourite edit the server accepted, so a server count of favourites (the You tab's
+    /// Bookmarks) may have changed. Keeps only the newest unread signal. One consumer.
+    let favoriteChanges: AsyncStream<Void>
 
     private struct Row: Sendable {
         let articleID: String
@@ -44,12 +47,14 @@ nonisolated final class Outbox: Sendable {
     private let database: AppDatabase
     private let read: ReadService
     private let continuation: AsyncStream<Rejection>.Continuation
+    private let favoriteContinuation: AsyncStream<Void>.Continuation
     private let state = Mutex(State())
 
     init(database: AppDatabase, read: ReadService) {
         self.database = database
         self.read = read
         (rejections, continuation) = AsyncStream.makeStream()
+        (favoriteChanges, favoriteContinuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
     }
 
     /// True for a transient failure: the server could not be reached, 401 or 5xx. Anything else
@@ -102,7 +107,7 @@ nonisolated final class Outbox: Sendable {
         return await task.value
     }
 
-    /// Cancels the drain, waits for it, and ends `rejections`.
+    /// Cancels the drain, waits for it, and ends `rejections` and `favoriteChanges`.
     func stop() async {
         let task = state.withLock { state in
             state.stopped = true
@@ -111,6 +116,7 @@ nonisolated final class Outbox: Sendable {
         task?.cancel()
         _ = await task?.value
         continuation.finish()
+        favoriteContinuation.finish()
     }
 
     /// One drain at a time: a request made while one runs sets `rerun`.
@@ -177,7 +183,7 @@ nonisolated final class Outbox: Sendable {
     }
 
     /// Sends one row. A refused `list` row also deletes the article, undoing the optimistic Save
-    /// to Reads.
+    /// to Reads; an accepted `is_favorite` row is announced on `favoriteChanges`.
     private func send(_ row: Row) async throws -> Outcome {
         let request = try Self.request(from: row.payload)
         do {
@@ -192,6 +198,9 @@ nonisolated final class Outbox: Sendable {
         } catch {
             Self.logger.info("Outbox halted at \(row.field.rawValue) edit of \(row.articleID): \(String(describing: error))")
             return .halted
+        }
+        if row.field == .isFavorite {
+            favoriteContinuation.yield()
         }
         try await remove(row, deletingArticle: false)
         return .sent
