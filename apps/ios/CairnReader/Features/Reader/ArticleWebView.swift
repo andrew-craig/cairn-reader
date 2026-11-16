@@ -3,8 +3,8 @@ import UIKit
 import WebKit
 
 /// The reader's web view (decision 2): shows the page from `ReaderTemplate` with no JavaScript,
-/// never navigates away (a link tap goes to `onLink`), restores the saved scroll fraction once
-/// the content is tall enough to reach it, and reports the scroll geometry from the scroll view.
+/// never navigates away (a link tap goes to `onLink`), restores the saved scroll fraction as the
+/// content grows until the user drags, and reports the scroll geometry from the scroll view.
 ///
 /// A `WKWebView` rather than SwiftUI's `WebView`: restoring needs the scroll view's content size
 /// as it grows (images load late), the moment the user starts dragging, and a synchronous offset
@@ -16,13 +16,6 @@ struct ArticleWebView: UIViewRepresentable {
     let restoreFraction: @MainActor () -> Double
     let onScroll: @MainActor (ReaderModel.Scroll) -> Void
     let onLink: @MainActor (URL) -> Void
-
-    /// Whether a saved `fraction` can be reached with the content and viewport measured so far:
-    /// the target `fraction * contentHeight` is at most the largest offset,
-    /// `contentHeight - viewport`. Never before the viewport is measured.
-    nonisolated static func isScrollTargetReachable(contentHeight: Double, viewport: Double, fraction: Double) -> Bool {
-        viewport > 0 && contentHeight - viewport >= fraction * contentHeight
-    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -53,12 +46,11 @@ struct ArticleWebView: UIViewRepresentable {
         private weak var webView: WKWebView?
         private var loadedHTML: String?
         private var restoreFraction = 0.0
-        /// The saved position has been restored (or there was none), or the user took over.
-        private var hasRestored = true
-        /// The page and its images have loaded (`didFinish`), or the user took over. Until then the
-        /// content may still grow, so no reading is confirmed: a fresh article whose text loads
-        /// before its images must not read as finished on open.
-        private var hasSettled = true
+        /// The page and its images have loaded (`didFinish`).
+        private var hasLoaded = false
+        /// The user has dragged since the page started loading: the restore ends, and readings
+        /// count from here.
+        private var hasDragged = false
         private var contentSizeObservation: NSKeyValueObservation?
 
         init(_ parent: ArticleWebView) {
@@ -77,25 +69,22 @@ struct ArticleWebView: UIViewRepresentable {
             guard let webView, html != loadedHTML else { return }
             loadedHTML = html
             restoreFraction = parent.restoreFraction()
-            hasRestored = restoreFraction <= 0
-            hasSettled = false
+            hasLoaded = false
+            hasDragged = false
             webView.loadHTMLString(html, baseURL: ReaderResources.baseURL)
         }
 
         // MARK: Scrolling
 
-        /// Moves towards the saved position on every growth of the content, until it can be
-        /// reached (then it is restored) or the user drags.
+        /// Moves to the saved position on every growth of the content until the user drags. The
+        /// fraction was measured on the finished layout, which can reach the scroll view after
+        /// `didFinish` and after a first layout that could already reach the target (text before
+        /// its images), so only the last growth puts it in the right place.
         private func contentSizeChanged() {
             guard let scrollView = webView?.scrollView else { return }
-            if !hasRestored {
-                let scroll = Self.scroll(of: scrollView, isRestoring: true)
+            if !hasDragged, restoreFraction > 0 {
+                let scroll = self.scroll(of: scrollView)
                 if scroll.viewport > 0, scroll.contentHeight > 0 {
-                    if ArticleWebView.isScrollTargetReachable(
-                        contentHeight: scroll.contentHeight, viewport: scroll.viewport, fraction: restoreFraction)
-                    {
-                        hasRestored = true
-                    }
                     let target = min(restoreFraction * scroll.contentHeight, max(scroll.contentHeight - scroll.viewport, 0))
                     // Reports through `scrollViewDidScroll` when the offset changes.
                     scrollView.contentOffset.y = CGFloat(target) - scrollView.adjustedContentInset.top
@@ -110,24 +99,24 @@ struct ArticleWebView: UIViewRepresentable {
 
         /// Once the user drags, the restore stops: they are never pulled away from where they went.
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            hasRestored = true
-            hasSettled = true
+            hasDragged = true
         }
 
         private func report(_ scrollView: UIScrollView) {
-            let scroll = Self.scroll(of: scrollView, isRestoring: !hasRestored || !hasSettled)
+            let scroll = self.scroll(of: scrollView)
             guard scroll.viewport > 0, scroll.contentHeight > 0 else { return }
             parent.onScroll(scroll)
         }
 
         /// The geometry measured from the top of the content, inside the bars' insets.
-        private static func scroll(of scrollView: UIScrollView, isRestoring: Bool) -> ReaderModel.Scroll {
+        private func scroll(of scrollView: UIScrollView) -> ReaderModel.Scroll {
             let insets = scrollView.adjustedContentInset
             return ReaderModel.Scroll(
                 offset: scrollView.contentOffset.y + insets.top,
                 viewport: scrollView.bounds.height - insets.top - insets.bottom,
                 contentHeight: scrollView.contentSize.height,
-                isRestoring: isRestoring)
+                hasLoaded: hasLoaded,
+                hasDragged: hasDragged)
         }
 
         // MARK: Navigation
@@ -146,13 +135,12 @@ struct ArticleWebView: UIViewRepresentable {
             return isPage && navigationAction.targetFrame?.isMainFrame == true ? .allow : .cancel
         }
 
-        /// The page and its images have loaded, so the content will not grow further: readings are
-        /// confirmed from here, and a saved position it still cannot reach (an article shorter than
-        /// the screen, or one whose content changed) ends the restore, completion included.
+        /// The page and its images have loaded. Their layout may not have reached the scroll view
+        /// yet (the content size can still be the viewport's, which reads as the end of the
+        /// article, bug_f546), so this neither ends the restore nor confirms a reading by itself:
+        /// readings count once the user has also dragged.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            if !hasRestored { contentSizeChanged() }
-            hasRestored = true
-            hasSettled = true
+            hasLoaded = true
             report(webView.scrollView)
         }
 
