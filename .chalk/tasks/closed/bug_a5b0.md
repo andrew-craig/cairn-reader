@@ -2,14 +2,14 @@
 id: bug_a5b0
 title: [iOS native] saveBody drops the fetched content_hash, so the next page sync discards a current body
 type: bug
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-15T10:09:25Z
-updated_at: 2026-11-15T10:09:25Z
+updated_at: 2026-11-16T10:25:46Z
 ---
 
 
