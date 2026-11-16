@@ -20,4 +20,4 @@ The quick actions at the bottom of the article page should be grouped together a
 - Owner on device: actions appear as one cluster on the right for Reads items, Feed items, and with/without Next.
 ## Review
 - Changed: `apps/ios/CairnReader/Features/Reader/ReaderView.swift` `toolbar` only (spacers; button images untouched).
-- Verified: `xcodebuild test` on the iPhone 17 Pro simulator (iOS 26.5) builds with warnings as errors and the suite passes. One issue recorded outside any test, from `HTTPClientTests.plusInQueryIsPercentEncoded` (query encoding), reproduces on every run and is unrelated (`HTTPClient` is untouched). Layout on device is the owner's check.
+- Verified: `xcodebuild test` on the iPhone 17 Pro simulator (iOS 26.5) builds with warnings as errors and the suite passes. The two runs in this worktree recorded an issue outside any test, from `HTTPClientTests.plusInQueryIsPercentEncoded` (query encoding). It did not reproduce on the base commit, on `HTTPClientTests` alone, or in the full run of the merged PR branch (386 passed, no issues), and `HTTPClient` is untouched; it is intermittent, as noted in task_5092. Layout on device is the owner's check.

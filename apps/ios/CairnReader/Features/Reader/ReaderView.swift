@@ -102,6 +102,7 @@ private struct ReaderScreen: View {
     private var linkAnchor: some View {
         Color.clear
             .frame(width: 1, height: 1)
+            .allowsHitTesting(false)
             .confirmationDialog(
                 link.map { ArticleRow.domain(of: $0.absoluteString) ?? $0.absoluteString } ?? "",
                 isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } }),

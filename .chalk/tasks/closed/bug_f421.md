@@ -21,4 +21,4 @@ The "You're offline" message is too prominent.
 ## Review
 - Changed: `apps/ios/CairnReader/App/OfflineBanner.swift` only (`apps/ios/CLAUDE.md` does not describe the banner's colours).
 - To check on device: with no background, the strip is clear, so a list scrolled under the navigation bar may show through behind the text.
-- Verified: `xcodebuild test` on the iPhone 17 Pro simulator (iOS 26.5) builds with warnings as errors and the suite passes (same unrelated `HTTPClientTests.plusInQueryIsPercentEncoded` issue as bug_6ed5).
+- Verified: `xcodebuild test` on the iPhone 17 Pro simulator (iOS 26.5) builds with warnings as errors and the suite passes (apart from the intermittent, unrelated `HTTPClientTests.plusInQueryIsPercentEncoded` issue described in bug_6ed5).
