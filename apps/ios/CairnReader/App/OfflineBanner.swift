@@ -6,9 +6,8 @@ struct OfflineBanner: View {
     var body: some View {
         Text("You\u{2019}re offline")
             .font(Typography.subheadline)
-            .foregroundStyle(Color(.background))
+            .foregroundStyle(Color(.warning))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
-            .background(Color(.warning), ignoresSafeAreaEdges: .top)
     }
 }
