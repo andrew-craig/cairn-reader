@@ -18,7 +18,7 @@ struct ReadsView: View {
             Button {
                 Task { await model.archive(article) }
             } label: {
-                Label("Archive", systemImage: "archivebox")
+                Label("Archive", image: .archive)
             }
             .tint(Color(.success))
         }
@@ -59,7 +59,7 @@ struct ReadsView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("No saved articles yet", systemImage: "book")
+                ContentUnavailableView("No saved articles yet", image: "read")
             }
         }
     }
