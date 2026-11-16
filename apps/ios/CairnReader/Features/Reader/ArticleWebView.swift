@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
 /// The reader's web view (decision 2): shows the page from `ReaderTemplate` with no JavaScript,
-/// never navigates away (a link tap goes to `onLink`), restores the saved scroll fraction as the
+/// never navigates away (a link tap goes to `onLink`, with where it was touched), restores the saved scroll fraction as the
 /// content grows until the user drags, and reports the scroll geometry from the scroll view.
 ///
 /// A `WKWebView` rather than SwiftUI's `WebView`: restoring needs the scroll view's content size
@@ -15,7 +16,8 @@ struct ArticleWebView: UIViewRepresentable {
     /// reader was); 0 restores nothing.
     let restoreFraction: @MainActor () -> Double
     let onScroll: @MainActor (ReaderModel.Scroll) -> Void
-    let onLink: @MainActor (URL) -> Void
+    /// A link was tapped at a point in the web view's own coordinates.
+    let onLink: @MainActor (URL, CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -32,6 +34,7 @@ struct ArticleWebView: UIViewRepresentable {
         webView.allowsLinkPreview = false
         webView.isOpaque = false
         webView.backgroundColor = UIColor(resource: .background)
+        webView.addGestureRecognizer(context.coordinator.touches)
         context.coordinator.attach(webView)
         return webView
     }
@@ -52,6 +55,8 @@ struct ArticleWebView: UIViewRepresentable {
         /// count from here.
         private var hasDragged = false
         private var contentSizeObservation: NSKeyValueObservation?
+        /// Where the last touch went down, for the link it activates.
+        let touches = TouchDownRecognizer()
 
         init(_ parent: ArticleWebView) {
             self.parent = parent
@@ -129,7 +134,7 @@ struct ArticleWebView: UIViewRepresentable {
             let url = navigationAction.request.url
             let isPage = url?.scheme == ReaderResources.scheme
             if navigationAction.navigationType == .linkActivated, !isPage, let url {
-                parent.onLink(url)
+                parent.onLink(url, touches.location)
                 return .cancel
             }
             return isPage && navigationAction.targetFrame?.isMainFrame == true ? .allow : .cancel
@@ -150,6 +155,19 @@ struct ArticleWebView: UIViewRepresentable {
             loadedHTML = nil
             load(html)
         }
+    }
+}
+
+/// Records where each touch goes down in its view and never recognises, so the web view's own
+/// gestures (link taps, scrolling) are untouched. Touch-down always comes before the link
+/// activation it leads to, which reaches the navigation delegate only after the finger lifts and a
+/// round trip to the web content process, so the location is that tap's.
+final class TouchDownRecognizer: UIGestureRecognizer {
+    private(set) var location = CGPoint.zero
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if let touch = touches.first { location = touch.location(in: view) }
+        state = .failed
     }
 }
 

@@ -36,6 +36,8 @@ private struct ReaderScreen: View {
     @State private var model: ReaderModel
     /// The link whose dialog is showing.
     @State private var link: URL?
+    /// Where the link was tapped, in the web view's coordinates; the dialog points there.
+    @State private var linkPoint = CGPoint.zero
     /// Whether the presenter has an order to follow (the Next button shows).
     let showsNext: Bool
     let next: Article?
@@ -65,17 +67,6 @@ private struct ReaderScreen: View {
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: link) { _, link in link != nil }
             .sensoryFeedback(.success, trigger: model.savedLinks)
-            .confirmationDialog(
-                link.map { ArticleRow.domain(of: $0.absoluteString) ?? $0.absoluteString } ?? "",
-                isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } }),
-                titleVisibility: .visible, presenting: link
-            ) { url in
-                Button("Save to Reads") {
-                    Task { await model.saveLink(url) }
-                }
-                Button("Open in Browser") { openURL(url) }
-                Button("Copy Link") { UIPasteboard.general.url = url }
-            }
             .alert(
                 model.alert?.title ?? "",
                 isPresented: Binding(get: { model.alert != nil }, set: { if !$0 { model.alert = nil } })
@@ -98,10 +89,32 @@ private struct ReaderScreen: View {
                 html: ReaderTemplate.html(for: model.article, baseSize: baseSize),
                 restoreFraction: { model.restoreFraction },
                 onScroll: { model.scrolled($0) },
-                onLink: { linkTapped($0) }
+                onLink: { linkTapped($0, at: $1) }
             )
+            .overlay { linkAnchor }
             .ignoresSafeArea()
         }
+    }
+
+    /// The link dialog, anchored at the tapped point: on iOS 26 it is a popover pointing at the
+    /// view it is attached to. In the web view's overlay, inside the same `ignoresSafeArea`, so the
+    /// web view's own coordinates place it.
+    private var linkAnchor: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .confirmationDialog(
+                link.map { ArticleRow.domain(of: $0.absoluteString) ?? $0.absoluteString } ?? "",
+                isPresented: Binding(get: { link != nil }, set: { if !$0 { link = nil } }),
+                titleVisibility: .visible, presenting: link
+            ) { url in
+                Button("Save to Reads") {
+                    Task { await model.saveLink(url) }
+                }
+                Button("Open in Browser") { openURL(url) }
+                Button("Copy Link") { UIPasteboard.general.url = url }
+            }
+            // After the dialog, so it anchors to the 1-point frame, not the full-size position box.
+            .position(linkPoint)
     }
 
     @ToolbarContentBuilder
@@ -141,10 +154,11 @@ private struct ReaderScreen: View {
     }
 
     /// The title opens the article in the browser; any other link asks what to do with it.
-    private func linkTapped(_ url: URL) {
+    private func linkTapped(_ url: URL, at point: CGPoint) {
         if url == ReaderTemplate.webURL(model.article.url) {
             openURL(url)
         } else {
+            linkPoint = point
             link = url
         }
     }
