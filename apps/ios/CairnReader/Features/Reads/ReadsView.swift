@@ -1,11 +1,14 @@
 import SwiftUI
 
 /// The Reads tab: the store's rows (or search results) in `ArticleListView`, with search,
-/// pull-to-refresh, full-swipe archive and the cached-data banner.
+/// pull-to-refresh, full-swipe archive, the cached-data banner and the add-link sheet.
 struct ReadsView: View {
+    private let session: UserSession
     @State private var model: ReadsModel
+    @State private var isAddingLink = false
 
     init(session: UserSession) {
+        self.session = session
         _model = State(initialValue: ReadsModel(session: session))
     }
 
@@ -26,6 +29,16 @@ struct ReadsView: View {
         .headerSearch(query: $search.query, prompt: "Search your reads")
         .refreshable { await model.refresh() }
         .navigationTitle("Reads")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Add link", systemImage: "plus") { isAddingLink = true }
+            }
+        }
+        .sheet(isPresented: $isAddingLink) {
+            AddLinkSheet(read: session.read, mode: .link) {
+                Task { await model.refresh() }
+            }
+        }
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
         .task(id: model.window) { await model.observe(model.window) }
         // Not `.task`: leaving the tab mid-sync would cancel the wait and read as a failure.
