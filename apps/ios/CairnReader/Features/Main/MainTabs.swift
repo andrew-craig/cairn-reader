@@ -24,13 +24,13 @@ struct MainTabs: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Feed", systemImage: "newspaper", value: MainTab.feed) {
+            Tab("Feed", image: icon("feed", for: .feed), value: MainTab.feed) {
                 NavigationStack { FeedView(session: session) }
             }
-            Tab("Reads", systemImage: "book", value: MainTab.reads) {
+            Tab("Reads", image: icon("read", for: .reads), value: MainTab.reads) {
                 NavigationStack { ReadsView(session: session) }
             }
-            Tab("You", systemImage: "person.crop.circle", value: MainTab.you) {
+            Tab("You", image: icon("profile", for: .you), value: MainTab.you) {
                 NavigationStack { YouView(model: you) }
             }
         }
@@ -49,6 +49,12 @@ struct MainTabs: View {
         } message: {
             Text(rejectionMessage ?? "")
         }
+    }
+
+    /// A tab's icon: the filled variant while the tab is selected, the outline otherwise (as the
+    /// React Native tab bar).
+    private func icon(_ name: String, for tab: MainTab) -> String {
+        selection == tab ? "\(name)-fill" : name
     }
 
     /// What the user is told when the server refuses an archive or a Save to Reads (the

@@ -52,7 +52,7 @@ struct BookmarksView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("No bookmarked articles yet", systemImage: "bookmark")
+                ContentUnavailableView("No bookmarked articles yet", image: "bookmark")
             }
         }
     }

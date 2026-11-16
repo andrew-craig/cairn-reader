@@ -122,21 +122,21 @@ private struct ReaderScreen: View {
         ToolbarItemGroup(placement: .bottomBar) {
             Spacer()
             if showsNext {
-                Button("Next Article", systemImage: "forward") {
+                Button("Next Article", image: .arrowDown) {
                     if let next { current = next }
                 }
                 .disabled(next == nil)
             }
             let isFavorite = model.article.isFavorite
-            Button(isFavorite ? "Remove from Favorites" : "Favorite", systemImage: isFavorite ? "bookmark.fill" : "bookmark") {
+            Button(isFavorite ? "Remove from Favorites" : "Favorite", image: isFavorite ? .bookmarkFill : .bookmark) {
                 Task { await model.toggleFavorite() }
             }
             if model.article.list == .feed {
-                Button("Save to Reads", systemImage: "tray.and.arrow.down") {
+                Button("Save to Reads", image: .read) {
                     Task { await model.saveToReads() }
                 }
             } else {
-                Button("Archive", systemImage: "archivebox") {
+                Button("Archive", image: .archive) {
                     Task { await model.archive() }
                 }
             }

@@ -18,7 +18,7 @@ struct FeedView: View {
             Button {
                 Task { await model.saveToReads(article) }
             } label: {
-                Label("Save to Reads", systemImage: "book")
+                Label("Save to Reads", image: .read)
             }
             .tint(Color(.info))
         }
@@ -59,7 +59,7 @@ struct FeedView: View {
                     }
                 }
             } else {
-                ContentUnavailableView("Your Feed is empty", systemImage: "newspaper")
+                ContentUnavailableView("Your Feed is empty", image: "feed")
             }
         }
     }
