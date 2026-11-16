@@ -143,7 +143,7 @@ nonisolated struct UnifiedSubscription: Codable, Sendable, Identifiable, Hashabl
     /// Passed through from the source service as a string.
     let subscribedAt: String
     /// Where this source's new items are delivered.
-    let list: ContentList
+    var list: ContentList
     let rssData: RSSSubscriptionData?
     let emailData: EmailSubscriptionData?
 }
