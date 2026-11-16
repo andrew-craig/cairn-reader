@@ -23,7 +23,7 @@ struct FeedView: View {
             .tint(Color(.info))
         }
         .overlay { emptyState }
-        .searchable(text: $list.query, prompt: "Search your feed")
+        .headerSearch(query: $list.query, prompt: "Search your feed")
         .refreshable { await list.refresh() }
         .navigationTitle("Feed")
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }

@@ -18,7 +18,7 @@ struct BookmarksView: View {
             EmptyView()
         }
         .overlay { emptyState }
-        .searchable(text: $list.query, prompt: "Search your bookmarks")
+        .headerSearch(query: $list.query, prompt: "Search your bookmarks")
         .refreshable { await list.refresh() }
         .navigationTitle("Bookmarks")
         // Not `.task`: popping back mid-refresh would cancel it and read as a failure.

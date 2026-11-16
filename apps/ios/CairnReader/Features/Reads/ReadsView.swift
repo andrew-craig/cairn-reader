@@ -23,7 +23,7 @@ struct ReadsView: View {
             .tint(Color(.success))
         }
         .overlay { emptyState }
-        .searchable(text: $search.query, prompt: "Search your reads")
+        .headerSearch(query: $search.query, prompt: "Search your reads")
         .refreshable { await model.refresh() }
         .navigationTitle("Reads")
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
