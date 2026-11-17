@@ -2,14 +2,14 @@
 id: feature_33bc
 title: [iOS native 10] Article list model, ArticleRow and the Reads tab
 type: feature
-status: in_progress
+status: closed
 priority: 1
 labels: [ios,ui]
-blocked_by: [task_4e17]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T08:04:08Z
+updated_at: 2026-11-17T11:52:48Z
 ---
 ## Goal
 The reusable list pieces (network paging model, row, list view) and the Reads tab, which shows the store and nothing else (decision 8).
@@ -72,4 +72,4 @@ Notes and follow-ups:
 - An archive from the reader of a search result leaves the result row until the search reruns (only `ReadsModel.archive` calls `search.remove`); store rows need nothing.
 - A first-page sync (appear after the TTL, pull-to-refresh) narrows the window back to the first page, as the RN reset did.
 - Timing-based tests: `ReadsModelTests` and the search tests poll with `eventually` (10 s timeout); `aRefreshInsideTheDebounceStillRestoresTheList` sleeps 50 ms past a 20 ms debounce.
-- CI: iOS App Checks green on PR #468 (3974b0e). Close after merge and on-device check.
+- CI: iOS App Checks green on PR #468 (3974b0e). Merged; the owner confirmed the on-device checks on 2026-11-17.

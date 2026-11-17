@@ -2,14 +2,14 @@
 id: task_4e17
 title: [iOS native 08] Connectivity, Sync (drain, Reads page sync, prefetch), FeedCache
 type: task
-status: in_progress
+status: closed
 priority: 2
 labels: [ios,offline]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T06:48:36Z
+updated_at: 2026-11-17T11:52:48Z
 ---
 ## Goal
 The background machinery around the store: know when the device is offline, sync Reads pages into the store, drain and prefetch at the right moments, and keep the last Feed page for the stale banner. All of it owned by `UserSession` (decision 10).
@@ -69,4 +69,4 @@ Risks and follow-ups:
 - Timing-based tests: `aRunRequestedDuringARunJoinsIt` (100 ms for the second run to join), `neverStartsACandidateBeyondTheFirstWaveOnceAborted` (100 ms delay of a2/a3), and the close tests (blocking/sleeping stub handlers).
 
 
-- CI: iOS App Checks green on PR #467 (85c43fb). Close after merge and on-device check.
+- CI: iOS App Checks green on PR #467 (85c43fb). Merged; the owner confirmed the on-device checks on 2026-11-17.

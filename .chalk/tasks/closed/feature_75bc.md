@@ -2,14 +2,14 @@
 id: feature_75bc
 title: [iOS native 11] Feed tab and Bookmarks
 type: feature
-status: in_progress
+status: closed
 priority: 2
 labels: [ios,ui]
-blocked_by: [feature_33bc]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T08:17:38Z
+updated_at: 2026-11-17T11:52:49Z
 ---
 ## Goal
 The online-only skim list and the favourites list, both on `ArticleListView` and `ArticleListModel`.
@@ -53,4 +53,4 @@ Notes:
 - The Feed's empty state can flash when the whole cached page is excluded while the first refresh runs.
 - A rejected save's row returns to the list and, on that `exclude` change, to the cache too, matching the server.
 - Timing-based tests poll with `eventually`; `rendersStoredFavoritesWhileTheNetworkCallIsPending` holds the stub handler with a polling sleep.
-- CI: iOS App Checks green on PR #468 (3974b0e). Close after merge and on-device check.
+- CI: iOS App Checks green on PR #468 (3974b0e). Merged; the owner confirmed the on-device checks on 2026-11-17.
