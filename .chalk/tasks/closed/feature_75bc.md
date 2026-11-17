@@ -53,4 +53,4 @@ Notes:
 - The Feed's empty state can flash when the whole cached page is excluded while the first refresh runs.
 - A rejected save's row returns to the list and, on that `exclude` change, to the cache too, matching the server.
 - Timing-based tests poll with `eventually`; `rendersStoredFavoritesWhileTheNetworkCallIsPending` holds the stub handler with a polling sleep.
-- CI: iOS App Checks green on PR #468 (3974b0e). Close after merge and on-device check.
+- CI: iOS App Checks green on PR #468 (3974b0e). Merged; the owner confirmed the on-device checks on 2026-11-17.
