@@ -26,8 +26,8 @@ struct ReaderView: View {
     }
 }
 
-/// One article: the web view (or its loading and offline states), the link dialog and the bottom
-/// toolbar.
+/// One article: the web view (or its loading and offline states), the link dialog, the bottom
+/// toolbar and the report-an-issue sheet.
 private struct ReaderScreen: View {
     @Environment(Connectivity.self) private var connectivity
     @Environment(\.dismiss) private var dismiss
@@ -38,6 +38,10 @@ private struct ReaderScreen: View {
     @State private var link: URL?
     /// Where the link was tapped, in the web view's coordinates; the dialog points there.
     @State private var linkPoint = CGPoint.zero
+    @State private var isReporting = false
+    /// Set by an accepted report; the confirmation shows once the sheet has gone.
+    @State private var reportSent = false
+    private let read: ReadService
     /// Whether the presenter has an order to follow (the Next button shows).
     let showsNext: Bool
     let next: Article?
@@ -46,6 +50,7 @@ private struct ReaderScreen: View {
 
     init(article: Article, session: UserSession, showsNext: Bool, next: Article?, current: Binding<Article>) {
         _model = State(initialValue: ReaderModel(article: article, session: session))
+        read = session.read
         self.showsNext = showsNext
         self.next = next
         _current = current
@@ -64,6 +69,9 @@ private struct ReaderScreen: View {
             }
             .onChange(of: model.isFinished) { _, isFinished in
                 if isFinished { dismiss() }
+            }
+            .sheet(isPresented: $isReporting, onDismiss: confirmReport) {
+                ReportIssueView(read: read, contentID: model.article.id) { reportSent = true }
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: link) { _, link in link != nil }
             .sensoryFeedback(.success, trigger: model.savedLinks)
@@ -144,7 +152,16 @@ private struct ReaderScreen: View {
             if let url = ReaderTemplate.webURL(model.article.url) {
                 ShareLink(item: url)
             }
+            Menu("More", systemImage: "ellipsis") {
+                Button("Report an issue with the article", systemImage: "ant") { isReporting = true }
+            }
         }
+    }
+
+    private func confirmReport() {
+        guard reportSent else { return }
+        reportSent = false
+        model.alert = (title: "Report sent", message: "Thanks — your report was sent.")
     }
 
     /// The user's Dynamic Type body size for the base of the page's type scale (16 pt at the

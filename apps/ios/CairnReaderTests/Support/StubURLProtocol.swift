@@ -21,11 +21,13 @@ nonisolated final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
-    /// The handler runs on its own queue, not the URL loading thread: that thread is shared by
-    /// every session in the process, so a handler that holds a request (a test waiting on a
-    /// pending fetch) would otherwise stall every other test's requests. The client is still
-    /// called on the loading thread's run loop, as `URLProtocol` requires; callbacks from another
-    /// thread are sometimes lost, leaving the request to time out.
+    /// The handler runs on a thread of its own, not the URL loading thread: that thread is shared
+    /// by every session in the process, so a handler that holds a request (a test waiting on a
+    /// pending fetch) would otherwise stall every other test's requests. Not a global queue
+    /// either: its pool is about one thread per core, so on a 3-core CI runner a few held
+    /// handlers starve every other request until it times out. The client is still called on the
+    /// loading thread's run loop, as `URLProtocol` requires; callbacks from another thread are
+    /// sometimes lost, leaving the request to time out.
     override func startLoading() {
         let id = request.value(forHTTPHeaderField: Self.idHeader) ?? ""
         guard let handler = Self.handlers.withLock({ $0[id] }) else {
@@ -38,7 +40,7 @@ nonisolated final class StubURLProtocol: URLProtocol, @unchecked Sendable {
             request.httpBody = Self.read(stream)
         }
         let loadingRunLoop = LoadingRunLoop(CFRunLoopGetCurrent())
-        DispatchQueue.global().async { [self, request] in
+        Thread.detachNewThread { [self, request] in
             let result = Result { try handler(request) }
             CFRunLoopPerformBlock(loadingRunLoop.runLoop, CFRunLoopMode.commonModes.rawValue) { [self] in
                 switch result {

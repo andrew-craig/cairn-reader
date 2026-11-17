@@ -11,8 +11,7 @@ enum Route: Hashable {
     case newsletters
 }
 
-/// The screen for each route, shared by every tab's stack. Routes whose screen has not landed yet
-/// show a stand-in; each is replaced by its own feature task.
+/// The screen for each route, shared by every tab's stack.
 ///
 /// A screen whose rows the reader can step through (Next article) declares the stack's
 /// destinations with `nextArticle`, its model's `article(after:)`. Only the destinations declared
@@ -46,9 +45,9 @@ struct RouteDestination: View {
         case .about:
             AboutView()
         case .rss:
-            ContentUnavailableView("RSS", systemImage: "dot.radiowaves.up.forward")
+            if let session { SubscriptionListView(session: session, kind: .rss) }
         case .newsletters:
-            ContentUnavailableView("Newsletters", systemImage: "envelope")
+            if let session { SubscriptionListView(session: session, kind: .newsletters) }
         }
     }
 }
