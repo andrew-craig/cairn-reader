@@ -2,14 +2,14 @@
 id: feature_33bc
 title: [iOS native 10] Article list model, ArticleRow and the Reads tab
 type: feature
-status: in_progress
+status: closed
 priority: 1
 labels: [ios,ui]
-blocked_by: [task_4e17]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T08:04:08Z
+updated_at: 2026-11-17T11:52:48Z
 ---
 ## Goal
 The reusable list pieces (network paging model, row, list view) and the Reads tab, which shows the store and nothing else (decision 8).

@@ -5,11 +5,11 @@ type: feature
 status: in_progress
 priority: 2
 labels: [ios,ui]
-blocked_by: [feature_33bc]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-16T21:06:13Z
+updated_at: 2026-11-17T11:52:48Z
 ---
 ## Goal
 Save a URL to Reads or subscribe to a feed, from the Reads toolbar and from the RSS screen.
