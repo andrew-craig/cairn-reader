@@ -2,14 +2,14 @@
 id: chore_ae2a
 title: Declare iOS export compliance in app config so TestFlight builds skip the encryption questions
 type: chore
-status: in_progress
+status: closed
 priority: 2
 labels: [mobile,ios]
 blocked_by: []
 parent: null
 remote_task_url: null
 created_at: 2026-10-30T10:19:00Z
-updated_at: 2026-10-31T00:49:07Z
+updated_at: 2026-11-18T06:56:25Z
 ---
 Each TestFlight upload shows 'Missing Compliance' and requires answering the encryption questions in App Store Connect. Set ios.config.usesNonExemptEncryption=false in apps/mobile/app.json so expo prebuild writes ITSAppUsesNonExemptEncryption=false into Info.plist (CI regenerates ios/ with prebuild --clean, so the setting must live in app.json). Cairn only uses HTTPS via Apple's system networking, which is exempt.
 
