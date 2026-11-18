@@ -5,11 +5,11 @@ type: feature
 status: in_progress
 priority: 3
 labels: [ios,ui]
-blocked_by: [feature_4e37]
+blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-16T21:06:13Z
+updated_at: 2026-11-18T07:22:40Z
 ---
 ## Goal
 Let the reader report a badly extracted article.

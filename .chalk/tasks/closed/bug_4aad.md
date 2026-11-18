@@ -2,14 +2,14 @@
 id: bug_4aad
 title: Reader: link tapped while the previous link dialog is dismissing opens no dialog
 type: bug
-status: open
+status: closed
 priority: 2
 labels: []
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-18T06:56:55Z
-updated_at: 2026-11-18T06:56:55Z
+updated_at: 2026-11-18T07:22:39Z
 ---
 
 Found in the on-device check of feature_4e37 (task 12). Tap a link, dismiss its dialog, then quickly tap another link: no dialog opens. The owner feels the tap haptic, and a tap a second later works again.
@@ -24,3 +24,5 @@ Either way, the cause is a single SwiftUI presentation slot shared by consecutiv
 - [ ] Remove `link`, `linkPoint`, `linkAnchor` and the `.confirmationDialog` from `ReaderScreen`.
 - [ ] Update `apps/ios/CLAUDE.md` (Reader bullet).
 - [ ] CI: iOS App Checks green. Owner on device: rapid link taps each open a dialog; the dialog still points at the tapped link; Save to Reads / Open in Browser / Copy Link still work.
+## Resolution
+Won't fix: a SwiftUI limitation. A binding-driven `.confirmationDialog` has one presentation slot. SwiftUI gives no signal when a dismissal finishes and can't queue a presentation behind one, so a tap during the roughly 0.3 s closing animation is lost. The impact is cosmetic: the haptic fires, no dialog appears, and the next tap works. The owner accepted it rather than replacing the dialog with a UIKit `UIAlertController` presented from the web view. That would be an extra UIKit special case, depend on finding the presenting view controller, and not be unit-testable. The plan above remains the fix if this becomes a problem in real use.
