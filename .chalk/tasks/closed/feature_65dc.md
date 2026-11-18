@@ -2,14 +2,14 @@
 id: feature_65dc
 title: [iOS native 13] Report extraction issue sheet
 type: feature
-status: in_progress
+status: closed
 priority: 3
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-18T07:22:40Z
+updated_at: 2026-11-18T11:16:03Z
 ---
 ## Goal
 Let the reader report a badly extracted article.
@@ -50,3 +50,4 @@ Risks:
 - The menu holds a single item. If later tasks add reader actions, they belong there.
 
 On-device follow-up (owner): the "Report sent" alert needed dismissing for no reason. It's replaced by a toast: once the sheet has gone, a glass capsule saying "Report sent" sits just above the bottom toolbar for 2 s, then fades. It ignores touches and is announced to VoiceOver. It's local to `ReaderScreen` (`showsReportToast`, cleared by a `.task(id:)` sleep), because nothing else needs a toast yet. Needs a recheck on device.
+On-device check (owner): passed, including the "Report sent" toast.

@@ -5,11 +5,11 @@ type: task
 status: open
 priority: 1
 labels: [ios,qa]
-blocked_by: [feature_65dc,feature_704f,feature_983c]
+blocked_by: [feature_704f,feature_983c]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-18T07:22:40Z
+updated_at: 2026-11-18T11:16:03Z
 ---
 ## Goal
 Confirm the native app can replace the RN app. Agents cannot run a simulator from Linux sessions, so the device checks are the owner's; findings become bug tasks under epic_bc48.
