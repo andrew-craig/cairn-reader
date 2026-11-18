@@ -49,3 +49,4 @@ Risks:
 - On device (owner): the sheet's keyboard handling with the multi-line field, and the alert appearing after the sheet's dismissal.
 - The menu holds a single item. If later tasks add reader actions, they belong there.
 
+On-device follow-up (owner): the "Report sent" alert needed dismissing for no reason. It's replaced by a toast: once the sheet has gone, a glass capsule saying "Report sent" sits just above the bottom toolbar for 2 s, then fades. It ignores touches and is announced to VoiceOver. It's local to `ReaderScreen` (`showsReportToast`, cleared by a `.task(id:)` sleep), because nothing else needs a toast yet. Needs a recheck on device.
