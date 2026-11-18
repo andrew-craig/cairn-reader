@@ -5,11 +5,11 @@ type: feature
 status: in_progress
 priority: 2
 labels: [ios,ui]
-blocked_by: [feature_b604,feature_704f]
+blocked_by: [feature_b604]
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-16T21:06:13Z
+updated_at: 2026-11-18T11:58:36Z
 ---
 ## Goal
 Manage sources and choose which list each one delivers to.

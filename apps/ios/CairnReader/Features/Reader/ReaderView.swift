@@ -39,8 +39,10 @@ private struct ReaderScreen: View {
     /// Where the link was tapped, in the web view's coordinates; the dialog points there.
     @State private var linkPoint = CGPoint.zero
     @State private var isReporting = false
-    /// Set by an accepted report; the confirmation shows once the sheet has gone.
+    /// Set by an accepted report; the toast shows once the sheet has gone.
     @State private var reportSent = false
+    /// The "Report sent" toast over the toolbar, which goes away by itself.
+    @State private var showsReportToast = false
     private let read: ReadService
     /// Whether the presenter has an order to follow (the Next button shows).
     let showsNext: Bool
@@ -72,6 +74,15 @@ private struct ReaderScreen: View {
             }
             .sheet(isPresented: $isReporting, onDismiss: confirmReport) {
                 ReportIssueView(read: read, contentID: model.article.id) { reportSent = true }
+            }
+            .overlay(alignment: .bottom) { reportToast }
+            .animation(.default, value: showsReportToast)
+            .task(id: showsReportToast) {
+                guard showsReportToast else { return }
+                do {
+                    try await Task.sleep(for: .seconds(2))
+                    showsReportToast = false
+                } catch {}
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: link) { _, link in link != nil }
             .sensoryFeedback(.success, trigger: model.savedLinks)
@@ -158,10 +169,25 @@ private struct ReaderScreen: View {
         }
     }
 
+    @ViewBuilder
+    private var reportToast: some View {
+        if showsReportToast {
+            Text("Report sent")
+                .font(Typography.subheadline)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect()
+                .padding(.bottom, 8)
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+        }
+    }
+
     private func confirmReport() {
         guard reportSent else { return }
         reportSent = false
-        model.alert = (title: "Report sent", message: "Thanks — your report was sent.")
+        showsReportToast = true
+        AccessibilityNotification.Announcement("Report sent").post()
     }
 
     /// The user's Dynamic Type body size for the base of the page's type scale (16 pt at the

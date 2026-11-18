@@ -4,7 +4,7 @@ import Testing
 @testable import CairnReader
 
 // Port of apps/mobile/src/components/ReportIssueModal.test.tsx against `ReportIssueModel`. The
-// "Report sent" alert and closing the sheet are the view's (`send()` answering true).
+// "Report sent" toast and closing the sheet are the view's (`send()` answering true).
 
 private let reportBody = """
     {

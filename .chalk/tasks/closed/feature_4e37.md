@@ -2,14 +2,14 @@
 id: feature_4e37
 title: [iOS native 12] Reader: web-view article, progress tracking, toolbar actions
 type: feature
-status: in_progress
+status: closed
 priority: 1
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-17T11:52:48Z
+updated_at: 2026-11-18T07:22:40Z
 ---
 ## Goal
 The reading screen. The highest-risk UI task: scroll restore and completion tracking must behave as they do today.
@@ -84,3 +84,4 @@ Risks:
 - Restore on device (owner): check that `adjustedContentInset` matches what WebKit uses under the iOS 26 bars, and that late image loads trigger the content-size KVO.
 - Timing-based tests: the held-detail tests poll a `Mutex` in the stub handler (which now runs off the shared URL-loading thread); the throttle test sends its readings in one turn with a 5 s interval; several cases sleep 50 ms to show that nothing was written.
 - CI: iOS App Checks green on PR #468 (3974b0e). Close after merge and on-device check.
+On-device check (owner): passed. The one issue, a quick second link tap during the previous dialog's dismissal showing no dialog, is filed as bug_4aad and accepted as a SwiftUI limitation (won't fix). The "Report an issue" entry was delivered by task 13 (feature_65dc).
