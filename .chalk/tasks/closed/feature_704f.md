@@ -2,14 +2,14 @@
 id: feature_704f
 title: [iOS native 14] Add link / subscribe sheet
 type: feature
-status: in_progress
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-17T11:52:48Z
+updated_at: 2026-11-18T11:58:36Z
 ---
 ## Goal
 Save a URL to Reads or subscribe to a feed, from the Reads toolbar and from the RSS screen.
@@ -74,3 +74,4 @@ Risks:
 - `PasteButton`'s closure is formed in a MainActor view; if the system calls it off the main thread, Swift 6's isolation check would trap. It is not exercised by tests, so check it on the device.
 - On device (owner): the `PasteButton` and the inline picker inside the Form; the sheet's keyboard and return-key behaviour; the success alert over the sheet.
 - Timing-based tests use a 20 ms debounce, `eventually` polling and two 50 ms sleeps, to show that a late response is not applied.
+On-device check (owner): passed. Covered paste, article and feed detection, the Feed/Reads choice, Find feed (one, several and none), the URL keyboard and return key, dismissal while detecting and adding, the duplicate-feed error, offline, and layout in light and dark.
