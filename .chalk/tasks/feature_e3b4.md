@@ -12,3 +12,5 @@ created_at: 2026-04-07T11:53:36Z
 updated_at: 2026-04-07T11:53:36Z
 ---
 
+## Platforms
+Both. Check first: both add-link flows already run a debounced `detectURL` and pick article or feed (iOS `AddLinkModel`, Android `AddLinkModal`); close this if that covers it. (Set at the iOS native cutover, chore_c364: iOS ships from `apps/ios`, Android from `apps/mobile`.)

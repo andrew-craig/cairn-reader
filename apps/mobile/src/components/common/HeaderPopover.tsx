@@ -4,7 +4,6 @@ import {
   View,
   TouchableOpacity,
   StyleSheet,
-  Platform,
   KeyboardAvoidingView,
   useColorScheme,
 } from 'react-native';
@@ -29,7 +28,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, 
       <View style={StyleSheet.absoluteFill}>
         <BlurView
           style={StyleSheet.absoluteFill}
-          intensity={Platform.OS === 'ios' ? 8 : 16}
+          intensity={16}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
         />
         <TouchableOpacity
@@ -38,7 +37,7 @@ export const HeaderPopover: React.FC<HeaderPopoverProps> = ({ visible, onClose, 
           onPress={onClose}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="height"
             style={styles.keyboardView}
           >
             <TouchableOpacity

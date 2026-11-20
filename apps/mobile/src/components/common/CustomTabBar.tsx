@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, useColorScheme, Platform } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -41,7 +41,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
     >
       <View style={[styles.shadowWrapper, { shadowColor: colors.shadow }]}>
         <BlurView
-          intensity={Platform.OS === 'ios' ? 10 : 20}
+          intensity={20}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={[
             styles.tabBar,

@@ -176,57 +176,49 @@ The workflows use GitHub Actions cache to speed up builds:
 - Clear cache by re-running workflow with "Re-run all jobs"
 - Or modify workflow to use `cache-from: type=gha,mode=min`
 
-## iOS Deployment Workflows
+## iOS Workflows
 
-### 🚀 Recommended: Fastlane (Free)
+iOS ships only from the native app in `apps/ios`. The Expo app in `apps/mobile` is Android-only and has no release workflow.
 
-**File:** `ios-testflight-fastlane.yml`
+### `ios-checks.yml` - Build and test
 
-- ✅ **Free** (uses GitHub Actions macOS runners)
-- ✅ **Industry standard** for iOS deployment
-- ✅ **Full control** over build process
-- ⚙️ **Setup:** Follow [apps/mobile/FASTLANE_SETUP.md](../../apps/mobile/FASTLANE_SETUP.md)
+**Triggers:** pull requests to `main` that touch `apps/ios/**`.
+
+Builds `CairnReader.xcodeproj` and runs its tests on an iOS 26 simulator (`macos-26` runner).
+
+### `ios-native-testflight.yml` - TestFlight release
 
 **Triggers:**
-- Manual: Actions tab → "iOS TestFlight (Fastlane)" → Run workflow
-- Automatic: Push a tag like `mobile-v1.0.0`
+- Manual: Actions tab → "iOS Native TestFlight" → Run workflow
+- Automatic: push a tag like `ios-v1.1.0`
 
 **What it does:**
-- Generates native iOS code with `expo prebuild`
-- Installs dependencies and CocoaPods
-- Downloads code signing certificates via Fastlane Match
-- Builds the app with Xcode
-- Auto-increments build number
+- Runs `bundle exec fastlane beta` in `apps/ios` (no Node, `expo prebuild` or CocoaPods)
+- Downloads signing certificates and profiles via Fastlane Match (read-only)
+- Builds `CairnReader.xcodeproj`, build number = latest TestFlight + 1
 - Uploads to TestFlight
 
-### 💰 Alternative: EAS Build (Easiest)
+**Secrets:** `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT`, `FASTLANE_APPLE_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, `MATCH_GIT_BASIC_AUTHORIZATION`, `TEAM_ID`. The marketing version is `MARKETING_VERSION` in the Xcode project. The `build_only` lane does the signed build without uploading.
 
-**File:** `ios-testflight.yml`
+**One-time provisioning:** the App Group `group.com.cairnapp.cairnreader` must be enabled on the App ID `com.cairnapp.cairnreader` in the Apple Developer portal. Then regenerate the Match profiles once, from a Mac with the Match secrets exported (`MATCH_GIT_URL`, `MATCH_PASSWORD`, `FASTLANE_APPLE_ID`, `ASC_*`):
 
-- 💵 **Paid** service ($29/month after free tier)
-- ✅ **Easiest setup** (minimal configuration)
-- ✅ **Managed** by Expo
-- ⚙️ **Setup:** Follow [TESTFLIGHT_SETUP.md](TESTFLIGHT_SETUP.md)
+```bash
+cd apps/ios && bundle install && bundle exec fastlane match appstore --force
+```
 
-**Triggers:**
-- Manual: Actions tab → "iOS TestFlight Deployment" → Run workflow
+CI runs Match read-only, so `beta` fails to sign until this is done.
 
-### 🔧 Advanced: Native Xcode Build
+## Mobile (Expo, Android) Workflow
 
-**File:** `ios-testflight-local-build.yml`
+### `mobile-checks.yml`
 
-- ✅ **Free** but complex
-- ⚙️ **Maximum control** over every build step
-- 🛠️ **Manual** certificate management required
+**Triggers:** pull requests to `main` that touch `apps/mobile/**`, `apps/shared/**` or the root npm manifests.
 
-### Comparison of iOS Options
-
-See [BUILD_OPTIONS.md](BUILD_OPTIONS.md) for a detailed comparison of all iOS build approaches.
+Runs TypeScript, ESLint, Jest, knip and an Android Metro bundle export (`expo export --platform android`).
 
 ## Related Documentation
 
 - [Docker Compose Setup](/infrastructure/docker/README.md)
 - [Service Documentation](/CLAUDE.md)
+- [iOS app](/apps/ios/CLAUDE.md) - native app, Fastlane lanes
 - [GitHub Container Registry Docs](https://docs.github.com/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
-- [Fastlane Setup Guide](../../apps/mobile/FASTLANE_SETUP.md) - iOS deployment setup
-- [iOS Build Options Comparison](BUILD_OPTIONS.md) - Compare EAS vs Fastlane vs Native

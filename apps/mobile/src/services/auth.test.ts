@@ -2,7 +2,6 @@ import { AuthService } from './auth';
 import { NetworkError, HttpError } from '@cairn/shared';
 
 jest.mock('expo-application', () => ({
-  getIosIdForVendorAsync: jest.fn().mockResolvedValue('test-device-id'),
   getAndroidId: jest.fn().mockReturnValue('test-device-id'),
 }));
 

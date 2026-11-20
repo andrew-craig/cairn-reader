@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, useColorScheme, Platform } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,7 +32,7 @@ export const TopBlurGradient: React.FC = () => {
       pointerEvents="none"
     >
       <BlurView
-        intensity={Platform.OS === 'ios' ? 10 : 20}
+        intensity={20}
         tint={colorScheme === 'dark' ? 'dark' : 'light'}
         style={styles.blur}
       />

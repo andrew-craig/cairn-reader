@@ -1,11 +1,12 @@
 # Cairn Architecture
 
-This document provides a detailed overview of Cairn's architecture, design decisions, data flows, and technical implementation across the mobile app, web app, and all backend services.
+This document provides a detailed overview of Cairn's architecture, design decisions, data flows, and technical implementation across the iOS app, the Android app, the web app, and all backend services.
 
 ## Table of Contents
 
 - [System Overview](#system-overview)
-- [Mobile App](#mobile-app)
+- [iOS App](#ios-app)
+- [Android App](#android-app)
 - [Web App](#web-app)
 - [User Service](#user-service)
 - [Read Service](#read-service)
@@ -23,7 +24,8 @@ Cairn is a microservices-based read-it-later application backend designed for sc
 ```mermaid
 flowchart TB
     subgraph Clients["Client Layer"]
-        Mobile["Mobile App<br/>React Native / Expo"]
+        IOS["iOS App<br/>Swift / SwiftUI"]
+        Mobile["Android App<br/>React Native / Expo"]
         Web["Web App<br/>React / Vite"]
     end
 
@@ -35,6 +37,8 @@ flowchart TB
 
     DB[("PostgreSQL<br/>one consolidated instance,<br/>separate logical DB per service")]
 
+    IOS -->|REST| UserSvc
+    IOS -->|REST| ReadSvc
     Mobile -->|REST| UserSvc
     Mobile -->|REST| ReadSvc
     Web -->|REST| UserSvc
@@ -75,9 +79,22 @@ The selfhost single-container build (`infrastructure/docker/selfhost/`) runs eve
 
 ---
 
-## Mobile App
+## iOS App
 
-The Mobile App is a React Native (Expo) client for iOS, Android, and web that lets users save and read articles from RSS feeds, newsletters, and manually added links. It contains no business logic of its own — auth and storage both live in the backend services — and acts as a thin REST client with local persistence for tokens and an offline-friendly article cache.
+The iOS App (`apps/ios`) is a native Swift/SwiftUI client and the only iOS build; it replaced the React Native app's iOS build and keeps its bundle id (`com.cairnapp.cairnreader`). It talks to the same REST APIs and follows the same offline model as the Android App below, built from system components (`TabView`, `NavigationStack`, `List`, `.searchable`, `.swipeActions`, sheets and forms).
+
+**Technology Stack**:
+- Swift 6, SwiftUI, iOS 26 minimum (iPhone and iPad)
+- Keychain for the session; `identifierForVendor` as the device ID for device login
+- GRDB (SQLite) for the per-user Reads store and outbox, in the App Group container
+- `NWPathMonitor` for connectivity; a web view for the reader
+- Fastlane (`apps/ios/fastlane`) and the `iOS Native TestFlight` workflow for releases
+
+**Data ownership**: Reads articles live in the on-device store and screens observe it; every edit goes through the outbox; everything that belongs to the signed-in user is owned by one `UserSession` that ends at sign-out. See [apps/ios/CLAUDE.md](/apps/ios/CLAUDE.md) for the code layout and details.
+
+## Android App
+
+The Android App (`apps/mobile`) is a React Native (Expo) client for Android (it also runs on web for development) that lets users save and read articles from RSS feeds, newsletters, and manually added links. It contains no business logic of its own — auth and storage both live in the backend services — and acts as a thin REST client with local persistence for tokens and an offline-friendly article cache.
 
 ### Service Purpose and Responsibilities
 
@@ -89,7 +106,7 @@ The Mobile App is a React Native (Expo) client for iOS, Android, and web that le
 - Runtime backend switching (a server URL field on the login screen) for pointing the app at a self-hosted or local backend without a rebuild
 
 **Technology Stack**:
-- React Native 0.81 + Expo SDK 54 (iOS, Android, Web)
+- React Native 0.81 + Expo SDK 54 (Android; Web for development)
 - TypeScript, React Navigation (stack + bottom tabs)
 - React Context (`AuthContext`) for auth state
 - `@cairn/shared` workspace package for the API config layer and data types (shared with the web app)
@@ -100,7 +117,7 @@ The Mobile App is a React Native (Expo) client for iOS, Android, and web that le
 
 ```mermaid
 flowchart LR
-    subgraph MobileApp["Mobile App (React Native / Expo)"]
+    subgraph MobileApp["Android App (React Native / Expo)"]
         direction TB
         Login["LoginScreen<br/>device ID or email/password"]
         AddArticle["AddArticleScreen<br/>(global modal, + header button)"]
@@ -295,7 +312,7 @@ The User Service is responsible for managing user access to the Cairn platform, 
 - User account creation and management (email/password or mobile device ID)
 - Stateless JWT authentication with RS256 signing
 - Refresh token management with automatic rotation and reuse detection
-- Mobile device authentication via Expo device ID
+- Mobile device authentication via device ID (Android ID on Android, `identifierForVendor` on iOS; sent as `expo_device_id`)
 - Account upgrade from device-only to email/password
 - Authorization checks ensuring users can only access their own data
 - Secure secrets management with HashiCorp Vault
@@ -591,7 +608,7 @@ CREATE INDEX idx_users_created_at ON users(created_at);
 **Key Fields**:
 - `id`: Primary UUID identifier
 - `email` / `password_hash`: NULL together for mobile-only accounts
-- `expo_device_id`: Expo Application Installation ID; NULL for email-only accounts
+- `expo_device_id`: the device's ID (Android ID or iOS `identifierForVendor`; the column name predates the native iOS app); NULL for email-only accounts
 - `failed_login_attempts` / `locked_until` / `last_failed_login_at`: back the account-lockout policy (locks after 5 consecutive failures, 15-minute lockout by default)
 
 #### Refresh Tokens Table

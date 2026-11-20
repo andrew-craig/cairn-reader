@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, useColorScheme, Platform } from 'react-native';
+import { View, StyleSheet, useColorScheme } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QuickAccessButton, QuickAccessButtonIcon } from './QuickAccessButton';
@@ -33,7 +33,7 @@ export const BottomActionMenu: React.FC<BottomActionMenuProps> = ({ actions }) =
     >
       <View style={[styles.shadowWrapper, { shadowColor: colors.shadow }]}>
         <BlurView
-          intensity={Platform.OS === 'ios' ? 10 : 20}
+          intensity={20}
           tint={colorScheme === 'dark' ? 'dark' : 'light'}
           style={[
             styles.menuContainer,

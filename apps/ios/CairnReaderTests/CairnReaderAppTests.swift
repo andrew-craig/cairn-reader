@@ -1,0 +1,13 @@
+import Foundation
+import Testing
+@testable import CairnReader
+
+struct CairnReaderAppTests {
+    @Test func bundleIdentifier() {
+        #expect(Bundle.main.bundleIdentifier == "com.cairnapp.cairnreader")
+    }
+
+    @Test func appGroupContainerResolves() {
+        #expect(FileManager.default.fileExists(atPath: AppGroup.containerURL.path))
+    }
+}

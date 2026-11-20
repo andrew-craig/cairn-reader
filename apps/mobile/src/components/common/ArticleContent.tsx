@@ -6,8 +6,6 @@ import {
   ScrollView,
   Linking,
   Alert,
-  ActionSheetIOS,
-  Platform,
   useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -110,26 +108,16 @@ export const ArticleContent: React.FC<ArticleContentProps> = ({
     if (!href) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const options = ['Save to Reading List', 'Open in Browser', 'Copy Link', 'Cancel'];
-    const cancelButtonIndex = 3;
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex, title: extractDomain(href) },
-        (index) => handleLinkAction(index, href)
-      );
-    } else {
-      Alert.alert(
-        extractDomain(href),
-        undefined,
-        [
-          { text: 'Save to Reading List', onPress: () => handleLinkAction(0, href) },
-          { text: 'Open in Browser', onPress: () => handleLinkAction(1, href) },
-          { text: 'Copy Link', onPress: () => handleLinkAction(2, href) },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-    }
+    Alert.alert(
+      extractDomain(href),
+      undefined,
+      [
+        { text: 'Save to Reading List', onPress: () => handleLinkAction(0, href) },
+        { text: 'Open in Browser', onPress: () => handleLinkAction(1, href) },
+        { text: 'Copy Link', onPress: () => handleLinkAction(2, href) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   }, [handleLinkAction]);
 
   const renderersProps = { a: { onPress: (_e: unknown, href: string) => handleLinkPress(href) } };

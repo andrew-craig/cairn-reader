@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, useColorScheme } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -61,7 +61,7 @@ export default function App() {
               <TopBlurGradient />
               <StatusBar
                 style={colorScheme === 'dark' ? 'light' : 'dark'}
-                translucent={Platform.OS === 'android'}
+                translucent
                 backgroundColor="transparent"
               />
             </NavigationContainer>

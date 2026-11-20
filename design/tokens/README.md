@@ -9,7 +9,8 @@ mode with the same token names (the build fails if they differ).
 | App | Generated file | Used as |
 |-----|----------------|---------|
 | Web | `apps/web/src/theme/colors.css` | `var(--color-text-secondary)`; dark values under `prefers-color-scheme: dark` |
-| Mobile (React Native) | `apps/mobile/src/constants/colors.ts` | `Colors[useColorScheme() ?? 'light'].textSecondary` |
+| Android (React Native, `apps/mobile`) | `apps/mobile/src/constants/colors.ts` | `Colors[useColorScheme() ?? 'light'].textSecondary` |
+| iOS (native) | `apps/ios/CairnReader/Resources/Colors.xcassets` (one colorset per token) | `Color(.textSecondary)`; light/dark switch natively. The app's accent colour is `primary` and its launch screen background is `background` |
 
 ## Changing a color
 
@@ -24,8 +25,3 @@ Never hardcode a color in an app. If no token fits, add one here.
 
 - `apps/mobile/app.json` (`backgroundColor` for the splash and Android icon) is static Expo config and cannot import
   tokens. It holds a copy of `light.background`; update it by hand if that changes.
-
-## Native Swift
-
-A future Swift app adds a platform to `build.js` (for example an asset-catalog colorset per token, which
-switches light/dark natively) without changing `colors.json`.
