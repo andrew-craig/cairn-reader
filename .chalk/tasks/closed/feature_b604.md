@@ -2,14 +2,14 @@
 id: feature_b604
 title: [iOS native 15] You tab, Account and About
 type: feature
-status: in_progress
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-15T06:48:36Z
+updated_at: 2026-11-20T10:44:11Z
 ---
 ## Goal
 The profile hub and its two settings screens as standard grouped lists and forms.
@@ -42,3 +42,4 @@ The profile hub and its two settings screens as standard grouped lists and forms
 - Known, not changed (task 04 territory, same as RN): a wrong current password gets a 401 from `PUT /user/{id}/password`, which `AuthService.authorizedRequest` treats as an expired token (refresh, retry, then sign out on the second 401).
 
 - CI: iOS App Checks green on PR #467 (85c43fb). Close after merge and on-device check.
+- Local run (2026-11-20, Xcode 27.2, iPhone 17 simulator on iOS 27.2, branch at 2f8ed73): `YouModelTests`, `AccountModelTests` and `AboutViewTests` all pass (17 tests in 3 suites). Closed at the owner's request.
