@@ -130,11 +130,16 @@ services:
       - INGEST_RSS_SERVICE_URL=http://ingest-rss:8081
       - EMAIL_INGEST_SERVICE_URL=http://email-ingest:8087
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_DEV_ROOT_TOKEN_ID}
+      - JWT_PUBLIC_KEY_PATH=secret/data/jwt/public-key
     depends_on:
       cairn-db:
         condition: service_healthy
       ingest-rss:
         condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s

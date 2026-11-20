@@ -322,8 +322,6 @@ cp .env.example .env
 # Edit .env
 # - Change all default passwords and API keys
 # - Set GITHUB_ORG and IMAGE_TAG for the published images
-#   (note: the per-service docker-build-*.yml workflows currently have `if: false`,
-#   so these images are not being published; see task_4f8a)
 nano .env
 
 # First start: vault-init initialises Vault, creates the JWT keys and writes the
@@ -378,7 +376,7 @@ The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 
 Internal endpoints (`/api/v1/internal/*`, `/api/v1/source/rss/*`) return 404 from the public proxy.
 
-For local testing without a TLS proxy, call `http://127.0.0.1:8099` directly. (`DOMAIN` appears in `.env.example` but the Caddyfile does not read it.)
+For local testing without a TLS proxy, call `http://127.0.0.1:8099` directly.
 
 ### Production Docker Compose Configuration
 

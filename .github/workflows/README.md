@@ -32,20 +32,6 @@ This directory contains GitHub Actions workflows for building and testing Docker
 - `ghcr.io/<org>/cairn-ingest-rss`
 - `ghcr.io/<org>/cairn-ingest-rss-worker`
 
-### 2. `docker-test.yml` - Docker Build Test
-
-**Triggers:**
-- Pull requests that modify:
-  - Service code (`services/**`)
-  - Docker infrastructure (`infrastructure/docker/**`)
-  - Docker workflows (`.github/workflows/docker-*.yml`)
-
-**What it does:**
-- Builds all Docker images to verify they compile correctly
-- Does NOT push images to registry
-- Tests that images can be instantiated
-- Provides fast feedback on PRs
-
 ## Setup Instructions
 
 ### 1. Enable GitHub Container Registry
