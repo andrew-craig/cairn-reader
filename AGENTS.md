@@ -201,26 +201,22 @@ If `semble` is not on `$PATH`, use `uvx --from "semble[mcp]" semble` in its plac
 
 ### Task Tracking
 
-ALWAYS use the `chalk` CLI tool for ALL task operations.
+ALL tasks are tracked in **Linear**, team **Andrew-cairn** (key `AND`), through the Linear MCP tools (`mcp__Linear__*`).
 
-```bash
-chalk ready                          # First command when picking up work — shows unblocked tasks by priority
-chalk ready --parent=epic_0c4d       # Find available work under a specific epic
-chalk show <id>                      # View full task details
-chalk list --status=open             # List tasks with filters
-chalk update <id> --status=in_progress  # Claim a task
-chalk close <id>                     # Mark done (auto-unblocks dependents)
-chalk create "Title" --parent=<id>   # Create sub-task
-```
+- **Find work:** `list_issues` with `team: "AND"` and a `state` (`Todo`, `In Progress`, `Backlog`); filter by `project` or `label` as needed. Check `blockedBy` relations before picking an issue up.
+- **Read an issue:** `get_issue` (description) and `list_comments` (discussion).
+- **Claim:** `save_issue` with `id` and `state: "In Progress"`.
+- **Create:** `save_issue` with `team: "AND"`, a `title`, and the `project` the work belongs to. Check `list_issues` with a `query` first to avoid duplicates.
+- **Close:** `save_issue` with `state: "Done"` in the PR that lands the work.
 
-If you have attempted to use `chalk` and it is not available, tasks can be read manually. Tasks are stored as markdown files with YAML frontmatter at `.chalk/tasks/<type>_<hex>.md` (e.g. `tasks/bug_5cc8.md`). Closed tasks move to `.chalk/tasks/closed/`.
+Epics are Linear **projects** (e.g. "Code quality remediation program", "Hosted launch"). Issue types are labels (`Bug`, `Feature`, `Chore`, `decision`).
 
 #### Workflow
-1. **Setup tracking**: If there is not an existing task, create one with `chalk create`
-2. **Plan First**: Write plan to the task file with checkable items
+1. **Setup tracking**: If there is not an existing issue, create one in Linear
+2. **Plan First**: Write the plan into the issue description with checkable items
 3. **Verify Plan**: Check in before starting implementation
 4. **Create a branch**: Put all code fixes into a new branch so they can be tracked and merged
 5. **Track Progress**: Mark items complete as you go
 6. **Explain Changes**: High-level summary at each step
-7. **Document Results**: Add review section to the task file
+7. **Document Results**: Add a review section to the issue description
 8. **Capture Lessons**: Update `LEARNINGS.md` after corrections
