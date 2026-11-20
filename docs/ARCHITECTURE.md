@@ -731,7 +731,7 @@ Ingest uses, so Content Service treats both producers identically.
 - Provide CRUD operations for content
 - Implement full-text search across user's content
 - Support bulk operations for RSS Fetcher and Email Ingest integration
-- Handle content deduplication (RSS-sourced content only)
+- Handle content deduplication (RSS: by content hash + feed; everything else: by content hash + URL)
 - Own Feed vs Reads routing: each user chooses, per source, which list new items land in (see "Feed vs Reads routing" below)
 - Expire old Feed items (daily cleanup job)
 
@@ -759,6 +759,8 @@ GET    /api/v1/content/user/{user_id}/search                 # Full-text search 
 GET    /api/v1/content/user/{user_id}/{content_id}            # Get single item (full HTML) (JWT)
 PATCH  /api/v1/content/user/{user_id}/{content_id}            # Update status/favorite/scroll/list (JWT)
 DELETE /api/v1/content/user/{user_id}/{content_id}            # Remove from user's list      (JWT)
+PUT    /api/v1/content/user/{user_id}/{content_id}/feedback    # Report an extraction problem (JWT)
+GET    /api/v1/content/user/{user_id}/{content_id}/feedback    # Get own extraction report    (JWT)
 GET    /api/v1/content/user/{user_id}/subscriptions             # List RSS + email subscriptions (JWT)
 DELETE /api/v1/content/user/{user_id}/subscriptions/rss/{feed_id} # Unsubscribe from RSS feed  (JWT)
 PUT    /api/v1/content/user/{user_id}/subscriptions/{type}/{key}/list # Choose Feed or Reads for a source (JWT)
@@ -846,6 +848,7 @@ CREATE TABLE contents (
     image_urls TEXT[],
     source_type VARCHAR(50) NOT NULL,        -- 'rss' | 'web' | 'email'
     source_feed_id UUID,                     -- NULL unless source_type = 'rss'
+    source_sender_id UUID,                   -- email sender, used to look up the source route
     metadata JSONB,
     orphaned_at TIMESTAMP WITH TIME ZONE,    -- Set when last user removes it
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -854,7 +857,8 @@ CREATE TABLE contents (
     CHECK (octet_length(cleaned_html) <= 5242880)
 );
 
-CREATE INDEX idx_contents_rss_dedup ON contents(content_hash, source_feed_id) WHERE source_type = 'rss';
+CREATE UNIQUE INDEX idx_contents_rss_dedup ON contents(content_hash, source_feed_id) WHERE source_type = 'rss';
+CREATE UNIQUE INDEX idx_contents_nonrss_dedup ON contents(content_hash, original_url) WHERE source_type != 'rss';
 CREATE INDEX idx_contents_orphaned ON contents(orphaned_at) WHERE orphaned_at IS NOT NULL;
 CREATE INDEX idx_contents_url ON contents(original_url);
 ```
@@ -864,8 +868,9 @@ CREATE INDEX idx_contents_url ON contents(original_url);
 - `canonical_url`: Normalized URL (tracking params removed)
 - `orphaned_at`: Timestamp when last user removed content (for cleanup)
 - `source_feed_id`: NULL for manually saved / emailed content, set for RSS content
-- Deduplication is enforced at the application level (`POST /api/v1/content/check-duplicate`),
-  backed by a non-unique partial index on RSS-sourced rows — not a DB-level UNIQUE constraint
+- Deduplication is checked at the application level (`POST /api/v1/content/check-duplicate`) and
+  backed by two partial UNIQUE indexes: `(content_hash, source_feed_id)` for RSS rows and
+  `(content_hash, original_url)` for all other rows (migration `000004`)
 
 #### User Contents Table
 
@@ -884,9 +889,10 @@ CREATE TABLE user_contents (
     UNIQUE(user_id, content_id)
 );
 
-CREATE INDEX idx_user_contents_user_status ON user_contents(user_id, status);
-CREATE INDEX idx_user_contents_user_favorite ON user_contents(user_id, is_favorite) WHERE is_favorite = TRUE;
-CREATE INDEX idx_user_contents_added_at ON user_contents(user_id, added_at DESC);
+CREATE INDEX idx_user_contents_status ON user_contents(user_id, status);
+CREATE INDEX idx_user_contents_favorite ON user_contents(user_id, is_favorite) WHERE is_favorite = TRUE;
+CREATE INDEX idx_user_contents_user ON user_contents(user_id, added_at DESC);
+CREATE INDEX idx_user_contents_content ON user_contents(content_id);
 CREATE INDEX idx_user_contents_user_list_added ON user_contents(user_id, list, added_at DESC);
 CREATE INDEX idx_user_contents_feed_expiry ON user_contents(added_at) WHERE list = 'feed' AND is_favorite = false;
 ```
@@ -915,6 +921,12 @@ CREATE TABLE source_routes (
 ```
 
 `contents.source_sender_id` (nullable UUID) records the email sender so ingest can look up the route.
+
+#### Content Sources and Feedback Tables
+
+Migration `000007` adds two tables for extraction-problem reports:
+- `content_sources(content_id PK → contents, raw_html, readability_failed, created_at)`: the raw HTML kept next to each extracted article so a report can include it; rows are deleted by the daily cleanup job after a retention period (default 30 days).
+- `content_feedback`: one report per `(user_id, content_id)` with `categories TEXT[]`, optional `comment`, `status` (`open` | `resolved`), and a snapshot of the extracted fields and raw HTML taken when the report is submitted.
 
 #### Feeds Table
 
@@ -960,8 +972,8 @@ CREATE TABLE feed_subscriptions (
     UNIQUE(user_id, feed_id)
 );
 
-CREATE INDEX idx_feed_subscriptions_user ON feed_subscriptions(user_id);
-CREATE INDEX idx_feed_subscriptions_feed ON feed_subscriptions(feed_id);
+CREATE INDEX idx_feed_subs_user ON feed_subscriptions(user_id);
+CREATE INDEX idx_feed_subs_feed ON feed_subscriptions(feed_id);
 ```
 
 **Trigger**: Enforce 100 feed limit per user
@@ -992,8 +1004,8 @@ CREATE TABLE feed_items (
     UNIQUE(feed_id, item_guid)
 );
 
-CREATE INDEX idx_feed_items_processing_status ON feed_items(processing_status, discovered_at);
-CREATE INDEX idx_feed_items_feed_id ON feed_items(feed_id, discovered_at DESC);
+CREATE INDEX idx_feed_items_status ON feed_items(processing_status, discovered_at);
+CREATE INDEX idx_feed_items_feed ON feed_items(feed_id, discovered_at DESC);
 ```
 
 #### Content Outbox Table
@@ -1014,8 +1026,10 @@ CREATE TABLE content_outbox (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_content_outbox_delivery_status ON content_outbox(next_retry_at) WHERE delivery_status IN ('pending', 'sending');
+CREATE INDEX idx_outbox_pending ON content_outbox(next_retry_at) WHERE delivery_status IN ('pending', 'sending');
 ```
+
+`feeds`, `feed_items` and `content_outbox` also carry a nullable `lease_expires_at` column (migration `000002`) used by the workers to claim rows.
 
 ### Communication Patterns
 
