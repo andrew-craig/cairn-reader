@@ -68,7 +68,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 - **Selfhost** (single-container build): [infrastructure/docker/selfhost/README.md](/infrastructure/docker/selfhost/README.md)
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
 - **Color palette** (single source for web, Android and iOS): [design/tokens/README.md](/design/tokens/README.md)
-- **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (epic_fefa)
+- **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (Linear project "Code quality remediation program")
 
 
 ## Approach to work
@@ -210,6 +210,8 @@ ALL tasks are tracked in **Linear**, team **Andrew-cairn** (key `AND`), through 
 - **Close:** `save_issue` with `state: "Done"` in the PR that lands the work.
 
 Epics are Linear **projects** (e.g. "Code quality remediation program", "Hosted launch"). Issue types are labels (`Bug`, `Feature`, `Chore`, `decision`).
+
+IDs like `task_cab7`, `bug_f546` or `epic_bc48` in code comments, commits and older docs are from chalk, the tracker used before Linear. Issues still open at the move say "Migrated from chalk `<id>`" in their Linear description, so search Linear for the ID; for the rest, read `.chalk/tasks/` in git history before commit `b0b7e0b`.
 
 #### Workflow
 1. **Setup tracking**: If there is not an existing issue, create one in Linear

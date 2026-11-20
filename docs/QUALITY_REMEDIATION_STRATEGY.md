@@ -51,7 +51,7 @@ Deprioritise: latent issues gated on conditions that don't hold yet (multi-repli
 
 ### 1.3 The wave plan
 
-Each row becomes one Linear issue titled `[<ID>] <summary>` in the "Code quality remediation program" project. "Recipe" points into Part 2. **P** column = the original chalk priority (0 critical … 4 backlog); in Linear use 0→Urgent, 1→High, 2→Medium, 3/4→Low.
+Each row becomes one Linear issue titled `[<ID>] <summary>` in the "Code quality remediation program" project. "Recipe" points into Part 2. **P** column = priority (0 critical … 4 backlog); in Linear use 0→Urgent, 1→High, 2→Medium, 3/4→Low.
 
 #### Wave 1 — Stop the bleeding (external exposure + timer-triggered outage)
 

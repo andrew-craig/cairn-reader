@@ -27,7 +27,7 @@ Backend is Go microservices over a single PostgreSQL instance (per-service logic
 
 ## Approach
 
-The audit is split into six independent **workstreams** plus a final **consolidation** step. Each workstream is a chalk task under `epic_9c21`; the consolidation task is blocked by all six and produces the single decision-ready deliverable.
+The audit is split into six independent **workstreams** plus a final **consolidation** step. Each workstream was a task under `epic_9c21`; the consolidation task is blocked by all six and produces the single decision-ready deliverable.
 
 ```
 epic_9c21  Pre-beta architecture audit
@@ -70,7 +70,7 @@ Can we *run* this in beta? Critical lead: no metrics endpoint / Prometheus / Gra
 Reliability and the single-instance → scaled path. Known leads: single Postgres (no replication/failover), backups documented but not automated, Vault file storage with plaintext unseal keys, in-memory state (rate limiter) that breaks under multiple instances, and a likely `max_connections` ceiling to verify. Links `task_5dcb`, `task_ece2`.
 
 ### Audit 7 — Consolidation (`task_b783`)
-Produces `docs/architecture/PRE_BETA_AUDIT.md`: executive readiness verdict, per-workstream findings, a prioritised next-steps plan (beta-blocking / fast-follow / roadmap), an action→chalk-task mapping, and the **API freeze checklist**.
+Produces `docs/architecture/PRE_BETA_AUDIT.md`: executive readiness verdict, per-workstream findings, a prioritised next-steps plan (beta-blocking / fast-follow / roadmap), an action→task mapping, and the **API freeze checklist**.
 
 ---
 
@@ -80,11 +80,4 @@ Produces `docs/architecture/PRE_BETA_AUDIT.md`: executive readiness verdict, per
 
 ## How to run it
 
-```bash
-chalk show epic_9c21          # epic overview
-chalk ready --parent=epic_9c21 # unblocked audit workstreams
-chalk update task_2a40 --status=in_progress   # claim a workstream (start with Audit 1)
-chalk close task_2a40                          # close as each section lands
-```
-
-Audit 7 stays blocked in `chalk ready` until all six workstreams are closed, then becomes available to write up the final document.
+The audit is complete: all seven tasks were closed and the deliverable is [`PRE_BETA_AUDIT.md`](PRE_BETA_AUDIT.md). The IDs above are from chalk, the tracker used before Linear; their task files are in git history before commit `b0b7e0b`.

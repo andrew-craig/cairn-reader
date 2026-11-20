@@ -207,9 +207,11 @@ S-2 and S-3 add **three new public endpoints** (`verify-email`, `forgot-password
 
 ---
 
-## 5. Action → chalk task mapping
+## 5. Action → task mapping
 
-Newly created under `epic_9c21` by this consolidation:
+The task IDs are from chalk, the tracker used before Linear. Tasks that were still open when tracking moved to Linear are listed with their Linear issue; the others had been closed.
+
+Newly created under `epic_9c21` by this consolidation (none were still open at the move):
 
 | Task | Title | Class | Findings |
 |---|---|---|---|
@@ -232,18 +234,18 @@ Newly created under `epic_9c21` by this consolidation:
 
 Existing tasks linked (not duplicated):
 
-| Task | Title | Class | Findings | Note |
-|---|---|---|---|---|
-| `task_644a` | Add Prometheus metrics and Grafana dashboards | BETA-BLOCKING | O-1 | blocked on `decision_4052` — unblock |
-| `task_652a` | Set up alerting system for pre-go-live | BETA-BLOCKING | O-1 | blocked on `decision_4052` — unblock |
-| `task_5dcb` | Add database backup script and cron container | BETA-BLOCKING | I-2 | blocked on `decision_4052` — unblock |
-| `task_48ea` | Add Docker resource constraints to production compose | FAST-FOLLOW | O-3, I-6 | pair with `task_7683` |
-| `task_6f3a` | Add integration test workflow with Docker/Postgres | FAST-FOLLOW | O-4 | |
-| `feature_1a69` | Add log monitoring/aggregation stack for production | FAST-FOLLOW | O-6 | |
-| `task_3216` | Optimize N+1 query in recommendation recording | FAST-FOLLOW | Audit 2 | |
-| `task_8392` | Implement load testing for pre-go-live | ROADMAP | informs O-3 | |
-| `task_ece2` | Migrate Vault to auto-unseal via KMS | ROADMAP | I-3 | pre-public-launch |
-| `feature_e001` | Add JTI claim for JWT token revocation | ROADMAP | Audit 4 | |
+| Task | Linear | Title | Class | Findings | Note |
+|---|---|---|---|---|---|
+| `task_644a` | AND-43 | Add Prometheus metrics and Grafana dashboards | BETA-BLOCKING | O-1 | blocked on `decision_4052` (AND-14) — unblock |
+| `task_652a` | AND-44 | Set up alerting system for pre-go-live | BETA-BLOCKING | O-1 | blocked on `decision_4052` (AND-14) — unblock |
+| `task_5dcb` | AND-41 | Add database backup script and cron container | BETA-BLOCKING | I-2 | blocked on `decision_4052` (AND-14) — unblock |
+| `task_48ea` | AND-37 | Add Docker resource constraints to production compose | FAST-FOLLOW | O-3, I-6 | pair with `task_7683` |
+| `task_6f3a` | AND-45 | Add integration test workflow with Docker/Postgres | FAST-FOLLOW | O-4 | |
+| `feature_1a69` | AND-16 | Add log monitoring/aggregation stack for production | FAST-FOLLOW | O-6 | |
+| `task_3216` | — | Optimize N+1 query in recommendation recording | FAST-FOLLOW | Audit 2 | |
+| `task_8392` | AND-48 | Implement load testing for pre-go-live | ROADMAP | informs O-3 | |
+| `task_ece2` | AND-56 | Migrate Vault to auto-unseal via KMS | ROADMAP | I-3 | pre-public-launch |
+| `feature_e001` | AND-34 | Add JTI claim for JWT token revocation | ROADMAP | Audit 4 | |
 
 ---
 

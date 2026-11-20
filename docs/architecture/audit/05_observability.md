@@ -288,13 +288,13 @@ No action now (documented): Load testing (`task_8392`) should inform resource li
 
 ## Existing tasks this workstream maps to
 
-| Chalk task | Title | Finding(s) | Status |
-|---|---|---|---|
-| `task_644a` | Add Prometheus metrics and Grafana dashboards | O-1 | open (blocked on `decision_4052`) |
-| `task_652a` | Set up alerting system for pre-go-live | O-1 | open (blocked on `decision_4052`) |
-| `task_8392` | Implement load testing for pre-go-live | informs O-3 limits | open (blocked on `decision_4052`) |
-| `task_48ea` | Add Docker resource constraints to production compose | O-3 | open (blocked on `decision_4052`) |
-| `task_6f3a` | Add integration test workflow with Docker/Postgres | O-4 | open (blocked on `decision_4052`) |
-| `feature_1a69` | Add log monitoring/aggregation stack for production | O-6b | open (blocked on `decision_4052`) |
-| **NEW** | Fix HTTP timeouts on user-service | O-5 | not yet created |
-| **NEW** | Propagate X-Request-ID across service boundaries | O-2 | not yet created |
+| Task (chalk) | Linear | Title | Finding(s) | Status |
+|---|---|---|---|---|
+| `task_644a` | AND-43 | Add Prometheus metrics and Grafana dashboards | O-1 | open (blocked on `decision_4052`, AND-14) |
+| `task_652a` | AND-44 | Set up alerting system for pre-go-live | O-1 | open (blocked on `decision_4052`, AND-14) |
+| `task_8392` | AND-48 | Implement load testing for pre-go-live | informs O-3 limits | open (blocked on `decision_4052`, AND-14) |
+| `task_48ea` | AND-37 | Add Docker resource constraints to production compose | O-3 | open (blocked on `decision_4052`, AND-14) |
+| `task_6f3a` | AND-45 | Add integration test workflow with Docker/Postgres | O-4 | open (blocked on `decision_4052`, AND-14) |
+| `feature_1a69` | AND-16 | Add log monitoring/aggregation stack for production | O-6b | open (blocked on `decision_4052`, AND-14) |
+| **NEW** | — | Fix HTTP timeouts on user-service | O-5 | not yet created |
+| **NEW** | — | Propagate X-Request-ID across service boundaries | O-2 | not yet created |

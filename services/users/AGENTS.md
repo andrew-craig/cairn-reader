@@ -333,7 +333,7 @@ Repeated failed email/password logins lock the account: 5 consecutive failures l
 
 After an upgrade the account is hybrid and device ID login is disabled; the user must authenticate with email/password.
 
-**Password reset**: not implemented. `/forgot-password` and `/reset-password` were removed (H3+H4, `epic_fefa`) — the tokens they generated were never delivered to the user by any mailer, and the self-host build panicked on both routes because it never wired up the token repository. Rather than ship a route that appears to work but silently does nothing, the routes were deleted; users with an email/password account who forget their password have no self-service recovery today. Account deletion + re-registration is the only path until a real delivery mechanism (and the routes) are added back deliberately.
+**Password reset**: not implemented. `/forgot-password` and `/reset-password` were removed (H3+H4, code quality remediation program) — the tokens they generated were never delivered to the user by any mailer, and the self-host build panicked on both routes because it never wired up the token repository. Rather than ship a route that appears to work but silently does nothing, the routes were deleted; users with an email/password account who forget their password have no self-service recovery today. Account deletion + re-registration is the only path until a real delivery mechanism (and the routes) are added back deliberately.
 
 ## Key Implementation Details
 
