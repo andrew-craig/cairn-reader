@@ -22,7 +22,7 @@ volume on the same physical server — same pinned Compose project name, CI's
 `DB_PASSWORD` override not matching the already-initialized Postgres role — producing
 a `password authentication failed for user cairn` incident and app crash loop on
 2026-09-20. The task's own author wrote this up as "root-caused" and shipped it. It
-shipped wrong: `.github/workflows/docker-test.yml` sets `runs-on: ubuntu-latest` on
+shipped wrong: `.github/workflows/docker-test.yml` (since renamed `selfhost-compose-smoke.yml`) sets `runs-on: ubuntu-latest` on
 every job, including this one — a GitHub-hosted, ephemeral, single-tenant VM that
 cannot share a Docker daemon, network, or volume namespace with the physical server.
 The collision mechanism described was never possible given how the job is configured.

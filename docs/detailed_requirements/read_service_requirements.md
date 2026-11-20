@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Cairn is a simple read-it-later mobile app that allows users to read long-form content. This repository contains the backend services responsible for fetching, storing, and serving user-selected content.
+Cairn is a simple read-it-later app (iOS, Android and web) that allows users to read long-form content. This repository contains the backend services responsible for fetching, storing, and serving user-selected content.
 
 The backend consists of modular services built in Go:
 - **Content Service**: Core service responsible for storing and serving content
@@ -114,7 +114,7 @@ Deduplication is handled on a **per-fetcher basis** to accommodate different fet
 
 ### Content Retrieval API
 
-Provide REST APIs for the mobile app to:
+Provide REST APIs for the client apps (iOS, Android, web) to:
 - Retrieve user's content list with filtering (by status, favorite, date range)
 - Get full content for a specific article
 - Update user-content metadata (status, scroll position, favorite)
@@ -129,7 +129,7 @@ Provide REST APIs for the mobile app to:
 
 Provide REST APIs for the RSS Fetcher to update content when source articles change:
 - Update content body and metadata while preserving all user-content relationships
-- Update endpoint: `PUT /api/v1/contents/:id`
+- Update endpoint: `PUT /api/v1/content/{content_id}`
   - Accepts updated cleaned_html, title, author, description, image_urls, content_hash
   - Preserves all existing user-content records (status, scroll_position, is_favorite)
   - Updates `updated_at` timestamp on the content record
@@ -156,7 +156,6 @@ The system should maintain:
 
 **Note**: The Content Service does not maintain a Users table. User IDs are provided in API requests and validated by a separate authentication service.
 
-**Initial Development**: For the initial implementation before production deployment, user ID validation is not enforced. Any user_id can be sent in API requests. This will be replaced with proper JWT-based authentication before production deployment.
 
 ### Content Retention Policy
 
@@ -690,25 +689,16 @@ The Email Ingest Service (`services/read/email`) accepts forwarded emails from a
 
 ## Authentication & Authorization
 
-**Note**: Authentication is **NOT** part of this initial implementation.
-
-The system integrates with a separate authentication service that uses JWT tokens. Authentication requirements will be added in a separate specification.
-
-For initial development:
-- APIs can be unprotected or use placeholder auth
-- Design with auth in mind (user IDs in requests, etc.)
+User-facing endpoints require a JWT access token (`Authorization: Bearer <token>`) issued by the User Service and validated with the shared `pkg/auth` middleware; see [pkg/auth/README.md](../../pkg/auth/README.md) and the content OpenAPI spec.
 
 ## Out of Scope (Initial Release)
 
 The following features are explicitly out of scope for the initial implementation:
 
-- JWT token validation and user authentication
 - Image downloading and hosting
 - Full-text search (basic filtering only)
 - Content recommendations or discovery algorithms
 - Social features (sharing, comments, etc.)
-- Mobile app development (backend only)
-- Web interface
 - Analytics and usage tracking
 - Email notifications
 - Import from other read-it-later services

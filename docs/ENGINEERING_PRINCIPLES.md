@@ -463,7 +463,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 
 ---
 
-### Mobile App (React Native)
+### Android App (React Native)
 
 **React Native Version:** 0.81.5
 **Expo SDK:** ~54.0.32
@@ -488,7 +488,7 @@ func (v *Validator) ValidateToken(tokenString string) (*Claims, error) {
 - `typescript` - Type checking
 
 **Why React Native + Expo?**
-- **Cross-platform:** Single codebase for iOS and Android
+- **Android:** `apps/mobile` is Android-only; iOS is a separate native Swift/SwiftUI app in `apps/ios` (see its CLAUDE.md)
 - **Fast iteration:** Hot reload, over-the-air updates
 - **Type safety:** TypeScript throughout
 - **Developer experience:** Expo simplifies native module integration
@@ -907,7 +907,7 @@ export const DEFAULT_SERVER_URL = 'https://cairn.seatrain.net';
 **Secrets Management:**
 - **Development:** Use `.env` files (never commit to git)
 - **Production:** Use HashiCorp Vault
-- **Mobile:** Use Expo SecureStore for sensitive data
+- **Android:** Tokens are currently kept in AsyncStorage (`@react-native-async-storage/async-storage`); `expo-secure-store` is not installed
 
 **Files:**
 - `services/users/internal/config/config.go` (structured config example)

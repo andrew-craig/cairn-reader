@@ -25,7 +25,7 @@ apps/mobile/
 ├── knip.json                 # Unused-code check config
 └── src/
     ├── components/           # AddLinkModal, ArticleListScreen, SubscriptionListScreen,
-    │   │                     #   ErrorBoundary, LogoMark; tests co-located (*.test.tsx)
+    │   │                     #   ErrorBoundary, LogoMark, ReportIssueModal; tests co-located (*.test.tsx)
     │   ├── common/           # ArticleContent, ArticleRow, BottomActionMenu, Button, CustomTabBar, HeaderPopover, HeaderSearch,
     │   │                     #   IconButton, ListChoice (explained Feed/Reads), ListToggle (Feed|Reads), OfflineBanner, ScreenHeader,
     │   │                     #   SwipeAction, SyncTriggerEffect, TopBlurGradient, ...

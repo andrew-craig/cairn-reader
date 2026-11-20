@@ -2,9 +2,9 @@
 
 ## Overview
 
-Cairn is a mobile read-it-later service that helps users read their longform content.
+Cairn is a read-it-later service that helps users read their longform content.
 
-Cairn is implemented as a React Native mobile app, a React/Vite web app, and a modular backend implemented in Go.
+Cairn is implemented as a native iOS app (Swift/SwiftUI), an Android app (React Native/Expo), a React/Vite web app, and a modular backend implemented in Go.
 
 The Cairn User Service is responsible for managing users access to the service, and managing their user account. It implements stateless JWT authentication with refresh token capability.
 
@@ -19,19 +19,19 @@ The Cairn User Service is responsible for managing users access to the service, 
 
 ## Core Endpoints
 Authentication
-* POST /auth/register - Create new user account with email/password, return access and refresh tokens
-* POST /auth/register/mobile - Create new mobile-only account using Expo device ID, return access and refresh tokens
-* POST /auth/login - Validate credentials, return access and refresh tokens
-* POST /auth/login/mobile - Authenticate using Expo device ID, return access and refresh tokens
-* POST /auth/refresh - Exchange valid refresh token for new access token
-* POST /auth/logout - Revoke specific refresh token
-* POST /auth/logout-all - Revoke all refresh tokens for a user
+* POST /api/v1/auth/register - Create new user account with email/password, return access and refresh tokens
+* POST /api/v1/auth/register/mobile - Create new mobile-only account using Expo device ID, return access and refresh tokens
+* POST /api/v1/auth/login - Validate credentials, return access and refresh tokens
+* POST /api/v1/auth/login/mobile - Authenticate using Expo device ID, return access and refresh tokens
+* POST /api/v1/auth/refresh - Exchange valid refresh token for new access token
+* POST /api/v1/auth/logout - Revoke specific refresh token
+* POST /api/v1/auth/logout-all - Revoke all refresh tokens for a user
 
 User Management
-* GET /users/{id} - Retrieve user profile (authenticated)
-* PATCH /users/{id} - Update user profile (authenticated)
-* POST /users/{id}/upgrade - Add email and password to mobile-only account (authenticated)
-* DELETE /users/{id} - Delete user account (authenticated)
+* GET /api/v1/user/{id} - Retrieve user profile (authenticated)
+* PATCH /api/v1/user/{id} - Update user profile (authenticated)
+* POST /api/v1/user/{id}/upgrade - Add email and password to mobile-only account (authenticated)
+* DELETE /api/v1/user/{id} - Delete user account (authenticated)
 
 Authorization
 * Users can only access their own user ID
@@ -95,14 +95,14 @@ Transport Security
 ## Mobile User Support
 Device-Based Authentication
 * Mobile users can register without providing email or password
-* Authentication uses Expo Application Installation ID (from expo-application)
+* Authentication uses a per-installation device ID: the Expo Application Installation ID (from expo-application) on Android, `identifierForVendor` on iOS
 * Expo device ID stored securely and treated as a credential
 * Device ID must be unique per installation
 * Mobile-only users receive full access to service features
 
 Account Upgrade Flow
 * Mobile-only users can upgrade their account by adding email and password
-* Upgrade endpoint: POST /users/{id}/upgrade with email and password in request body
+* Upgrade endpoint: POST /api/v1/user/{id}/upgrade with email and password in request body
 * Email must be unique across all users (not already registered)
 * Password must meet standard password requirements
 * After upgrade, account becomes hybrid (all three fields populated)
@@ -128,8 +128,8 @@ Validation Rules
 Multi-Device Support
 * Mobile-only (device ID) accounts are single-device only
 * Users requiring multi-device access must upgrade to email/password authentication
-* After upgrade to hybrid account, only email/password login is accepted (POST /auth/login)
-* Device ID login (POST /auth/login/mobile) is rejected for hybrid accounts
+* After upgrade to hybrid account, only email/password login is accepted (POST /api/v1/auth/login)
+* Device ID login (POST /api/v1/auth/login/mobile) is rejected for hybrid accounts
 * This ensures users have recoverable credentials when using multiple devices
 
 ## Cross-Service Integration
@@ -184,7 +184,7 @@ Monitoring
 Future Considerations
 * OAuth2/OpenID Connect support for third-party authentication
 * Multi-factor authentication (MFA)
-* Email verification workflow
+* Email verification workflow (token generation/consumption and `email_verified` exist; no email is sent yet)
 * Password reset functionality
 * Account lockout after failed attempts
 * Remember device functionality​​​​​​​​​​​​​​​​

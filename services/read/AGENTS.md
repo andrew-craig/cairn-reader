@@ -1291,4 +1291,4 @@ For issues or questions:
 - Check database state: `docker compose exec cairn-db psql -U cairn_content -d content_service`
 - Review tests for usage examples
 - Consult OpenAPI specifications for API details
-- See troubleshooting guide: `/services/read/README.md#troubleshooting`
+- See troubleshooting guide: [docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md)

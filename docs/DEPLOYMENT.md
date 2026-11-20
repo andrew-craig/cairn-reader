@@ -439,6 +439,7 @@ The `DB_SSLMODE` environment variable controls this setting in every service and
 - contents
 - user_contents (each row in the `feed` or `reads` list)
 - source_routes (per-user Feed/Reads choice per source)
+- content_sources (raw source HTML), content_feedback (extraction feedback reports)
 
 **rss_fetcher_service:**
 - feeds

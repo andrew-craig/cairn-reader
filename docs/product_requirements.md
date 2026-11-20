@@ -216,8 +216,8 @@ The following features are **not** included in the initial release:
 ## Platform Requirements
 
 ### Mobile App
-- iOS (React Native/Expo)
-- Android (React Native/Expo)
+- iOS (native Swift/SwiftUI, `apps/ios`)
+- Android (React Native/Expo, `apps/mobile`)
 - Responsive to various screen sizes
 - Works on tablets and phones
 
@@ -226,7 +226,7 @@ The following features are **not** included in the initial release:
 
 ### Authentication
 - Email/password signup
-- Mobile device authentication (Expo device ID)
+- Mobile device authentication (device ID; iOS sends `identifierForVendor`, Android the Expo installation ID, both in the `expo_device_id` field)
 - Secure token-based authentication (JWT)
 - Account upgrade from device-only to email/password
 

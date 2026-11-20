@@ -372,7 +372,7 @@ flowchart TD
 
 **Key Principles**:
 1. **Stateless Authentication**: JWTs validated without database lookups (public key only)
-2. **Refresh Token Rotation**: A new refresh token is issued — and the old one deleted — on every use, within the same `token_family`
+2. **Refresh Token Rotation**: A new refresh token is issued — and the old one marked revoked — on every use, within the same `token_family`
 3. **Vault Integration**: RSA key pair loaded from Vault at startup; `KeyRotationManager` can refresh keys on an interval and renew the Vault token, updating the live `JWTManager` in place
 4. **Service-Layer Authorization**: Each `/api/v1/user/*` handler compares the authenticated `user_id` (from the validated JWT) against the `{user_id}` path parameter and returns `403` on mismatch — this is done in the handler/service layer, not by a dedicated authorization middleware (see "Authorization" under Security Considerations below)
 5. **Multi-Device Support**: Email/password accounts work across devices; mobile-only accounts are single-device
@@ -465,12 +465,12 @@ sequenceDiagram
         API-->>Client: 401 invalid refresh token
     else token expired
         DB-->>RTS: row, expires_at < now
-        RTS->>DB: DELETE FROM refresh_tokens WHERE id = $1
+        RTS->>DB: UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1
         RTS-->>API: ErrTokenExpired
         API-->>Client: 401 refresh token expired
-    else reuse detected (same token used again within a 15s grace window)
-        DB-->>RTS: row, last_used_at != created_at, reused inside grace window
-        RTS->>DB: DELETE FROM refresh_tokens WHERE token_family = $1
+    else reuse detected (row already has revoked_at set)
+        DB-->>RTS: row, revoked_at IS NOT NULL
+        RTS->>DB: UPDATE refresh_tokens SET revoked_at = now() WHERE token_family = $1
         note right of DB: entire token_family revoked —<br/>every session sharing this rotation chain is signed out
         RTS-->>API: ErrTokenReused
         API-->>Client: 401 token reuse detected
@@ -479,14 +479,14 @@ sequenceDiagram
         RTS->>DB: UPDATE refresh_tokens SET last_used_at = now() WHERE id = $1
         RTS->>RTS: generate new random 32-byte token, SHA-256 hash it
         RTS->>DB: INSERT new refresh_token row (same token_family)
-        RTS->>DB: DELETE FROM refresh_tokens WHERE id = $1 (old token)
+        RTS->>DB: UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1 (old token)
         RTS-->>API: newRefreshToken, userID
         API->>API: JWTManager.GenerateToken(userID) — new access token
         API-->>Client: 200 {access_token, refresh_token, expires_in}
     end
 ```
 
-Note on reuse detection: rotation hard-deletes the previous token row rather than soft-revoking it, so a token replayed *after* its rotation has already completed simply comes back "not found." The reuse branch above catches the narrower, security-relevant race where the same token is replayed within 15 seconds of its first (legitimate) use — e.g. a stolen token used concurrently with the real client — before the delete has taken effect.
+Note on reuse detection: rotation and logout soft-revoke the previous token (`revoked_at` is set) and keep the row until it expires, so replaying any already-revoked token that has not yet expired is unambiguously reuse and revokes the whole `token_family`. There is no grace window.
 
 ### JWT Token Management
 
@@ -500,11 +500,11 @@ Note on reuse detection: rotation hard-deletes the previous token row rather tha
 **Refresh Tokens**:
 - Lifetime: 7 days in the dev Docker Compose config (`JWT_REFRESH_TOKEN_EXPIRY`); code default is 30 days if the env var is unset
 - Cryptographically random 32-byte token, base64url-encoded; stored as a SHA-256 hash (never the raw token)
-- Rotated on every use: new token issued, old token row deleted, within the same `token_family`
+- Rotated on every use: new token issued, old token row marked revoked (`revoked_at`, retained until expiry), within the same `token_family`
 - Tracks `device_info` (User-Agent) and `ip_address` for security monitoring
 - `token_family` groups a chain of rotated tokens for reuse detection (see above)
 - Cascade-deleted when the owning user is deleted
-- An hourly background job (`tokenCleanupScheduler` in `main.go`, with an initial run at startup) deletes expired refresh tokens
+- An hourly background job (`tokenCleanupScheduler` in `main.go`, with an initial run at startup) deletes expired refresh tokens (this is the only hard delete)
 
 **Token Claims Structure**:
 ```json
@@ -560,7 +560,7 @@ POST /api/v1/auth/verify-email         # Verify email with token (JSON body)
 GET  /api/v1/auth/verify-email         # Verify email with token (query param, for email links)
 POST /api/v1/auth/resend-verification  # Resend verification email (requires auth)
 ```
-Password reset (`/forgot-password`, `/reset-password`) is not implemented — see `services/users/AGENTS.md`.
+Password reset (`/forgot-password`, `/reset-password`) is not implemented — see `services/users/CLAUDE.md`.
 
 **User Management Endpoints** (all under `/api/v1/user`, all require JWT authentication):
 ```
@@ -623,16 +623,18 @@ CREATE TABLE refresh_tokens (
     last_used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     device_info TEXT,                               -- User-Agent string
     ip_address VARCHAR(45),                          -- IPv4 or IPv6
-    token_family UUID                                -- groups a rotation chain for reuse detection
+    token_family UUID,                               -- groups a rotation chain for reuse detection
+    revoked_at TIMESTAMP WITH TIME ZONE              -- set on rotation/logout (migration 000007); NULL = active
 );
 
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE token_family IS NOT NULL;
+CREATE INDEX idx_refresh_tokens_revoked_at ON refresh_tokens(revoked_at) WHERE revoked_at IS NOT NULL;
 ```
 
-Rotation and revocation (`RevokeToken`, `RevokeAllUserTokens`, `RevokeTokenFamily`, `CleanupExpiredTokens`) all `DELETE` rows — refresh tokens are hard-deleted, not soft-revoked.
+Rotation and revocation (`RevokeToken`, `RevokeAllUserTokens`, `RevokeTokenFamily`) soft-revoke by setting `revoked_at`; only `CleanupExpiredTokens` hard-deletes rows (once they pass `expires_at`).
 
 #### Email Verification Tokens
 
@@ -648,7 +650,7 @@ CREATE TABLE email_verification_tokens (
 );
 ```
 
-A `password_reset_tokens` table existed briefly (migration `000006`) but was dropped (migration `000008`) along with the `/forgot-password`/`/reset-password` routes — see `services/users/AGENTS.md`.
+A `password_reset_tokens` table existed briefly (migration `000006`) but was dropped (migration `000008`) along with the `/forgot-password`/`/reset-password` routes — see `services/users/CLAUDE.md`.
 
 ### Security Considerations
 
@@ -660,13 +662,12 @@ A `password_reset_tokens` table existed briefly (migration `000006`) but was dro
 **Token Security**:
 - RS256 asymmetric signing (2048-bit RSA keys, stored in Vault)
 - Refresh tokens hashed (SHA-256) before database storage
-- Rotation on every refresh; token family tracking detects reuse within a 15-second grace window and revokes the whole family
+- Rotation on every refresh; token family tracking detects reuse of an already-revoked token and revokes the whole family
 - Account lockout after 5 consecutive failed logins (15-minute default lockout)
 
 **Authorization**:
 - `pkg/auth`'s `RequireAuth` middleware validates the JWT and puts `user_id` on the request context for all `/api/v1/user/*` routes
 - Each `UserHandler` method then compares that authenticated `user_id` against the `{user_id}` path parameter (via the service layer, which returns a 403-mapped error on mismatch) — this check is service-layer logic, not a dedicated middleware
-- `internal/middleware/authorization.go` defines `RequireSameUser`/`RequireOwnership` helpers for the same purpose, but they are not wired into the router; this file is currently dead code
 
 **API Security**:
 - Rate limiting on the entire `/api/v1/auth/*` route group, per IP, in-memory (default 100 requests/minute, configurable via `RATE_LIMIT_REQUESTS`/`RATE_LIMIT_WINDOW`); `/api/v1/user/*` is not rate limited

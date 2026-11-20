@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document specifies requirements for a **desktop web application** for Cairn, a read-it-later product. The web app delivers the same core experience as the existing React Native/Expo mobile app (`apps/mobile`) — saving and reading long-form content — optimized for desktop browsers and larger viewports.
+This document specifies requirements for a **desktop web application** for Cairn, a read-it-later product. The web app delivers the same core experience as the existing mobile apps (`apps/ios`, native Swift/SwiftUI; `apps/mobile`, React Native/Expo, Android only) — saving and reading long-form content — optimized for desktop browsers and larger viewports.
 
 The guiding principle is **maximum reuse of the mobile app**: its feature set, backend service contracts, data models, service-layer logic, design tokens, and information architecture should be carried over directly. The web app is a new **presentation layer** over the same backend, not a new product.
 
@@ -393,14 +393,16 @@ instead must:
   favorite, delete, subscribe/unsubscribe, and newsletter-address flows
   against a running backend.
 
-## Project Structure (proposed)
+## Project Structure
 
 Add the web app alongside the mobile app:
 
 ```
 apps/
-  mobile/   # existing React Native/Expo app
-  web/      # new React (Vite) desktop web app
+  ios/      # native Swift/SwiftUI iOS app
+  mobile/   # React Native/Expo Android app
+  shared/   # types, service logic and theme tokens shared by mobile and web
+  web/      # React (Vite) desktop web app
     src/
       config/        # api base URL (localStorage-backed)
       constants/     # theme tokens (shared with mobile or mirrored)
