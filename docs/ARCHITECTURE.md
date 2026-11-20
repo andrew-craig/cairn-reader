@@ -1177,7 +1177,7 @@ ELSE
 #### 3. Idempotency
 
 **Content Service**:
-- Duplicate check on `content_hash + source_feed_id` (RSS content only)
+- Duplicate check on `content_hash + source_feed_id` (RSS) or `content_hash + original_url` (everything else)
 - Returns existing content if duplicate
 - Safe to retry creation
 
@@ -1422,7 +1422,7 @@ Future enhancement:
 ### Batch Processing
 
 - Bulk content creation (max 100 items)
-- Batch feed polling (10 feeds at a time)
+- Batch feed polling (50 feeds per batch)
 - Batch outbox delivery (concurrent workers)
 
 ---

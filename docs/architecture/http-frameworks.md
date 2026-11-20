@@ -2,7 +2,7 @@
 
 ## Summary
 
-All Cairn backend services use **Chi v5** (`github.com/go-chi/chi/v5`) for HTTP routing combined with Go's stdlib `net/http` for server implementation. Gin is not used in any service — its presence in one `go.mod` is an indirect/transitive dependency only.
+All Cairn backend services use **Chi v5** (`github.com/go-chi/chi/v5`) for HTTP routing combined with Go's stdlib `net/http` for server implementation. Gin is not used anywhere (it appears in no `go.mod`).
 
 ## Decision
 
@@ -21,6 +21,7 @@ Every service follows the same shape:
 ```
 cmd/<service>/main.go          → creates &http.Server{Handler: router}
 internal/api/router.go         → chi.NewRouter(), middleware chain, route groups
+                                 (User Service: internal/handlers/router.go)
 pkg/middleware/                → shared middleware (Recovery, CORS, security, rate limit)
 pkg/auth/middleware.go         → JWT authentication (RequireAuth, OptionalAuth)
 pkg/auth/internal_auth.go      → service-to-service auth (RequireInternalAPIKey)
