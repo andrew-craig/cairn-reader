@@ -9,9 +9,8 @@ import type { UserContentDetailResponse } from '@cairn/shared';
 // After each successful list sync, download cleaned_html for
 // unread/reading articles that lack a body — bounded concurrency, newest
 // first, capped at the 100 most recent Read-list articles, run from a
-// service rather than a screen (decision 4), never while offline (decision
-// 7), aborting the batch on the first NetworkError (decision 7), and
-// single-flight (decision 8).
+// service rather than a screen, never while offline, aborting the batch on
+// the first NetworkError, and single-flight.
 
 jest.mock('./articleStore', () => ({
   ArticleStore: {
@@ -134,8 +133,8 @@ describe('ArticlePrefetchService.run', () => {
   it('never starts a candidate beyond the initial wave once aborted', async () => {
     // 5 candidates against a fixed 3-worker pool: workers 0-2 have already
     // grabbed a1-a3 synchronously before any of their fetches can settle —
-    // that first wave is unavoidable and acceptable (decision 7's "abort the
-    // *remaining* work"). What must never happen is a worker looping back
+    // that first wave is unavoidable and acceptable (the abort stops only the
+    // *remaining* work). What must never happen is a worker looping back
     // for a4 or a5 after the abort. a1 rejects with NetworkError; a2/a3
     // resolve normally, so this also proves an abort stops workers that
     // weren't the one that failed, not just the failing one.

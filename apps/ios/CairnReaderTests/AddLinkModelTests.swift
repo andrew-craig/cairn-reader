@@ -194,7 +194,7 @@ struct AddLinkModelTests {
         #expect(model.url == "https://example.com")
     }
 
-    // MARK: Feed/Reads choice (epic 6e4d)
+    // MARK: Feed/Reads choice
 
     @Test func aNewFeedSubscriptionDefaultsToReads() async {
         let source = Source()

@@ -5,7 +5,7 @@ import OSLog
 
 /// The Feed tab: online-only `list=feed` pages in an `ArticleListModel`, never written to the
 /// store and never prefetched. Stored ids are left out of the pages and the search results: the
-/// store holds only Reads, so a stored id has been saved (decision 8). That one rule hides a row
+/// store holds only Reads, so a stored id has been saved. That one rule hides a row
 /// the moment it is saved (from the swipe or the reader), keeps it hidden while the save is
 /// queued, and brings it back if the save is rejected and its store row deleted. The last first
 /// page, after that exclusion, is kept in `FeedCache` and shown with a stale banner when a

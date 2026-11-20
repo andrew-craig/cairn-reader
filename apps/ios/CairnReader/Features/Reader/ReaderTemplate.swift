@@ -1,6 +1,6 @@
 import UIKit
 
-/// The reader's page: the bundled `reader.html` and `reader.css` (decision 2) with the article's
+/// The reader's page: the bundled `reader.html` and `reader.css` with the article's
 /// header and `cleaned_html` filled in. The colour tokens are written as CSS variables from the
 /// colour assets (light, and dark under `prefers-color-scheme`), so the page has no colour of
 /// its own; the base size is the user's Dynamic Type body size.

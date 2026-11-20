@@ -219,8 +219,8 @@ here, `expect(abortError).not.toBeInstanceOf(Error)` — so that if the environm
 shifts, it fails loudly instead of quietly ceasing to test anything.
 
 **Tally, because it is the point:** this is the fourth window in which an
-unconverted fetch rejection could clear valid tokens (refresh fetch in cab7,
-primary fetch and 401-retry fetch in c87c, now the abort *shape* on the retry).
+unconverted fetch rejection could clear valid tokens (refresh fetch in the
+offline-logout fix, primary fetch and 401-retry fetch in the AbortError fix, now the abort *shape* on the retry).
 Each was found by a different reviewer, none by a test written beforehand. The
 fix is not more review — it is the raw-`fetch` lint rule, which makes the next
 unwrapped `fetch` fail CI.

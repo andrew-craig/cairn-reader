@@ -113,7 +113,7 @@ describe('LoginScreen', () => {
     expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 
-  // Scope amendment: the register fallback is correct only for a
+  // The register fallback is correct only for a
   // 401 ("this device isn't registered"). An error type the screen doesn't
   // recognize is not evidence this device needs an account, so it must
   // propagate rather than trigger a register attempt — the deliberate
@@ -170,7 +170,7 @@ describe('LoginScreen', () => {
     expect(mockedAuthService.registerWithDevice).toHaveBeenCalledTimes(1);
   });
 
-  // Scope amendment: 403 (hybrid account already exists), 429
+  // 403 (hybrid account already exists), 429
   // (locked out / rate limited) and 400 (invalid input) are all real,
   // definitive rejections from the backend (services/users/internal/services
   // /auth_service.go:310), but none of them mean "register this device" —

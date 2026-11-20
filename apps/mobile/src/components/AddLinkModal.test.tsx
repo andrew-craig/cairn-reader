@@ -93,7 +93,7 @@ describe('AddLinkModal dismissal during Find-feed', () => {
   });
 });
 
-// Epic 6e4d: subscribing to a feed asks where its new items should land.
+// Subscribing to a feed asks where its new items should land.
 
 describe('AddLinkModal Feed/Reads choice for feeds', () => {
   afterEach(() => jest.restoreAllMocks());

@@ -1,7 +1,7 @@
 import Foundation
 
 /// The read service's user endpoints (content, subscriptions, extraction feedback) and the email
-/// address endpoint, sent through `AuthService` for one user (decision 10: bound at init, owned by
+/// address endpoint, sent through `AuthService` for one user (bound at init, owned by
 /// that user's `UserSession`). Errors pass through unchanged: `NetworkError`
 /// when the server could not be reached, `HttpError` for its answer, `AuthError.sessionExpired`
 /// when there is no session.

@@ -6,7 +6,7 @@ import Testing
 
 // Port of apps/mobile/src/services/outbox.test.ts, minus `attempts` and `pendingSaveIds` (the
 // pending flag is the store's observation, tested in ArticleStoreTests), plus the cases for the
-// outbox being the only write path (decision 9).
+// outbox being the only write path.
 
 private let favoriteTrue = UpdateUserContentRequest(isFavorite: true)
 

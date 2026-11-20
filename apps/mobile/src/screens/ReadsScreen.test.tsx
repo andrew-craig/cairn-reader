@@ -10,7 +10,7 @@ import { Article } from '../types';
 // store immediately on focus, before the network page for the same list has
 // resolved — the store is the read-through cache for the initial render.
 // Prefetch is triggered from this screen's sync callback only —
-// after upsertMany, per decision 4 — and the screen itself knows nothing
+// after upsertMany — and the screen itself knows nothing
 // else about it.
 // Pull-to-refresh routes through SyncTrigger.run() (outbox
 // drain, then prefetch) instead of calling ArticlePrefetchService directly,

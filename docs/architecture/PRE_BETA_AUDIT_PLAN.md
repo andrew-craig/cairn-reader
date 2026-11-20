@@ -26,7 +26,7 @@ Backend is Go microservices over a single PostgreSQL instance (per-service logic
 
 ## Approach
 
-The audit is split into six independent **workstreams** plus a final **consolidation** step. Each workstream was its own task; the consolidation task is blocked by all six and produces the single decision-ready deliverable.
+The audit is split into six independent **workstreams** plus a final **consolidation** step. Each workstream was its own task; the consolidation task was blocked by all six and produced the single decision-ready deliverable.
 
 ```
 Pre-beta architecture audit
@@ -77,6 +77,6 @@ Produces `docs/architecture/PRE_BETA_AUDIT.md`: executive readiness verdict, per
 
 `docs/architecture/PRE_BETA_AUDIT.md` — a single document with a clear go/no-go readiness verdict and a prioritised, task-linked list of proposed next steps. That document, not this plan, is the output of the review.
 
-## How to run it
+## Status
 
 The audit is complete: all seven tasks were closed and the deliverable is [`PRE_BETA_AUDIT.md`](PRE_BETA_AUDIT.md).

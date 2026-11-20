@@ -8,7 +8,7 @@ import { Article } from '../types';
 import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shared';
 
 // Opening a previously-read article must render its cached body
-// (decision 4: opportunistic body caching) without waiting on the network
+// (opportunistic body caching) without waiting on the network
 // getContentById call to resolve.
 // A stored body whose hash matches the fresh route-param hash
 // skips the network call entirely, and offline with nothing stored shows an

@@ -3,7 +3,7 @@ import UIKit
 import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
-/// The reader's web view (decision 2): shows the page from `ReaderTemplate` with no JavaScript,
+/// The reader's web view: shows the page from `ReaderTemplate` with no JavaScript,
 /// never navigates away (a link tap goes to `onLink`, with where it was touched), restores the saved scroll fraction as the
 /// content grows until the user drags, and reports the scroll geometry from the scroll view.
 ///
