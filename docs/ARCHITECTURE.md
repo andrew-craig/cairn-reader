@@ -208,7 +208,7 @@ The Web App is a React (Vite) browser client offering the same core reading expe
 **Core Responsibilities**:
 - Route-based navigation across Feed, Reads, and You (account/rss/newsletters/bookmarks/about), guarded by a `RequireAuth` route wrapper
 - Email/password authentication only — browsers have no Expo device identifier, so device-ID login (mobile-only) isn't offered
-- A service layer (`AuthService`, `ReadService`, `SystemService`) ported from the mobile app's equivalents and adapted to browser storage
+- A service layer: `AuthService` comes from `@cairn/shared` (shared with Android); `ReadService` and `SystemService` live in `apps/web/src/services` and are ported from the Android app's equivalents, with a `localStorage` adapter (`storage.ts`)
 - Session persistence via `localStorage`, with proactive token refresh and a single 401-retry choke point (`fetchWithAuth`)
 - Same-origin backend resolution by default (`window.location.origin`), overridable via `VITE_API_URL` in development — this is what lets the selfhost single-container build (port `8099`) serve the SPA and all APIs behind one origin
 
@@ -238,7 +238,7 @@ flowchart TB
         AuthCtx["AuthContext<br/>(user, isAuthenticated, login, logout)"]
 
         subgraph Services["Service layer (src/services)"]
-            AuthSvc["AuthService (auth.ts)"]
+            AuthSvc["AuthService (@cairn/shared)"]
             ReadSvc["ReadService (read.ts)"]
             SystemSvc["SystemService (system.ts)"]
         end
@@ -288,7 +288,7 @@ flowchart TB
 
 ### Authentication and Session Handling
 
-- `AuthService` is a near-verbatim port of the mobile auth service, with two deliberate differences: it persists tokens to `localStorage` (synchronous) instead of `AsyncStorage`, and it drops device-ID/anonymous login — web users authenticate with email/password only.
+- `AuthService` is the `@cairn/shared` implementation (Android subclasses it to add device-ID login and account upgrade). The web app wires in a `localStorage` storage adapter instead of `AsyncStorage` and uses email/password login only — there is no device-ID login.
 - Tokens (`access_token`, `refresh_token`, `expires_at`, `user`) are cached both in static class fields and `localStorage`, so any tab reload rehydrates the session via `AuthService.initialize()`.
 - `AuthService.fetchWithAuth()` is the single choke point every authenticated service call goes through: it proactively refreshes a token expiring within 5 minutes, and reactively retries once on an HTTP 401 before giving up and clearing the session.
 - `AuthContext` wraps the router, exposes `{ user, isAuthenticated, isLoading, login, logout }`, and subscribes to `AuthService.onAuthStateChange` so a token wipe triggered deep inside a service call (e.g. a failed refresh) is reflected in the UI and redirects to `/login` via the `RequireAuth` route guard.
