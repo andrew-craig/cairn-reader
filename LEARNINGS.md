@@ -2,6 +2,18 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
+## 2026-11-20 — Removing an identifier also removes everything that only made sense through it
+
+**What happened:** removing the old tracker IDs (`task_cab7` and the like) was checked with a
+grep for the full ID pattern, which came back clean. Review still found leftovers: bare
+fragments (`cab7`, `epic 6e4d`) the pattern could not match, and references such as
+"(decision 8)" or "item B" that pointed at lists inside the deleted tasks. With the ID gone,
+those had no referent.
+
+**How to apply:** when removing an identifier, also search for its short forms, and for
+anything that could only be resolved by following it (numbered decisions, review items,
+"see X"). Rewrite each to say what it meant, or drop it if the sentence already does.
+
 ## 2026-09-23 — A root-cause diagnosis is only as good as the execution environment it assumes (PR #406)
 
 **What happened:** PR #406 asserted, as a confirmed root cause, that the
