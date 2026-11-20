@@ -2,7 +2,7 @@
 
 **Status:** Active
 **Written:** 2026-08-09
-**Tracking epic:** `epic_fefa` (chalk)
+**Tracking project:** "Code quality remediation program" (Linear, team `AND`)
 **Companion document:** [CODE_QUALITY_REVIEW.md](/docs/CODE_QUALITY_REVIEW.md) — the findings ledger this strategy executes against.
 
 This document is a **playbook, not a report**. It tells an engineer (or agent) with no prior context: what to work on next, how to verify the problem is real, how to fix it without breaking things, and how to prove the fix. Follow it top to bottom.
@@ -11,15 +11,15 @@ This document is a **playbook, not a report**. It tells an engineer (or agent) w
 
 ## 0. How to use this document
 
-1. Run `chalk ready --parent=epic_fefa`. If a task exists, claim it (`chalk update <id> --status=in_progress`) and jump to [Part 2](#part-2--how-to-fix-things) for the matching recipe.
-2. If no tasks exist under the epic, you are the bootstrapper: create the next wave's tasks from the [wave plan](#13-the-wave-plan) (one chalk task per row, `--parent=epic_fefa`, priority as listed) and then claim the first one.
+1. List open issues in the Linear project "Code quality remediation program" (`list_issues` with `project`, `state: "Todo"`). If one exists, claim it (`save_issue` with `state: "In Progress"`) and jump to [Part 2](#part-2--how-to-fix-things) for the matching recipe.
+2. If no issues are open in the project, you are the bootstrapper: create the next wave's issues from the [wave plan](#13-the-wave-plan) (one Linear issue per row, in that project, priority as listed) and then claim the first one.
 3. Every fix follows the same loop: **re-verify the finding → write a failing test → fix minimally → prove → PR**. No step is optional.
 4. When a wave's tasks are all closed, create the next wave's tasks. Waves are strictly ordered; do not cherry-pick from a later wave while an earlier wave has open tasks, unless a task is blocked and says so.
 
 ### Rules of engagement (read before touching code)
 
 - **One finding, one branch, one PR.** Small PRs get reviewed and merged; big ones rot.
-- **Re-verify before fixing.** The review is dated 2026-07-05; code has moved (e.g. the mobile "Archive = hard delete" finding P2-C5 was fixed in PR #298). Confirm the cited file/line still exhibits the problem. If it's already fixed, note that in the chalk task, close it, and take the next one.
+- **Re-verify before fixing.** The review is dated 2026-07-05; code has moved (e.g. the mobile "Archive = hard delete" finding P2-C5 was fixed in PR #298). Confirm the cited file/line still exhibits the problem. If it's already fixed, note that in the Linear issue, close it, and take the next one.
 - **The failing test comes first.** If you cannot make a test fail that demonstrates the problem, either the finding is stale (close it) or you haven't understood it yet (stop and re-read). Never ship a fix whose test passed before the fix.
 - **Copy the in-repo reference pattern** ([§2.3](#23-reference-patterns--copy-these-dont-invent)) instead of inventing a new one. Most findings have a correct implementation elsewhere in this repo.
 - **Surgical diffs.** Don't reformat, rename, or "improve" adjacent code. Every changed line must trace to the finding.
@@ -51,7 +51,7 @@ Deprioritise: latent issues gated on conditions that don't hold yet (multi-repli
 
 ### 1.3 The wave plan
 
-Each row becomes one chalk task titled `[<ID>] <summary>` under `epic_fefa`. "Recipe" points into Part 2. **P** column = chalk priority.
+Each row becomes one Linear issue titled `[<ID>] <summary>` in the "Code quality remediation program" project. "Recipe" points into Part 2. **P** column = the original chalk priority (0 critical … 4 backlog); in Linear use 0→Urgent, 1→High, 2→Medium, 3/4→Low.
 
 #### Wave 1 — Stop the bleeding (external exposure + timer-triggered outage)
 
@@ -127,7 +127,7 @@ When the review backlog is exhausted, generate new targets in this order of cost
    ```
    Cross-reference against `wc -l`. Review the intersection first.
 2. **Re-run the review's axes on new code.** The original review worked because each pass took a *different axis* (per-service static, cross-service contracts, DB semantics, dependencies, DoS, tenancy matrix). Any service or feature added since 2026-07-05 has had none of these passes. Apply the same axes to the diff.
-3. **The Cairn-specific smell checklist.** Every critical in the review is an instance of one of these. When touching any file, grep for the pattern; when one is found anywhere, file a chalk task:
+3. **The Cairn-specific smell checklist.** Every critical in the review is an instance of one of these. When touching any file, grep for the pattern; when one is found anywhere, file a Linear issue:
    - A route registered outside `RequireAuth`/`RequireInternalAPIKey` whose handler reads a `user_id` or writes shared state.
    - `json.NewDecoder(r.Body)` without `http.MaxBytesReader` upstream.
    - Multi-row `INSERT` without `ON CONFLICT` on a table with any uniqueness expectation.
@@ -292,7 +292,7 @@ Consolidation deletes code; the risk is silent behavior change. Sequence per dup
 - [ ] A test exists that failed before the fix and passes after, at the level §2.2 prescribes.
 - [ ] Relevant §2.4 verification suite green locally (including web checks until web CI exists).
 - [ ] Docs touched by the change updated: service `openapi.yaml`, service `CLAUDE.md` route tables, `docs/ARCHITECTURE.md` if a boundary changed.
-- [ ] Ledger row in §1.3 ticked with PR number; chalk task closed.
+- [ ] Ledger row in §1.3 ticked with PR number; Linear issue closed.
 - [ ] PR description: finding ID, what the failing test proves, any behavior deliberately changed.
 
 ---
@@ -302,4 +302,4 @@ Consolidation deletes code; the risk is silent behavior change. Sequence per dup
 - Review document merged 2026-07-05 (PRs #300, #301); commits since then are styling/docs/mobile-archive only → backlog is essentially untouched.
 - CI: `go-checks.yml` = gofmt + golangci-lint + go vet + `go test -race` per service; `mobile-checks.yml` = tsc + eslint + jest + knip; **no workflow runs any check on `apps/web`**; `docker-test.yml` = image builds + selfhost compose smoke (which curls the readiness endpoint that under-reports — Wave 3).
 - Test volume: Go 224 source / 111 test files; front-ends 111 source / 10 test files (mobile-heavy) — but per the review, coverage *quality* is the issue, not volume.
-- Task tracking: chalk (`.chalk/tasks/`), umbrella epic for this program: `epic_fefa`.
+- Task tracking: Linear (team `AND`), umbrella project for this program: "Code quality remediation program".
