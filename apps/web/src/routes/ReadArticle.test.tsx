@@ -6,7 +6,7 @@ import type { Article, UserContentResponse } from '@cairn/shared';
 import ReadArticle from './ReadArticle';
 import { ReadService } from '../services/read';
 
-// task_3c49 piece 4: archive/delete used to fire immediately with no
+// Archive/delete used to fire immediately with no
 // confirmation and surfaced failures only via console.error, invisible to the
 // user. Confirmation must gate both actions, and a failure must be visible.
 
@@ -113,7 +113,7 @@ describe('ReadArticle destructive actions', () => {
   });
 });
 
-// task_f4ac: Feed items are skim-only — Save to Reads replaces Archive and no
+// Feed items are skim-only — Save to Reads replaces Archive and no
 // reading progress is written.
 describe('ReadArticle for Feed items', () => {
   function renderFeedReader() {

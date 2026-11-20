@@ -3,7 +3,7 @@ import GRDB
 import Testing
 @testable import CairnReader
 
-// Re-expression of apps/mobile/src/services/articleMutations.test.ts for decision 9: a mutation
+// Re-expression of apps/mobile/src/services/articleMutations.test.ts: a mutation
 // is one transaction (store change plus outbox row) and never sends or throws for the backend.
 // The jest cases about enqueuing on a retryable error or surfacing a 4xx become the drain's
 // outcomes (OutboxTests) and "mutations do not throw for the backend" below.

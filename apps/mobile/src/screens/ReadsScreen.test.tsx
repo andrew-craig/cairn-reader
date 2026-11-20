@@ -6,13 +6,13 @@ import { ArticleStore } from '../services/articleStore';
 import { SyncTrigger } from '../services/syncTrigger';
 import { Article } from '../types';
 
-// task_a8a4: ReadsScreen must render articles already in the local SQLite
+// ReadsScreen must render articles already in the local SQLite
 // store immediately on focus, before the network page for the same list has
 // resolved — the store is the read-through cache for the initial render.
-// task_c55c: prefetch is triggered from this screen's sync callback only —
-// after upsertMany, per decision 4 — and the screen itself knows nothing
+// Prefetch is triggered from this screen's sync callback only —
+// after upsertMany — and the screen itself knows nothing
 // else about it.
-// task_ebf1 (item G): pull-to-refresh routes through SyncTrigger.run() (outbox
+// Pull-to-refresh routes through SyncTrigger.run() (outbox
 // drain, then prefetch) instead of calling ArticlePrefetchService directly,
 // so the outbox gets a drain on this path too.
 

@@ -3,7 +3,7 @@ import UIKit
 import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
-/// The reader's web view (decision 2): shows the page from `ReaderTemplate` with no JavaScript,
+/// The reader's web view: shows the page from `ReaderTemplate` with no JavaScript,
 /// never navigates away (a link tap goes to `onLink`, with where it was touched), restores the saved scroll fraction as the
 /// content grows until the user drags, and reports the scroll geometry from the scroll view.
 ///
@@ -142,7 +142,7 @@ struct ArticleWebView: UIViewRepresentable {
 
         /// The page and its images have loaded. Their layout may not have reached the scroll view
         /// yet (the content size can still be the viewport's, which reads as the end of the
-        /// article, bug_f546), so this neither ends the restore nor confirms a reading by itself:
+        /// article), so this neither ends the restore nor confirms a reading by itself:
         /// readings count once the user has also dragged.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             hasLoaded = true

@@ -129,7 +129,7 @@ describe('ArticleStore', () => {
     });
   });
 
-  // task_c55c: upsertMany diffs content_hash so a body whose hash no longer
+  // upsertMany diffs content_hash so a body whose hash no longer
   // matches the server's is invalidated immediately, rather than only being
   // caught later by comparing against a fresh fetch. Pins both halves: a
   // refresh with the same hash keeps the body, a refresh with a changed hash
@@ -277,7 +277,7 @@ describe('ArticleStore', () => {
       expect(recent).toEqual([]);
     });
 
-    // task_ebf1 (module layout, item F): a queued write must never replay
+    // A queued write must never replay
     // against a different account — clear() (called on logout) drops the
     // outbox alongside the articles it shares a database with.
     it('also clears queued outbox rows', async () => {
@@ -299,11 +299,10 @@ describe('ArticleStore', () => {
     });
   });
 
-  // task_ebf1: the tech lead's note on task_a8a4's review — upsertMany's
+  // From the local cache's review: upsertMany's
   // "server rows win" sync would otherwise clobber a value the user just
-  // changed offline while its write is still queued. See scope clarification
-  // decision 1 (guard in SQL) and pre-assignment review item B (pending
-  // archive).
+  // changed offline while its write is still queued. The guard lives in the
+  // SQL, and also covers a pending archive.
   describe('outbox guard on upsertMany (interleaving with a pending write)', () => {
     it('preserves a pending offline change when a list sync arrives before the drain', async () => {
       await ArticleStore.upsertMany([makeArticle({ id: 'a1', isFavorite: false, title: 'Original' })]);
@@ -323,7 +322,7 @@ describe('ArticleStore', () => {
       expect(stored?.title).toBe('Refreshed'); // non-user-state columns still sync normally
     });
 
-    it('does not resurrect an article with a pending archive (item B)', async () => {
+    it('does not resurrect an article with a pending archive', async () => {
       await ArticleStore.upsertMany([makeArticle({ id: 'a1' })]);
       await ArticleStore.remove('a1');
       await Outbox.enqueue('a1', 'status', { status: 'archived' });
@@ -456,7 +455,7 @@ describe('failure handling (root cause: reads degrade, writes still propagate)',
   });
 });
 
-// task_c55c decision 2: schema changes since v1 (task_a8a4) are applied by a
+// Schema changes since v1 are applied by a
 // PRAGMA user_version-driven migration inside getDb(), not by widening the
 // v1 CREATE TABLE — that statement is CREATE TABLE IF NOT EXISTS, so
 // widening it is a no-op against every install that already has the v1
@@ -465,7 +464,7 @@ describe('failure handling (root cause: reads degrade, writes still propagate)',
 describe('v1 -> v2 migration (content_hash)', () => {
   type ArticleStoreModule = typeof import('./articleStore');
 
-  // The exact v1 shape task_a8a4 shipped — no content_hash column.
+  // The exact v1 shape that shipped — no content_hash column.
   const V1_SCHEMA = `
     CREATE TABLE articles (
       id TEXT PRIMARY KEY,

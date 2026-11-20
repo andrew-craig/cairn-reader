@@ -88,7 +88,7 @@ struct RootView: View {
             case .signedOut:
                 LoginView(model: loginModel)
             case let .signedIn(session):
-                // The id ends navigation state and screen models with the account (decision 10).
+                // The id ends navigation state and screen models with the account.
                 MainTabs(session: session)
                     .id(session.user.id)
             }

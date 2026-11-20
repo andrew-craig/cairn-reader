@@ -6,7 +6,7 @@ import { AuthService, ArticleStore, FeedCache } from '../services';
 import { NetworkError } from '@cairn/shared';
 import { User } from '../types';
 
-// task_cab7: checkAuthStatus is the offline app-launch path. Before this fix,
+// checkAuthStatus is the offline app-launch path. Before this fix,
 // ensureValidToken throwing a NetworkError landed in the generic catch and
 // called setUser(null) — logging the user out on screen even though their
 // tokens were still on disk. On a NetworkError the persisted session must be
@@ -30,7 +30,7 @@ jest.mock('../services', () => ({
 }));
 
 // Only loadServerUrl is stubbed; the rest of @cairn/shared is real, since the
-// error classes this file constructs now live there too (task_47c1) and a
+// error classes this file constructs now live there too and a
 // wholesale stub would leave them undefined.
 jest.mock('@cairn/shared', () => ({
   ...jest.requireActual('@cairn/shared'),
@@ -54,7 +54,7 @@ function Consumer() {
   return <Text>user:{user ? user.id : 'none'}</Text>;
 }
 
-describe('AuthProvider.checkAuthStatus offline handling (task_cab7)', () => {
+describe('AuthProvider.checkAuthStatus offline handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => {});

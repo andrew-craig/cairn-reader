@@ -4,7 +4,7 @@ import { ArticlePrefetchService } from './articlePrefetch';
 // Consumers run in this fixed order every time the trigger fires. The order
 // is this module's contract, not the caller's — see useSyncTrigger, which
 // only decides *when* to fire, never what runs or in what order. The outbox
-// drain runs first (task_ebf1): a queued write should reach the server ahead
+// drain runs first: a queued write should reach the server ahead
 // of the prefetch pass, though the store-level guard in articleStore.ts's
 // UPSERT_SQL is what actually protects a pending write, not this ordering.
 const consumers: (() => Promise<void>)[] = [
@@ -20,7 +20,7 @@ const consumers: (() => Promise<void>)[] = [
 let inFlight = false;
 
 // Runs each consumer in order, isolating one from the next: a rejection
-// (e.g. the outbox drain task_ebf1 adds ahead of prefetch) must not stop the
+// (e.g. the outbox drain ahead of prefetch) must not stop the
 // rest of the fixed order from running, and must not escape as an unhandled
 // rejection into useSyncTrigger's `void SyncTrigger.run()`. Exported
 // separately from SyncTrigger.run() only so this isolation behavior can be

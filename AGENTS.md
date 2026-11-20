@@ -68,7 +68,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 - **Selfhost** (single-container build): [infrastructure/docker/selfhost/README.md](/infrastructure/docker/selfhost/README.md)
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
 - **Color palette** (single source for web, Android and iOS): [design/tokens/README.md](/design/tokens/README.md)
-- **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (epic_fefa)
+- **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (Linear project "Code quality remediation program")
 
 
 ## Approach to work

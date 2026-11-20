@@ -1,5 +1,5 @@
 // Server-URL state and persistence for the Cairn API client, shared by
-// apps/mobile and apps/web (decision_9b2d ADR — single source of truth).
+// apps/mobile and apps/web (docs/decisions/web-app-adr.md — single source of truth).
 //
 // Two things are app-specific and therefore injected rather than hardcoded here:
 //   - the *default* server URL (mobile ships against a fixed backend; web

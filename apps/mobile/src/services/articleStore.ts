@@ -31,10 +31,9 @@ interface ArticleRow {
 //   stored (a plain refresh) — COALESCE also guards the never-carries-a-body
 //   case, same as before this task. Cleared when the incoming hash differs
 //   from the stored one: a body whose hash no longer matches the server's is
-//   stale and must not be served offline. See task_c55c scope clarification,
-//   "Selection, staleness and eviction".
+//   stale and must not be served offline.
 //
-// task_ebf1 adds two guards against a queued offline write being clobbered
+// Two guards against a queued offline write being clobbered
 // by a list sync that runs before the outbox drains:
 // - A pending archive (a `status` row with `{"status":"archived"}`) for this
 //   article skips the insert/update entirely — the WHERE on the SELECT source
@@ -229,7 +228,7 @@ export const ArticleStore = {
 
   /**
    * Unread/reading articles with no cached body, newest first, for the
-   * prefetch service (task_c55c). `upsertMany` already clears `body` when a
+   * prefetch service. `upsertMany` already clears `body` when a
    * list sync's incoming hash differs from what's stored, so this is the
    * full selection: nothing else needs to compare hashes. Reads never
    * reject — see `listRecent`.
@@ -309,7 +308,7 @@ export const ArticleStore = {
 
   /**
    * Drop all stored articles, e.g. on logout. Also clears the outbox
-   * (task_ebf1) — a queued write must never replay against a different
+   * — a queued write must never replay against a different
    * account.
    */
   async clear(): Promise<void> {

@@ -6,7 +6,7 @@ import Testing
 
 // Re-expression of apps/mobile/src/screens/ReadArticleDetailScreen.test.tsx and
 // ReadArticleDetailScreen.mutations.test.tsx against `ReaderModel` with an in-memory store. The
-// optimistic-rollback and backend-failure alert cases do not port (decision_adb1: mutations never
+// optimistic-rollback and backend-failure alert cases do not port (mutations never
 // see the backend's answer; a refusal is the root's alert and the store follows the re-sync).
 
 /// The reader's server: details (optionally held until released), PATCHes and the Reads first
@@ -376,7 +376,7 @@ struct ReaderModelTests {
         #expect(try await harness.session.articles.getById("a1")?.scrollPosition == 0.4)
     }
 
-    /// bug_f546: the web view reports readings at load, before the page's layout reaches the
+    /// The web view reports readings at load, before the page's layout reaches the
     /// scroll view, when the content height is about the viewport's and the reading looks like
     /// the end of the article. Until the page has loaded and the user has dragged, no reading
     /// completes the article or saves a position.
@@ -400,7 +400,7 @@ struct ReaderModelTests {
         #expect(model.restoreFraction == 0)
     }
 
-    /// bug_f546: a part scroll saves its fraction without completing the article (the row shows
+    /// A part scroll saves its fraction without completing the article (the row shows
     /// it started), and reopening the article restores that fraction.
     @Test func aPartScrollIsSavedAndReopeningRestoresIt() async throws {
         server.online.withLock { $0 = false }

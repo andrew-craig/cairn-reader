@@ -8,7 +8,7 @@ import OSLog
 /// favourite, read state and a value re-synced after a rejection are never held twice. An article
 /// the store does not hold (Feed, and Bookmarks or search results outside the store) keeps the
 /// route's value with the reader's own edits applied. Every edit goes through `ArticleMutations`
-/// (decision 9) without waiting for the backend. Ported from the React Native
+/// without waiting for the backend. Ported from the React Native
 /// `ReadArticleDetailScreen`.
 @Observable
 final class ReaderModel {
@@ -213,7 +213,7 @@ final class ReaderModel {
         await mutate("Setting the favourite") { try await $0.setFavorite(id, isFavorite: isFavorite) }
     }
 
-    /// Archives a Reads item and pops at once; the lists follow the store (decision 8).
+    /// Archives a Reads item and pops at once; the lists follow the store.
     func archive() async {
         isFinished = true
         let id = route.id

@@ -5,7 +5,7 @@ import OSLog
 /// Bookmarks, pushed from You: the user's favourites from every list (`is_favorite=true` pages)
 /// in an `ArticleListModel`, searching every list as the React Native screen does. Stored
 /// favourites show while nothing is listed yet, so a failed refresh is not a blank screen. It
-/// never writes the store: `Sync` is the only writer of Reads pages (decision 8), and favourited
+/// never writes the store: `Sync` is the only writer of Reads pages, and favourited
 /// Feed items do not belong there.
 @Observable
 final class BookmarksModel {

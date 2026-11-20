@@ -3,11 +3,11 @@
 - **Status**: Accepted
 - **Date**: 2026-06-09
 - **Update (2026-10-15)**: The Explore service and tab were removed (#425). Where this record names `explore`, read it as historical; the notes inline show the current state. The decisions themselves stand.
-- **Context**: Epic "Desktop web app" (`epic_f54e`). See
+- **Context**: Epic "Desktop web app". See
   [`docs/detailed_requirements/web_app_requirements.md`](../detailed_requirements/web_app_requirements.md).
 
 Two decisions gate the web app scaffold and the tasks that depend on it
-(`task_f734` project scaffold, `task_f61e` authentication). This ADR records both
+(project scaffold, authentication). This ADR records both
 choices and their rationale so subsequent tasks have a single source of truth.
 
 ---
@@ -58,7 +58,7 @@ both `apps/mobile` and `apps/web`.
 
 ### Consequences for downstream tasks
 
-- The scaffold task (`task_f734`) consumes types and service logic from `apps/shared`
+- The scaffold task consumes types and service logic from `apps/shared`
   rather than copying them into `apps/web`.
 - The shared service/config layer is parameterized over a **storage adapter** so each
   client supplies its own backend: `AsyncStorage` on mobile, `localStorage` on web
@@ -102,7 +102,7 @@ browser-equivalent of mobile's `AsyncStorage` keys.
   non-goal of this epic is "no new backend… frontend-only effort; reimplementing or
   changing any backend service" is excluded.
 - **CORS is already configured for bearer-token auth, not cookies.** The completed
-  CORS work (`task_1318`) deliberately uses wildcard origin `*` with
+  CORS work deliberately uses wildcard origin `*` with
   `AllowCredentials: false` — correct for `Authorization`-header requests. A cookie
   model needs `AllowCredentials: true` with an explicit (non-wildcard) origin, i.e.
   the very backend change ruled out above.
@@ -120,7 +120,7 @@ browser-equivalent of mobile's `AsyncStorage` keys.
 - **Mitigation is mandatory, not optional**: all remote HTML (`cleaned_html` for
   saved articles, the explore `content` field for recommendations, since removed in #425) **must** be
   sanitized with DOMPurify before injection. This is a hard requirement on the
-  article reader task (`task_e0f7`), not a nicety. Without sanitization this decision
+  article reader task, not a nicety. Without sanitization this decision
   is not safe.
 
 ### Revisit criteria

@@ -1,6 +1,6 @@
 # Audit 3 — Mobile Client/Server Efficiency
 
-**Workstream:** `task_1eaa` (epic `epic_9c21`, P3)
+**Priority:** P3
 **Status:** Findings complete
 **Date:** 2026-06-16
 

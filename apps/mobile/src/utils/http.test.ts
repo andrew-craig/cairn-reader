@@ -1,9 +1,9 @@
 import { fetchOrNetworkError, NetworkError } from '@cairn/shared';
 
-// fetchOrNetworkError now lives in @cairn/shared (task_47c1), but its abort guard
+// fetchOrNetworkError now lives in @cairn/shared, but its abort guard
 // exists because of React Native's runtime, so the test stays in the mobile suite.
 //
-// chore_1089: fetchOrNetworkError is the single place every service call site
+// fetchOrNetworkError is the single place every service call site
 // routes through to convert "couldn't reach the server" into a NetworkError,
 // so callers can tell it apart from a rejected credential (4xx).
 describe('fetchOrNetworkError', () => {
@@ -32,7 +32,7 @@ describe('fetchOrNetworkError', () => {
     await expect(fetchOrNetworkError('https://api.test/x')).rejects.toBeInstanceOf(NetworkError);
   });
 
-  // task_c87c review fix (fourth instance of this bug class): a DOMException
+  // Review fix (fourth instance of this bug class): a DOMException
   // does not extend Error in every runtime, so the guard must match by name,
   // not by `instanceof Error`.
   it('converts a non-Error DOMException AbortError (timeout) into a NetworkError', async () => {

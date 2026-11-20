@@ -4,7 +4,7 @@ import { useSyncTrigger } from './useSyncTrigger';
 import { useNetworkStatus } from './useNetworkStatus';
 import { SyncTrigger } from '../services/syncTrigger';
 
-// task_06e5: fires on an offline->online transition and on an
+// Fires on an offline->online transition and on an
 // AppState background/inactive->active transition — never merely because
 // the app is currently online/active, and never twice for one transition.
 

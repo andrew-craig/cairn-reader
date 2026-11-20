@@ -7,7 +7,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { NetworkError, HttpError } from '@cairn/shared';
 import { LoginResponse } from '../types';
 
-// task_5bd6: offline-aware login. handleGetStarted's bare `catch {}` used to
+// Offline-aware login. handleGetStarted's bare `catch {}` used to
 // swallow a NetworkError from loginWithDevice and fall through to
 // registerWithDevice — a second doomed round trip while offline. These tests
 // fail against pre-fix code: the offline case previously called
@@ -30,7 +30,7 @@ jest.mock('expo-application', () => ({
 }));
 
 // Only the server-URL accessors are stubbed; the rest of @cairn/shared is real,
-// since the error classes this file constructs now live there too (task_47c1)
+// since the error classes this file constructs now live there too
 // and a wholesale stub would leave them undefined.
 jest.mock('@cairn/shared', () => ({
   ...jest.requireActual('@cairn/shared'),
@@ -113,7 +113,7 @@ describe('LoginScreen', () => {
     expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 
-  // task_f19d scope amendment: the register fallback is correct only for a
+  // The register fallback is correct only for a
   // 401 ("this device isn't registered"). An error type the screen doesn't
   // recognize is not evidence this device needs an account, so it must
   // propagate rather than trigger a register attempt — the deliberate
@@ -133,9 +133,9 @@ describe('LoginScreen', () => {
     expect(onLoginSuccess).not.toHaveBeenCalled();
   });
 
-  // task_f19d: a 5xx device login is a broken server, not a rejected
+  // A 5xx device login is a broken server, not a rejected
   // credential, and must not trigger the register fallback — the same
-  // symptom task_5bd6 fixed for NetworkError, still reachable via HttpError
+  // symptom the offline-login fix handled for NetworkError, still reachable via HttpError
   // before this fix (pre-change, only `instanceof NetworkError` was checked,
   // so a 500 fell through to registerWithDevice() same as a 4xx).
   it('makes exactly one network attempt and does not fall back to register when device login fails with a 5xx', async () => {
@@ -170,7 +170,7 @@ describe('LoginScreen', () => {
     expect(mockedAuthService.registerWithDevice).toHaveBeenCalledTimes(1);
   });
 
-  // task_f19d scope amendment: 403 (hybrid account already exists), 429
+  // 403 (hybrid account already exists), 429
   // (locked out / rate limited) and 400 (invalid input) are all real,
   // definitive rejections from the backend (services/users/internal/services
   // /auth_service.go:310), but none of them mean "register this device" —

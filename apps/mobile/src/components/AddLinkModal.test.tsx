@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-
 import { AddLinkModal } from './AddLinkModal';
 import { ReadService } from '../services/read';
 
-// task_7c06: dismissal must not be gated on `detecting` — detection is not
+// Dismissal must not be gated on `detecting` — detection is not
 // user-initiated (fires on every URL change), so an in-flight detection must
 // never trap the modal.
 
@@ -48,7 +48,7 @@ describe('AddLinkModal dismissal during URL detection', () => {
   });
 });
 
-// task_7c06 follow-up: dismissal must not be gated on `discovering` either,
+// Follow-up: dismissal must not be gated on `discovering` either,
 // and a late discoverFeed resolution after close must not fire the
 // 'Multiple feeds found' Alert (or otherwise touch state).
 
@@ -93,7 +93,7 @@ describe('AddLinkModal dismissal during Find-feed', () => {
   });
 });
 
-// Epic 6e4d: subscribing to a feed asks where its new items should land.
+// Subscribing to a feed asks where its new items should land.
 
 describe('AddLinkModal Feed/Reads choice for feeds', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -219,7 +219,7 @@ describe('AddLinkModal Feed/Reads choice for feeds', () => {
   });
 });
 
-// feature_bd13 / task_9188: the RSS page opens the same modal in feed mode.
+// The RSS page opens the same modal in feed mode.
 
 describe('AddLinkModal feed mode', () => {
   afterEach(() => jest.restoreAllMocks());

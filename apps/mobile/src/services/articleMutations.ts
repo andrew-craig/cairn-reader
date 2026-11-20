@@ -7,8 +7,8 @@ import { Outbox, OutboxField, isRetryable } from './outbox';
  * Runs a backend write; an error `isRetryable` (NetworkError, HttpError(401),
  * HttpError(5xx)) is queued for later replay instead of surfacing —
  * store-first, so the local write already happened and would otherwise
- * silently revert on the next sync with nothing in the outbox to freeze it
- * (task_c894). A definitive 4xx other than 401 is a real rejection and is
+ * silently revert on the next sync with nothing in the outbox to freeze it.
+ * A definitive 4xx other than 401 is a real rejection and is
  * rethrown, exactly as an unqueued write would surface today.
  *
  * Uses the same `isRetryable` predicate as `outbox.ts`'s `sendRow` rather
@@ -34,7 +34,7 @@ async function withOutboxOnRetryableError(
 }
 
 /**
- * Facade for the reading screen's mutations (task_ebf1): each writes the
+ * Facade for the reading screen's mutations: each writes the
  * local store first, then attempts the backend write, queuing it in the
  * outbox on a retryable error rather than losing it. Add-URL and Explore are
  * untouched — they stay online-only.

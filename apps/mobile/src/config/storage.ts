@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { StorageAdapter } from '@cairn/shared';
 
-// Mobile-specific glue for the shared API config layer (decision_9b2d ADR). The
+// Mobile-specific glue for the shared API config layer (docs/decisions/web-app-adr.md). The
 // server-URL state machine lives in @cairn/shared, parameterized over a default
 // URL and a StorageAdapter; mobile supplies both. App.tsx wires these in at
 // startup via configureStorage() and configureDefaultServerUrl().

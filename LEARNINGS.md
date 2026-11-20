@@ -2,9 +2,21 @@
 
 Corrections worth remembering, captured as they happen. Newest first.
 
-## 2026-09-23 — A root-cause diagnosis is only as good as the execution environment it assumes (task_9def, PR #406)
+## 2026-11-20 — Removing an identifier also removes everything that only made sense through it
 
-**What happened:** task_9def and PR #406 asserted, as a confirmed root cause, that the
+**What happened:** removing the old tracker IDs (`task_cab7` and the like) was checked with a
+grep for the full ID pattern, which came back clean. Review still found leftovers: bare
+fragments (`cab7`, `epic 6e4d`) the pattern could not match, and references such as
+"(decision 8)" or "item B" that pointed at lists inside the deleted tasks. With the ID gone,
+those had no referent.
+
+**How to apply:** when removing an identifier, also search for its short forms, and for
+anything that could only be resolved by following it (numbered decisions, review items,
+"see X"). Rewrite each to say what it meant, or drop it if the sentence already does.
+
+## 2026-09-23 — A root-cause diagnosis is only as good as the execution environment it assumes (PR #406)
+
+**What happened:** PR #406 asserted, as a confirmed root cause, that the
 `selfhost-compose-smoke` CI job collided with the real self-hosted deployment's Docker
 volume on the same physical server — same pinned Compose project name, CI's
 `DB_PASSWORD` override not matching the already-initialized Postgres role — producing
@@ -35,7 +47,7 @@ every job in the same file), not checking it before asserting the diagnosis as
 confirmed is the actual error — the keep-worthy code fix was never in question, only
 the story wrapped around it.
 
-## 2026-09-20 — A sixth instance of "fixing the throw site doesn't fix the catch site" (task_c894)
+## 2026-09-20 — A sixth instance of "fixing the throw site doesn't fix the catch site"
 
 **What happened:** `outbox.ts`'s `sendRow` and `articleMutations.ts`'s
 `withOutboxOnNetworkError` both catch the same `HttpError`/`NetworkError` types thrown
@@ -45,7 +57,7 @@ retry next drain), `withOutboxOnNetworkError` treated it as definitive (rethrow,
 nothing queued). Online, a live 503 on archive meant `ArticleStore.remove()` had
 already run, the DELETE was rethrown, and no outbox row existed to freeze the value
 against the next sync — the one case the outbox was built for that it never saw. Same
-bug class as the 2026-09-12 entry below (task_5bd6, task_f19d): the error type was
+bug class as the 2026-09-12 entry below: the error type was
 already correct at both throw sites, but the two catch sites carried independently
 drifted assumptions about what it meant.
 
@@ -67,23 +79,23 @@ task says "confirm this case rather than assuming symmetry," actually trace the
 throw path (here, into `fetchWithAuth`) instead of pattern-matching the other
 module's handling onto it.
 
-## 2026-09-14 — A task's status field is a claim about the tree, not evidence of it (task_88aa and 4 others)
+## 2026-09-14 — A task's status field is a claim about the tree, not evidence of it
 
 **What happened:** a backlog sweep found all five `in_progress` tasks were already
-merged to `main` — including **task_88aa, a P0 auth outage, stranded for five weeks**.
+merged to `main` — including **a P0 auth outage fix (JWT key refresh), stranded for five weeks**.
 The board said five things were mid-flight; the tree said all five were done. Every
 suggestion built on that board would have been wrong.
 
 Two distinct causes, and the P0's is the instructive one:
 
-- **task_88aa** was implemented under an explicit "do not push, do not open a PR — the
+- **The P0 fix** was implemented under an explicit "do not push, do not open a PR — the
   coordinator is handling it" instruction. The handoff happened, but the code landed
   inside `bbcad8f` (#346), *"Tag services/users integration tests with `//go:build
   integration`"*. Nothing in that title mentions JWT keys, so no log scan, changelog
   read, or PR-title search would ever surface it. The task could only be closed by
   someone who went looking for `pkg/auth/key_refresher.go` directly.
-- **task_2315, chore_6449, bug_0099, task_47c1** merged under their own honest titles
-  and simply never got the `chalk close`.
+- **The other four** merged under their own honest titles and simply never got
+  closed.
 
 **How to apply:** when a task claims `in_progress`, verify it against the working tree
 before acting on it or reporting it — `ls` the file it was supposed to add, `grep` for
@@ -98,32 +110,31 @@ name them in the PR body. A stacked or piggy-backed change that lands under an
 unrelated title is invisible to everyone who was not in the room, and the task tracking
 it goes stale silently — for five weeks, in the case of a P0. This is the same family
 as the stacked-PR entry below: **branch topology that diverges from the PR's stated
-subject is how work gets lost, in both directions** — task_47c1's first attempt was
-lost by being orphaned, task_88aa's by being carried.
+subject is how work gets lost, in both directions** — the auth consolidation's first attempt
+was lost by being orphaned, the P0 fix by being carried.
 
-**Recurred 2026-09-23:** five more tasks (bug_54f6, task_fd42, task_fc02, task_9def,
-task_c894) had merged with a `## Review` section written but `status: open` — each PR
-filled in the review and stopped one command short. The top four slots of `chalk ready`
-were finished work. **Close the task (now: set the Linear issue to Done) in the PR that lands the work**, alongside
+**Recurred 2026-09-23:** five more tasks had merged with a `## Review` section written but `status: open` — each PR
+filled in the review and stopped one command short. The top four slots of the ready queue
+were finished work. **Set the Linear issue to Done in the PR that lands the work**, alongside
 the Review section; a separate housekeeping pass is the fallback, not the process.
 
-## 2026-09-12 — The canonical error type ends the bug class only where it's actually consumed (task_5bd6, task_f19d)
+## 2026-09-12 — The canonical error type ends the bug class only where it's actually consumed
 
 **Correction:** The 2026-09-07 entry below tallied four windows where an unwrapped
-fetch rejection could clear valid tokens or log a user out, and named chore_1089's
+fetch rejection could clear valid tokens or log a user out, and named the
 lint rule (fail CI on a raw `fetch`) the fix — "not more review." That closed the
 *construction* side: every fetch in `auth.ts` now produces a well-typed
 `NetworkError`/`HttpError`. Two more instances turned up anyway, both on the
 *consumption* side of those same types.
 
-`task_5bd6`: `LoginScreen.handleGetStarted` wraps `AuthService.loginWithDevice()` in
+Offline login: `LoginScreen.handleGetStarted` wraps `AuthService.loginWithDevice()` in
 a bare `catch {}` that falls through to `registerWithDevice()` — correct for "this
 device isn't registered yet," wrong for "I couldn't reach the server." Offline, the
-first call already threw a well-formed `NetworkError` (chore_1089 had wrapped
+first call already threw a well-formed `NetworkError` (the fetch-wrapping change had wrapped
 `loginWithDevice` itself), but the bare catch swallowed it and made a second,
 equally doomed request before alerting.
 
-`task_f19d`: the same four auth entry points threw a plain `Error` on any
+Typed HTTP errors: the same four auth entry points threw a plain `Error` on any
 `!response.ok`, so a 5xx was indistinguishable *by type* from the one status — 401 —
 that actually means "register this device." The first scope decision picked
 `status >= 500` as the "unreachable-ish" threshold; a follow-up pass against the
@@ -154,7 +165,7 @@ problem") — read the actual handler on the other end of the call and enumerate
 statuses it can return, the way this same file's `doRefreshAccessToken` already
 modeled for this exact endpoint family.
 
-## 2026-09-11 — A swallowed error and a surfaced error are not interchangeable (task_ebf1)
+## 2026-09-11 — A swallowed error and a surfaced error are not interchangeable
 
 Scope item 4 said to remove the `.catch(console.error)` swallowing at the six
 `ReadArticleDetailScreen` mutation call sites. The implementation did exactly that,
@@ -187,7 +198,7 @@ implementing one: find the shape that does both. Here, navigating first and aler
 from the `.catch` surfaced the error without blocking — the two goals were never
 actually in conflict.
 
-## 2026-09-07 — `instanceof` in a catch block is a bet about a runtime you don't control (task_c87c)
+## 2026-09-07 — `instanceof` in a catch block is a bet about a runtime you don't control
 
 **Correction:** `fetchOrNetworkError` classified an aborted request with
 `error instanceof Error && error.name === 'AbortError'`. A `DOMException` — what
@@ -220,13 +231,13 @@ here, `expect(abortError).not.toBeInstanceOf(Error)` — so that if the environm
 shifts, it fails loudly instead of quietly ceasing to test anything.
 
 **Tally, because it is the point:** this is the fourth window in which an
-unconverted fetch rejection could clear valid tokens (refresh fetch in cab7,
-primary fetch and 401-retry fetch in c87c, now the abort *shape* on the retry).
+unconverted fetch rejection could clear valid tokens (refresh fetch in the
+offline-logout fix, primary fetch and 401-retry fetch in the AbortError fix, now the abort *shape* on the retry).
 Each was found by a different reviewer, none by a test written beforehand. The
-fix is not more review — it is chore_1089's lint rule, which makes the next
+fix is not more review — it is the raw-`fetch` lint rule, which makes the next
 unwrapped `fetch` fail CI.
 
-## 2026-09-06 — Replacing a module inherits its callers' assumptions about how it fails (task_a8a4)
+## 2026-09-06 — Replacing a module inherits its callers' assumptions about how it fails
 
 **Correction:** `ArticleStore` replaced `StorageService`'s article caches. The old
 read methods wrapped their bodies in try/catch and returned `null` or `[]`, so
@@ -263,16 +274,16 @@ need no change" outcome is a good signal that a fix landed at the right layer.
 Per-call-site handling of a cross-cutting failure mode is how you get a bug that
 recurs three times before anyone names it.
 
-## 2026-09-06 — Adding a throwing call to an existing try block silently widens its blast radius (task_cab7, then task_a8a4)
+## 2026-09-06 — Adding a throwing call to an existing try block silently widens its blast radius
 
 **Correction:** The same defect was caught twice in one feature, by two different
 reviewers, in two different files.
 
-First, in PR #381 (task_cab7): `AuthContext.checkAuthStatus`'s new `NetworkError`
+First, in PR #381: `AuthContext.checkAuthStatus`'s new `NetworkError`
 branch called `AuthService.getUser()` — which does `JSON.parse` on persisted data
 and can throw on corrupt storage — inside the catch handler, unguarded.
 
-Then, in task_a8a4: `AuthContext.logout` added `await ArticleStore.clear()`
+Then, in the mobile local cache work: `AuthContext.logout` added `await ArticleStore.clear()`
 between `AuthService.logout()` and `setUser(null)`, inside a try whose catch
 rethrows and never reaches `setUser(null)`. A SQLite failure would wipe the tokens
 but leave the context reporting the user as authenticated — the app keeps
@@ -307,12 +318,12 @@ needs the new call to throw, which no existing test provoked. Both fixes shipped
 with a test that forces the rejection. That test is cheap and is the thing that
 stops a third occurrence.
 
-## 2026-09-06 — "Keep the tokens" was not the same as "keep the user logged in" (task_cab7)
+## 2026-09-06 — "Keep the tokens" was not the same as "keep the user logged in"
 
 **Correction:** The task, and then my own scope clarification on it, both stopped
 short of the change that actually fixed the user-visible bug.
 
-task_cab7 described the offline-logout bug as living in one function,
+The task described the offline-logout bug as living in one function,
 `doRefreshAccessToken`, which called `clearTokens()` on any error. Reviewing it, I
 found the failure actually propagated through three functions and re-scoped the
 task to cover `ensureValidToken` (which collapsed "server rejected" and "server
@@ -345,9 +356,9 @@ a different reason than the service tests do.
 
 ---
 
-## A stacked PR whose base is never repointed merges into nothing (task_47c1, 2026-09-13)
+## A stacked PR whose base is never repointed merges into nothing (2026-09-13)
 
-**What happened:** task_47c1 was implemented once, in PR #365, and lost. #365 was
+**What happened:** the auth consolidation onto `@cairn/shared` was implemented once, in PR #365, and lost. #365 was
 stacked on #364 with `base: tier4/mobile-fetchwithauth` and a note saying "base will
 move to `main` once #364 merges". #364 squash-merged into `main` at 08:17:39, which
 deleted the branch's history from main's perspective; #365 merged 70 seconds later
@@ -369,14 +380,14 @@ either the PR state or the branch name.
 
 **Corollary that cost real work here:** by the time the orphan was found, main had
 fixed the mobile half of the same bug with a better model (`NetworkError` +
-`fetchOrNetworkError`, task_cab7/task_f19d) than the orphan's own
+`fetchOrNetworkError`) than the orphan's own
 `RefreshRejectedError`/`RefreshNetworkError`. Rebasing the orphan would have
 regressed main. An orphaned branch's *design* can be worth harvesting long after its
 *diff* has become a liability — read it, don't rebase it.
 
 ## Committing from a working tree another session is also editing
 
-**What happened:** partway through task_47c1 a `git diff HEAD` showed 41 lines of a
+**What happened:** partway through the auth consolidation a `git diff HEAD` showed 41 lines of a
 `countUserContents` method, a Go handler, an openapi block and a new shared type that
 I had not written. A concurrent interactive session was working in the same checkout.
 

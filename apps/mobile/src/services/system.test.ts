@@ -1,7 +1,7 @@
 import { SystemService } from './system';
 import { NetworkError } from '@cairn/shared';
 
-// chore_1089: system.ts's unauthenticated health check was one of the 9 raw
+// system.ts's unauthenticated health check was one of the 9 raw
 // fetch call sites; it now shares fetchOrNetworkError with AuthService so an
 // unreachable server surfaces the same distinguishable NetworkError.
 describe('SystemService.getServerVersion', () => {

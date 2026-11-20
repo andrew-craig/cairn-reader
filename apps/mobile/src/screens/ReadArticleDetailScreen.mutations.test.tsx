@@ -7,7 +7,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
 import { HttpError } from '@cairn/shared';
 
-// task_ebf1 tech-lead review follow-up: two behaviors specific to the
+// Review follow-up: two behaviors specific to the
 // ArticleMutations facade wiring, not covered by
 // ReadArticleDetailScreen.test.tsx (which mocks BottomActionMenu away
 // entirely and never exercises these handlers).

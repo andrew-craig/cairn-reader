@@ -22,7 +22,7 @@ nonisolated final class AppDatabase: Sendable {
 
     /// The database file for a user, in the App Group container. One file per user, so a file
     /// left behind by a sign-out that did not finish is never read for another account. The RN
-    /// app's `cairnreader.db` is never opened: on-device RN data is not migrated (decision 4).
+    /// app's `cairnreader.db` is never opened: on-device RN data is not migrated.
     static func url(forUser userID: String) -> URL {
         AppGroup.containerURL.appending(path: "store-\(userID).sqlite")
     }

@@ -100,11 +100,11 @@ describe('AuthService token refresh logging', () => {
   });
 });
 
-// task_cab7: a failed refresh must only clear tokens when the server actually
+// A failed refresh must only clear tokens when the server actually
 // rejected the credential (4xx). Network errors, timeouts, 5xx responses, and
 // malformed bodies must keep the tokens and surface a retryable NetworkError,
 // otherwise a merely-offline device gets logged out.
-describe('AuthService token refresh: offline vs rejected (task_cab7)', () => {
+describe('AuthService token refresh: offline vs rejected', () => {
   beforeEach(async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -210,13 +210,13 @@ describe('AuthService token refresh: offline vs rejected (task_cab7)', () => {
   });
 });
 
-// task_f19d: a 5xx auth response must be distinguishable, by type, from a 4xx
+// A 5xx auth response must be distinguishable, by type, from a 4xx
 // credential rejection, so LoginScreen (and any future caller) can tell
 // "server is broken" apart from "the credential was rejected" without
 // parsing the message text. These tests fail against pre-change code: the
 // four entry points below used to throw a plain Error for every non-2xx
 // status, so `toBeInstanceOf(HttpError)` fails regardless of status.
-describe('AuthService auth entry points: non-2xx responses throw HttpError (task_f19d)', () => {
+describe('AuthService auth entry points: non-2xx responses throw HttpError', () => {
   beforeEach(() => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});

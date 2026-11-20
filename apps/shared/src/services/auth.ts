@@ -1,5 +1,5 @@
 // Shared authentication / token-refresh state machine for apps/web and
-// apps/mobile (task_47c1). This used to be a near-verbatim copy in each app's
+// apps/mobile. This used to be a near-verbatim copy in each app's
 // services/auth.ts; the only real differences were the persistence backend
 // (AsyncStorage vs localStorage) and the set of login flavors (device vs
 // email). Persistence is injected via the same StorageAdapter the server-URL
@@ -101,7 +101,7 @@ export class AuthService {
    * Shared POST-credentials-then-store flow behind every login/register flavor.
    * A non-2xx response throws HttpError carrying the status, so callers can
    * tell a rejected credential (4xx) from a broken server (5xx) without
-   * parsing the message text (task_f19d).
+   * parsing the message text.
    */
   protected static async authenticate(
     path: string,
@@ -310,7 +310,7 @@ export class AuthService {
     let response: Response;
     try {
       // Not routed through fetchOrNetworkError: this catch converts *any*
-      // thrown error to NetworkError (task_cab7), which is deliberately
+      // thrown error to NetworkError, which is deliberately
       // broader than fetchOrNetworkError's TypeError/AbortError-only guard.
       // Losing a refresh to an unrecognized failure mode must never look like
       // a rejected credential.

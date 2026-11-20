@@ -1,6 +1,6 @@
 # Audit 1 — API Contract Consistency & Stability
 
-**Workstream:** `task_2a40` (epic `epic_9c21`, P1 — most time-sensitive)
+**Priority:** P1 — most time-sensitive
 **Status:** Findings complete
 **Date:** 2026-06-07
 
@@ -143,7 +143,7 @@ agrees (`apps/mobile/src/services/read.ts:96,144,183,218,250`).
 Spec diverges on three axes: segment `content` vs `contents`; nesting `/content/user/{id}` vs
 `/users/{id}/contents`; `check-duplicate` vs `check-duplicates`.
 
-**Resolved (task_6525):** the divergent spec was the stale *aggregate* `services/read/api/openapi.yaml`,
+**Resolved:** the divergent spec was the stale *aggregate* `services/read/api/openapi.yaml`,
 which has been deleted. The canonical per-sub-service spec `services/read/content/api/openapi.yaml` already
 pins the correct singular forms (`/api/v1/content`, `/content/user/{user_id}`, `check-duplicate`). The
 remaining follow-ups below (handler doc-comments, routing unit tests through the production router) are
@@ -219,7 +219,7 @@ explore recommender `/api/v1/explore`; explore fetcher `/api/v1/explore/feed`.
 Before signups open, the following must be true:
 
 - [ ] **F-1** Auth-401, panic-500, and content Content-Type-400 all emit the `pkg/api` error envelope.
-- [x] **F-4** Stale aggregate `services/read/api/openapi.yaml` deleted (task_6525); canonical `services/read/content/api/openapi.yaml` already matches the content router (singular `/content`, `check-duplicate`).
+- [x] **F-4** Stale aggregate `services/read/api/openapi.yaml` deleted; canonical `services/read/content/api/openapi.yaml` already matches the content router (singular `/content`, `check-duplicate`).
 - [ ] **F-5** `services/read/fetcher/api/openapi.yaml` paths match the fetcher router (`/source/rss/...`).
 - [ ] **F-6** users/explore/fetcher specs document the `{error,message,details,meta}` envelope.
 - [ ] **F-3** Pagination param/response shape locked per endpoint and reflected in specs.

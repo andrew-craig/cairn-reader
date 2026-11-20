@@ -76,8 +76,8 @@ async function withValidToken() {
   });
 }
 
-// task_cab7 / task_f19d, previously mobile-only: a failed refresh may only clear
-// tokens when the server actually rejected the credential. Before task_47c1 the
+// Previously mobile-only: a failed refresh may only clear
+// tokens when the server actually rejected the credential. Before the move to @cairn/shared the
 // web copy of this state machine cleared tokens on *any* refresh error, so a
 // merely-offline browser was logged out; consolidating onto this implementation
 // gives web the mobile semantics.
@@ -307,7 +307,7 @@ describe('fetchWithAuth', () => {
     expect(await AuthService.getAccessToken()).toBe('access-1');
   });
 
-  // H12 (bug_8123): a retried request that is *also* rejected must end the
+  // H12: a retried request that is *also* rejected must end the
   // session rather than being handed back to the caller as an ordinary 401
   // response.
   it('clears tokens and throws session-expired when the retried request is also a 401', async () => {
@@ -335,7 +335,7 @@ describe('login and register', () => {
     expect(await AuthService.getUserId()).toBe('user-1');
   });
 
-  // task_f19d: callers need the status by type, so "server is broken" can be
+  // Callers need the status by type, so "server is broken" can be
   // told apart from "the credential was rejected" without parsing prose.
   it.each([401, 500])('throws HttpError carrying the %i status and server message', async (status) => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(status, { message: 'server says no' }));

@@ -1,6 +1,6 @@
 import Foundation
 
-/// The App Group shared with a future share extension (decision 11). The database, the Keychain
+/// The App Group shared with a future share extension. The database, the Keychain
 /// session and the saved server URL live here so the extension can reach them.
 nonisolated enum AppGroup {
     static let identifier = "group.com.cairnapp.cairnreader"

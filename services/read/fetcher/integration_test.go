@@ -61,7 +61,7 @@ func setupTestRouter(subscriptionHandler *handlers.SubscriptionHandler) *chi.Mux
 
 // TestContentServiceReceivesRSSTitleAndAuthor verifies that an RSS-parsed
 // title and author end up in the HTTP request body sent to the Content
-// Service. This is the bug regression test for bug_fda7.
+// Service. This is a regression test for that bug.
 func TestContentServiceReceivesRSSTitleAndAuthor(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test")

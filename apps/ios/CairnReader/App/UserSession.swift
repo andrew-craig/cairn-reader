@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import Synchronization
 
-/// Everything that belongs to one signed-in user (decision 10): the database, the article store,
+/// Everything that belongs to one signed-in user: the database, the article store,
 /// the outbox and mutations on them, a `ReadService` bound to the user, `Sync`, the Feed cache,
 /// and the work started on them. `SessionModel` creates one at sign-in and closes it at
 /// sign-out, which erases the user's on-device data.

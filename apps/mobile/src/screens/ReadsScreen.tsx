@@ -52,7 +52,7 @@ export const ReadsScreen: React.FC = () => {
   const onResetLoaded = useCallback((next: Article[]) => {
     setQueued(queuedSnapshotRef.current);
     // SyncTrigger.run() drains the outbox and then runs prefetch, in that
-    // fixed order (task_ebf1) — prefetch reads the post-sync store state
+    // fixed order — prefetch reads the post-sync store state
     // (upsertMany already cleared any body whose hash changed), so it must
     // run after upsertMany resolves, not alongside it. Routing pull-to-
     // refresh through the same entry point as the reconnect/foreground

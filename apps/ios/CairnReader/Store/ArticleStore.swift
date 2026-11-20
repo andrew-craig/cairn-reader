@@ -10,7 +10,7 @@ nonisolated struct ReadsEntry: Identifiable, Hashable, Sendable {
 }
 
 /// The on-device store of Reads articles: metadata, user state, and an opportunistically cached
-/// body diffed by `content_hash`. The source of truth for the Reads list (decision 8): network
+/// body diffed by `content_hash`. The source of truth for the Reads list: network
 /// pages are written in with `syncPage`, and screens follow the store through its observations.
 ///
 /// Every method throws a store failure: a broken database breaks Reads (there is no network-only

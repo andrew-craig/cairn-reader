@@ -1,6 +1,6 @@
 // Mobile's authentication service. The token-refresh state machine, email
 // login/register, logout, changePassword and fetchWithAuth all live in
-// @cairn/shared (task_47c1) — this subclass adds only what is genuinely
+// @cairn/shared — this subclass adds only what is genuinely
 // mobile-specific: the device-ID login flavors, account upgrade, and the
 // retrying fetch wrapper built on mobile's withRetry.
 //

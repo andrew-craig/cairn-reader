@@ -15,7 +15,7 @@ import (
 //     the route only registers POST (chi would otherwise return 405); and
 //   - emits Access-Control-Allow-Origin on a plain GET health endpoint.
 //
-// This guards the wiring assumption behind task_1318: top-level Use runs before
+// This guards the CORS wiring assumption: top-level Use runs before
 // chi's route/method resolution.
 func TestCORSChiTopLevel(t *testing.T) {
 	r := chi.NewRouter()

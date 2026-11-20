@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// The reader's and the lists' edits (decision 9). Each is one transaction, the store change plus
+/// The reader's and the lists' edits. Each is one transaction, the store change plus
 /// the outbox row, then a request to drain (`Sync.requestDrain`) that the caller does not wait
 /// for. Nothing is sent from here, so a throw means the database failed, never that the backend
 /// said no: a refusal comes back later through `Outbox.rejections`.

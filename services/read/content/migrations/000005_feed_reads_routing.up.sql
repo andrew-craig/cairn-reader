@@ -1,5 +1,5 @@
 -- Feed vs Reads: every user_contents row lives in exactly one of two lists,
--- chosen per source by the user (see epic_6e4d). Existing rows predate the
+-- chosen per source by the user. Existing rows predate the
 -- split and stay in Reads; direct saves are always Reads.
 ALTER TABLE user_contents
     ADD COLUMN list VARCHAR(10) NOT NULL DEFAULT 'reads'

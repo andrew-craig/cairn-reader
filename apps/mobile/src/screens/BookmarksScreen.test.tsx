@@ -5,7 +5,7 @@ import { ReadService } from '../services/read';
 import { ArticleStore } from '../services/articleStore';
 import { Article } from '../types';
 
-// task_a8a4: BookmarksScreen had no local cache at all before this change —
+// BookmarksScreen had no local cache at all before this change —
 // a network failure blanked the list to the error state even when the
 // favorite was already known locally. It must now render from the store
 // first, and a subsequent network failure must not blank that list.

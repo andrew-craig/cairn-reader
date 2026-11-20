@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import AddLinkModal from './AddLinkModal';
 import { ReadService } from '../services/read';
 
-// task_7c06: gating dismissal on `detecting` traps the user — detection is not
+// Gating dismissal on `detecting` traps the user — detection is not
 // user-initiated (fires on a 400ms debounce on every URL change). Escape, the
 // Cancel button and the backdrop must all dismiss while a detection is pending.
 
@@ -58,7 +58,7 @@ describe('AddLinkModal dismissal during URL detection', () => {
   });
 });
 
-// task_7c06 follow-up: dismissal must not be gated on `discovering` either, and
+// Follow-up: dismissal must not be gated on `discovering` either, and
 // a late discoverFeed resolution after close must not setState (single-feed
 // success calls setUrl, which would re-trigger the detection effect on a
 // closing modal).
@@ -113,7 +113,7 @@ describe('AddLinkModal dismissal during Find-feed', () => {
   });
 });
 
-// task_f4ac: a detected feed asks where new items should land; pages never send a list.
+// A detected feed asks where new items should land; pages never send a list.
 describe('AddLinkModal Feed/Reads choice', () => {
   const feedDetection = { url: 'https://example.com/rss', type: 'feed' as const, title: 'Example' };
 

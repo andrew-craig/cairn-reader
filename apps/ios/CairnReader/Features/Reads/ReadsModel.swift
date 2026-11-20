@@ -3,7 +3,7 @@ import GRDB
 import Observation
 import OSLog
 
-/// The Reads tab (decision 8): its rows are the store's, followed through
+/// The Reads tab: its rows are the store's, followed through
 /// `ArticleStore.observeReads`; syncing writes pages into the store through `Sync` and widens the
 /// window of stored rows shown. It keeps no list of its own, so a row archived, saved or changed
 /// anywhere shows here through the store. Search results (`ArticleListModel`, `list=reads`)

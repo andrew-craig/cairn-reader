@@ -5,8 +5,8 @@ import Synchronization
 import Testing
 @testable import CairnReader
 
-// Re-expression of apps/mobile/src/services/syncTrigger.test.ts against `Sync` (decision_adb1:
-// the trigger's fixed consumer order becomes `Sync.run`, its single-flight guard becomes the
+// Re-expression of apps/mobile/src/services/syncTrigger.test.ts against `Sync`
+// (the trigger's fixed consumer order becomes `Sync.run`, its single-flight guard becomes the
 // operation queue), plus the Reads page sync and the queueing rules.
 
 /// Answers PATCHes with `patch`, the Reads list with `page`, and a detail with its body.

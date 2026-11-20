@@ -103,7 +103,7 @@ describe('RootNavigator offline banner', () => {
     expect(useSyncTrigger).not.toHaveBeenCalled();
   });
 
-  // task_5bd6: RootNavigator's isLoading and !isAuthenticated early returns
+  // RootNavigator's isLoading and !isAuthenticated early returns
   // never rendered OfflineBanner, so a login attempt (or the loading spinner
   // itself) gave no connectivity indication. SyncTriggerEffect must stay out
   // of both — its doc comment is explicit that living inside the
@@ -138,7 +138,7 @@ describe('RootNavigator offline banner', () => {
     expect(useSyncTrigger).not.toHaveBeenCalled();
   });
 
-  // task_cab7 (see LEARNINGS.md, 2026-09-06) made a cold start offline with
+  // The offline-logout fix (see LEARNINGS.md, 2026-09-06) made a cold start offline with
   // valid persisted tokens keep the user signed in — AuthContext resolves
   // isAuthenticated: true despite isOffline: true. RootNavigator must route
   // that state to the authenticated tree, never to LoginScreen. AuthContext's
