@@ -296,7 +296,7 @@ vault kv get -field=value secret/jwt/private-key | head -1
 ### Service-Specific Notes
 
 **Account Types**: The service supports three account types:
-- **Mobile-only**: Authenticates with Expo device ID only
+- **Mobile-only**: Authenticates with the device ID only (Android ID or iOS `identifierForVendor`, sent as `expo_device_id`)
 - **Email-only**: Authenticates with email/password only
 - **Hybrid**: Upgraded mobile account, authenticates with email/password (device login disabled)
 
@@ -510,7 +510,7 @@ The single-container build (`cmd/selfhost`, see [infrastructure/docker/selfhost/
 
 ### Client Configuration
 
-The web app reads `VITE_API_URL` (build-time, optional) to pick the backend; it defaults to the page origin. See [apps/web/CLAUDE.md](../apps/web/CLAUDE.md). The mobile app reads no `EXPO_PUBLIC_*` variables.
+The web app reads `VITE_API_URL` (build-time, optional) to pick the backend; it defaults to the page origin. See [apps/web/CLAUDE.md](../apps/web/CLAUDE.md). The Android (Expo) app reads no `EXPO_PUBLIC_*` variables, and the iOS app reads no build-time configuration; both take the server URL at runtime from the login screen.
 
 ---
 

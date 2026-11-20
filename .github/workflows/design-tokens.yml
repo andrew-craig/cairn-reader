@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - main
-      - feature/ios-native-migration
     paths:
       - 'design/tokens/**'
       - 'apps/web/src/theme/colors.css'

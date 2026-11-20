@@ -3,7 +3,8 @@
 ## Cairn Reader Overview
 
 Cairn is a read-it-later application consisting of:
-- **Mobile App** (React Native/Expo): iOS and Android app with Feed, Reads and You tabs
+- **iOS App** (Swift/SwiftUI, `apps/ios`): native iOS app with Feed, Reads and You tabs
+- **Android App** (React Native/Expo, `apps/mobile`): Android app with the same tabs
 - **Web App** (React/Vite): browser client with the same Feed, Reads and You structure
 - **Backend Services** (Go): Microservices for content storage, ingestion, and user management
   - **Read Service**: Article storage, RSS subscriptions, and Feed/Reads routing
@@ -13,7 +14,7 @@ Cairn is a read-it-later application consisting of:
 ### Architecture
 
 ```
-Mobile App / Web App → REST APIs → Backend Services
+iOS App / Android App / Web App → REST APIs → Backend Services
                                    ├── User Service (Auth)
                                    ├── Read Service (Storage)
                                    └── Email Ingest Service
@@ -26,6 +27,7 @@ Mobile App / Web App → REST APIs → Backend Services
 - Services communicate only via HTTP REST APIs — **never** access another service's database
 - JWT-based stateless authentication (RS256, keys managed by HashiCorp Vault)
 - All user-specific endpoints require `Authorization: Bearer <token>` header
+- Mobile is two codebases: a user-facing mobile change is implemented in `apps/ios` (iOS) and `apps/mobile` (Android). Every task states which platforms it covers
 - Local dev ports differ from each service's container-internal port — see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md) for the full port table.
 
 For detailed architecture, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md). For per-service details, see the service CLAUDE.md files linked below.
@@ -35,9 +37,9 @@ For detailed architecture, see [docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md). Fo
 Read the following documentation as necessary for each task. do not read a document unless it is needed.
 
 ### Service documentation
-- [Mobile App](/apps/mobile/CLAUDE.md) - React Native/Expo mobile application
+- [iOS App](/apps/ios/CLAUDE.md) - Native Swift/SwiftUI iOS application (the only iOS build)
+- [Android App](/apps/mobile/CLAUDE.md) - React Native/Expo application, Android only
 - [Web App](/apps/web/CLAUDE.md) - React/Vite browser client
-- [iOS App](/apps/ios/CLAUDE.md) - Native Swift/SwiftUI iOS application (replacing the mobile app's iOS build)
 - [Read Service](/services/read/CLAUDE.md) - Article storage, RSS feed management, and Feed/Reads routing
 - [User Service](/services/users/CLAUDE.md) - Authentication and user management
 - [Email Ingest Service](/services/read/email/CLAUDE.md) - Email-to-article ingestion
@@ -65,7 +67,7 @@ All services use `/health/live` (liveness) and `/health/ready` (readiness) for h
 - **Shared auth package** (JWT middleware used by all services): [pkg/auth/README.md](/pkg/auth/README.md)
 - **Selfhost** (single-container build): [infrastructure/docker/selfhost/README.md](/infrastructure/docker/selfhost/README.md)
 - **Infrastructure**: [infrastructure/docker/README.md](/infrastructure/docker/README.md)
-- **Color palette** (single source for web, mobile and iOS): [design/tokens/README.md](/design/tokens/README.md)
+- **Color palette** (single source for web, Android and iOS): [design/tokens/README.md](/design/tokens/README.md)
 - **Quality Remediation**: [docs/QUALITY_REMEDIATION_STRATEGY.md](/docs/QUALITY_REMEDIATION_STRATEGY.md) — playbook for working the code-quality backlog (epic_fefa)
 
 

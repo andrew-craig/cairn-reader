@@ -2,14 +2,14 @@
 id: feature_983c
 title: [iOS native 16] Subscriptions: RSS and Newsletters with per-source Feed/Reads routing
 type: feature
-status: in_progress
+status: closed
 priority: 2
 labels: [ios,ui]
 blocked_by: []
 parent: epic_bc48
 remote_task_url: null
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-20T10:44:11Z
+updated_at: 2026-11-20T10:59:22Z
 ---
 ## Goal
 Manage sources and choose which list each one delivers to.

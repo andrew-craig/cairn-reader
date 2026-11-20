@@ -4,7 +4,6 @@ on:
   pull_request:
     branches:
       - main
-      - feature/ios-native-migration
     paths:
       - 'apps/ios/**'
       - '.github/workflows/ios-checks.yml'

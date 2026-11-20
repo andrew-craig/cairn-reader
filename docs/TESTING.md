@@ -15,7 +15,8 @@ This document provides comprehensive testing guidelines for the Cairn backend se
   - [Read Service](#read-service)
   - [User Service](#user-service)
   - [Self-host binary and shared packages](#self-host-binary-and-shared-packages)
-  - [Web and Mobile Apps](#web-and-mobile-apps)
+  - [Web and Android Apps](#web-and-android-apps)
+  - [iOS App](#ios-app)
 - [Test Helpers and Utilities](#test-helpers-and-utilities)
 - [CI/CD Integration](#cicd-integration)
 - [Troubleshooting](#troubleshooting)
@@ -391,7 +392,7 @@ cd pkg/auth && go test ./...        # also pkg/config, pkg/logging, pkg/middlewa
 
 `services/users/selfhost` and the other `services/*/selfhost` packages carry their own unit tests and run with their service module.
 
-### Web and Mobile Apps
+### Web and Android Apps
 
 The npm workspace root (`package.json`) contains `apps/web`, `apps/shared` and `apps/mobile`; run `npm ci` once from the repo root.
 
@@ -402,11 +403,23 @@ cd apps/web && npm test            # vitest run
 # Shared package: Vitest in plain Node (apps/shared/vitest.config.ts)
 cd apps/shared && npm test
 
-# Mobile app: Jest with the jest-expo preset (apps/mobile/jest.config.js, jest.setup.ts)
+# Android (Expo) app: Jest with the jest-expo preset (apps/mobile/jest.config.js, jest.setup.ts)
 cd apps/mobile && npm test         # npm run test:ci for jest --ci --coverage
 ```
 
-Tests are colocated as `*.test.ts(x)` next to the source. There is no Playwright or other automated browser/device end-to-end suite in the repo. See [Web App](/apps/web/CLAUDE.md#testing) and [Mobile App](/apps/mobile/CLAUDE.md#testing) for conventions and patterns.
+Tests are colocated as `*.test.ts(x)` next to the source. There is no Playwright or other automated browser/device end-to-end suite in the repo. See [Web App](/apps/web/CLAUDE.md#testing) and [Android App](/apps/mobile/CLAUDE.md#development-workflow) for conventions and patterns.
+
+### iOS App
+
+`apps/ios/CairnReaderTests` holds unit tests (Swift Testing) hosted in the app. They need macOS and Xcode 26:
+
+```bash
+cd apps/ios
+xcodebuild test -project CairnReader.xcodeproj -scheme CairnReader \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
+Sessions without a Mac rely on the `ios-checks.yml` workflow. See [iOS App](/apps/ios/CLAUDE.md#build-and-test).
 
 ---
 
@@ -499,7 +512,8 @@ Workflows live in `.github/workflows/`; test-related ones are:
 | `go-checks.yml` | Per module (path-filtered): gofmt, golangci-lint, `go vet`, `go build`, and `go test -race -count=1` with coverage for `services/read` (content, fetcher), `services/read/email`, `services/users` (`./internal/...` with `-p 1` against a PostgreSQL service container and migrations applied first), `cmd/selfhost` and the `pkg/*` modules |
 | `go-checks.yml` (integration jobs) | `go test -race -tags=integration` for content, fetcher and email (PostgreSQL 16 service, `TEST_DB_*` pointing at it, `CAIRN_SKIP_NETWORK_TESTS=1`) and for `cmd/selfhost`; for `services/users` it starts `test/integration/docker-compose.test.yml` (PostgreSQL, Vault and the key-seeding init container), runs `test/integration`, then starts the service against the same environment and runs the `test/security` scripts (`make test-security`) |
 | `web-checks.yml` | `tsc --noEmit`, ESLint, `npx vitest run` for `apps/web`, and `tsc` + `vitest run` for `apps/shared` |
-| `mobile-checks.yml` | `tsc --noEmit`, ESLint, `npx jest --ci --coverage`, an Expo iOS bundle export, and `knip` (dead code) |
+| `mobile-checks.yml` | `tsc --noEmit`, ESLint, `npx jest --ci --coverage`, an Expo Android bundle export, and `knip` (dead code) for `apps/mobile` |
+| `ios-checks.yml` | `xcodebuild build` and `xcodebuild test` for `apps/ios` on an iOS 26 simulator (`macos-26` runner) |
 | `selfhost-compose-smoke.yml` | Builds the self-host image, starts `infrastructure/docker/selfhost` with Docker Compose and checks `/health/live` |
 | `docker-test.yml` | Builds each service image (no push) as a smoke test |
 

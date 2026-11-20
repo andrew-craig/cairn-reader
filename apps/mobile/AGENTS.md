@@ -1,10 +1,12 @@
-# CLAUDE.md - Mobile App
+# CLAUDE.md - Android App (Expo)
 
-This file provides guidance to Claude Code when working with the Cairn mobile application.
+This file provides guidance to Claude Code when working with the Cairn Android app (`apps/mobile`).
 
 ## Service Overview
 
-The Cairn mobile app is a React Native application built with Expo (iOS and Android; `npm run web` also works) that provides a read-it-later experience. It talks to the Cairn backend (User and Read services) through a single server origin.
+The Cairn mobile app is a React Native application built with Expo that provides a read-it-later experience on **Android** (`npm run web` also works for development). It talks to the Cairn backend (User and Read services) through a single server origin.
+
+iOS is not built from here: it ships from the native Swift app in [`apps/ios`](/apps/ios/CLAUDE.md). A user-facing mobile change therefore needs a matching change there; say in each task which platforms it covers. There is no committed `android/` project or Android release workflow yet.
 
 **Key Features:**
 - Device ID or email/password authentication (JWT, tokens in AsyncStorage)
@@ -19,7 +21,6 @@ The Cairn mobile app is a React Native application built with Expo (iOS and Andr
 apps/mobile/
 ├── App.tsx / index.js        # Entry (index.js imports src/config/init first, then registers App)
 ├── app.json                  # Expo config (no app.config.*, no EXPO_PUBLIC_* env vars)
-├── ios/                      # Committed native project; ios/fastlane lanes: beta (TestFlight), certificates, build_only
 ├── jest.config.js, jest.setup.ts, __mocks__/   # Test setup
 ├── knip.json                 # Unused-code check config
 └── src/
@@ -91,7 +92,7 @@ Services are static classes or plain objects (no instantiation) in `src/services
 - **Errors** — `NetworkError` (unreachable, timeout, unparseable body) vs `HttpError` (definitive non-2xx, has `status`), from `@cairn/shared`; offline logic keys off this distinction.
 
 ### AuthService (`src/services/auth.ts`)
-Subclasses the shared `AuthService` and adds only mobile-specific parts: `getDeviceId()` (`expo-application`: `getIosIdForVendorAsync()` on iOS, `getAndroidId()` on Android), `loginWithDevice()`, `registerWithDevice()`, `upgradeAccount(email, password)` and `fetchWithAuthAndRetry()` (also retries 5xx/network errors). Everything else (`initialize`, `loginWithEmail`, `logout`, `getAccessToken`, `refreshAccessToken`, `fetchWithAuth`, `changePassword`, ...) lives in `apps/shared/src/services/auth.ts`. Session state is module-level there.
+Subclasses the shared `AuthService` and adds only mobile-specific parts: `getDeviceId()` (`expo-application` `getAndroidId()`), `loginWithDevice()`, `registerWithDevice()`, `upgradeAccount(email, password)` and `fetchWithAuthAndRetry()` (also retries 5xx/network errors). Everything else (`initialize`, `loginWithEmail`, `logout`, `getAccessToken`, `refreshAccessToken`, `fetchWithAuth`, `changePassword`, ...) lives in `apps/shared/src/services/auth.ts`. Session state is module-level there.
 
 AsyncStorage keys: `@cairn:access_token`, `@cairn:refresh_token`, `@cairn:token_expires_at`, `@cairn:user`, `@cairn:server_url`, `@cairn:feed_cache`.
 
@@ -117,16 +118,15 @@ Auth/user endpoints used by the shared and mobile `AuthService`: `/api/v1/auth/{
 ## Configuration
 
 - **Server URL**: a single backend origin. Default `DEFAULT_SERVER_URL` in `src/config/storage.ts` (`https://cairn.seatrain.net`); users override it at runtime from the Login screen (persisted under `@cairn:server_url`; switching server wipes the session keys). `src/config/init.ts` must be imported first in `index.js` so the shared layer is configured before use.
-- **Local backend**: use the [self-hosted stack](/infrastructure/docker/selfhost/README.md), which serves all services on `http://localhost:8099`. iOS simulator: `http://localhost:8099`; Android emulator: `http://10.0.2.2:8099` (or the machine's LAN IP).
-- **Expo**: `app.json` (bundle IDs `com.cairnapp.cairnreader`, plugins `expo-web-browser`, `expo-font`, `expo-sqlite`, translucent Android status bar). There are no `EXPO_PUBLIC_*` variables.
+- **Local backend**: use the [self-hosted stack](/infrastructure/docker/selfhost/README.md), which serves all services on `http://localhost:8099`. Android emulator: `http://10.0.2.2:8099` (or the machine's LAN IP).
+- **Expo**: `app.json` (Android package `com.cairnapp.cairnreader`, plugins `expo-web-browser`, `expo-font`, `expo-sqlite`, translucent Android status bar). There are no `EXPO_PUBLIC_*` variables.
 
 ## Development Workflow
 
 This is an npm workspace (`apps/web`, `apps/shared`, `apps/mobile`); run `npm install` from the repo root. In `apps/mobile`:
 
 ```bash
-npm start            # expo start (press i / a / w for simulator / emulator / web)
-npm run ios          # expo run:ios
+npm start            # expo start (press a / w for emulator / web)
 npm run android      # expo run:android
 npm run type-check   # tsc --noEmit
 npm run lint         # eslint .
@@ -165,6 +165,7 @@ Content scrolls behind the status bar and the floating tab bar/action menu. **Do
 - **Root CLAUDE.md**: `/CLAUDE.md` - Project-wide guidance
 - **Architecture**: `/docs/ARCHITECTURE.md`
 - **Engineering Principles**: `/docs/ENGINEERING_PRINCIPLES.md` - Coding standards and architecture
+- **iOS App**: `/apps/ios/CLAUDE.md` - Native iOS client; mirror user-facing changes there
 - **Web App**: `/apps/web/CLAUDE.md` - Sibling client sharing `@cairn/shared`
 - **User Service**: `/services/users/CLAUDE.md` - Authentication backend
 - **Read Service**: `/services/read/CLAUDE.md` - Content storage backend

@@ -11,3 +11,6 @@ created_at: 2026-03-21T04:20:37Z
 updated_at: 2026-03-21T04:20:37Z
 ---
 Track recently added URLs and show them in the AddLinkModal for quick re-access.
+
+## Platforms
+Both. iOS: `AddLinkSheet` in `apps/ios`. Android: `AddLinkModal` in `apps/mobile`. (Set at the iOS native cutover, chore_c364: iOS ships from `apps/ios`, Android from `apps/mobile`.)

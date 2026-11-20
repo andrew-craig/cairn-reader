@@ -1019,7 +1019,7 @@ After deployment:
 
 ## Mobile App Releases
 
-The iOS app is not deployed by the compose stacks. Fastlane lanes live in `apps/mobile/ios/fastlane/Fastfile`: `beta` (build and upload to TestFlight), `certificates` (fetch signing certificates and profiles via match) and `build_only` (local build without uploading). The `iOS TestFlight (Fastlane)` and `iOS TestFlight (Local Build)` workflows in `.github/workflows/` are manually triggered (`workflow_dispatch`). See [apps/mobile/CLAUDE.md](../apps/mobile/CLAUDE.md) for mobile build details. The native iOS app (`apps/ios`) has its own lanes in `apps/ios/fastlane/Fastfile` and ships through the `iOS Native TestFlight` workflow on `ios-v*` tags; see [apps/ios/CLAUDE.md](../apps/ios/CLAUDE.md).
+The mobile apps are not deployed by the compose stacks. iOS ships only from the native app (`apps/ios`): Fastlane lanes in `apps/ios/fastlane/Fastfile` are `beta` (build and upload to TestFlight), `certificates` (fetch signing certificates and profiles via match) and `build_only` (signed build without uploading), and the `iOS Native TestFlight` workflow runs `beta` on a pushed `ios-v*` tag or manually; see [apps/ios/CLAUDE.md](../apps/ios/CLAUDE.md). The Android app (`apps/mobile`, Expo) has no committed release workflow yet; see [apps/mobile/CLAUDE.md](../apps/mobile/CLAUDE.md).
 
 ---
 

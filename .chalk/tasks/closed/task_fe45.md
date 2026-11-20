@@ -2,14 +2,14 @@
 id: task_fe45
 title: [iOS native 18] Parity and platform QA pass on device
 type: task
-status: open
+status: closed
 priority: 1
 labels: [ios,qa]
 blocked_by: [feature_983c]
 parent: epic_bc48
-remote_task_url: null
+remote_task_url: https://linear.app/andrew-cairn/issue/AND-5/ios-native-18-parity-and-platform-qa-pass-on-device
 created_at: 2026-11-14T02:35:53Z
-updated_at: 2026-11-18T11:58:36Z
+updated_at: 2026-11-20T10:59:22Z
 ---
 ## Goal
 Confirm the native app can replace the RN app. Agents cannot run a simulator from Linux sessions, so the device checks are the owner's; findings become bug tasks under epic_bc48.
@@ -32,3 +32,6 @@ Confirm the native app can replace the RN app. Agents cannot run a simulator fro
 
 ## Done when
 - [ ] No open P0/P1 bug under the epic and the owner signs off on cutover.
+
+## Review
+Migrated to Linear as AND-5 (2026-11-20); the QA pass is tracked there. Closed in chalk so it no longer blocks the cutover (chore_c364), which the owner chose to do ahead of this pass.

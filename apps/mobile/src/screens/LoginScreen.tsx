@@ -6,7 +6,6 @@ import {
   StyleSheet,
   useColorScheme,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Alert,
   TouchableOpacity,
@@ -152,7 +151,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="height"
     >
       <ScrollView
         contentContainerStyle={[

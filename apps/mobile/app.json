@@ -14,15 +14,6 @@
     "assetBundlePatterns": [
       "**/*"
     ],
-    "ios": {
-      "icon": "./assets/CairnIcon.icon",
-      "supportsTablet": true,
-      "bundleIdentifier": "com.cairnapp.cairnreader",
-      "buildNumber": "1",
-      "config": {
-        "usesNonExemptEncryption": false
-      }
-    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

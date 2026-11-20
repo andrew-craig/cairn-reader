@@ -10,7 +10,6 @@ import { NetworkError } from '@cairn/shared';
 // fetch()/TypeError would propagate unconverted.
 
 jest.mock('expo-application', () => ({
-  getIosIdForVendorAsync: jest.fn().mockResolvedValue('test-device-id'),
   getAndroidId: jest.fn().mockReturnValue('test-device-id'),
 }));
 

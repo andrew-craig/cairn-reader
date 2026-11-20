@@ -1,6 +1,6 @@
 # CLAUDE.md - iOS App (native)
 
-Native Swift/SwiftUI iOS client, replacing the React Native app's iOS build (epic_bc48). Android stays on the Expo app in `apps/mobile`, which also keeps shipping iOS until cutover. Same backend, same bundle id (`com.cairnapp.cairnreader`).
+Native Swift/SwiftUI iOS client and the only iOS build (it replaced the React Native app's iOS build, epic_bc48). Android ships from the Expo app in `apps/mobile`, so a user-facing mobile change is implemented twice: here for iOS and in `apps/mobile` for Android. Same backend, same bundle id (`com.cairnapp.cairnreader`) as the React Native build it replaced; the RN code that behaviour was ported from still lives in `apps/mobile`.
 
 ## Layout
 
@@ -52,7 +52,7 @@ Add a Swift file by creating it in the right folder; the synchronized groups pic
 
 ## Build and test
 
-Verify through CI. Cloud agent sessions run on Linux and cannot build or test this app: push and read the **iOS App Checks** workflow (`.github/workflows/ios-checks.yml`, `macos-26`), which builds and tests on an iOS 26 simulator. Warnings are errors through the project-level build settings (`SWIFT_TREAT_WARNINGS_AS_ERRORS`, `GCC_TREAT_WARNINGS_AS_ERRORS`), so local builds match CI; never pass them as `xcodebuild` overrides, which also reach package targets and conflict with their `-suppress-warnings`. On-device checks are the owner's.
+Verify through CI. Cloud agent sessions run on Linux and cannot build or test this app: open a pull request to `main` and read the **iOS App Checks** workflow (`.github/workflows/ios-checks.yml`, `macos-26`, runs when `apps/ios/**` changes), which builds and tests on an iOS 26 simulator. Warnings are errors through the project-level build settings (`SWIFT_TREAT_WARNINGS_AS_ERRORS`, `GCC_TREAT_WARNINGS_AS_ERRORS`), so local builds match CI; never pass them as `xcodebuild` overrides, which also reach package targets and conflict with their `-suppress-warnings`. On-device checks are the owner's.
 
 On a Mac (Xcode 26):
 
@@ -64,6 +64,6 @@ xcodebuild test -project CairnReader.xcodeproj -scheme CairnReader \
 
 ## Release
 
-`.github/workflows/ios-native-testflight.yml` runs `bundle exec fastlane beta` (`apps/ios/fastlane`) on a pushed `ios-v*` tag or manually: match (read-only) signing, build number = latest TestFlight + 1, upload to TestFlight. The marketing version is `MARKETING_VERSION` in the project (1.1.0, above the RN app's 1.0.0 so the first build installs as an update). Lanes: `beta`, `certificates`, `build_only` (signed build, no upload). Secrets are the same as the RN TestFlight workflow.
+`.github/workflows/ios-native-testflight.yml` runs `bundle exec fastlane beta` (`apps/ios/fastlane`) on a pushed `ios-v*` tag or manually: match (read-only) signing, build number = latest TestFlight + 1, upload to TestFlight. The marketing version is `MARKETING_VERSION` in the project (1.1.0, above the RN app's 1.0.0 so the first build installs as an update). Lanes: `beta`, `certificates`, `build_only` (signed build, no upload). Secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT`, `FASTLANE_APPLE_ID`, `MATCH_GIT_URL`, `MATCH_PASSWORD`, `MATCH_GIT_BASIC_AUTHORIZATION`, `TEAM_ID`. This is the only iOS release path.
 
 One-time provisioning: enable the App Group on the App ID, then regenerate the profiles with `bundle exec fastlane match appstore --force` from `apps/ios` (CI never forces). See `.github/workflows/README.md`.

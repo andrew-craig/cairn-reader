@@ -83,7 +83,7 @@ jobs:
         working-directory: .
         run: npm ci
       - name: Verify JS bundle compiles
-        run: npx expo export --platform ios --output-dir /tmp/expo-export-test
+        run: npx expo export --platform android --output-dir /tmp/expo-export-test
 
   knip:
     name: Dead Code

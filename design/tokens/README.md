@@ -9,7 +9,7 @@ mode with the same token names (the build fails if they differ).
 | App | Generated file | Used as |
 |-----|----------------|---------|
 | Web | `apps/web/src/theme/colors.css` | `var(--color-text-secondary)`; dark values under `prefers-color-scheme: dark` |
-| Mobile (React Native) | `apps/mobile/src/constants/colors.ts` | `Colors[useColorScheme() ?? 'light'].textSecondary` |
+| Android (React Native, `apps/mobile`) | `apps/mobile/src/constants/colors.ts` | `Colors[useColorScheme() ?? 'light'].textSecondary` |
 | iOS (native) | `apps/ios/CairnReader/Resources/Colors.xcassets` (one colorset per token) | `Color(.textSecondary)`; light/dark switch natively. The app's accent colour is `primary` and its launch screen background is `background` |
 
 ## Changing a color

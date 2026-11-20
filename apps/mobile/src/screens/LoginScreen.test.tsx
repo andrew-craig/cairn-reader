@@ -26,7 +26,6 @@ jest.mock('../services', () => ({
 jest.mock('../hooks/useNetworkStatus');
 
 jest.mock('expo-application', () => ({
-  getIosIdForVendorAsync: jest.fn().mockResolvedValue('test-device-id'),
   getAndroidId: jest.fn().mockReturnValue('test-device-id'),
 }));
 

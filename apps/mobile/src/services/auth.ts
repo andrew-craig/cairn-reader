@@ -8,7 +8,6 @@
 // session no matter whether a caller reaches it through this subclass or the
 // base class.
 import * as Application from 'expo-application';
-import { Platform } from 'react-native';
 import {
   AuthService as SharedAuthService,
   getServerUrl,
@@ -21,14 +20,7 @@ import { withRetry } from '../utils/retry';
 
 export class AuthService extends SharedAuthService {
   static async getDeviceId(): Promise<string> {
-    let deviceId: string | null = null;
-
-    if (Platform.OS === 'ios') {
-      deviceId = await Application.getIosIdForVendorAsync();
-    } else if (Platform.OS === 'android') {
-      deviceId = Application.getAndroidId();
-    }
-
+    const deviceId = Application.getAndroidId();
     if (!deviceId) {
       throw new Error('Failed to get device ID');
     }
