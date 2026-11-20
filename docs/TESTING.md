@@ -515,7 +515,7 @@ Workflows live in `.github/workflows/`; test-related ones are:
 | `mobile-checks.yml` | `tsc --noEmit`, ESLint, `npx jest --ci --coverage`, an Expo Android bundle export, and `knip` (dead code) for `apps/mobile` |
 | `ios-checks.yml` | `xcodebuild build` and `xcodebuild test` for `apps/ios` on an iOS 26 simulator (`macos-26` runner) |
 | `selfhost-compose-smoke.yml` | Builds the self-host image, starts `infrastructure/docker/selfhost` with Docker Compose and checks `/health/live` |
-| `docker-test.yml` | Builds each service image (no push) as a smoke test |
+| `docker-build-*.yml` (per service) | On pull requests, builds the service image without pushing; on `main` and `v*` tags, pushes it to GHCR |
 
 ---
 

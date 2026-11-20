@@ -4,14 +4,11 @@ name: cairn-prod
 
 services:
   # ─────────────────────────────────────────────────────────────────────────────
-  # Caddy Reverse Proxy — TLS termination with automatic Let's Encrypt
+  # Caddy Reverse Proxy — plain HTTP on 127.0.0.1:8099
   # ─────────────────────────────────────────────────────────────────────────────
-  # Caddy is the single public entry point. All backend services are reachable
-  # only through the internal Docker network.
-  #
-  # Set DOMAIN in .env to your production domain (e.g., api.cairnapp.com).
-  # Caddy will automatically obtain and renew TLS certificates via Let's Encrypt.
-  # For local testing without TLS, set DOMAIN=localhost.
+  # Caddy is the single entry point. All backend services are reachable
+  # only through the internal Docker network. TLS is terminated by the host
+  # reverse proxy (nginx), which forwards to 127.0.0.1:8099.
   caddy:
     image: caddy:2-alpine
     ports:
@@ -307,6 +304,7 @@ services:
       - DB_NAME=${POSTGRES_DB_RSS}
       - DB_SSLMODE=disable
       - DB_MAX_OPEN_CONNS=15
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
     depends_on:
       cairn-db:
         condition: service_healthy
@@ -442,7 +440,7 @@ volumes:
   cairn_db_data:
   vault-keys:
   vault-data:
-  caddy_data:      # TLS certificates (Let's Encrypt)
+  caddy_data:      # Caddy data directory
   caddy_config:    # Caddy runtime configuration
 
 networks:

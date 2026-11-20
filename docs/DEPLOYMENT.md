@@ -46,8 +46,6 @@ docker compose up --build
 
 This starts all services with automatic database migrations and Vault initialization.
 
-> **Known issue**: the dev compose sets no `VAULT_*` variables for `content-service`, and the Content Service refuses to start without a Vault token or AppRole (`services/read/content/internal/config/config.go`, `Validate`). See [infrastructure/docker/README.md](../infrastructure/docker/README.md) and task_4f8a.
-
 ### Service Endpoints
 
 After deployment, services are available at:
@@ -322,8 +320,6 @@ cp .env.example .env
 # Edit .env
 # - Change all default passwords and API keys
 # - Set GITHUB_ORG and IMAGE_TAG for the published images
-#   (note: the per-service docker-build-*.yml workflows currently have `if: false`,
-#   so these images are not being published; see task_4f8a)
 nano .env
 
 # First start: vault-init initialises Vault, creates the JWT keys and writes the
@@ -345,8 +341,6 @@ docker compose ps
 ```
 
 The vault-init script also writes the Vault unseal keys to `/vault-keys/UNSEAL_KEYS.txt` on first run. Copy them to secure storage. The `vault-unseal` watchdog reads that file to unseal Vault after restarts, so removing it means unsealing by hand each time (see [infrastructure/docker/README.md](../infrastructure/docker/README.md)).
-
-> **Known issue**: `prod/docker-compose.yml` sets no `INTERNAL_API_KEY` on `ingest-rss`, but the service requires it at startup (`services/read/fetcher/internal/config/config.go`, `Validate`). Whether the prod stack is fixed or removed is an open owner decision (task_4f8a).
 
 #### 4. Configure Firewall
 
@@ -378,7 +372,7 @@ The routing configuration is in `infrastructure/docker/prod/Caddyfile`:
 
 Internal endpoints (`/api/v1/internal/*`, `/api/v1/source/rss/*`) return 404 from the public proxy.
 
-For local testing without a TLS proxy, call `http://127.0.0.1:8099` directly. (`DOMAIN` appears in `.env.example` but the Caddyfile does not read it.)
+For local testing without a TLS proxy, call `http://127.0.0.1:8099` directly.
 
 ### Production Docker Compose Configuration
 
