@@ -8,12 +8,18 @@ on:
       - 'v*'
     paths:
       - 'services/users/**'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/docker-build-user-service.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'services/users/**'
+      - 'pkg/**'
+      - 'go.mod'
+      - 'go.sum'
       - '.github/workflows/docker-build-user-service.yml'
   workflow_dispatch:
 
