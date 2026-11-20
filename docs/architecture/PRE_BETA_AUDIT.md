@@ -1,6 +1,5 @@
 # Pre-Beta Architecture Audit — Proposed Next Steps
 
-**Epic:** `epic_9c21` — Pre-beta architecture audit
 **Status:** Findings consolidated — decision-ready
 **Date:** 2026-06-16
 **Source workstreams:** `docs/architecture/audit/01_api_contract.md` … `06_infra.md`
@@ -44,9 +43,9 @@ unblocking. Once they land, Cairn is ready for a **single-instance private/publi
 with a documented scaling ceiling. The horizontal-scaling, HA-database, and Vault-KMS work
 is correctly deferred to roadmap.
 
-> **Process note:** several existing remediation tasks (`task_644a`, `task_652a`,
-> `task_5dcb`, `task_48ea`, `task_6f3a`, `task_8392`, `feature_1a69`) are currently
-> **blocked on `decision_4052`** ("Decide to offer hosted service"). The metrics and
+> **Process note:** several existing remediation tasks (AND-43, AND-44,
+> AND-41, AND-37, AND-45, AND-48, AND-16) are currently
+> **blocked on AND-14** ("Decide to offer hosted service"). The metrics and
 > backup items among these are beta-blocking regardless of the hosting decision — that
 > decision should be made (or these tasks de-coupled from it) so the work can start.
 
@@ -67,7 +66,7 @@ is correctly deferred to roadmap.
 Each finding links to its detailed write-up in `docs/architecture/audit/`. Severity, current
 state, recommendation, and effort are summarised; the source docs carry the file:line evidence.
 
-### 3.1 API contract & stability — `01_api_contract.md` (`task_2a40`)
+### 3.1 API contract & stability — `01_api_contract.md`
 
 | ID | Finding | Class | Effort |
 |---|---|---|---|
@@ -83,7 +82,7 @@ state, recommendation, and effort are summarised; the source docs carry the file
 **Reconciliation rule for all spec drift:** the shipped mobile client is ground truth — make
 the **spec match the implementation**, never the reverse, because the client is already pinned.
 
-### 3.2 Data layer & query efficiency — `02_data_layer.md` (`task_e695`)
+### 3.2 Data layer & query efficiency — `02_data_layer.md`
 
 | ID | Finding | Class | Effort |
 |---|---|---|---|
@@ -97,7 +96,7 @@ the **spec match the implementation**, never the reverse, because the client is 
 | D-8 | Migrations versioned/reversible, but explore ships duplicate legacy files and destructive downs are untested | FAST-FOLLOW | S |
 | D-9 | feed-limit `COUNT(*)`-per-insert trigger and votes growth — correct at beta scale (votes display uses denormalised counters) | ROADMAP / NOTE | — |
 
-### 3.3 Mobile client/server efficiency — `03_mobile.md` (`task_1eaa`)
+### 3.3 Mobile client/server efficiency — `03_mobile.md`
 
 | ID | Finding | Class | Effort |
 |---|---|---|---|
@@ -112,7 +111,7 @@ the **spec match the implementation**, never the reverse, because the client is 
 M-1 and M-2 each require a **new server endpoint** (see API-freeze checklist) — these are why
 mobile correctness is a contract-freeze concern, not just a client polish item.
 
-### 3.4 Security & auth hardening — `04_security.md` (`task_659b`)
+### 3.4 Security & auth hardening — `04_security.md`
 
 Baseline confirmed-good (verified, not re-litigated): bcrypt-12, RS256 + algorithm
 enforcement, refresh-token rotation + reuse-detection family revocation, SHA-256 token
@@ -132,24 +131,24 @@ sanitization, security headers, HTTPS enforcement, no hardcoded secrets.
 S-2 and S-3 add **three new public endpoints** (`verify-email`, `forgot-password`,
 `reset-password`) and an `email_verified` field — these feed the API-freeze checklist.
 
-### 3.5 Observability & operational readiness — `05_observability.md` (`task_ed30`)
+### 3.5 Observability & operational readiness — `05_observability.md`
 
 | ID | Finding | Class | Existing task | Effort |
 |---|---|---|---|---|
-| O-1 | No metrics endpoint, no Prometheus, no Grafana, no alerting — production unobservable | **BETA-BLOCKING** | `task_644a` + `task_652a` | L |
+| O-1 | No metrics endpoint, no Prometheus, no Grafana, no alerting — production unobservable | **BETA-BLOCKING** | AND-43 + AND-44 | L |
 | O-2 | No cross-service request-trace propagation (X-Request-ID stays within a service) | FAST-FOLLOW | NEW | S |
-| O-3 | No container resource limits in prod/selfhost compose | FAST-FOLLOW | `task_48ea` | S |
-| O-4 | Integration tests exist + are tagged but CI never runs them — inter-service breakage merges undetected | FAST-FOLLOW | `task_6f3a` | M |
+| O-3 | No container resource limits in prod/selfhost compose | FAST-FOLLOW | AND-37 | S |
+| O-4 | Integration tests exist + are tagged but CI never runs them — inter-service breakage merges undetected | FAST-FOLLOW | AND-45 | M |
 | O-5 | User-service `http.Server` has no Read/Write/Idle timeouts (infinite) → slow-loris exhausts the auth gateway | **BETA-BLOCKING** | NEW | S |
-| O-6 | Log format defaults to `text` in prod (`LOG_FORMAT` unset); no log shipping stack | FAST-FOLLOW | `feature_1a69` | S→M |
+| O-6 | Log format defaults to `text` in prod (`LOG_FORMAT` unset); no log shipping stack | FAST-FOLLOW | AND-16 | S→M |
 
-### 3.6 Infrastructure reliability & scaling — `06_infra.md` (`task_1d08`)
+### 3.6 Infrastructure reliability & scaling — `06_infra.md`
 
 | ID | Finding | Class | Decision needed | Effort |
 |---|---|---|---|---|
 | I-1 | Single PostgreSQL instance — no replication/failover | **BETA-BLOCKING** | Managed DB *or* documented single-instance + rehearsed restore | M |
-| I-2 | Backups not automated — `scripts/backup.sh` referenced in docs but **does not exist**; no cron, no offsite | **BETA-BLOCKING** | Execute `task_5dcb` before beta | M |
-| I-3 | Vault file storage (not HA) + all 5 Shamir unseal keys stored plaintext in `vault-keys` volume | **BETA-BLOCKING** | Accept + back up volume for beta; `task_ece2` pre-public-launch | M |
+| I-2 | Backups not automated — `scripts/backup.sh` referenced in docs but **does not exist**; no cron, no offsite | **BETA-BLOCKING** | Execute AND-41 before beta | M |
+| I-3 | Vault file storage (not HA) + all 5 Shamir unseal keys stored plaintext in `vault-keys` volume | **BETA-BLOCKING** | Accept + back up volume for beta; AND-56 pre-public-launch | M |
 | I-4 | In-memory rate limiter breaks under multiple instances (currently single-instance by design) | FAST-FOLLOW | Document single-instance topology; defer Redis | S |
 | I-5 | `sslmode=disable` on all internal DB connections | FAST-FOLLOW | Accept within Docker network; document | S |
 | I-6 | Connection ceiling: 9 containers × ≤25 conns = **~175** vs Postgres default `max_connections=100` (**unset** in prod compose) | **BETA-BLOCKING** | Set `max_connections`≥200 in prod + cap pools | S |
@@ -161,47 +160,47 @@ S-2 and S-3 add **three new public endpoints** (`verify-email`, `forgot-password
 
 ### 4.1 BETA-BLOCKING — must fix before opening signups
 
-| # | Action | Findings | Task |
+| # | Action | Findings | Linear |
 |---|---|---|---|
-| 1 | Reconcile OpenAPI specs with implemented routes + unify error envelope through `pkg/api` | F-1, F-3, F-4, F-5, F-6 | `task_065e` |
-| 2 | Split content list vs detail: drop `cleaned_html` from list/search responses (summary projection) | D-1 | `task_bfad` |
-| 3 | Add `statement_timeout` to all API DB connection pools (centralise in `pkg/config`) | D-2 | `task_0b27` |
-| 4 | Add `GET /api/v1/explore/user/vote-stats` aggregate endpoint; remove the `limit=10000` client count | M-1 | `task_12e0` |
-| 5 | Add `GET /api/v1/explore/search` server-side search (or remove the Explore search UI) | M-2 | `task_0502` |
-| 6 | Per-account failed-login tracking + lockout | S-1 | `task_f416` |
-| 7 | RFC email validation + email verification flow | S-2 | `task_2c1f` |
-| 8 | Forgot-password / reset-password flow | S-3 | `task_fe44` |
-| 9 | Set Read/Write/Idle timeouts on the user-service HTTP server | O-5 | `task_fc2f` |
-| 10 | Set Postgres `max_connections` + cap connection pools in prod compose | I-6 | `task_7683` |
-| 11 | Metrics + dashboards (`/metrics`, Prometheus, Grafana) | O-1 | `task_644a` (existing) |
-| 12 | Critical alerts (error rate, latency, health, pool utilisation) | O-1 | `task_652a` (existing) |
-| 13 | Automated, tested, offsite backups (ship `backup.sh` + cron container) | I-2 | `task_5dcb` (existing) |
+| 1 | Reconcile OpenAPI specs with implemented routes + unify error envelope through `pkg/api` | F-1, F-3, F-4, F-5, F-6 | — |
+| 2 | Split content list vs detail: drop `cleaned_html` from list/search responses (summary projection) | D-1 | — |
+| 3 | Add `statement_timeout` to all API DB connection pools (centralise in `pkg/config`) | D-2 | — |
+| 4 | Add `GET /api/v1/explore/user/vote-stats` aggregate endpoint; remove the `limit=10000` client count | M-1 | — |
+| 5 | Add `GET /api/v1/explore/search` server-side search (or remove the Explore search UI) | M-2 | — |
+| 6 | Per-account failed-login tracking + lockout | S-1 | — |
+| 7 | RFC email validation + email verification flow | S-2 | — |
+| 8 | Forgot-password / reset-password flow | S-3 | — |
+| 9 | Set Read/Write/Idle timeouts on the user-service HTTP server | O-5 | — |
+| 10 | Set Postgres `max_connections` + cap connection pools in prod compose | I-6 | — |
+| 11 | Metrics + dashboards (`/metrics`, Prometheus, Grafana) | O-1 | AND-43 (existing) |
+| 12 | Critical alerts (error rate, latency, health, pool utilisation) | O-1 | AND-44 (existing) |
+| 13 | Automated, tested, offsite backups (ship `backup.sh` + cron container) | I-2 | AND-41 (existing) |
 | 14 | Single-instance SPOF decision recorded + restore runbook rehearsed | I-1 | covered by #13 + decision |
 
 ### 4.2 FAST-FOLLOW — fix within the first weeks of beta
 
-| # | Action | Findings | Task |
+| # | Action | Findings | Linear |
 |---|---|---|---|
-| 15 | Mobile resilience: focus-refetch TTL, retry/back-off, offline stale-fallback | M-3, M-4, M-5 | `task_5229` |
-| 16 | Standardise health-check JSON; document undocumented routes / split explore spec | F-2, F-7 | `task_396d` |
-| 17 | Data-layer cleanup: `(user_id,status,added_at)` index, pool unification, multi-row INSERT, drop unused view, migration up→down→up CI | D-3, D-4, D-5, D-6, D-8 | `task_9208` |
-| 18 | Security fast-follow: Redis-backed rate limiter, auth audit log, Vault startup retry | S-4, S-5, S-6 | `task_126b` |
-| 19 | Propagate X-Request-ID across service-to-service HTTP calls | O-2 | `task_9b71` |
-| 20 | Infra fast-follow: document single-instance topology, sslmode note, email key rotation + per-key limit | I-4, I-5, I-7 | `task_c542` |
-| 21 | Container resource limits in prod/selfhost compose | O-3 | `task_48ea` (existing) |
-| 22 | Run integration tests in CI against a Postgres service container | O-4 | `task_6f3a` (existing) |
-| 23 | `LOG_FORMAT=json` in prod + log shipping/aggregation stack | O-6 | `feature_1a69` (existing) |
-| 24 | Cursor pagination shape for `votes`/senders (freeze param/response now, swap to keyset when needed) | D-7, F-3 | folded into `task_065e` / `task_9208` |
-| 25 | Optimize N+1 query in recommendation recording | (Audit 2 cross-ref) | `task_3216` (existing) |
+| 15 | Mobile resilience: focus-refetch TTL, retry/back-off, offline stale-fallback | M-3, M-4, M-5 | — |
+| 16 | Standardise health-check JSON; document undocumented routes / split explore spec | F-2, F-7 | — |
+| 17 | Data-layer cleanup: `(user_id,status,added_at)` index, pool unification, multi-row INSERT, drop unused view, migration up→down→up CI | D-3, D-4, D-5, D-6, D-8 | — |
+| 18 | Security fast-follow: Redis-backed rate limiter, auth audit log, Vault startup retry | S-4, S-5, S-6 | — |
+| 19 | Propagate X-Request-ID across service-to-service HTTP calls | O-2 | — |
+| 20 | Infra fast-follow: document single-instance topology, sslmode note, email key rotation + per-key limit | I-4, I-5, I-7 | — |
+| 21 | Container resource limits in prod/selfhost compose | O-3 | AND-37 (existing) |
+| 22 | Run integration tests in CI against a Postgres service container | O-4 | AND-45 (existing) |
+| 23 | `LOG_FORMAT=json` in prod + log shipping/aggregation stack | O-6 | AND-16 (existing) |
+| 24 | Cursor pagination shape for `votes`/senders (freeze param/response now, swap to keyset when needed) | D-7, F-3 | folded into items 1 and 17 |
+| 25 | Optimize N+1 query in recommendation recording | (Audit 2 cross-ref) | — |
 
 ### 4.3 ROADMAP — post-beta scaling & hardening
 
-| # | Action | Findings | Task |
+| # | Action | Findings | Linear |
 |---|---|---|---|
 | 26 | Managed / replicated Postgres (HA, failover) | I-1 | roadmap |
-| 27 | Vault KMS auto-unseal (remove plaintext unseal keys) | I-3 | `task_ece2` (existing) |
-| 28 | Load testing to size resource limits | (informs O-3) | `task_8392` (existing) |
-| 29 | JTI claim for JWT token revocation | (Audit 4 cross-ref) | `feature_e001` (existing) |
+| 27 | Vault KMS auto-unseal (remove plaintext unseal keys) | I-3 | AND-56 (existing) |
+| 28 | Load testing to size resource limits | (informs O-3) | AND-48 (existing) |
+| 29 | JTI claim for JWT token revocation | (Audit 4 cross-ref) | AND-34 (existing) |
 | 30 | CAPTCHA / bot protection on public signup | S-7 | roadmap |
 | 31 | Horizontal scaling story (multi-instance, shared state) | I-4, S-4 | roadmap |
 
@@ -209,43 +208,43 @@ S-2 and S-3 add **three new public endpoints** (`verify-email`, `forgot-password
 
 ## 5. Action → task mapping
 
-The task IDs are from chalk, the tracker used before Linear. Tasks that were still open when tracking moved to Linear are listed with their Linear issue; the others had been closed.
+Tasks still open are listed with their Linear issue; the rest have been closed.
 
-Newly created under `epic_9c21` by this consolidation (none were still open at the move):
+Newly created by this consolidation (all since closed):
 
-| Task | Title | Class | Findings |
-|---|---|---|---|
-| `task_065e` | API freeze: reconcile OpenAPI specs with routes + unify error envelope | BETA-BLOCKING | F-1,F-3,F-4,F-5,F-6 |
-| `task_bfad` | Split content list vs detail payload (drop `cleaned_html` from lists) | BETA-BLOCKING | D-1 |
-| `task_0b27` | Add `statement_timeout` to all API DB connection pools | BETA-BLOCKING | D-2 |
-| `task_12e0` | Add explore vote-stats aggregate endpoint | BETA-BLOCKING | M-1 |
-| `task_0502` | Add explore server-side search endpoint | BETA-BLOCKING | M-2 |
-| `task_f416` | Per-account failed-login tracking + lockout | BETA-BLOCKING | S-1 |
-| `task_2c1f` | RFC email validation + email verification flow | BETA-BLOCKING | S-2 |
-| `task_fe44` | Forgot-password / reset-password flow | BETA-BLOCKING | S-3 |
-| `task_fc2f` | Set HTTP timeouts on user-service | BETA-BLOCKING | O-5 |
-| `task_7683` | Set Postgres `max_connections` + cap pools in prod compose | BETA-BLOCKING | I-6 |
-| `task_5229` | Mobile resilience (TTL, retry/backoff, offline fallback) | FAST-FOLLOW | M-3,M-4,M-5 |
-| `task_396d` | Standardise health-check JSON + document undocumented routes | FAST-FOLLOW | F-2,F-7 |
-| `task_9208` | Data-layer fast-follow cleanup | FAST-FOLLOW | D-3,D-4,D-5,D-6,D-8 |
-| `task_126b` | Security fast-follow (Redis limiter, audit log, Vault retry) | FAST-FOLLOW | S-4,S-5,S-6 |
-| `task_9b71` | Propagate X-Request-ID across services | FAST-FOLLOW | O-2 |
-| `task_c542` | Infra fast-follow (single-instance docs, sslmode, email key rotation) | FAST-FOLLOW | I-4,I-5,I-7 |
+| Title | Class | Findings |
+|---|---|---|
+| API freeze: reconcile OpenAPI specs with routes + unify error envelope | BETA-BLOCKING | F-1,F-3,F-4,F-5,F-6 |
+| Split content list vs detail payload (drop `cleaned_html` from lists) | BETA-BLOCKING | D-1 |
+| Add `statement_timeout` to all API DB connection pools | BETA-BLOCKING | D-2 |
+| Add explore vote-stats aggregate endpoint | BETA-BLOCKING | M-1 |
+| Add explore server-side search endpoint | BETA-BLOCKING | M-2 |
+| Per-account failed-login tracking + lockout | BETA-BLOCKING | S-1 |
+| RFC email validation + email verification flow | BETA-BLOCKING | S-2 |
+| Forgot-password / reset-password flow | BETA-BLOCKING | S-3 |
+| Set HTTP timeouts on user-service | BETA-BLOCKING | O-5 |
+| Set Postgres `max_connections` + cap pools in prod compose | BETA-BLOCKING | I-6 |
+| Mobile resilience (TTL, retry/backoff, offline fallback) | FAST-FOLLOW | M-3,M-4,M-5 |
+| Standardise health-check JSON + document undocumented routes | FAST-FOLLOW | F-2,F-7 |
+| Data-layer fast-follow cleanup | FAST-FOLLOW | D-3,D-4,D-5,D-6,D-8 |
+| Security fast-follow (Redis limiter, audit log, Vault retry) | FAST-FOLLOW | S-4,S-5,S-6 |
+| Propagate X-Request-ID across services | FAST-FOLLOW | O-2 |
+| Infra fast-follow (single-instance docs, sslmode, email key rotation) | FAST-FOLLOW | I-4,I-5,I-7 |
 
 Existing tasks linked (not duplicated):
 
-| Task | Linear | Title | Class | Findings | Note |
-|---|---|---|---|---|---|
-| `task_644a` | AND-43 | Add Prometheus metrics and Grafana dashboards | BETA-BLOCKING | O-1 | blocked on `decision_4052` (AND-14) — unblock |
-| `task_652a` | AND-44 | Set up alerting system for pre-go-live | BETA-BLOCKING | O-1 | blocked on `decision_4052` (AND-14) — unblock |
-| `task_5dcb` | AND-41 | Add database backup script and cron container | BETA-BLOCKING | I-2 | blocked on `decision_4052` (AND-14) — unblock |
-| `task_48ea` | AND-37 | Add Docker resource constraints to production compose | FAST-FOLLOW | O-3, I-6 | pair with `task_7683` |
-| `task_6f3a` | AND-45 | Add integration test workflow with Docker/Postgres | FAST-FOLLOW | O-4 | |
-| `feature_1a69` | AND-16 | Add log monitoring/aggregation stack for production | FAST-FOLLOW | O-6 | |
-| `task_3216` | — | Optimize N+1 query in recommendation recording | FAST-FOLLOW | Audit 2 | |
-| `task_8392` | AND-48 | Implement load testing for pre-go-live | ROADMAP | informs O-3 | |
-| `task_ece2` | AND-56 | Migrate Vault to auto-unseal via KMS | ROADMAP | I-3 | pre-public-launch |
-| `feature_e001` | AND-34 | Add JTI claim for JWT token revocation | ROADMAP | Audit 4 | |
+| Linear | Title | Class | Findings | Note |
+|---|---|---|---|---|
+| AND-43 | Add Prometheus metrics and Grafana dashboards | BETA-BLOCKING | O-1 | blocked on AND-14 — unblock |
+| AND-44 | Set up alerting system for pre-go-live | BETA-BLOCKING | O-1 | blocked on AND-14 — unblock |
+| AND-41 | Add database backup script and cron container | BETA-BLOCKING | I-2 | blocked on AND-14 — unblock |
+| AND-37 | Add Docker resource constraints to production compose | FAST-FOLLOW | O-3, I-6 | pair with the `max_connections` task (item 10) |
+| AND-45 | Add integration test workflow with Docker/Postgres | FAST-FOLLOW | O-4 | |
+| AND-16 | Add log monitoring/aggregation stack for production | FAST-FOLLOW | O-6 | |
+| — | Optimize N+1 query in recommendation recording | FAST-FOLLOW | Audit 2 | |
+| AND-48 | Implement load testing for pre-go-live | ROADMAP | informs O-3 | |
+| AND-56 | Migrate Vault to auto-unseal via KMS | ROADMAP | I-3 | pre-public-launch |
+| AND-34 | Add JTI claim for JWT token revocation | ROADMAP | Audit 4 | |
 
 ---
 
@@ -255,19 +254,19 @@ These contract changes **must land before signups open** — they pin under ship
 Aggregated from Audit 1 (F-series), Audit 2 (D-1), Audit 3 (M-1/M-2), and Audit 4 (S-2/S-3).
 
 - [ ] **Spec ↔ route reconciliation** — content (`/api/v1/content/...`, `check-duplicate`) and
-      fetcher (`/api/v1/source/rss/...`) OpenAPI paths match the routers (F-4, F-5). `task_065e`
+      fetcher (`/api/v1/source/rss/...`) OpenAPI paths match the routers (F-4, F-5).
 - [ ] **Error envelope** — auth-401, panic-500, content-type-400 all emit the `pkg/api`
-      `{error,message,details,meta}` shape; users/explore/fetcher specs document it (F-1, F-6). `task_065e`
+      `{error,message,details,meta}` shape; users/explore/fetcher specs document it (F-1, F-6).
 - [ ] **Pagination shape** — request param + response `pagination` fields locked per endpoint and
-      reflected in specs (cursor for unbounded lists, offset for bounded) (F-3, D-7). `task_065e`
+      reflected in specs (cursor for unbounded lists, offset for bounded) (F-3, D-7).
 - [ ] **List vs detail DTO** — list/search responses use a summary projection without
-      `cleaned_html`; list and detail shapes frozen in the spec (D-1). `task_bfad`
-- [ ] **New endpoint** `GET /api/v1/explore/user/vote-stats` → `{upvotes,downvotes}` specced (M-1). `task_12e0`
-- [ ] **New endpoint** `GET /api/v1/explore/search?q=` specced (M-2). `task_0502`
+      `cleaned_html`; list and detail shapes frozen in the spec (D-1).
+- [ ] **New endpoint** `GET /api/v1/explore/user/vote-stats` → `{upvotes,downvotes}` specced (M-1).
+- [ ] **New endpoint** `GET /api/v1/explore/search?q=` specced (M-2).
 - [ ] **New endpoints** `POST /api/v1/auth/verify-email`, `POST /api/v1/auth/forgot-password`,
-      `POST /api/v1/auth/reset-password` specced; `email_verified` field on the user DTO (S-2, S-3). `task_2c1f`, `task_fe44`
+      `POST /api/v1/auth/reset-password` specced; `email_verified` field on the user DTO (S-2, S-3).
 - [ ] **Drift guard** — unit tests route through the production router so spec drift fails CI
-      (defensive; ties to O-4 / `task_6f3a`).
+      (defensive; ties to O-4 / AND-45).
 
 Once every box above is checked and the non-contract beta-blockers (§4.1 #6, #9, #10, #11–14)
 are done, the API surface can be declared frozen and public signups can open on a

@@ -4,7 +4,7 @@ import Testing
 @testable import CairnReader
 
 // Re-expression of apps/mobile/src/screens/FeedScreen.test.tsx against `FeedModel` with an
-// in-memory store (decision_adb1: a saved row is hidden by the store's ids, not by
+// in-memory store (a saved row is hidden by the store's ids, not by
 // `Outbox.pendingSaveIds` and a put-back on rejection).
 
 /// A server for one user's Feed: `list=feed` pages, an empty Reads page for the sync after a

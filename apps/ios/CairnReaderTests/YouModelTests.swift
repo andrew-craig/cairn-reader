@@ -125,7 +125,7 @@ private final class BookmarksServer: Sendable {
     }
 }
 
-/// The Bookmarks count after a favourite edit, through the session's outbox and `Sync` (bug_3e3d):
+/// The Bookmarks count after a favourite edit, through the session's outbox and `Sync`:
 /// the edit is only queued, so the count can change once the drain has sent it.
 @MainActor
 struct YouModelFavoriteTests {

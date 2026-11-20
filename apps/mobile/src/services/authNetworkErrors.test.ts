@@ -1,12 +1,12 @@
 import { AuthService } from './auth';
 import { NetworkError } from '@cairn/shared';
 
-// chore_1089: every previously-bare fetch in auth.ts is now routed through
+// Every previously-bare fetch in auth.ts is now routed through
 // the shared fetchOrNetworkError helper. These tests assert each newly
 // wrapped path rejects with NetworkError (not a bare TypeError) when the
 // server is unreachable, so AccountScreen et al. surface
 // "Unable to reach the server..." instead of a raw "Network request failed".
-// Each of these tests fails against pre-chore_1089 code, since the raw
+// Each of these tests fails against the code before that change, since the raw
 // fetch()/TypeError would propagate unconverted.
 
 jest.mock('expo-application', () => ({
@@ -68,7 +68,7 @@ describe('AuthService network-error wrapping', () => {
   });
 
   // Regression guard, not a proof: logout() already swallowed this failure
-  // before chore_1089 (it only logs and continues), so this passes both
+  // before that change (it only logs and continues), so this passes both
   // before and after. Kept to pin that swallowing behavior now that the
   // error type flowing into the catch is NetworkError instead of TypeError.
   it('logout swallows the unreachable-server failure and still clears tokens', async () => {

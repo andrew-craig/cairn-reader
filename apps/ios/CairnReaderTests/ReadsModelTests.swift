@@ -4,7 +4,7 @@ import Testing
 @testable import CairnReader
 
 // Re-expression of apps/mobile/src/screens/ReadsScreen.test.tsx against `ReadsModel` with an
-// in-memory store (decision_adb1: the screen observes the store instead of merging the store,
+// in-memory store (the screen observes the store instead of merging the store,
 // the server page and queued saves). ReadsScreen.storeFailure.test.tsx does not port.
 
 /// A server for one user's Reads: list pages by cursor, search results, PATCHes and details,

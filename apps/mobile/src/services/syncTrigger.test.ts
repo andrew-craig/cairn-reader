@@ -2,8 +2,8 @@ import { SyncTrigger, runConsumersIsolated } from './syncTrigger';
 import { ArticlePrefetchService } from './articlePrefetch';
 import { Outbox } from './outbox';
 
-// task_06e5: SyncTrigger.run() is the single, fixed-order entry point the
-// app-foreground/reconnect trigger calls into. task_ebf1 adds the outbox
+// SyncTrigger.run() is the single, fixed-order entry point the
+// app-foreground/reconnect trigger calls into. The outbox
 // drain as a consumer, ahead of ArticlePrefetchService.
 
 jest.mock('./articlePrefetch', () => ({

@@ -87,7 +87,7 @@ export const ReadArticleDetailScreen: React.FC = () => {
 
       // A stored body whose hash matches the fresh route-param hash is
       // already current — skip the network fetch entirely. That's the point
-      // of the hash diff: today's screen (pre-task_c55c) fetched on every
+      // of the hash diff: the screen before the hash diff fetched on every
       // open regardless.
       const hashMatches =
         hasStoredBody &&

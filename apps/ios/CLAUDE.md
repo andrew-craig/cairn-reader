@@ -1,6 +1,6 @@
 # CLAUDE.md - iOS App (native)
 
-Native Swift/SwiftUI iOS client and the only iOS build (it replaced the React Native app's iOS build, epic_bc48). Android ships from the Expo app in `apps/mobile`, so a user-facing mobile change is implemented twice: here for iOS and in `apps/mobile` for Android. Same backend, same bundle id (`com.cairnapp.cairnreader`) as the React Native build it replaced; the RN code that behaviour was ported from still lives in `apps/mobile`.
+Native Swift/SwiftUI iOS client and the only iOS build (it replaced the React Native app's iOS build). Android ships from the Expo app in `apps/mobile`, so a user-facing mobile change is implemented twice: here for iOS and in `apps/mobile` for Android. Same backend, same bundle id (`com.cairnapp.cairnreader`) as the React Native build it replaced; the RN code that behaviour was ported from still lives in `apps/mobile`.
 
 ## Layout
 

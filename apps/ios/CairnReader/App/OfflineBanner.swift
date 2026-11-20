@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// "You're offline", shown above everything while the device has no connection. One of the few
-/// custom views (epic_bc48): the system has no equivalent status bar.
+/// custom views: the system has no equivalent status bar.
 struct OfflineBanner: View {
     var body: some View {
         Text("You\u{2019}re offline")

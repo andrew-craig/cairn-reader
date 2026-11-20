@@ -1,6 +1,6 @@
 # Audit 5 — Observability & Operational Readiness
 
-**Workstream:** `task_ed30` (epic `epic_9c21`, P2)
+**Priority:** P2
 **Status:** Findings complete
 **Date:** 2026-06-16
 
@@ -22,12 +22,12 @@
 
 | ID | Finding | Class | Existing task |
 |---|---|---|---|
-| O-1 | No metrics endpoint, no Prometheus, no Grafana — cannot observe latency/errors/saturation | **BETA-BLOCKING** | `task_644a` + `task_652a` |
+| O-1 | No metrics endpoint, no Prometheus, no Grafana — cannot observe latency/errors/saturation | **BETA-BLOCKING** | AND-43 + AND-44 |
 | O-2 | No distributed tracing; X-Request-ID propagates within a service but not across services | FAST-FOLLOW | NEW |
-| O-3 | No container resource limits in prod or selfhost compose | FAST-FOLLOW | `task_48ea` |
-| O-4 | Integration tests exist and are tagged but CI never runs them — breaking inter-service changes merge undetected | FAST-FOLLOW | `task_6f3a` |
+| O-3 | No container resource limits in prod or selfhost compose | FAST-FOLLOW | AND-37 |
+| O-4 | Integration tests exist and are tagged but CI never runs them — breaking inter-service changes merge undetected | FAST-FOLLOW | AND-45 |
 | O-5 | Users service has no HTTP ReadTimeout or WriteTimeout — slow client attack can exhaust goroutines | **BETA-BLOCKING** | NEW |
-| O-6 | Log format defaults to `text` in prod; LOG_FORMAT not set in prod compose; no log shipping stack | FAST-FOLLOW | `feature_1a69` |
+| O-6 | Log format defaults to `text` in prod; LOG_FORMAT not set in prod compose; no log shipping stack | FAST-FOLLOW | AND-16 |
 
 ---
 
@@ -62,19 +62,19 @@ The only observability surface is structured `slog` JSON logs and the health pro
 - Is the users service throwing 5xx to real users? (logs exist but no rate counter or alert)
 - Are Postgres connection pools at capacity? (no `pgxpool.Stat` gauge)
 
-**Minimal beta bar (covers `task_644a` + `task_652a`):**
+**Minimal beta bar (covers AND-43 + AND-44):**
 1. Add `github.com/prometheus/client_golang` to each service module.
 2. Wrap the chi router with `promhttp`-based middleware recording: HTTP request count by method/path/status, HTTP request duration histogram (p50/p95/p99), active in-flight requests.
 3. Expose `/metrics` on a separate internal port (or the same port with IP-restriction at Caddy).
 4. Add a `prometheus` + `grafana` service to the prod compose (or use a hosted Grafana Cloud free tier for beta).
-5. Wire four critical alerts (`task_652a`): error-rate > 5% over 5 min, p99 latency > 2s, any service health/ready failing, Postgres pool in-use > 80%.
+5. Wire four critical alerts: error-rate > 5% over 5 min, p99 latency > 2s, any service health/ready failing, Postgres pool in-use > 80%.
 6. Add per-DB pool stats (call `pool.Stat()` in a background goroutine and export as gauges — one iteration per service).
 
 **Worker-specific:** worker job duration (`Histogram`) and failure count (`Counter`) per job type. The cron workers (`cleanup_job`, `outbox_cleanup_job`, `feed_items_cleanup_job`) are currently fire-and-forget with only log output.
 
 **Effort:** 2–3 days of instrumenting + 1 day for compose + dashboards. The prometheus client middleware is ~30 lines; the bulk is the dashboard JSON.
 
-**Existing tasks:** `task_644a` (Add Prometheus metrics and Grafana dashboards) and `task_652a` (Set up alerting system for pre-go-live) cover this finding exactly. Both are blocked on `decision_4052`; that decision should be unblocked immediately since this is beta-blocking.
+**Existing tasks:** AND-43 (Add Prometheus metrics and Grafana dashboards) and AND-44 (Set up alerting system for pre-go-live) cover this finding exactly. Both are blocked on AND-14; that decision should be unblocked immediately since this is beta-blocking.
 
 ---
 
@@ -108,7 +108,7 @@ Evidence (absence): searching the HTTP client construction in each inter-service
 
 **Effort:** 1 day. No schema changes, no new dependencies.
 
-**Existing task:** None. **NEW task needed** — link to `task_644a` as a prerequisite or complement.
+**Existing task:** None. **NEW task needed** — link to AND-43 as a prerequisite or complement.
 
 ---
 
@@ -125,7 +125,7 @@ The prod compose runs 11 containers (caddy, vault, vault-init, vault-unseal, cai
 
 **The selfhost compose** also has no limits, though it does tune Postgres parameters (`shared_buffers`, `work_mem`, etc.) via command args — so the DB is bounded but the application containers are not.
 
-**Recommendation (FAST-FOLLOW, `task_48ea`):**
+**Recommendation (FAST-FOLLOW, AND-37):**
 Add `deploy.resources.limits` to each service block. Suggested starting values for a 2–4 GB host:
 
 | Service | Memory limit | CPU limit |
@@ -140,11 +140,11 @@ Add `deploy.resources.limits` to each service block. Suggested starting values f
 | vault | 256m | 0.5 |
 | caddy | 128m | 0.25 |
 
-Actual values should be validated against `task_8392` load-test results. Set `mem_reservation` (soft limit) below `memory` (hard limit) so Docker can reclaim headroom between bursts.
+Actual values should be validated against AND-48 load-test results. Set `mem_reservation` (soft limit) below `memory` (hard limit) so Docker can reclaim headroom between bursts.
 
-**Effort:** 1–2 hours to add limits; 1 day to validate against load-test baselines (`task_8392`).
+**Effort:** 1–2 hours to add limits; 1 day to validate against load-test baselines.
 
-**Existing task:** `task_48ea` (Add Docker resource constraints to production compose) covers this exactly.
+**Existing task:** AND-37 (Add Docker resource constraints to production compose) covers this exactly.
 
 ---
 
@@ -167,7 +167,7 @@ The selfhost compose smoke test (`docker-test.yml:326-371`) does spin up the ful
 
 **Why it matters (ties to Audit 1 contract drift).** Inter-service integration tests are the primary guard against schema drift and broken client-service contracts. Audit 1 found route path mismatches between OpenAPI specs and implementations (F-4, F-5); those were undetected because unit tests build their own chi contexts and do not exercise the real router with a real database. The integration tests that *would* catch this are never run.
 
-**Recommendation (FAST-FOLLOW, `task_6f3a`):**
+**Recommendation (FAST-FOLLOW, AND-45):**
 Add a separate GitHub Actions workflow (or a job in `go-checks.yml` gated on a `run-integration` label or a push-to-main trigger) that:
 1. Uses GitHub Actions service containers for Postgres (`services: postgres: image: postgres:18`).
 2. Runs `go test -tags integration -count=1 -timeout 10m ./...` for each service.
@@ -177,7 +177,7 @@ The simplest unblocking step (1 day) is a single job using service containers fo
 
 **Effort:** 1–2 days for CI wiring; the tests themselves already exist.
 
-**Existing task:** `task_6f3a` (Add integration test workflow with Docker/Postgres) covers this exactly.
+**Existing task:** AND-45 (Add integration test workflow with Docker/Postgres) covers this exactly.
 
 ---
 
@@ -254,15 +254,15 @@ None of the service blocks in `infrastructure/docker/prod/docker-compose.yml` se
 
 Services emit structured slog output to stdout. In the prod compose, `docker compose logs` is the only consumption path — no Loki, no Promtail, no CloudWatch agent, no Datadog agent is configured. With multiple containers across a single host, there is no way to query logs across services, set log-based alerts, or retain logs beyond the Docker daemon's buffer.
 
-**Why FAST-FOLLOW (not BETA-BLOCKING):** logs are accessible via `docker compose logs` in an emergency; a beta with a small number of users can be monitored manually for the first weeks. The risk is that incidents take longer to diagnose. This becomes BETA-BLOCKING if metrics (`task_644a`) are also absent — you'd have no observability at all. With metrics in place, logs are a secondary debugging tool.
+**Why FAST-FOLLOW (not BETA-BLOCKING):** logs are accessible via `docker compose logs` in an emergency; a beta with a small number of users can be monitored manually for the first weeks. The risk is that incidents take longer to diagnose. This becomes BETA-BLOCKING if metrics are also absent — you'd have no observability at all. With metrics in place, logs are a secondary debugging tool.
 
-**Recommendation (FAST-FOLLOW, `feature_1a69`):**
-- Minimum viable for beta: add Loki + Promtail sidecar to the prod compose. Promtail scrapes Docker log files from `/var/lib/docker/containers/`; Loki provides query via Grafana (same Grafana added for O-1). This reuses the Grafana instance from `task_644a` and adds ~2 compose services.
+**Recommendation (FAST-FOLLOW, AND-16):**
+- Minimum viable for beta: add Loki + Promtail sidecar to the prod compose. Promtail scrapes Docker log files from `/var/lib/docker/containers/`; Loki provides query via Grafana (same Grafana added for O-1). This reuses the Grafana instance from AND-43 and adds ~2 compose services.
 - Set `LOG_FORMAT=json` and `LOG_LEVEL=info` on all service blocks immediately (5-minute change, no restart of the DB or Vault needed).
 
 **Effort:** 30 minutes for the env-var change; 1 day for Loki/Promtail setup.
 
-**Existing task:** `feature_1a69` (Add log monitoring/aggregation stack for production) covers O-6b. O-6a (missing LOG_FORMAT) is a gap within `feature_1a69` — include it in that task's scope.
+**Existing task:** AND-16 (Add log monitoring/aggregation stack for production) covers O-6b. O-6a (missing LOG_FORMAT) is a gap within AND-16 — include it in that task's scope.
 
 ---
 
@@ -270,31 +270,31 @@ Services emit structured slog output to stdout. In the prod compose, `docker com
 
 Before signups open, the following must be true:
 
-- [ ] **O-1** At minimum: HTTP request count + duration metrics exported on `/metrics`; Prometheus scraping all services; one Grafana dashboard per service (error rate, p99 latency, active connections). (`task_644a`)
-- [ ] **O-1** At minimum: four critical alerts configured: error rate, latency, health probe, pool utilisation. (`task_652a`)
+- [ ] **O-1** At minimum: HTTP request count + duration metrics exported on `/metrics`; Prometheus scraping all services; one Grafana dashboard per service (error rate, p99 latency, active connections).
+- [ ] **O-1** At minimum: four critical alerts configured: error rate, latency, health probe, pool utilisation.
 - [ ] **O-5** `services/users/cmd/user-service/main.go` `http.Server` has `ReadTimeout`, `WriteTimeout`, `IdleTimeout` set. (NEW task)
 
 Fast-follow during beta:
 
 - [ ] **O-2** Outbound HTTP clients forward `X-Request-ID` from context across service boundaries. (NEW task)
-- [ ] **O-3** `deploy.resources.limits` added to all service blocks in prod and selfhost compose. (`task_48ea`)
-- [ ] **O-4** GitHub Actions workflow runs integration tests (`-tags integration`) against a Postgres service container on PRs to main or on merge. (`task_6f3a`)
+- [ ] **O-3** `deploy.resources.limits` added to all service blocks in prod and selfhost compose.
+- [ ] **O-4** GitHub Actions workflow runs integration tests (`-tags integration`) against a Postgres service container on PRs to main or on merge.
 - [ ] **O-6a** `LOG_FORMAT=json` and `ENVIRONMENT=production` set on all service blocks in prod compose.
-- [ ] **O-6b** Loki + Promtail added to prod compose; logs queryable via Grafana. (`feature_1a69`)
+- [ ] **O-6b** Loki + Promtail added to prod compose; logs queryable via Grafana.
 
-No action now (documented): Load testing (`task_8392`) should inform resource limits (`task_48ea`) — sequence them in that order.
+No action now (documented): Load testing should inform resource limits — sequence them in that order.
 
 ---
 
 ## Existing tasks this workstream maps to
 
-| Task (chalk) | Linear | Title | Finding(s) | Status |
-|---|---|---|---|---|
-| `task_644a` | AND-43 | Add Prometheus metrics and Grafana dashboards | O-1 | open (blocked on `decision_4052`, AND-14) |
-| `task_652a` | AND-44 | Set up alerting system for pre-go-live | O-1 | open (blocked on `decision_4052`, AND-14) |
-| `task_8392` | AND-48 | Implement load testing for pre-go-live | informs O-3 limits | open (blocked on `decision_4052`, AND-14) |
-| `task_48ea` | AND-37 | Add Docker resource constraints to production compose | O-3 | open (blocked on `decision_4052`, AND-14) |
-| `task_6f3a` | AND-45 | Add integration test workflow with Docker/Postgres | O-4 | open (blocked on `decision_4052`, AND-14) |
-| `feature_1a69` | AND-16 | Add log monitoring/aggregation stack for production | O-6b | open (blocked on `decision_4052`, AND-14) |
-| **NEW** | — | Fix HTTP timeouts on user-service | O-5 | not yet created |
-| **NEW** | — | Propagate X-Request-ID across service boundaries | O-2 | not yet created |
+| Linear | Title | Finding(s) | Status |
+|---|---|---|---|
+| AND-43 | Add Prometheus metrics and Grafana dashboards | O-1 | open (blocked on AND-14) |
+| AND-44 | Set up alerting system for pre-go-live | O-1 | open (blocked on AND-14) |
+| AND-48 | Implement load testing for pre-go-live | informs O-3 limits | open (blocked on AND-14) |
+| AND-37 | Add Docker resource constraints to production compose | O-3 | open (blocked on AND-14) |
+| AND-45 | Add integration test workflow with Docker/Postgres | O-4 | open (blocked on AND-14) |
+| AND-16 | Add log monitoring/aggregation stack for production | O-6b | open (blocked on AND-14) |
+| **NEW** | Fix HTTP timeouts on user-service | O-5 | not yet created |
+| **NEW** | Propagate X-Request-ID across service boundaries | O-2 | not yet created |

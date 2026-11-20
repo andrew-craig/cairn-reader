@@ -30,7 +30,7 @@ const goBlog: UnifiedSubscription = {
   rss_data: { feed_id: 'feed-1', feed_url: 'https://go.dev/feed' },
 };
 
-// feature_bd13: the RSS page can add a feed itself, with the Feed/Reads choice.
+// The RSS page can add a feed itself, with the Feed/Reads choice.
 describe('RssScreen Add feed', () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -46,7 +46,7 @@ type SendOutcome = 'success' | 'drop' | 'halt';
  *
  * Shared by `sendRow` (below) and `articleMutations.ts`'s
  * `withOutboxOnRetryableError` so the two halves of the offline write path
- * can never classify a *recognized* error differently (task_c894).
+ * can never classify a *recognized* error differently.
  */
 export function isRetryable(error: unknown): boolean {
   return error instanceof NetworkError || (error instanceof HttpError && (error.status === 401 || error.status >= 500));
@@ -104,7 +104,7 @@ export const Outbox = {
 
   /**
    * Replays queued mutations in FIFO order (`created_at`, then `rowid` to
-   * break ties within the same millisecond — see task_ebf1 decision C).
+   * break ties within the same millisecond).
    * Stops at the first row that comes back `halt` so a later row can never
    * reach the server ahead of an earlier one still pending: that row's
    * `attempts` is bumped (bookkeeping only, no backoff or drop-after-N in

@@ -4,9 +4,9 @@ import { ReadService } from './read';
 import { Outbox } from './outbox';
 import { HttpError, NetworkError } from '@cairn/shared';
 
-// task_ebf1 (decision 4): each of the reading screen's six mutation call
+// Each of the reading screen's six mutation call
 // sites goes through this facade instead of repeating "write the store, try
-// the network, enqueue on a retryable error" inline. task_c894: a retryable
+// the network, enqueue on a retryable error" inline. A retryable
 // error (NetworkError, HttpError(401), HttpError(5xx) — the same set
 // outbox.ts's sendRow treats as transient) enqueues; a definitive 4xx other
 // than 401 surfaces exactly as it does without the facade.
@@ -75,7 +75,7 @@ describe('ArticleMutations', () => {
       expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     });
 
-    // task_c894: a live 503 was previously indistinguishable from a
+    // A live 503 was previously indistinguishable from a
     // definitive 4xx here, so the DELETE/PATCH was rethrown after the store
     // write had already landed, and nothing was queued to freeze the value
     // against the next sync.
@@ -218,7 +218,7 @@ describe('ArticleMutations', () => {
       expect(mockedOutbox.enqueue).not.toHaveBeenCalled();
     });
 
-    // The motivating case from task_c894: online, backend returns 503 on
+    // The motivating case: online, backend returns 503 on
     // archive — ArticleStore.remove() already ran, and without this the
     // PATCH would be rethrown with nothing queued, leaving the article gone
     // locally but still present on the server.

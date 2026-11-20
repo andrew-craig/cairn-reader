@@ -7,13 +7,13 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Article } from '../types';
 import type { UserContentResponse, UserContentDetailResponse } from '@cairn/shared';
 
-// task_a8a4: opening a previously-read article must render its cached body
+// Opening a previously-read article must render its cached body
 // (decision 4: opportunistic body caching) without waiting on the network
 // getContentById call to resolve.
-// task_c55c: a stored body whose hash matches the fresh route-param hash
+// A stored body whose hash matches the fresh route-param hash
 // skips the network call entirely, and offline with nothing stored shows an
 // explicit "Not available offline" state instead of a blank body.
-// task_ebf1: the "mark as reading" effect fires unconditionally on mount for
+// The "mark as reading" effect fires unconditionally on mount for
 // an unread article, now via the ArticleMutations facade — it must be mocked
 // here even though this file's tests don't assert on it directly.
 
@@ -152,7 +152,7 @@ describe('ReadArticleDetailScreen offline body cache', () => {
     expect(mockedReadService.getContentById).not.toHaveBeenCalled();
   });
 
-  // task_06e5: regaining connectivity while this screen is open used to
+  // Regaining connectivity while this screen is open used to
   // leave it stuck on a blank ArticleContent — the render guard
   // (`!article.content && isOffline`) stopped matching once isOffline went
   // false, but nothing re-triggered the fetch that would give it content.

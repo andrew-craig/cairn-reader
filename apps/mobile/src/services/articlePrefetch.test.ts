@@ -6,7 +6,7 @@ import { NetworkError } from '@cairn/shared';
 import { Article } from '../types';
 import type { UserContentDetailResponse } from '@cairn/shared';
 
-// task_c55c: after each successful list sync, download cleaned_html for
+// After each successful list sync, download cleaned_html for
 // unread/reading articles that lack a body — bounded concurrency, newest
 // first, capped at the 100 most recent Read-list articles, run from a
 // service rather than a screen (decision 4), never while offline (decision

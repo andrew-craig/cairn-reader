@@ -211,8 +211,6 @@ ALL tasks are tracked in **Linear**, team **Andrew-cairn** (key `AND`), through 
 
 Epics are Linear **projects** (e.g. "Code quality remediation program", "Hosted launch"). Issue types are labels (`Bug`, `Feature`, `Chore`, `decision`).
 
-IDs like `task_cab7`, `bug_f546` or `epic_bc48` in code comments, commits and older docs are from chalk, the tracker used before Linear. Issues still open at the move say "Migrated from chalk `<id>`" in their Linear description, so search Linear for the ID; for the rest, read `.chalk/tasks/` in git history before commit `b0b7e0b`.
-
 #### Workflow
 1. **Setup tracking**: If there is not an existing issue, create one in Linear
 2. **Plan First**: Write the plan into the issue description with checkable items

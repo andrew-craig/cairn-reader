@@ -1,6 +1,6 @@
 # Audit 4 — Security & Auth Hardening
 
-**Workstream:** `task_659b` (epic `epic_9c21`, P2)
+**Priority:** P2
 **Status:** Findings complete
 **Date:** 2026-06-16
 

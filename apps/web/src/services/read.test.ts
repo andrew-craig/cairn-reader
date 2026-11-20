@@ -6,7 +6,7 @@ import type {
 } from '@cairn/shared';
 import { ReadService } from './read';
 
-// task_de6d: transformToArticle and transformDetailToArticle were near-identical
+// transformToArticle and transformDetailToArticle were near-identical
 // mappers differing only in whether `content` (the cleaned HTML body) is set.
 // transformDetailToArticle now composes on transformToArticle; these tests pin
 // that the detail mapping still equals the summary mapping plus the HTML body.
@@ -93,7 +93,7 @@ describe('ReadService.transformDetailToArticle', () => {
   });
 });
 
-// Feed/Reads routing (task_f4ac): list filter on read calls, moveToReads, setSourceList.
+// Feed/Reads routing: list filter on read calls, moveToReads, setSourceList.
 describe('ReadService list routing', () => {
   const fetchWithAuth = vi.fn();
 

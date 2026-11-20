@@ -14,7 +14,7 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = SQLite.openDatabaseAsync(DB_NAME)
       .then(async (db) => {
-        // Kept at its original (v1) shape. Installs from before task_a8a4
+        // Kept at its original (v1) shape. Installs from before the local cache
         // already have this table; widening this statement would be a no-op
         // against them, so schema changes since v1 are applied by migrate()
         // instead, tracked via PRAGMA user_version.
@@ -64,14 +64,14 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
   const startVersion = row?.user_version ?? 0;
   let version = startVersion;
 
-  // Step 2 (task_c55c): content_hash, for diffing cached bodies against the
+  // Step 2: content_hash, for diffing cached bodies against the
   // server's hash so unchanged bodies are never re-downloaded.
   if (version < 2) {
     await db.execAsync('ALTER TABLE articles ADD COLUMN content_hash TEXT');
     version = 2;
   }
 
-  // Step 3 (task_ebf1): the offline mutation outbox. Keyed on (article_id,
+  // Step 3: the offline mutation outbox. Keyed on (article_id,
   // field) so a repeated write to the same field coalesces into one row —
   // see Outbox.enqueue. Left with an implicit rowid (no WITHOUT ROWID) so
   // Outbox.drain can break created_at ties deterministically.

@@ -70,7 +70,7 @@ func TestForgotPasswordAndResetPasswordRoutesRemoved(t *testing.T) {
 	}
 }
 
-// TestKeyRotationReachesRouterValidator is the regression test for task_41e2:
+// TestKeyRotationReachesRouterValidator is the regression test for a key-rotation bug:
 // the users service signs tokens with a rotated key
 // (KeyRotationManager.OnRotation -> jwtManager.UpdateKeys, see
 // cmd/user-service/main.go) but, before this fix, its own router built the

@@ -142,7 +142,7 @@ struct ArticleWebView: UIViewRepresentable {
 
         /// The page and its images have loaded. Their layout may not have reached the scroll view
         /// yet (the content size can still be the viewport's, which reads as the end of the
-        /// article, bug_f546), so this neither ends the restore nor confirms a reading by itself:
+        /// article), so this neither ends the restore nor confirms a reading by itself:
         /// readings count once the user has also dragged.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             hasLoaded = true

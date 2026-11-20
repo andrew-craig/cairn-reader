@@ -1,6 +1,6 @@
 # Audit 6 — Infrastructure Reliability & Scaling
 
-**Workstream:** `task_1d08` (epic `epic_9c21`, P2)
+**Priority:** P2
 **Status:** Findings complete
 **Date:** 2026-06-16
 
@@ -23,8 +23,8 @@
 | ID | Finding | Class | Decision needed |
 |---|---|---|---|
 | I-1 | Single PostgreSQL instance — no replication, no failover | **BETA-BLOCKING** | Managed DB or documented single-instance + tested restore |
-| I-2 | Backups not automated — script in docs only, no cron container, no offsite store | **BETA-BLOCKING** | Execute `task_5dcb`: ship the script + cron container before beta |
-| I-3 | Vault uses file storage (not HA) + unseal keys stored plaintext in `vault-keys` volume | **BETA-BLOCKING** | Accept risk + volume backup plan, or execute `task_ece2` (KMS auto-unseal) |
+| I-2 | Backups not automated — script in docs only, no cron container, no offsite store | **BETA-BLOCKING** | Execute AND-41: ship the script + cron container before beta |
+| I-3 | Vault uses file storage (not HA) + unseal keys stored plaintext in `vault-keys` volume | **BETA-BLOCKING** | Accept risk + volume backup plan, or execute AND-56 (KMS auto-unseal) |
 | I-4 | In-memory rate limiter breaks under multiple instances; currently single-instance by design | FAST-FOLLOW | Document single-instance as the beta topology; defer Redis-backed limiter |
 | I-5 | `sslmode=disable` on all internal DB connections within Docker network | FAST-FOLLOW | Accept for beta (private Docker network); document the decision |
 | I-6 | Connection ceiling: 9 containers × up to 25 conns each = **up to 175 connections** vs Postgres default max_connections **100** (unset in prod compose) | **BETA-BLOCKING** | Set `max_connections` ≥ 200 in prod postgres command args, or reduce pool caps |
@@ -48,14 +48,14 @@ failure, or accidental `docker compose down -v` destroys all user data.
 
 **Decision needed.** Two viable options for beta:
 
-1. **Accept the SPOF** (single-instance) with compensating controls: automated daily backup (`task_5dcb`, see I-2), a tested restore runbook, and operator alerting so downtime is detected within minutes. Appropriate for a private beta cohort where SLA expectations are low.
+1. **Accept the SPOF** (single-instance) with compensating controls: automated daily backup (AND-41, see I-2), a tested restore runbook, and operator alerting so downtime is detected within minutes. Appropriate for a private beta cohort where SLA expectations are low.
 2. **Migrate to a managed DB** (AWS RDS Postgres, Cloud SQL, Neon, etc.) before signups. Eliminates the hardware SPOF and gives point-in-time recovery, but adds cost and configuration effort.
 
-**Recommendation.** For beta: accept the SPOF + implement `task_5dcb` immediately + document and rehearse the restore procedure (time-to-restore target). Capture "migrate to managed DB" as a post-beta roadmap item in `task_5dcb`'s parent epic. The single-VPS architecture is appropriate for a private beta, not for a public launch at scale.
+**Recommendation.** For beta: accept the SPOF + implement AND-41 immediately + document and rehearse the restore procedure (time-to-restore target). Capture "migrate to managed DB" as a post-beta roadmap item. The single-VPS architecture is appropriate for a private beta, not for a public launch at scale.
 
-**Effort.** Restore runbook + `task_5dcb`: 1–2 days. Managed DB migration: 2–4 days.
+**Effort.** Restore runbook + AND-41: 1–2 days. Managed DB migration: 2–4 days.
 
-**Existing task.** `task_5dcb` covers the backup side. **No new task needed** — add "test restore procedure" and "single-instance risk accepted for beta" decisions to `task_5dcb`.
+**Existing task.** AND-41 covers the backup side. **No new task needed** — add "test restore procedure" and "single-instance risk accepted for beta" decisions to AND-41.
 
 ---
 
@@ -63,14 +63,14 @@ failure, or accidental `docker compose down -v` destroys all user data.
 
 **Current state.** `docs/DEPLOYMENT.md:657–695` documents a `scripts/backup.sh` and a
 host-level cron schedule. That script **does not exist** as an actual file in the repository —
-`task_5dcb` records this gap. No Docker service runs as a backup cron. There is no S3 or
+AND-41 records this gap. No Docker service runs as a backup cron. There is no S3 or
 offsite upload step in the documented script. The production compose file has no backup container.
 
 **Evidence:**
 - `infrastructure/docker/prod/docker-compose.yml` — no `backup` or `pgdump` service.
 - `infrastructure/docker/scripts/` — contains `init-databases.sh`, `init-vault.sh`, `init-vault-prod.sh`, `unseal-vault.sh`, but **no** `backup.sh`.
 - `docs/DEPLOYMENT.md:659` — "Create `scripts/backup.sh`:" (present tense directive, file absent).
-- `task_5dcb` — status `open`, blocked by `decision_4052`.
+- AND-41 — status `open`, blocked by AND-14.
 
 **Why beta-blocking.** Any data ingested during beta is user data. Without automated backups,
 a volume loss event results in complete, unrecoverable user data loss. A manual cron on the
@@ -78,14 +78,14 @@ host is operationally fragile (needs the cairn user's crontab to survive host re
 Offsite storage (e.g. S3) is mandatory for data durability at any level of user trust.
 
 **Recommendation.**
-1. Unblock `task_5dcb` from `decision_4052` (the decision is: implement for beta, accept single-instance).
+1. Unblock AND-41 from AND-14 (the decision is: implement for beta, accept single-instance).
 2. Create `infrastructure/docker/scripts/backup.sh` that runs `pg_dumpall` piped to gzip, uploads to S3 (or compatible), and purges local copies older than 7 days.
 3. Add a lightweight `backup` container to `prod/docker-compose.yml` using `docker-library/docker` or a minimal cron image, mounting the Docker socket or using `pg_dump` directly against the `cairn-db` service. Schedule daily at 02:30 (after the content cleanup cron at 02:00).
 4. Add a restore runbook to `docs/DEPLOYMENT.md` and test it once before beta opens.
 
 **Effort.** 1–2 days.
 
-**Existing task.** `task_5dcb` covers this directly. **No new task needed.**
+**Existing task.** AND-41 covers this directly. **No new task needed.**
 
 ---
 
@@ -110,7 +110,7 @@ plaintext on the Docker host indefinitely.
 - `infrastructure/docker/scripts/unseal-vault.sh:13,59–71` — reads keys from `UNSEAL_KEYS.txt`.
 - `infrastructure/docker/scripts/init-vault-prod.sh:69–84` — writes all 5 keys + warning comment.
 - `infrastructure/docker/prod/docker-compose.yml:117–135` — `vault-unseal` mounts `vault-keys:ro`.
-- `task_ece2` — "Migrate Vault to auto-unseal via KMS", status `open`, blocked by `decision_4052`.
+- AND-56 — "Migrate Vault to auto-unseal via KMS", status `open`, blocked by AND-14.
 
 **Risk assessment.** The SPOF chain is:
 1. `vault-data` volume lost → JWT keys lost → all services fail to authenticate → total outage.
@@ -123,14 +123,14 @@ For a private beta on a single trusted VPS, this is an **accepted operational ri
 
 **Decision needed.** Three options:
 1. **Accept for beta** with volume backup + restricted host access + documented risk.
-2. **KMS auto-unseal** (`task_ece2`): use AWS KMS or GCP CKMS to auto-unseal; removes the plaintext-key problem and the manual watchdog. Moderate effort.
+2. **KMS auto-unseal**: use AWS KMS or GCP CKMS to auto-unseal; removes the plaintext-key problem and the manual watchdog. Moderate effort.
 3. **Managed Vault** (HCP Vault Secrets, Infisical, etc.): eliminates the entire Vault SPOF. Higher effort.
 
-**Recommendation.** Accept option 1 for the private beta: add `vault-data` and `vault-keys` to the backup scope, document the risk, and gate public launch on `task_ece2`. The plaintext keys are a serious long-term concern but acceptable on a single, well-guarded VPS for a closed beta.
+**Recommendation.** Accept option 1 for the private beta: add `vault-data` and `vault-keys` to the backup scope, document the risk, and gate public launch on AND-56. The plaintext keys are a serious long-term concern but acceptable on a single, well-guarded VPS for a closed beta.
 
 **Effort.** Option 1 (accept + backup): 0.5 days documentation. Option 2 (KMS): 2–3 days.
 
-**Existing task.** `task_ece2` covers KMS migration. **No new task needed** — accept risk for beta, schedule `task_ece2` for pre-public-launch.
+**Existing task.** AND-56 covers KMS migration. **No new task needed** — accept risk for beta, schedule AND-56 for pre-public-launch.
 
 ---
 
@@ -150,7 +150,7 @@ bypass the limit by distributing requests across instances: each instance sees a
 
 **Correction to the task lead.** The Caddyfile uses a single static upstream per service (no multi-instance routing). The current production topology is therefore **single-instance by design**, and the in-memory limiter works correctly for that topology. This is not a live bug — it is a scaling constraint that must be documented.
 
-**Decision needed.** Formally declare: **beta runs single-instance per service**. Document the single-instance ceiling so operators do not `docker compose scale` without first deploying a Redis-backed limiter or removing the assumption. If horizontal scaling is needed before beta ends, `task_ece2`-style coordination (shared state) is required. Suggest creating a tracking issue for "Redis-backed rate limiter for horizontal scaling".
+**Decision needed.** Formally declare: **beta runs single-instance per service**. Document the single-instance ceiling so operators do not `docker compose scale` without first deploying a Redis-backed limiter or removing the assumption. If horizontal scaling is needed before beta ends, AND-56-style coordination (shared state) is required. Suggest creating a tracking issue for "Redis-backed rate limiter for horizontal scaling".
 
 **Recommendation.** Accept for beta. Add a comment to `Caddyfile` and `docs/DEPLOYMENT.md` Scaling section noting that `docker compose scale` is **not supported** without a Redis limiter. File a ROADMAP task for Redis-backed limiter if/when horizontal scaling becomes a requirement.
 
@@ -279,8 +279,8 @@ The `api_keys` schema supports `status`, `expires_at`, and `last_used_at`
 Before signups open, the following must be true:
 
 - [ ] **I-1** Single-instance SPOF decision recorded; restore runbook written and rehearsed (or managed DB in place).
-- [ ] **I-2** `task_5dcb` delivered: `scripts/backup.sh` exists, cron container in prod compose, S3 upload verified.
-- [ ] **I-3** Vault volume (`vault-data`, `vault-keys`) included in backup scope; plaintext-key risk documented; `task_ece2` scheduled for pre-public-launch.
+- [ ] **I-2** AND-41 delivered: `scripts/backup.sh` exists, cron container in prod compose, S3 upload verified.
+- [ ] **I-3** Vault volume (`vault-data`, `vault-keys`) included in backup scope; plaintext-key risk documented; AND-56 scheduled for pre-public-launch.
 - [ ] **I-6** `max_connections=200` (or equivalent) set in prod `cairn-db` command args; pool caps (≤15) added to all API service env blocks in prod compose.
 
 Fast-follow during beta:
@@ -293,11 +293,11 @@ Fast-follow during beta:
 
 ## Existing tasks this workstream maps to
 
-| Task | Title | Status | Relevance |
+| Linear | Title | Status | Relevance |
 |---|---|---|---|
-| `task_5dcb` | Add database backup script and cron container | open (blocked `decision_4052`) | Directly covers I-2; unblocking is **BETA-BLOCKING** |
-| `task_ece2` | Migrate Vault to auto-unseal via KMS | open (blocked `decision_4052`) | Covers I-3 long-term; accepted for beta, required pre-public-launch |
-| `task_48ea` | Add Docker resource constraints to production compose | open (blocked `decision_4052`) | Adjacent to I-6 (pool caps); complementary — do both in the same PR |
-| NEW | Set `max_connections` in prod compose + cap pool sizes | — | **BETA-BLOCKING** I-6 fix; create as child of `task_48ea` or standalone |
+| AND-41 | Add database backup script and cron container | open (blocked AND-14) | Directly covers I-2; unblocking is **BETA-BLOCKING** |
+| AND-56 | Migrate Vault to auto-unseal via KMS | open (blocked AND-14) | Covers I-3 long-term; accepted for beta, required pre-public-launch |
+| AND-37 | Add Docker resource constraints to production compose | open (blocked AND-14) | Adjacent to I-6 (pool caps); complementary — do both in the same PR |
+| NEW | Set `max_connections` in prod compose + cap pool sizes | — | **BETA-BLOCKING** I-6 fix; create as child of AND-37 or standalone |
 | NEW | Document single-instance topology + Redis-backed rate limiter plan | — | FAST-FOLLOW I-4 |
 | NEW | Email API key rotation runbook + per-key rate limit | — | FAST-FOLLOW I-7 |

@@ -1,6 +1,6 @@
 # Audit 2 — Data Layer & Query Efficiency
 
-**Workstream:** `task_e695` (epic `epic_9c21`, P2)
+**Priority:** P2
 **Status:** Findings complete
 **Date:** 2026-06-08
 

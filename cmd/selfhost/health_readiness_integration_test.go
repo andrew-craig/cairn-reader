@@ -18,7 +18,7 @@ import (
 )
 
 // TestReadiness_DetectsDownedUsersDB reproduces the "readiness probe lies"
-// finding (task_fd42): before the fix, the users database was never
+// finding: before the fix, the users database was never
 // registered with the selfhost health checker's addDB/addPinger, so
 // /health/ready kept reporting "healthy" even after the users DB became
 // unreachable.

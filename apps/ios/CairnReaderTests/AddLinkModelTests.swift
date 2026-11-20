@@ -133,7 +133,7 @@ struct AddLinkModelTests {
         #expect(source.added.first?.list == nil)
     }
 
-    // MARK: Dismissal (task_7c06)
+    // MARK: Dismissal
 
     /// Jest: "closes on request while a detection is in flight".
     @Test func closingIsAllowedWhileADetectionIsInFlight() async {
@@ -284,7 +284,7 @@ struct AddLinkModelTests {
         #expect(model.successMessage == "Article added to reading list")
     }
 
-    // MARK: Feed mode (feature_bd13 / task_9188)
+    // MARK: Feed mode
 
     /// Jest: "explains both destinations when a feed is detected". The explanation is the sheet's
     /// section footer; what the model owns is that the choice shows, defaulting to Reads.

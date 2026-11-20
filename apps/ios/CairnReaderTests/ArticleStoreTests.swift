@@ -5,9 +5,9 @@ import Testing
 
 // Port of apps/mobile/src/services/articleStore.test.ts against a real in-memory database.
 // Not ported: the v1 -> v2 migration cases (there is no RN migration ladder here; the schema is
-// created in one migration, epic_bc48 decision 4). Outbox rows are inserted directly until the
-// outbox itself is ported (task_387d). The list methods and `clear` were replaced by the
-// observations and `UserSession.close()` (task_288e), so their cases moved there.
+// created in one migration). Outbox rows are inserted directly until the
+// outbox itself is ported. The list methods and `clear` were replaced by the
+// observations and `UserSession.close()`, so their cases moved there.
 
 private func makeArticle(
     _ id: String = "a1", title: String = "Article One", isRead: Bool = false, isFavorite: Bool = false,

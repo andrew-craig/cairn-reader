@@ -18,7 +18,7 @@ let inFlight = false;
  * Downloads cleaned_html for unread/reading Read-list articles that lack a
  * body, bounded concurrency, newest first, capped at PREFETCH_LIMIT. Called
  * from ReadsScreen's sync callback after ArticleStore.upsertMany — see
- * apps/mobile/CLAUDE.md and task_c55c. Explore article content is never
+ * apps/mobile/CLAUDE.md. Explore article content is never
  * synced or prefetched.
  */
 export const ArticlePrefetchService = {

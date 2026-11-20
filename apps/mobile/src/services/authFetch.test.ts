@@ -2,7 +2,7 @@ import { AuthService } from './auth';
 import { withRetry } from '../utils/retry';
 import { NetworkError } from '@cairn/shared';
 
-// task_ca2d: mobile's read.ts and explore.ts each carried a private copy of the
+// Mobile's read.ts and explore.ts each carried a private copy of the
 // authenticated-fetch policy. These are now one implementation on AuthService.
 // The tests below characterize the canonical behavior the two callers relied on
 // and pin the load-bearing error-message-to-retryability contract.
@@ -26,7 +26,7 @@ describe('withRetry auth-error classification (load-bearing message contract)', 
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  // task_cab7: an offline/unreachable-server failure must be retried, not
+  // An offline/unreachable-server failure must be retried, not
   // treated like a rejected credential.
   it('DOES retry when the request throws a NetworkError', async () => {
     jest.useFakeTimers();
@@ -46,7 +46,7 @@ describe('withRetry auth-error classification (load-bearing message contract)', 
     }
   });
 
-  // task_c87c: isRetryable must recognize a NetworkError by type, not by
+  // isRetryable must recognize a NetworkError by type, not by
   // falling through to the "unrecognized error" default — otherwise a
   // NetworkError whose message happens to contain a substring the classifier
   // treats as a non-retryable 4xx (e.g. "not found") would stop being
@@ -146,10 +146,10 @@ describe('AuthService.fetchWithAuth', () => {
     expect(await AuthService.getAccessToken()).toBeNull();
   });
 
-  // task_c87c: a 401 followed by a successful refresh followed by a dropped
+  // A 401 followed by a successful refresh followed by a dropped
   // connection on the retry request must surface a NetworkError and keep
-  // tokens — not log the user out. This is the exact window task_cab7 exists
-  // to close, in the one spot the initial fix missed.
+  // tokens — not log the user out. This is the exact window the offline-logout fix
+  // exists to close, in the one spot the initial fix missed.
   it('rejects with a NetworkError and keeps tokens when the network drops on the 401 retry request', async () => {
     const unauthorized = { status: 401, ok: false } as Response;
     const fetchMock = jest
@@ -180,7 +180,7 @@ describe('AuthService.fetchWithAuth', () => {
     expect(await AuthService.hasRefreshToken()).toBe(true);
   });
 
-  // task_cab7: an expiring/expired access token with the server unreachable must
+  // An expiring/expired access token with the server unreachable must
   // surface a retryable NetworkError, not 'Session expired', and must not log
   // the user out.
   it('rejects with a NetworkError (not "Session expired") and keeps tokens when offline with an expiring token', async () => {
@@ -205,7 +205,7 @@ describe('AuthService.fetchWithAuth', () => {
     expect(await AuthService.hasRefreshToken()).toBe(true);
   });
 
-  // task_c87c: the gap task_cab7 deliberately left — the request fetch itself
+  // The gap the offline-logout fix deliberately left — the request fetch itself
   // (after the token check passes with a still-valid token) must also surface
   // a NetworkError when the server is unreachable, not a bare TypeError.
   it('rejects with a NetworkError (not a bare TypeError) when offline with a valid, unexpired token', async () => {
@@ -231,7 +231,7 @@ describe('AuthService.fetchWithAuth', () => {
     await expect(AuthService.fetchWithAuth('https://api.test/x')).rejects.toBeInstanceOf(NetworkError);
   });
 
-  // task_c87c review fix: an aborted fetch can reject with a DOMException,
+  // Review fix: an aborted fetch can reject with a DOMException,
   // which is not an instanceof Error in this test environment (confirmed
   // below) — a guard that only checked `instanceof Error` would miss it and
   // let the raw abort fall through to the 401-retry's session-expired path,
