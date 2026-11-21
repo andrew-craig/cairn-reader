@@ -29,6 +29,7 @@ struct ReadsView: View {
         .headerSearch(query: $search.query, prompt: "Search your reads")
         .refreshable { await model.refresh() }
         .navigationTitle("Reads")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Add link", systemImage: "plus") { isAddingLink = true }

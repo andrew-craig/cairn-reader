@@ -58,6 +58,7 @@ struct AccountView: View {
         .disabled(model.isWorking)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("Account")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .alert(
             model.alert?.title ?? "",
             isPresented: Binding(get: { model.alert != nil }, set: { if !$0 { model.alert = nil } }),
