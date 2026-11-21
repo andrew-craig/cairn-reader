@@ -30,7 +30,8 @@ private struct HeaderSearch: ViewModifier {
                 if isOpen {
                     Field(query: $query, prompt: prompt) { isOpen = false }
                         .padding(.horizontal)
-                        .padding(.vertical, 5)
+                        // Centred on the bar buttons' row and as tall as the bar, so the list does not move.
+                        .padding(.bottom, 2)
                 }
             }
     }
@@ -39,7 +40,8 @@ private struct HeaderSearch: ViewModifier {
 /// A glass capsule holding the search icon and the focused text field, with a glass close circle
 /// to its right. Opening, the capsule stretches leftwards from where the search button was and the
 /// close circle and field fade in; closing clears `query` and plays it in reverse, faster. Reduce
-/// Motion snaps the size and fades the contents.
+/// Motion snaps the stretch and fades the contents; the close circle's arrival still narrows the
+/// capsule during that fade.
 private struct Field: View {
     @Binding var query: String
     let prompt: String
