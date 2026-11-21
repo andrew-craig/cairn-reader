@@ -21,7 +21,7 @@ struct BookmarksView: View {
         .headerSearch(query: $list.query, prompt: "Search your bookmarks")
         .refreshable { await list.refresh() }
         .navigationTitle("Bookmarks")
-        .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbarTitleDisplayMode(.inline)
         // Not `.task`: popping back mid-refresh would cancel it and read as a failure.
         .onAppear {
             Task { await model.appear() }

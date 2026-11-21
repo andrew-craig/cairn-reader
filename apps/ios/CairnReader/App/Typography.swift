@@ -53,13 +53,13 @@ enum Typography {
     /// Like the system bars, the inline title and tab items keep a fixed size (the Large
     /// Content Viewer covers large Dynamic Type sizes) and the large title scales. It gets one
     /// appearance per content size category, so UIKit re-applies it when the size changes.
-    /// Screens use `.toolbarTitleDisplayMode(.inlineLarge)`: a tab root shows the large title in the
-    /// bar's button row; a pushed screen shows it on its own row beneath the back button.
+    /// Tab roots show the large title in the bar's button row (`.toolbarTitleDisplayMode(.inlineLarge)`);
+    /// screens pushed from You always show the inline title (`.toolbarTitleDisplayMode(.inline)`).
     static func applyBarAppearance() {
-        UINavigationBar.appearance().titleTextAttributes = [.font: BrandFont.interSemiBold.uiFont(size: 17)]
+        UINavigationBar.appearance().titleTextAttributes = [.font: BrandFont.interSemiBold.uiFont(size: 22)]
         UITabBarItem.appearance().setTitleTextAttributes([.font: BrandFont.interMedium.uiFont(size: 10)], for: .normal)
 
-        let largeTitle = BrandFont.interBold.uiFont(size: 34)
+        let largeTitle = BrandFont.interBold.uiFont(size: 28)
         let categories: [UIContentSizeCategory] = [
             .extraSmall, .small, .medium, .large, .extraLarge, .extraExtraLarge, .extraExtraExtraLarge,
             .accessibilityMedium, .accessibilityLarge, .accessibilityExtraLarge,

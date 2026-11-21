@@ -40,7 +40,7 @@ struct SubscriptionListView: View {
         .overlay { emptyState }
         .refreshable { await model.load() }
         .navigationTitle(model.kind == .rss ? "RSS" : "Newsletters")
-        .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(model.kind == .rss ? "Add feed" : "Add newsletter", systemImage: "plus") {

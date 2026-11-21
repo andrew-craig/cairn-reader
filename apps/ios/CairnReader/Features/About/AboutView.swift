@@ -17,7 +17,7 @@ struct AboutView: View {
             LabeledContent("Server version", value: serverVersion)
         }
         .navigationTitle("About")
-        .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbarTitleDisplayMode(.inline)
         .task { serverVersion = await Self.serverVersionText(systemService) }
     }
 
