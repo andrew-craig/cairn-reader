@@ -185,7 +185,7 @@ Future Considerations
 * OAuth2/OpenID Connect support for third-party authentication
 * Multi-factor authentication (MFA)
 * Email verification workflow (token generation/consumption and `email_verified` exist; no email is sent yet)
-* Password reset functionality
+* Password reset functionality — beta prerequisite, tracked in Linear AND-64
 * Account lockout after failed attempts
 * Remember device functionality​​​​​​​​​​​​​​​​
 

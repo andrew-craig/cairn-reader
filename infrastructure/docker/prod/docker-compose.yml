@@ -132,7 +132,7 @@ services:
   # Consolidated PostgreSQL Database
   # Single container hosting all service databases (separate logical DBs)
   #
-  # Connection budget (I-6 fix — see docs/architecture/audit/06_infra.md):
+  # Connection budget:
   #   user-service         15
   #   content-service      15
   #   ingest-rss           15
