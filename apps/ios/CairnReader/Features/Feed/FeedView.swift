@@ -26,6 +26,7 @@ struct FeedView: View {
         .headerSearch(query: $list.query, prompt: "Search your feed")
         .refreshable { await list.refresh() }
         .navigationTitle("Feed")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .navigationDestination(for: Route.self) { RouteDestination($0, nextArticle: model.article(after:)) }
         .task { await model.observeSaved() }
         // Not `.task`: leaving the tab mid-refresh would cancel it and read as a failure.

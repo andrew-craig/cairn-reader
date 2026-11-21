@@ -38,6 +38,7 @@ struct YouView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("You")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .navigationDestination(for: Route.self, destination: RouteDestination.init)
         // Not `.task`: leaving the tab mid-fetch would cancel it and show a failure.
         .onAppear {
