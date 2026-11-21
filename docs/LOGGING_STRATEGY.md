@@ -22,7 +22,7 @@ The shared `pkg/logging` package exists and all HTTP services use `log/slog` wit
 
 | Item | Where | Status |
 |------|-------|--------|
-| `log.Printf` in env-parsing helpers | `services/read/content/cmd/worker/main.go` (lines 163, 177) | Open - runs after the slog logger is configured, should use `slog.Warn` |
+| `log.Printf` in env-parsing helpers | `services/read/content/cmd/worker/main.go` (lines 165, 179) | Open - runs after the slog logger is configured, should use `slog.Warn` |
 | `log.Printf` / `log.Fatalf` in example program | `pkg/auth/examples/basic/main.go` | Open, low priority - sample code, not a service |
 | `log.*` / `fmt.Print*` in CLI tools | `services/read/email/cmd/manage_keys/main.go`, `services/users/cmd/migrate/main.go`, `cmd/selfhost/version.go` | Intentional - interactive command output, not service logs |
 | Log aggregation (e.g., CloudWatch, Datadog) | - | Not configured |

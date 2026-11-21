@@ -448,7 +448,7 @@ Future enhancements planned:
 
 For issues, questions, or contributions:
 
-- **Issues**: [GitHub Issues](https://github.com/andrew-craig/cairn-reader/services/read/issues)
+- **Issues**: [GitHub Issues](https://github.com/andrew-craig/cairn-reader/issues)
 - **Documentation**: See `/docs` directory
 - **Architecture**: [../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
 

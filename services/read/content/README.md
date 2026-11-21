@@ -89,8 +89,9 @@ curl http://localhost:8083/health/ready   # includes DB check
 
 If `type` is omitted the service detects it. Request and response shapes are in [api/openapi.yaml](api/openapi.yaml).
 
-The mobile and web "Add" flow calls `/detect` first and submits with the detected type hint
-(see `apps/mobile/src/components/AddLinkModal.tsx`).
+The Add flow in the web, Android and iOS apps calls `/detect` first and submits with the detected type hint
+(see `apps/web/src/components/AddLinkModal.tsx`, `apps/mobile/src/components/AddLinkModal.tsx`,
+`apps/ios/CairnReader/Features/AddLink/AddLinkModel.swift`).
 
 ## API Endpoints
 
@@ -107,8 +108,8 @@ table with auth requirements is in [../CLAUDE.md](/services/read/CLAUDE.md).
 
 ### Dependencies
 
-- Go 1.21+
-- PostgreSQL 15+
+- Go 1.25+ (see `../go.mod`)
+- PostgreSQL 18 (dev stack image)
 - golang-migrate (for migrations)
 
 ### Testing

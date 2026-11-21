@@ -31,7 +31,7 @@ This document is a **playbook, not a report**. It tells an engineer (or agent) w
 
 ### 1.1 The primary source: the existing review
 
-Do **not** start by re-auditing the codebase. A three-pass deep review already exists in [CODE_QUALITY_REVIEW.md](/docs/CODE_QUALITY_REVIEW.md) with ~50 findings, each with file:line evidence, severity, and often a repro. As of 2026-10-15 the wave plan in [§1.3](#13-the-wave-plan) is largely done: 30 of its 33 rows are ticked, and 3 are open (P2-C4 deploy decision, fetch dedup, env parsing). The backlog below *is* the review, ordered; findings that were Explore-only are archived in [explore_code_quality_findings.md](/docs/archive/explore_code_quality_findings.md) (Explore was removed in #425).
+Do **not** start by re-auditing the codebase. A three-pass deep review already exists in [CODE_QUALITY_REVIEW.md](/docs/CODE_QUALITY_REVIEW.md) with ~50 findings, each with file:line evidence, severity, and often a repro. As of 2026-10-15 the wave plan in [§1.3](#13-the-wave-plan) is largely done: 32 of its 33 rows are ticked, and 2 are open (fetch dedup, env parsing). The backlog below *is* the review, ordered; findings that were Explore-only are archived in [explore_code_quality_findings.md](/docs/archive/explore_code_quality_findings.md) (Explore was removed in #425).
 
 Read the review's finding text in full before starting its task — this document only carries the ID, a one-line summary, and the recipe to apply.
 
@@ -96,7 +96,7 @@ The RSS/email→content write path fails under *normal* traffic. These need real
 | [x] #347 | Sentinel bug | Routine token expiry logs at ERROR (wrong sentinel: `auth.ErrTokenExpired` vs `apperrors.ErrTokenExpired`) — makes error-rate monitoring useless | 2 | [R6](#r6--operational-fixes) |
 | [x] #411 | Worker liveness | Outbox/fetcher workers: heartbeat log + `recover()` in loop + circuit-breaker state via slog (currently `fmt.Printf`) | 2 | [R6](#r6--operational-fixes) |
 | [x] #403 | Readiness | Self-host `/health/ready` checks only 3 of 6 DBs → reports healthy while half the system is down (and CI smoke-curls it → false green) | 2 | [R6](#r6--operational-fixes) |
-| [ ] | P2-C4 | Decide the prod deploy story: image publishing is `if: false`, Vault init misses two AppRoles, dev compose broken for content-service. Either fix `prod/` or delete it and document selfhost as the only path | 2 | needs owner decision — write up options in the task, ask |
+| [x] #479 | P2-C4 | Decide the prod deploy story: image publishing is `if: false`, Vault init misses two AppRoles, dev compose broken for content-service. Either fix `prod/` or delete it and document selfhost as the only path (resolved: prod stack made deployable, AND-38) | 2 | needs owner decision — write up options in the task, ask |
 
 #### Wave 4 — Consolidation (make fixes land once)
 
@@ -290,7 +290,7 @@ Consolidation deletes code; the risk is silent behavior change. Sequence per dup
 
 - [ ] Finding re-verified on current `main` before work started (or task closed as stale).
 - [ ] A test exists that failed before the fix and passes after, at the level §2.2 prescribes.
-- [ ] Relevant §2.4 verification suite green locally (including web checks until web CI exists).
+- [ ] Relevant §2.4 verification suite green locally (including web checks).
 - [ ] Docs touched by the change updated: service `openapi.yaml`, service `CLAUDE.md` route tables, `docs/ARCHITECTURE.md` if a boundary changed.
 - [ ] Ledger row in §1.3 ticked with PR number; Linear issue closed.
 - [ ] PR description: finding ID, what the failing test proves, any behavior deliberately changed.

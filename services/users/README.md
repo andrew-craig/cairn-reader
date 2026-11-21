@@ -151,13 +151,13 @@ curl http://localhost:8082/health/ready
 # Register user
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"securepass123"}' \
+  -d '{"email":"user@example.com","password":"Testpass123!"}' \
   http://localhost:8082/api/v1/auth/register
 
 # Login
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"securepass123"}' \
+  -d '{"email":"user@example.com","password":"Testpass123!"}' \
   http://localhost:8082/api/v1/auth/login
 
 # Refresh token

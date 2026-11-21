@@ -1,6 +1,6 @@
 # Cairn Explore - Product Requirements (Archived)
 
-> **Archived.** The Explore tab and its backend were removed in #425 (Oct 2026). This content was moved out of `docs/product_requirements.md` unchanged, for historical reference. It does not describe shipped behaviour. See also [explore_service_requirements.md](explore_service_requirements.md) and [explore_web_app_requirements.md](explore_web_app_requirements.md).
+> **Archived.** The Explore tab and its backend were removed in #425 (Oct 2026). This content was moved out of `docs/product_requirements.md` unchanged, for historical reference. It does not describe shipped behaviour. See also [explore_web_app_requirements.md](explore_web_app_requirements.md).
 
 ## Product Overview (Explore)
 

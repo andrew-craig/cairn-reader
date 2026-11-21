@@ -1,16 +1,17 @@
 # Cairn
 
-A modern read-it-later application with a React Native mobile app, a React web app and Go-based backend services for content ingestion, storage, and user management.
+A modern read-it-later application with a native iOS app, a React Native Android app, a React web app and Go-based backend services for content ingestion, storage, and user management.
 
 ## Overview
 
 Cairn is a monorepo containing:
-- **Mobile App**: React Native application for iOS and Android
+- **iOS App**: native Swift/SwiftUI application (`apps/ios`)
+- **Android App**: React Native (Expo) application (`apps/mobile`, Android only)
 - **Web App**: React/Vite browser client with the same Feed, Reads and You structure
 - **Backend Services**: Go microservices for content management and ingestion
 - **Infrastructure**: Docker configuration and deployment scripts
 
-### Mobile App Features
+### App Features
 
 - 📚 Save articles for later reading
 - ⭐ Mark articles as favorites
@@ -32,13 +33,17 @@ Cairn is a monorepo containing:
 
 ## Tech Stack
 
-### Mobile App
+### Android App
 - **Framework**: React Native with Expo
 - **Navigation**: React Navigation (Stack & Bottom Tabs)
 - **Language**: TypeScript
 - **Storage**: AsyncStorage and SQLite (`expo-sqlite`)
 - **UI**: React Native core components
 - **Icons**: Expo Vector Icons (Ionicons)
+
+### iOS App
+- **Language**: Swift 6, SwiftUI (iOS 26 minimum)
+- **Storage**: SQLite through GRDB
 
 ### Backend Services
 - **Language**: Go 1.25+
@@ -52,9 +57,10 @@ Cairn is a monorepo containing:
 ```
 cairn/
 ├── apps/
-│   ├── mobile/              # React Native (Expo) mobile app
+│   ├── ios/                 # Native Swift/SwiftUI iOS app
+│   ├── mobile/              # React Native (Expo) Android app
 │   ├── web/                 # React (Vite) web app
-│   └── shared/              # @cairn/shared: API config layer and types used by mobile and web
+│   └── shared/              # @cairn/shared: API config layer and types used by Android and web
 │
 ├── services/
 │   ├── read/                # Read Service (Go module with several binaries)
@@ -82,7 +88,7 @@ cairn/
 
 - Node.js (v16 or later)
 - npm or yarn
-- Expo CLI (optional, but recommended)
+- Xcode 26 (for the iOS app, on macOS)
 - Go 1.25+ (for backend services)
 - Docker & Docker Compose (for running backend services)
 - PostgreSQL 14+ (if running services locally without Docker)
@@ -127,7 +133,11 @@ POSTGRES_DB=database_name
 VAULT_DEV_ROOT_TOKEN_ID=your_vault_token_here
 ```
 
-### Mobile App Development
+### iOS App Development
+
+The native app lives in `apps/ios` and is built with Xcode (open `apps/ios/CairnReader.xcodeproj`). See [apps/ios/CLAUDE.md](apps/ios/CLAUDE.md) for layout, build and test instructions.
+
+### Android App Development
 
 1. Navigate to the mobile app directory:
 
@@ -147,13 +157,7 @@ npm install
 npm start
 ```
 
-4. Run on iOS simulator:
-
-```bash
-npm run ios
-```
-
-5. Run on Android emulator:
+4. Run on Android emulator:
 
 ```bash
 npm run android
@@ -161,11 +165,9 @@ npm run android
 
 #### Using Expo Go
 
-1. Install Expo Go on your iOS or Android device
+1. Install Expo Go on your Android device
 2. Run `npm start` to start the development server
-3. Scan the QR code with:
-   - iOS: Camera app
-   - Android: Expo Go app
+3. Scan the QR code with the Expo Go app
 
 ### Backend Services Development
 
@@ -207,9 +209,9 @@ Features:
 
 See the [User Service README](services/users/README.md) for detailed documentation.
 
-## Mobile App Screens
+## Android App Screens
 
-Navigation lives in `apps/mobile/src/navigation`: a root stack (`RootNavigator`) wrapping a bottom tab navigator (`TabNavigator`) with three tabs, **Feed | Reads | You**. Screens are in `apps/mobile/src/screens`.
+The native iOS app has the same Feed, Reads and You structure (`apps/ios/CairnReader/Features`). In the Android app, navigation lives in `apps/mobile/src/navigation`: a root stack (`RootNavigator`) wrapping a bottom tab navigator (`TabNavigator`) with three tabs, **Feed | Reads | You**. Screens are in `apps/mobile/src/screens`.
 
 ### Tabs
 - **Feed** (`FeedScreen`): skim list of items from sources routed to Feed. Online-only; non-favorited items expire after 30 days.
@@ -226,15 +228,15 @@ Navigation lives in `apps/mobile/src/navigation`: a root stack (`RootNavigator`)
 
 ## Data Model
 
-The `Article` type, along with the auth and Read service API types, is shared by the mobile and web clients and defined in `apps/shared/src/types` (`article.ts`, `auth.ts`, `read.ts`, exported from `@cairn/shared`).
+The `Article` type, along with the auth and Read service API types, is shared by the Android and web clients and defined in `apps/shared/src/types` (`article.ts`, `auth.ts`, `read.ts`, exported from `@cairn/shared`).
 
 ## Theme
 
-The app supports both light and dark modes, automatically following the system preference. Color schemes are defined in `src/constants/theme.ts`.
+The apps support both light and dark modes, automatically following the system preference. Colors come from one source, `design/tokens/colors.json`, see [design/tokens/README.md](design/tokens/README.md). The Android app's theme is in `apps/mobile/src/constants/theme.ts`.
 
 ## Architecture
 
-Cairn follows a microservices architecture: the mobile and web clients call the User Service (auth) and the Read services over REST, and each service owns its own logical database in a single PostgreSQL instance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams, ports and data flows.
+Cairn follows a microservices architecture: the iOS, Android and web clients call the User Service (auth) and the Read services over REST, and each service owns its own logical database in a single PostgreSQL instance. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams, ports and data flows.
 
 ### Service Communication
 - All services expose REST APIs; services never access each other's databases
@@ -251,7 +253,7 @@ npm run dev          # Vite dev server
 npm test             # Vitest
 ```
 
-### Mobile App Development
+### Android App Development
 
 #### Type Checking
 
@@ -265,22 +267,6 @@ npm run type-check
 ```bash
 cd apps/mobile
 npm run lint
-```
-
-#### Building for Production
-
-##### iOS
-
-```bash
-cd apps/mobile
-expo build:ios
-```
-
-##### Android
-
-```bash
-cd apps/mobile
-expo build:android
 ```
 
 ### Backend Services Development

@@ -39,7 +39,7 @@ Run from the repo root with `-w @cairn/web` (npm workspace), or from `apps/web`:
 ## Colors
 
 Never hardcode a color; use the `--color-*` variables. They are generated into `src/theme/colors.css` from
-[design/tokens/colors.json](/design/tokens/README.md), the palette shared with the mobile app; add or change a color
+[design/tokens/colors.json](/design/tokens/README.md), the palette shared with the Android and iOS apps; add or change a color
 there and regenerate.
 
 ## Testing
