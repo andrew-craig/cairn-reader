@@ -76,14 +76,16 @@ private struct Field: View {
             .glassEffect(in: Capsule())
             .frame(maxWidth: .infinity, alignment: .trailing)
 
-            Button("Close search", image: .close, action: close)
-                .labelStyle(.iconOnly)
-                .foregroundStyle(Color(.text))
-                .frame(width: Self.size, height: Self.size)
-                .contentShape(Circle())
-                .glassEffect(.regular.interactive(), in: Circle())
-                .opacity(showsContents ? 1 : 0)
-                .scaleEffect(showsContents ? 1 : 0.6)
+            // Out of the layout until shown, so the collapsed capsule sits where the search button was.
+            if showsContents {
+                Button("Close search", image: .close, action: close)
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(Color(.text))
+                    .frame(width: Self.size, height: Self.size)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .transition(.opacity.combined(with: .scale(scale: 0.6)))
+            }
         }
         .onAppear(perform: open)
     }
