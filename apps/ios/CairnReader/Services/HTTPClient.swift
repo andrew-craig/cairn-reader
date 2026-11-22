@@ -102,9 +102,14 @@ nonisolated struct HTTPClient: Sendable {
     private func makeURLRequest(_ request: HTTPRequest) throws -> URLRequest {
         var url = server.url.appending(path: request.path)
         if !request.query.isEmpty {
-            // Encodes `+` as `%2B` (base64 cursors contain it); `URLComponents.queryItems` would
-            // leave it raw and Go would read it as a space. Covered by HTTPClientTests.
-            url.append(queryItems: request.query)
+            // Encodes everything but unreserved characters ourselves: Foundation leaves `+` raw
+            // (base64 cursors and searches contain it) and Go reads it as a space. Covered by
+            // HTTPClientTests.
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            components.percentEncodedQueryItems = request.query.map {
+                URLQueryItem(name: Self.encodeQuery($0.name), value: $0.value.map(Self.encodeQuery))
+            }
+            url = components.url!
         }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
@@ -125,6 +130,14 @@ nonisolated struct HTTPClient: Sendable {
     private struct ErrorBody: Decodable {
         let error: String?
         let message: String?
+    }
+
+    /// RFC 3986 unreserved characters; everything else in a query name or value is percent-encoded.
+    private static let queryUnreserved = CharacterSet(
+        charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    private static func encodeQuery(_ text: String) -> String {
+        text.addingPercentEncoding(withAllowedCharacters: queryUnreserved)!
     }
 
     static let decoder: JSONDecoder = {
