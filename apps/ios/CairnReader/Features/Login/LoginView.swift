@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LoginView: View {
     @Bindable var model: LoginModel
+    @State private var showsServerSheet = false
 
     var body: some View {
         Form {
@@ -45,23 +46,23 @@ struct LoginView: View {
                     Text(message).foregroundStyle(Color(.error))
                 }
             }
-
-            Section {
-                DisclosureGroup("Advanced") {
-                    TextField("https://your-server.example.com", text: $model.serverURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Text("Point the app at a self-hosted Cairn server. Leave empty for the default.")
-                        .font(Typography.caption)
-                        .foregroundStyle(Color(.textSecondary))
-                    Button("Save server") {
-                        Task { await model.saveServer() }
-                    }
-                }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 4) {
+                Text("Powered by")
+                Button("cairnreader.app") { showsServerSheet = true }
+                    .buttonStyle(.plain)
+                    .underline()
+                    .accessibilityHint("Choose the server")
             }
+            .font(Typography.subheadline)
+            .foregroundStyle(Color(.textSecondary))
+            .padding(.vertical, 8)
         }
         .disabled(model.isWorking)
-        .scrollDismissesKeyboard(.interactively)
+        .sheet(isPresented: $showsServerSheet) {
+            ServerSheet(model: model)
+        }
     }
 }
