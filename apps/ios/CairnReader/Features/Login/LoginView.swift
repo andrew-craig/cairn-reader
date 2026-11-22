@@ -54,8 +54,9 @@ struct LoginView: View {
                 Button("cairnreader.app") { showsServerSheet = true }
                     .buttonStyle(.plain)
                     .underline()
-                    .accessibilityHint("Choose the server")
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Choose the server")
             .font(Typography.subheadline)
             .foregroundStyle(Color(.textSecondary))
             .padding(.vertical, 8)
