@@ -49,13 +49,16 @@ struct LoginView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 4) {
-                Text("Powered by")
-                Button("cairnreader.app") { showsServerSheet = true }
-                    .buttonStyle(.plain)
-                    .underline()
+            // One button for the whole line, so VoiceOver reads it as a single button.
+            Button {
+                showsServerSheet = true
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Powered by")
+                    Text("cairnreader.app").underline()
+                }
             }
-            .accessibilityElement(children: .combine)
+            .buttonStyle(.plain)
             .accessibilityHint("Choose the server")
             .font(Typography.subheadline)
             .foregroundStyle(Color(.textSecondary))
