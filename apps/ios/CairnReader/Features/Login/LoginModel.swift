@@ -53,6 +53,14 @@ final class LoginModel {
         serverURL = server.url.absoluteString
     }
 
+    var isDefaultServer: Bool { server.url == ServerConfig.defaultURL }
+
+    /// Goes back to the default server (clearing the session if that changes the server).
+    func resetServer() async {
+        serverURL = ""
+        await saveServer()
+    }
+
     private func credentials() -> (email: String, password: String)? {
         let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !email.isEmpty, !password.isEmpty else {

@@ -146,4 +146,15 @@ struct LoginModelTests {
         #expect(h.config.url == ServerConfig.defaultURL)
         #expect(h.model.serverURL == ServerConfig.defaultURL.absoluteString)
     }
+
+    @Test func resetServerRestoresTheDefaultAndClearsTheSession() async {
+        let h = Harness(StubServer(replies: []), session: AuthFixtures.valid)
+        _ = h.config.setURL("https://selfhost.example.com")
+        #expect(!h.model.isDefaultServer)
+        await h.model.resetServer()
+        #expect(h.config.url == ServerConfig.defaultURL)
+        #expect(h.model.serverURL == ServerConfig.defaultURL.absoluteString)
+        #expect(h.model.isDefaultServer)
+        #expect(h.storage.session == nil)
+    }
 }
