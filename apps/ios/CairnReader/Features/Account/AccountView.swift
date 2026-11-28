@@ -48,7 +48,8 @@ struct AccountView: View {
                 Button("Log out", role: .destructive) {
                     isConfirmingLogout = true
                 }
-                .confirmationDialog("Log out?", isPresented: $isConfirmingLogout, titleVisibility: .visible) {
+                .alert("Log out?", isPresented: $isConfirmingLogout) {
+                    Button("Cancel", role: .cancel) {}
                     Button("Log out", role: .destructive) {
                         Task { await sessionModel.logout() }
                     }
